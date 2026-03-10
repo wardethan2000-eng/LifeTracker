@@ -1,0 +1,12 @@
+node_modules
+.turbo
+dist
+build
+.next
+.expo
+.expo-shared
+coverage
+*.log
+.env
+.env.local
+apps/api/generated

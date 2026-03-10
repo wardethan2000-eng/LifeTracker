@@ -1,0 +1,51 @@
+import type { Asset, Prisma, PrismaClient } from "@prisma/client";
+
+export class ForbiddenError extends Error {
+  constructor(message = "FORBIDDEN") {
+    super(message);
+  }
+}
+
+export const membershipWhere = (householdId: string, userId: string) => ({
+  householdId,
+  userId
+});
+
+export const accessibleAssetWhere = (assetId: string, userId: string): Prisma.AssetWhereInput => ({
+  id: assetId,
+  household: {
+    members: {
+      some: {
+        userId
+      }
+    }
+  },
+  OR: [
+    { visibility: "shared" },
+    { createdById: userId }
+  ]
+});
+
+export const assertMembership = async (
+  prisma: PrismaClient,
+  householdId: string,
+  userId: string
+): Promise<void> => {
+  const membership = await prisma.householdMember.findUnique({
+    where: {
+      householdId_userId: membershipWhere(householdId, userId)
+    }
+  });
+
+  if (!membership) {
+    throw new ForbiddenError();
+  }
+};
+
+export const getAccessibleAsset = async (
+  prisma: PrismaClient,
+  assetId: string,
+  userId: string
+): Promise<Asset | null> => prisma.asset.findFirst({
+  where: accessibleAssetWhere(assetId, userId)
+});

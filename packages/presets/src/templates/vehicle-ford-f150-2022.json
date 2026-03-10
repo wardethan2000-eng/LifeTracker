@@ -1,0 +1,34 @@
+{
+  "key": "vehicle-ford-f150-2022",
+  "label": "2022 Ford F-150",
+  "category": "vehicle",
+  "manufacturer": "Ford",
+  "model": "F-150",
+  "suggestedCustomFields": [
+    { "key": "engine", "label": "Engine", "type": "string" },
+    { "key": "drivetrain", "label": "Drivetrain", "type": "string" }
+  ],
+  "schedules": [
+    {
+      "name": "Engine oil and filter",
+      "triggerConfig": {
+        "type": "compound",
+        "intervalDays": 180,
+        "metricId": "odometer",
+        "intervalValue": 5000,
+        "logic": "whichever_first",
+        "leadTimeDays": 14,
+        "leadTimeValue": 250
+      }
+    },
+    {
+      "name": "Tire rotation",
+      "triggerConfig": {
+        "type": "usage",
+        "metricId": "odometer",
+        "intervalValue": 7500,
+        "leadTimeValue": 500
+      }
+    }
+  ]
+}

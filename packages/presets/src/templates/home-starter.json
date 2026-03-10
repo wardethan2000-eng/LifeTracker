@@ -1,0 +1,28 @@
+{
+  "key": "home-starter",
+  "label": "Starter Home Maintenance",
+  "category": "home",
+  "suggestedCustomFields": [
+    { "key": "squareFootage", "label": "Square Footage", "type": "number" },
+    { "key": "yearBuilt", "label": "Year Built", "type": "number" }
+  ],
+  "schedules": [
+    {
+      "name": "Replace HVAC filter",
+      "triggerConfig": {
+        "type": "interval",
+        "intervalDays": 90,
+        "leadTimeDays": 7
+      }
+    },
+    {
+      "name": "Winterize exterior faucets",
+      "triggerConfig": {
+        "type": "seasonal",
+        "month": 10,
+        "day": 15,
+        "leadTimeDays": 14
+      }
+    }
+  ]
+}
