@@ -9,4 +9,5 @@ coverage
 *.log
 .env
 .env.local
+*.tsbuildinfo
 apps/api/generated
