@@ -8,6 +8,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { enqueueNotificationScan } from "../../lib/queues.js";
 import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
@@ -129,6 +130,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    await enqueueNotificationScan({ householdId: asset.householdId });
+
     return reply.code(201).send(toMaintenanceScheduleResponse(schedule));
   });
 
@@ -233,6 +236,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Maintenance schedule not found." });
     }
 
+    await enqueueNotificationScan({ householdId: asset.householdId });
+
     return reply.code(201).send({
       log: toMaintenanceLogResponse(result.log),
       schedule: toMaintenanceScheduleResponse(result.schedule)
@@ -332,6 +337,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Maintenance schedule not found." });
     }
 
+    await enqueueNotificationScan({ householdId: asset.householdId });
+
     return toMaintenanceScheduleResponse(schedule);
   });
 
@@ -357,6 +364,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     await app.prisma.maintenanceSchedule.delete({
       where: { id: existing.id }
     });
+
+    await enqueueNotificationScan({ householdId: asset.householdId });
 
     return reply.code(204).send();
   });

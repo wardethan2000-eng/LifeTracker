@@ -42,6 +42,28 @@ export const assertMembership = async (
   }
 };
 
+export const getMembership = async (
+  prisma: PrismaClient,
+  householdId: string,
+  userId: string
+) => prisma.householdMember.findUnique({
+  where: {
+    householdId_userId: membershipWhere(householdId, userId)
+  }
+});
+
+export const assertOwner = async (
+  prisma: PrismaClient,
+  householdId: string,
+  userId: string
+): Promise<void> => {
+  const membership = await getMembership(prisma, householdId, userId);
+
+  if (!membership || membership.role !== "owner") {
+    throw new ForbiddenError();
+  }
+};
+
 export const getAccessibleAsset = async (
   prisma: PrismaClient,
   assetId: string,

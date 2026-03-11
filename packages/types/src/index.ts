@@ -14,6 +14,8 @@ export const assetCategoryValues = [
 
 export const assetVisibilityValues = ["shared", "personal"] as const;
 export const householdRoleValues = ["owner", "member"] as const;
+export const authSourceValues = ["clerk", "dev-bypass"] as const;
+export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "announcement"] as const;
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
@@ -32,6 +34,8 @@ export const customFieldTemplateTypeValues = [
 export const assetCategorySchema = z.enum(assetCategoryValues);
 export const assetVisibilitySchema = z.enum(assetVisibilityValues);
 export const householdRoleSchema = z.enum(householdRoleValues);
+export const authSourceSchema = z.enum(authSourceValues);
+export const notificationTypeSchema = z.enum(notificationTypeValues);
 export const triggerTypeSchema = z.enum(triggerTypeValues);
 export const notificationChannelSchema = z.enum(notificationChannelValues);
 export const notificationStatusSchema = z.enum(notificationStatusValues);
@@ -305,6 +309,141 @@ export const assetSchema = z.object({
   updatedAt: z.string().datetime()
 });
 
+export const notificationPreferencesSchema = z.object({
+  pauseAll: z.boolean().default(false),
+  enabledChannels: z.array(notificationChannelSchema).min(1).default(["push"]),
+  preferDigest: z.boolean().default(false)
+});
+
+export const userProfileSchema = z.object({
+  id: z.string().cuid(),
+  clerkUserId: z.string(),
+  email: z.string().email().nullable(),
+  displayName: z.string().nullable(),
+  notificationPreferences: notificationPreferencesSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createHouseholdSchema = z.object({
+  name: z.string().min(1).max(120)
+});
+
+export const updateHouseholdSchema = z.object({
+  name: z.string().min(1).max(120).optional()
+});
+
+export const householdSummarySchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  createdById: z.string().cuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  memberCount: z.number().int().min(0),
+  myRole: householdRoleSchema
+});
+
+export const addHouseholdMemberSchema = z.object({
+  userId: z.string().cuid().optional(),
+  clerkUserId: z.string().min(1).max(255).optional(),
+  email: z.string().email().optional(),
+  role: householdRoleSchema.default("member")
+}).superRefine((value, context) => {
+  if (!value.userId && !value.clerkUserId && !value.email) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["userId"],
+      message: "Provide userId, clerkUserId, or email when adding a household member."
+    });
+  }
+});
+
+export const updateHouseholdMemberSchema = z.object({
+  role: householdRoleSchema.optional()
+});
+
+export const householdMemberSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  userId: z.string().cuid(),
+  role: householdRoleSchema,
+  joinedAt: z.string().datetime(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  user: userProfileSchema
+});
+
+export const meResponseSchema = z.object({
+  user: userProfileSchema,
+  auth: z.object({
+    source: authSourceSchema,
+    clerkUserId: z.string().nullable()
+  }),
+  households: z.array(householdSummarySchema)
+});
+
+export const notificationPayloadSchema = z.record(z.string(), z.unknown());
+
+export const notificationSchema = z.object({
+  id: z.string().cuid(),
+  userId: z.string().cuid(),
+  householdId: z.string().cuid().nullable(),
+  assetId: z.string().cuid().nullable(),
+  scheduleId: z.string().cuid().nullable(),
+  dedupeKey: z.string(),
+  type: notificationTypeSchema,
+  channel: notificationChannelSchema,
+  status: notificationStatusSchema,
+  title: z.string(),
+  body: z.string(),
+  scheduledFor: z.string().datetime(),
+  sentAt: z.string().datetime().nullable(),
+  readAt: z.string().datetime().nullable(),
+  escalationLevel: z.number().int().min(0),
+  payload: notificationPayloadSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const updateNotificationPreferencesSchema = notificationPreferencesSchema.partial();
+
+export const assetOverviewSchema = z.object({
+  asset: assetSchema,
+  dueScheduleCount: z.number().int().min(0),
+  overdueScheduleCount: z.number().int().min(0),
+  nextDueAt: z.string().datetime().nullable(),
+  lastCompletedAt: z.string().datetime().nullable()
+});
+
+export const dueWorkItemSchema = z.object({
+  assetId: z.string().cuid(),
+  assetName: z.string(),
+  assetCategory: assetCategorySchema,
+  scheduleId: z.string().cuid(),
+  scheduleName: z.string(),
+  status: scheduleStatusSchema,
+  nextDueAt: z.string().datetime().nullable(),
+  nextDueMetricValue: z.number().nullable(),
+  currentMetricValue: z.number().nullable(),
+  metricUnit: z.string().nullable(),
+  summary: z.string()
+});
+
+export const householdDashboardStatsSchema = z.object({
+  assetCount: z.number().int().min(0),
+  dueScheduleCount: z.number().int().min(0),
+  overdueScheduleCount: z.number().int().min(0),
+  unreadNotificationCount: z.number().int().min(0)
+});
+
+export const householdDashboardSchema = z.object({
+  household: householdSummarySchema,
+  stats: householdDashboardStatsSchema,
+  dueWork: z.array(dueWorkItemSchema),
+  assets: z.array(assetOverviewSchema),
+  notifications: z.array(notificationSchema)
+});
+
 export const createMaintenanceScheduleSchema = z.object({
   assetId: z.string().cuid(),
   name: z.string().min(1).max(120),
@@ -394,9 +533,20 @@ export const maintenanceLogSchema = z.object({
   updatedAt: z.string().datetime()
 });
 
+export const assetDetailResponseSchema = z.object({
+  asset: assetSchema,
+  metrics: z.array(usageMetricResponseSchema),
+  schedules: z.array(maintenanceScheduleSchema),
+  recentLogs: z.array(maintenanceLogSchema),
+  dueScheduleCount: z.number().int().min(0),
+  overdueScheduleCount: z.number().int().min(0)
+});
+
 export type AssetCategory = z.infer<typeof assetCategorySchema>;
 export type AssetVisibility = z.infer<typeof assetVisibilitySchema>;
 export type HouseholdRole = z.infer<typeof householdRoleSchema>;
+export type AuthSource = z.infer<typeof authSourceSchema>;
+export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type TriggerType = z.infer<typeof triggerTypeSchema>;
 export type NotificationChannel = z.infer<typeof notificationChannelSchema>;
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>;
@@ -427,6 +577,23 @@ export type UsageMetric = z.infer<typeof usageMetricResponseSchema>;
 export type CreateAssetInput = z.infer<typeof createAssetSchema>;
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
 export type Asset = z.infer<typeof assetSchema>;
+export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
+export type UserProfile = z.infer<typeof userProfileSchema>;
+export type CreateHouseholdInput = z.infer<typeof createHouseholdSchema>;
+export type UpdateHouseholdInput = z.infer<typeof updateHouseholdSchema>;
+export type HouseholdSummary = z.infer<typeof householdSummarySchema>;
+export type AddHouseholdMemberInput = z.infer<typeof addHouseholdMemberSchema>;
+export type UpdateHouseholdMemberInput = z.infer<typeof updateHouseholdMemberSchema>;
+export type HouseholdMember = z.infer<typeof householdMemberSchema>;
+export type MeResponse = z.infer<typeof meResponseSchema>;
+export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
+export type Notification = z.infer<typeof notificationSchema>;
+export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesSchema>;
+export type AssetOverview = z.infer<typeof assetOverviewSchema>;
+export type DueWorkItem = z.infer<typeof dueWorkItemSchema>;
+export type HouseholdDashboardStats = z.infer<typeof householdDashboardStatsSchema>;
+export type HouseholdDashboard = z.infer<typeof householdDashboardSchema>;
+export type AssetDetailResponse = z.infer<typeof assetDetailResponseSchema>;
 export type CreateMaintenanceScheduleInput = z.infer<typeof createMaintenanceScheduleSchema>;
 export type UpdateMaintenanceScheduleInput = z.infer<typeof updateMaintenanceScheduleSchema>;
 export type MaintenanceSchedule = z.infer<typeof maintenanceScheduleSchema>;

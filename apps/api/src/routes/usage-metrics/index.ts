@@ -1,12 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import {
   createUsageMetricSchema,
-  usageMetricResponseSchema,
   updateUsageMetricSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { enqueueNotificationScan } from "../../lib/queues.js";
+import { toUsageMetricResponse } from "../../lib/presenters.js";
 import { recalculateAssetSchedules } from "../../lib/schedule-state.js";
 
 const assetParamsSchema = z.object({
@@ -15,22 +16,6 @@ const assetParamsSchema = z.object({
 
 const metricParamsSchema = assetParamsSchema.extend({
   metricId: z.string().cuid()
-});
-
-const toUsageMetricResponse = (metric: {
-  id: string;
-  assetId: string;
-  name: string;
-  unit: string;
-  currentValue: number;
-  lastRecordedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => usageMetricResponseSchema.parse({
-  ...metric,
-  lastRecordedAt: metric.lastRecordedAt?.toISOString() ?? null,
-  createdAt: metric.createdAt.toISOString(),
-  updatedAt: metric.updatedAt.toISOString()
 });
 
 export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
@@ -72,6 +57,7 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
 
     const metric = await app.prisma.usageMetric.create({ data });
     await recalculateAssetSchedules(app.prisma, asset.id);
+    await enqueueNotificationScan({ householdId: asset.householdId });
 
     return reply.code(201).send(toUsageMetricResponse(metric));
   });
@@ -142,6 +128,7 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
     });
 
     await recalculateAssetSchedules(app.prisma, asset.id);
+    await enqueueNotificationScan({ householdId: asset.householdId });
 
     return toUsageMetricResponse(metric);
   });
@@ -179,6 +166,7 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.usageMetric.delete({ where: { id: existing.id } });
+    await enqueueNotificationScan({ householdId: asset.householdId });
 
     return reply.code(204).send();
   });

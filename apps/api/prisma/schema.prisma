@@ -39,6 +39,7 @@ enum TriggerType {
 
 enum NotificationType {
   due_soon
+  due
   overdue
   digest
   announcement
@@ -62,6 +63,7 @@ model User {
   clerkUserId         String             @unique
   email               String?            @unique
   displayName         String?
+  notificationPreferences Json           @default("{}")
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   householdMemberships HouseholdMember[]
@@ -221,6 +223,7 @@ model Notification {
   householdId     String?
   assetId         String?
   scheduleId      String?
+  dedupeKey       String             @unique
   type            NotificationType
   channel         NotificationChannel
   status          NotificationStatus @default(pending)

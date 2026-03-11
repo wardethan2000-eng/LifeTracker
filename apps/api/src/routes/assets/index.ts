@@ -10,6 +10,7 @@ import {
   assertMembership,
   getAccessibleAsset
 } from "../../lib/asset-access.js";
+import { toAssetResponse } from "../../lib/presenters.js";
 
 const assetIdParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -18,29 +19,6 @@ const assetIdParamsSchema = z.object({
 const listAssetsQuerySchema = z.object({
   householdId: z.string().cuid(),
   includeArchived: z.coerce.boolean().default(false)
-});
-
-const toAssetResponse = (asset: {
-  id: string;
-  householdId: string;
-  createdById: string;
-  name: string;
-  category: string;
-  visibility: string;
-  description: string | null;
-  manufacturer: string | null;
-  model: string | null;
-  serialNumber: string | null;
-  purchaseDate: Date | null;
-  customFields: Prisma.JsonValue;
-  isArchived: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}) => assetSchema.parse({
-  ...asset,
-  purchaseDate: asset.purchaseDate?.toISOString() ?? null,
-  createdAt: asset.createdAt.toISOString(),
-  updatedAt: asset.updatedAt.toISOString()
 });
 
 export const assetRoutes: FastifyPluginAsync = async (app) => {

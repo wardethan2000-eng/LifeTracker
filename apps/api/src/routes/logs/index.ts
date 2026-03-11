@@ -6,6 +6,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { enqueueNotificationScan } from "../../lib/queues.js";
 import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
@@ -126,6 +127,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       await syncScheduleCompletionFromLogs(app.prisma, log.scheduleId);
     }
 
+    await enqueueNotificationScan({ householdId: asset.householdId });
+
     return reply.code(201).send(toMaintenanceLogResponse(log));
   });
 
@@ -206,6 +209,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       await syncScheduleCompletionFromLogs(app.prisma, log.scheduleId);
     }
 
+    await enqueueNotificationScan({ householdId: asset.householdId });
+
     return toMaintenanceLogResponse(log);
   });
 
@@ -235,6 +240,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     if (existing.scheduleId) {
       await syncScheduleCompletionFromLogs(app.prisma, existing.scheduleId);
     }
+
+    await enqueueNotificationScan({ householdId: asset.householdId });
 
     return reply.code(204).send();
   });

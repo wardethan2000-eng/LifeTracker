@@ -2,11 +2,14 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-const userId = "clkeeperuser0000000000001";
+const ownerUserId = "clkeeperuser0000000000001";
+const memberUserId = "clkeeperuser0000000000002";
 const householdId = "clkeeperhouse000000000001";
 const assetId = "clkeeperasset0000000000001";
+const personalAssetId = "clkeeperasset0000000000002";
 const usageMetricId = "clkeepermetric000000000001";
 const maintenanceScheduleId = "clkeeperschedule000000001";
+const overdueScheduleId = "clkeeperschedule000000002";
 const maintenanceLogId = "clkeeperlog00000000000001";
 const presetProfileId = "clkeeperpreset000000000001";
 
@@ -15,13 +18,47 @@ async function main(): Promise<void> {
     where: { clerkUserId: "dev_clerk_user_primary" },
     update: {
       email: "demo@lifekeeper.app",
-      displayName: "LifeKeeper Demo"
+      displayName: "LifeKeeper Demo",
+      notificationPreferences: {
+        pauseAll: false,
+        enabledChannels: ["push", "digest"],
+        preferDigest: false
+      }
     },
     create: {
-      id: userId,
+      id: ownerUserId,
       clerkUserId: "dev_clerk_user_primary",
       email: "demo@lifekeeper.app",
-      displayName: "LifeKeeper Demo"
+      displayName: "LifeKeeper Demo",
+      notificationPreferences: {
+        pauseAll: false,
+        enabledChannels: ["push", "digest"],
+        preferDigest: false
+      }
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { clerkUserId: "dev_clerk_user_member" },
+    update: {
+      email: "member@lifekeeper.app",
+      displayName: "Household Member",
+      notificationPreferences: {
+        pauseAll: false,
+        enabledChannels: ["push"],
+        preferDigest: false
+      }
+    },
+    create: {
+      id: memberUserId,
+      clerkUserId: "dev_clerk_user_member",
+      email: "member@lifekeeper.app",
+      displayName: "Household Member",
+      notificationPreferences: {
+        pauseAll: false,
+        enabledChannels: ["push"],
+        preferDigest: false
+      }
     }
   });
 
@@ -29,12 +66,12 @@ async function main(): Promise<void> {
     where: { id: householdId },
     update: {
       name: "Demo Household",
-      createdById: userId
+      createdById: ownerUserId
     },
     create: {
       id: householdId,
       name: "Demo Household",
-      createdById: userId
+      createdById: ownerUserId
     }
   });
 
@@ -42,7 +79,7 @@ async function main(): Promise<void> {
     where: {
       householdId_userId: {
         householdId,
-        userId
+        userId: ownerUserId
       }
     },
     update: {
@@ -50,8 +87,25 @@ async function main(): Promise<void> {
     },
     create: {
       householdId,
-      userId,
+      userId: ownerUserId,
       role: "owner"
+    }
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId,
+        userId: memberUserId
+      }
+    },
+    update: {
+      role: "member"
+    },
+    create: {
+      householdId,
+      userId: memberUserId,
+      role: "member"
     }
   });
 
@@ -66,7 +120,7 @@ async function main(): Promise<void> {
     create: {
       id: assetId,
       householdId,
-      createdById: userId,
+      createdById: ownerUserId,
       name: "Primary Vehicle",
       category: "vehicle",
       visibility: "shared",
@@ -76,6 +130,32 @@ async function main(): Promise<void> {
       customFields: {
         engine: "3.5L EcoBoost",
         odometer: 42500
+      }
+    }
+  });
+
+  await prisma.asset.upsert({
+    where: { id: personalAssetId },
+    update: {
+      name: "Private Workshop Printer",
+      category: "workshop",
+      visibility: "personal",
+      description: "Seeded private asset for access-control verification",
+      createdById: ownerUserId
+    },
+    create: {
+      id: personalAssetId,
+      householdId,
+      createdById: ownerUserId,
+      name: "Private Workshop Printer",
+      category: "workshop",
+      visibility: "personal",
+      description: "Seeded private asset for access-control verification",
+      manufacturer: "Prusa",
+      model: "MK4",
+      customFields: {
+        nozzle: "0.4mm",
+        enclosure: true
       }
     }
   });
@@ -151,6 +231,51 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.maintenanceSchedule.upsert({
+    where: { id: overdueScheduleId },
+    update: {
+      triggerType: "interval",
+      triggerConfig: {
+        type: "interval",
+        intervalDays: 90,
+        leadTimeDays: 10
+      },
+      notificationConfig: {
+        channels: ["push"],
+        sendAtDue: true,
+        digest: false,
+        upcomingLeadDays: 10,
+        overdueCadenceDays: 7,
+        maxOverdueNotifications: 3
+      },
+      lastCompletedAt: new Date("2025-11-15T00:00:00.000Z"),
+      nextDueAt: new Date("2026-02-13T00:00:00.000Z"),
+      nextDueMetricValue: null
+    },
+    create: {
+      id: overdueScheduleId,
+      assetId,
+      name: "Rotate tires",
+      triggerType: "interval",
+      triggerConfig: {
+        type: "interval",
+        intervalDays: 90,
+        leadTimeDays: 10
+      },
+      notificationConfig: {
+        channels: ["push"],
+        sendAtDue: true,
+        digest: false,
+        upcomingLeadDays: 10,
+        overdueCadenceDays: 7,
+        maxOverdueNotifications: 3
+      },
+      lastCompletedAt: new Date("2025-11-15T00:00:00.000Z"),
+      nextDueAt: new Date("2026-02-13T00:00:00.000Z"),
+      nextDueMetricValue: null
+    }
+  });
+
   await prisma.presetProfile.upsert({
     where: {
       householdId_key: {
@@ -198,7 +323,7 @@ async function main(): Promise<void> {
     create: {
       id: presetProfileId,
       householdId,
-      createdById: userId,
+      createdById: ownerUserId,
       key: "vehicle-owner-core",
       name: "Vehicle Owner Core",
       category: "vehicle",
@@ -253,7 +378,7 @@ async function main(): Promise<void> {
       id: maintenanceLogId,
       assetId,
       scheduleId: maintenanceScheduleId,
-      completedById: userId,
+      completedById: ownerUserId,
       title: "Engine oil and filter",
       completedAt: new Date("2026-03-09T00:00:00.000Z"),
       usageValue: 42500,
@@ -263,7 +388,14 @@ async function main(): Promise<void> {
     }
   });
 
-  console.log(JSON.stringify({ userId, householdId }, null, 2));
+  console.log(JSON.stringify({
+    ownerUserId,
+    memberUserId,
+    householdId,
+    sharedAssetId: assetId,
+    personalAssetId,
+    overdueScheduleId
+  }, null, 2));
 }
 
 main()
