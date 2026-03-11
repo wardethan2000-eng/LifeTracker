@@ -1,75 +1,57 @@
+import type { AssetOverview } from "@lifekeeper/types";
+import Link from "next/link";
 import type { JSX } from "react";
-import type { AssetCardData, DueItem, WorkState } from "../lib/mock-data";
-
-const stateLabel: Record<WorkState, string> = {
-  overdue: "Overdue",
-  due: "Due now",
-  upcoming: "Upcoming",
-  clear: "Clear"
-};
-
-const toneClass: Record<WorkState, string> = {
-  overdue: "is-overdue",
-  due: "is-due",
-  upcoming: "is-upcoming",
-  clear: "is-clear"
-};
-
-const dueToneClass: Record<DueItem["state"], string> = {
-  overdue: "is-overdue",
-  due: "is-due",
-  upcoming: "is-upcoming"
-};
+import {
+  formatAssetStateLabel,
+  formatCategoryLabel,
+  formatDate,
+  formatVisibilityLabel,
+  getAssetTone
+} from "../lib/formatters";
 
 type AssetCardProps = {
-  asset: AssetCardData;
+  asset: AssetOverview;
 };
 
 export function AssetCard({ asset }: AssetCardProps): JSX.Element {
+  const tone = getAssetTone(asset);
+  const subtitle = [asset.asset.manufacturer, asset.asset.model].filter(Boolean).join(" ") || asset.asset.description || "No extra details yet.";
+
   return (
-    <article className={`asset-card ${toneClass[asset.workState]}`}>
+    <article className={`asset-card asset-card--${tone}`}>
       <div className="asset-card__header">
         <div>
-          <p className="asset-card__eyebrow">{asset.category}</p>
-          <h3>{asset.name}</h3>
-          <p className="asset-card__subtitle">{asset.subtitle}</p>
+          <p className="eyebrow">{formatCategoryLabel(asset.asset.category)}</p>
+          <h3>{asset.asset.name}</h3>
+          <p className="asset-card__subtitle">{subtitle}</p>
         </div>
-        <span className={`status-pill ${toneClass[asset.workState]}`}>{stateLabel[asset.workState]}</span>
+        <span className={`status-chip status-chip--${tone}`}>{formatAssetStateLabel(asset)}</span>
       </div>
 
-      <p className="asset-card__next">{asset.nextAction}</p>
-
-      <ul className="due-list" aria-label={`${asset.name} due work`}>
-        {asset.dueItems.map((item) => (
-          <li key={item.name} className="due-list__item">
-            <span className={`status-dot ${dueToneClass[item.state]}`} aria-hidden="true" />
-            <div>
-              <strong>{item.name}</strong>
-              <p>{item.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <dl className="asset-metrics">
-        {asset.metrics.map((metric) => (
-          <div key={metric.label}>
-            <dt>{metric.label}</dt>
-            <dd>{metric.value}</dd>
-          </div>
-        ))}
+      <dl className="asset-card__stats">
+        <div>
+          <dt>Overdue</dt>
+          <dd>{asset.overdueScheduleCount}</dd>
+        </div>
+        <div>
+          <dt>Due now</dt>
+          <dd>{asset.dueScheduleCount}</dd>
+        </div>
+        <div>
+          <dt>Next due</dt>
+          <dd>{formatDate(asset.nextDueAt, "No date")}</dd>
+        </div>
+        <div>
+          <dt>Last logged</dt>
+          <dd>{formatDate(asset.lastCompletedAt, "No history")}</dd>
+        </div>
       </dl>
 
       <div className="asset-card__footer">
-        <p>{asset.logLine}</p>
-        <div className="asset-card__actions">
-          <button type="button" className="button button--primary">
-            Quick log
-          </button>
-          <button type="button" className="button button--ghost">
-            View asset
-          </button>
-        </div>
+        <span className="pill">{formatVisibilityLabel(asset.asset.visibility)}</span>
+        <Link href={`/assets/${asset.asset.id}`} className="text-link">
+          Open asset
+        </Link>
       </div>
     </article>
   );

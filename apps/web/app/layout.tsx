@@ -16,8 +16,8 @@ const displayFont = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "LifeKeeper Web",
-  description: "Asset-centered maintenance tracking for vehicles, home systems, yard tools, and equipment."
+  title: "AssetKeeper Dashboard",
+  description: "Household-first maintenance tracking for vehicles, homes, tools, and equipment."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>): JSX.Element {

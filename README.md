@@ -6,7 +6,7 @@ LifeKeeper is a universal maintenance tracking platform for assets across vehicl
 
 - `apps/api`: Fastify + Prisma backend
 - `apps/mobile`: Expo app shell for Phase 1 mobile work
-- `apps/web`: placeholder for Phase 2 Next.js application
+- `apps/web`: live Next.js dashboard for household maintenance management
 - `packages/types`: shared TypeScript types and Zod schemas
 - `packages/utils`: shared utility functions for dates and trigger calculations
 - `packages/presets`: starter preset templates for onboarding
@@ -19,6 +19,7 @@ LifeKeeper is a universal maintenance tracking platform for assets across vehicl
 4. Run migrations with `pnpm db:migrate`.
 5. Seed development data with `pnpm db:seed`.
 6. Start the API with `pnpm --filter @lifekeeper/api dev`.
+7. Start the web dashboard with `pnpm --filter @lifekeeper/web dev`.
 
 If you use Docker locally, you can start PostgreSQL and Redis with:
 
@@ -61,6 +62,23 @@ Recommended local setup:
 5. For notification development, keep `NOTIFICATION_DELIVERY_MODE="log"`.
 
 The development bypass is rejected in production.
+
+## Web dashboard
+
+The web app now talks directly to the API and is intended as the primary interface for testing the current product slice.
+
+Useful local defaults:
+
+1. Keep the API running at `http://127.0.0.1:4000` or set `LIFEKEEPER_API_BASE_URL` for the web app.
+2. Keep dev auth bypass enabled and use the seeded demo user `clkeeperuser0000000000001`, or set `LIFEKEEPER_DEV_USER_ID`.
+3. Open the web app and use the seeded household `clkeeperhouse000000000001` if you want immediate demo data.
+
+Current web flows include:
+
+- Household dashboard with live due work, notifications, and asset overview cards
+- Household switching for the current user
+- Manual asset creation with optional library preset application
+- Asset detail views with usage metric updates, schedule completion, and maintenance log capture
 
 ## Notification development
 
