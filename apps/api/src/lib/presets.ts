@@ -1,6 +1,7 @@
 import type { Asset, Prisma, PrismaClient, UsageMetric } from "@prisma/client";
 import { presetLibrary } from "@lifekeeper/presets";
 import {
+  assetFieldDefinitionsSchema,
   customPresetProfileSchema,
   maintenanceTriggerSchema,
   presetCustomFieldTemplateSchema,
@@ -19,6 +20,24 @@ const metricTemplatesArraySchema = presetUsageMetricTemplateSchema.array();
 const scheduleTemplatesArraySchema = presetScheduleTemplateSchema.array();
 
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
+
+const normalizePresetFieldDefinition = (field: PresetDefinition["suggestedCustomFields"][number], index: number) => ({
+  key: field.key,
+  label: field.label,
+  type: field.type,
+  required: field.required,
+  helpText: field.helpText,
+  placeholder: field.placeholder,
+  unit: field.unit,
+  group: field.group,
+  wide: field.wide,
+  order: field.order ?? index,
+  options: field.options.map((option) => ({
+    label: option,
+    value: option
+  })),
+  defaultValue: field.defaultValue
+});
 
 export const slugifyPresetKey = (value: string): string => value
   .trim()
@@ -109,7 +128,7 @@ const metricLookupKey = (name: string, unit: string): string => `${name.toLowerC
 
 export const applyPresetToAsset = async (
   prisma: PrismaExecutor,
-  asset: Pick<Asset, "id" | "householdId" | "category" | "customFields">,
+  asset: Pick<Asset, "id" | "householdId" | "category" | "fieldDefinitions" | "customFields">,
   preset: PresetDefinition,
   options: Pick<ApplyPresetInput, "mergeCustomFields" | "skipExistingMetrics" | "skipExistingSchedules"> & {
     sourceLabel: string;
@@ -127,11 +146,19 @@ export const applyPresetToAsset = async (
   });
 
   const assetCustomFields = ((asset.customFields as Record<string, unknown> | null) ?? {});
+  const existingFieldDefinitions = assetFieldDefinitionsSchema.parse(asset.fieldDefinitions ?? []);
+  const nextFieldDefinitions = [...existingFieldDefinitions];
+  const knownFieldKeys = new Set(existingFieldDefinitions.map((field) => field.key));
   let mergedFieldCount = 0;
   const nextCustomFields: Record<string, unknown> = { ...assetCustomFields };
 
   if (options.mergeCustomFields) {
-    for (const field of preset.suggestedCustomFields) {
+    for (const [index, field] of preset.suggestedCustomFields.entries()) {
+      if (!knownFieldKeys.has(field.key)) {
+        nextFieldDefinitions.push(normalizePresetFieldDefinition(field, index));
+        knownFieldKeys.add(field.key);
+      }
+
       if (!(field.key in nextCustomFields)) {
         nextCustomFields[field.key] = field.defaultValue ?? null;
         mergedFieldCount += 1;
@@ -139,14 +166,23 @@ export const applyPresetToAsset = async (
     }
   }
 
-  if (mergedFieldCount > 0) {
-    await prisma.asset.update({
-      where: { id: asset.id },
-      data: {
-        customFields: toInputJsonValue(nextCustomFields)
-      }
-    });
+  const assetUpdateData: Prisma.AssetUpdateInput = {
+    assetTypeKey: preset.key,
+    assetTypeLabel: preset.label,
+    assetTypeSource: options.sourceLabel.startsWith("custom:") ? "custom" : "library",
+    assetTypeVersion: 1,
+    fieldDefinitions: toInputJsonValue(nextFieldDefinitions),
+    customFields: toInputJsonValue(nextCustomFields)
+  };
+
+  if (preset.description !== undefined) {
+    assetUpdateData.assetTypeDescription = preset.description;
   }
+
+  await prisma.asset.update({
+    where: { id: asset.id },
+    data: assetUpdateData
+  });
 
   const metricKeyToId = new Map<string, string>();
   const existingMetricsByIdentity = new Map(existingMetrics.map((metric) => [metricLookupKey(metric.name, metric.unit), metric]));

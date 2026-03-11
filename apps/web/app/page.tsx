@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { createAssetAction, createHouseholdAction, enqueueNotificationScanAction, markNotificationReadAction } from "./actions";
+import { AssetProfileWorkbench } from "../components/asset-profile-workbench";
 import { AssetCard } from "../components/asset-card";
-import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getLibraryPresets, getMe } from "../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getHouseholdPresets, getLibraryPresets, getMe } from "../lib/api";
 import { formatCategoryLabel, formatDateTime, formatDueLabel, formatNotificationTone } from "../lib/formatters";
 
 type HomePageProps = {
@@ -96,9 +97,10 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((household) => household.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, presets] = await Promise.all([
+    const [dashboard, presets, customPresets] = await Promise.all([
       getHouseholdDashboard(selectedHousehold.id),
-      getLibraryPresets()
+      getLibraryPresets(),
+      getHouseholdPresets(selectedHousehold.id)
     ]);
     const prioritizedAssets = [...dashboard.assets].sort(byAttention);
     const overdueAssets = prioritizedAssets.filter((asset) => asset.overdueScheduleCount > 0).length;
@@ -386,74 +388,13 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                   <p className="ops-panel__copy">This stays narrow and operational. The primary flow is compare first, capture second.</p>
                 </div>
 
-                <form action={createAssetAction} className="form-grid">
-                <input type="hidden" name="householdId" value={selectedHousehold.id} />
-
-                <label className="field field--full">
-                  <span>Name</span>
-                  <input type="text" name="name" placeholder="Primary vehicle" required />
-                </label>
-
-                <label className="field">
-                  <span>Category</span>
-                  <select name="category" defaultValue="vehicle">
-                    <option value="vehicle">Vehicle</option>
-                    <option value="home">Home</option>
-                    <option value="marine">Marine</option>
-                    <option value="yard">Yard</option>
-                    <option value="workshop">Workshop</option>
-                    <option value="appliance">Appliance</option>
-                    <option value="hvac">HVAC</option>
-                    <option value="technology">Technology</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>Visibility</span>
-                  <select name="visibility" defaultValue="shared">
-                    <option value="shared">Shared</option>
-                    <option value="personal">Personal</option>
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>Manufacturer</span>
-                  <input type="text" name="manufacturer" placeholder="Ford" />
-                </label>
-
-                <label className="field">
-                  <span>Model</span>
-                  <input type="text" name="model" placeholder="F-150" />
-                </label>
-
-                <label className="field">
-                  <span>Serial number</span>
-                  <input type="text" name="serialNumber" placeholder="Optional" />
-                </label>
-
-                <label className="field">
-                  <span>Purchase date</span>
-                  <input type="date" name="purchaseDate" />
-                </label>
-
-                <label className="field field--full">
-                  <span>Description</span>
-                  <textarea name="description" rows={3} placeholder="Notes, trim, location, or ownership context" />
-                </label>
-
-                <label className="field field--full">
-                  <span>Preset</span>
-                  <select name="presetKey" defaultValue="">
-                    <option value="">Manual asset only</option>
-                    {presets.map((preset) => (
-                      <option key={preset.key} value={preset.key}>{preset.label}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <button type="submit" className="button button--primary">Create asset</button>
-                </form>
+                <AssetProfileWorkbench
+                  action={createAssetAction}
+                  householdId={selectedHousehold.id}
+                  submitLabel="Create asset"
+                  libraryPresets={presets}
+                  customPresets={customPresets}
+                />
               </section>
             </aside>
           </div>

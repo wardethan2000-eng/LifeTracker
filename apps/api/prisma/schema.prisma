@@ -116,6 +116,12 @@ model Asset {
   model          String?
   serialNumber   String?
   purchaseDate   DateTime?
+  assetTypeKey   String?
+  assetTypeLabel String?
+  assetTypeDescription String?
+  assetTypeSource String                @default("manual")
+  assetTypeVersion Int                  @default(1)
+  fieldDefinitions Json                 @default("[]")
   customFields   Json                  @default("{}")
   isArchived     Boolean               @default(false)
   createdAt      DateTime              @default(now())

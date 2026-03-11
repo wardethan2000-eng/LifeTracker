@@ -439,6 +439,10 @@ p {
   flex-wrap: wrap;
 }
 
+.inline-actions--end {
+  justify-content: flex-end;
+}
+
 .list-card,
 .notification-card,
 .log-card {
@@ -526,6 +530,59 @@ p {
 
 .field--checkbox input {
   width: auto;
+}
+
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--ink);
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.asset-studio {
+  display: grid;
+  gap: 18px;
+}
+
+.panel--studio {
+  gap: 18px;
+}
+
+.asset-studio__field-stack,
+.asset-detail-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.asset-studio__field-card,
+.asset-detail-group {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.asset-studio__field-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.field small {
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .button {
@@ -633,6 +690,7 @@ p {
 
   .hero-card,
   .panel-header,
+  .asset-studio__field-card-header,
   .asset-card__header,
   .schedule-card__summary,
   .list-card,

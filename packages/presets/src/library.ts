@@ -7,10 +7,12 @@ import type {
 } from "@lifekeeper/types";
 
 const field = (
-  input: Omit<PresetCustomFieldTemplate, "required" | "options"> & Partial<Pick<PresetCustomFieldTemplate, "required" | "options">>
+  input: Omit<PresetCustomFieldTemplate, "required" | "options" | "wide" | "order"> & Partial<Pick<PresetCustomFieldTemplate, "required" | "options" | "wide" | "order">>
 ): PresetCustomFieldTemplate => ({
   required: false,
   options: [],
+  wide: false,
+  order: 0,
   ...input
 });
 

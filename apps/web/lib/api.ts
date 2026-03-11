@@ -1,6 +1,7 @@
 import {
   assetDetailResponseSchema,
   assetSchema,
+  customPresetProfileSchema,
   maintenanceScheduleSchema,
   householdDashboardSchema,
   householdSummarySchema,
@@ -10,17 +11,20 @@ import {
   type Asset,
   type AssetDetailResponse,
   type CompleteMaintenanceScheduleInput,
+  type CreatePresetProfileInput,
   type CreateAssetInput,
   type CreateHouseholdInput,
   type CreateMaintenanceScheduleInput,
   type CreateMaintenanceLogInput,
   type CreateUsageMetricInput,
+  type CustomPresetProfile,
   type HouseholdDashboard,
   type HouseholdSummary,
   type LibraryPreset,
   type MaintenanceSchedule,
   type MeResponse,
   type Notification,
+  type UpdateAssetInput,
   type UpdateUsageMetricInput,
   usageMetricResponseSchema
 } from "@lifekeeper/types";
@@ -37,6 +41,7 @@ type RequestOptions<T> = {
 };
 
 const libraryPresetListSchema = libraryPresetSchema.array();
+const customPresetProfileListSchema = customPresetProfileSchema.array();
 
 export class ApiError extends Error {
   readonly status: number;
@@ -141,19 +146,52 @@ export const createAsset = async (input: CreateAssetInput): Promise<Asset> => ap
   schema: assetSchema
 });
 
-export const applyLibraryPreset = async (assetId: string, presetKey: string): Promise<void> => {
+export const updateAsset = async (assetId: string, input: UpdateAssetInput): Promise<Asset> => apiRequest({
+  path: `/v1/assets/${assetId}`,
+  method: "PATCH",
+  body: input,
+  schema: assetSchema
+});
+
+export const getHouseholdPresets = async (householdId: string): Promise<CustomPresetProfile[]> => apiRequest({
+  path: `/v1/households/${householdId}/presets`,
+  schema: customPresetProfileListSchema
+});
+
+export const createPresetProfile = async (
+  householdId: string,
+  input: CreatePresetProfileInput
+): Promise<CustomPresetProfile> => apiRequest({
+  path: `/v1/households/${householdId}/presets`,
+  method: "POST",
+  body: input,
+  schema: customPresetProfileSchema
+});
+
+export const applyPreset = async (
+  assetId: string,
+  body: {
+    source: "library" | "custom";
+    presetKey?: string;
+    presetProfileId?: string;
+  }
+): Promise<void> => {
   await apiRequest({
     path: `/v1/assets/${assetId}/apply-preset`,
     method: "POST",
     body: {
-      source: "library",
-      presetKey,
+      ...body,
       mergeCustomFields: true,
       skipExistingMetrics: true,
       skipExistingSchedules: true
     }
   });
 };
+
+export const applyLibraryPreset = async (assetId: string, presetKey: string): Promise<void> => applyPreset(assetId, {
+  source: "library",
+  presetKey
+});
 
 export const completeSchedule = async (
   assetId: string,

@@ -8,9 +8,11 @@ import {
   createScheduleAction,
   deleteScheduleAction,
   toggleScheduleActiveAction,
+  updateAssetAction,
   updateMetricAction
 } from "../../actions";
-import { ApiError, getAssetDetail, getLibraryPresets } from "../../../lib/api";
+import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
+import { ApiError, getAssetDetail, getHouseholdPresets, getLibraryPresets } from "../../../lib/api";
 import {
   formatCategoryLabel,
   formatCurrency,
@@ -36,8 +38,41 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
       getAssetDetail(assetId),
       getLibraryPresets()
     ]);
+    const customPresets = await getHouseholdPresets(detail.asset.householdId);
     const matchingPresets = presets.filter((preset) => preset.category === detail.asset.category);
     const visiblePresets = matchingPresets.length > 0 ? matchingPresets : presets;
+    const groupedFields = detail.asset.fieldDefinitions.reduce<Record<string, typeof detail.asset.fieldDefinitions>>((groups, field) => {
+      const groupKey = field.group?.trim() || "Asset details";
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey].push(field);
+      return groups;
+    }, {});
+    const formatFieldValue = (fieldKey: string): string => {
+      const field = detail.asset.fieldDefinitions.find((item) => item.key === fieldKey);
+      const value = detail.asset.customFields[fieldKey];
+
+      if (value === null || value === undefined || value === "") {
+        return "Not recorded";
+      }
+
+      if (Array.isArray(value)) {
+        return value.join(", ");
+      }
+
+      if (field?.type === "currency" && typeof value === "number") {
+        return formatCurrency(value);
+      }
+
+      if (field?.type === "date" && typeof value === "string") {
+        return formatDate(value, "Not recorded");
+      }
+
+      return String(value);
+    };
 
     return (
       <main className="detail-shell">
@@ -76,6 +111,41 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
 
         <div className="detail-layout">
           <div className="detail-column">
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Asset profile</p>
+                  <h2>Recorded detail fields</h2>
+                </div>
+              </div>
+
+              {detail.asset.fieldDefinitions.length === 0 ? (
+                <p className="empty-state">No custom detail fields are attached to this asset yet.</p>
+              ) : (
+                <div className="asset-detail-groups">
+                  {Object.entries(groupedFields).map(([groupLabel, fields]) => (
+                    <section key={groupLabel} className="asset-detail-group">
+                      <div className="panel-header">
+                        <div>
+                          <p className="eyebrow">{groupLabel}</p>
+                          <h3>{fields.length} recorded field{fields.length === 1 ? "" : "s"}</h3>
+                        </div>
+                      </div>
+
+                      <dl className="data-list">
+                        {fields.map((field) => (
+                          <div key={field.key}>
+                            <dt>{field.label}</dt>
+                            <dd>{formatFieldValue(field.key)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </section>
+
             <section className="panel">
               <div className="panel-header">
                 <div>
@@ -240,6 +310,24 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
           </div>
 
           <aside className="detail-column detail-column--aside">
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Edit profile</p>
+                  <h2>Schema and core details</h2>
+                </div>
+              </div>
+
+              <AssetProfileWorkbench
+                action={updateAssetAction}
+                householdId={detail.asset.householdId}
+                submitLabel="Update asset"
+                libraryPresets={visiblePresets}
+                customPresets={customPresets}
+                initialAsset={detail.asset}
+              />
+            </section>
+
             <section className="panel">
               <div className="panel-header">
                 <div>

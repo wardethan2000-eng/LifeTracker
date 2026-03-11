@@ -1,5 +1,6 @@
 import type { Asset, Notification, Prisma, UsageMetric, User } from "@prisma/client";
 import {
+  assetFieldDefinitionsSchema,
   assetSchema,
   notificationPreferencesSchema,
   notificationSchema,
@@ -16,9 +17,10 @@ export const toUserProfileResponse = (user: Pick<User, "id" | "clerkUserId" | "e
   updatedAt: user.updatedAt.toISOString()
 });
 
-export const toAssetResponse = (asset: Pick<Asset, "id" | "householdId" | "createdById" | "name" | "category" | "visibility" | "description" | "manufacturer" | "model" | "serialNumber" | "purchaseDate" | "customFields" | "isArchived" | "createdAt" | "updatedAt">) => assetSchema.parse({
+export const toAssetResponse = (asset: Pick<Asset, "id" | "householdId" | "createdById" | "name" | "category" | "visibility" | "description" | "manufacturer" | "model" | "serialNumber" | "purchaseDate" | "assetTypeKey" | "assetTypeLabel" | "assetTypeDescription" | "assetTypeSource" | "assetTypeVersion" | "fieldDefinitions" | "customFields" | "isArchived" | "createdAt" | "updatedAt">) => assetSchema.parse({
   ...asset,
   purchaseDate: asset.purchaseDate?.toISOString() ?? null,
+  fieldDefinitions: assetFieldDefinitionsSchema.parse(asset.fieldDefinitions ?? []),
   createdAt: asset.createdAt.toISOString(),
   updatedAt: asset.updatedAt.toISOString()
 });

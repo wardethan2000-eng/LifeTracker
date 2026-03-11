@@ -2,28 +2,41 @@
 
 import type {
   AssetCategory,
+  AssetFieldDefinition,
+  AssetTypeSource,
   AssetVisibility,
   CompleteMaintenanceScheduleInput,
   CreateAssetInput,
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
+  CreatePresetProfileInput,
   CreateUsageMetricInput,
   MaintenanceTrigger,
+  PresetScheduleTemplate,
+  PresetUsageMetricTemplate,
   UpdateUsageMetricInput
+} from "@lifekeeper/types";
+import {
+  assetCustomFieldsSchema,
+  assetFieldDefinitionsSchema,
+  presetScheduleTemplateSchema,
+  presetUsageMetricTemplateSchema
 } from "@lifekeeper/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  applyLibraryPreset,
+  applyPreset,
   completeSchedule,
   createMetric,
   createAsset,
   createHousehold,
   createMaintenanceLog,
+  createPresetProfile,
   createSchedule,
   deleteSchedule,
   enqueueNotificationScan,
   markNotificationRead,
+  updateAsset,
   updateSchedule,
   updateMetric
 } from "../lib/api";
@@ -64,6 +77,112 @@ const getOptionalNumber = (formData: FormData, key: string): number | undefined 
   return parsed;
 };
 
+const getOptionalBoolean = (formData: FormData, key: string): boolean | undefined => {
+  const value = getOptionalString(formData, key);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value === "true" || value === "on" || value === "1";
+};
+
+const parseJsonField = <T>(
+  formData: FormData,
+  key: string,
+  schema: { parse: (value: unknown) => T },
+  fallback: T
+): T => {
+  const raw = getOptionalString(formData, key);
+
+  if (!raw) {
+    return fallback;
+  }
+
+  return schema.parse(JSON.parse(raw));
+};
+
+const toPresetFieldTemplate = (field: AssetFieldDefinition) => ({
+  ...field,
+  options: field.options.map((option) => option.value)
+});
+
+const parsePresetTags = (value: string | undefined): string[] => value
+  ? value.split(",").map((item) => item.trim()).filter(Boolean)
+  : [];
+
+type AssetProfilePayload = {
+  fieldDefinitions: AssetFieldDefinition[];
+  fieldValues: CreateAssetInput["customFields"];
+  assetTypeSource: AssetTypeSource;
+  assetTypeVersion: number;
+  assetTypeKey: string | undefined;
+  assetTypeLabel: string | undefined;
+  assetTypeDescription: string | undefined;
+  presetSource: "library" | "custom" | undefined;
+  presetKey: string | undefined;
+  presetProfileId: string | undefined;
+  metricTemplates: PresetUsageMetricTemplate[];
+  scheduleTemplates: PresetScheduleTemplate[];
+};
+
+const parseAssetProfilePayload = (formData: FormData): AssetProfilePayload => {
+  const assetTypeVersion = getOptionalNumber(formData, "assetTypeVersion") ?? 1;
+  const assetTypeSource = (getOptionalString(formData, "assetTypeSource") as AssetTypeSource | undefined) ?? "manual";
+  const presetSource = getOptionalString(formData, "presetSource");
+
+  return {
+    fieldDefinitions: parseJsonField(formData, "fieldDefinitionsJson", assetFieldDefinitionsSchema, []),
+    fieldValues: parseJsonField(formData, "fieldValuesJson", assetCustomFieldsSchema, {}),
+    assetTypeSource,
+    assetTypeVersion,
+    assetTypeKey: getOptionalString(formData, "assetTypeKey"),
+    assetTypeLabel: getOptionalString(formData, "assetTypeLabel"),
+    assetTypeDescription: getOptionalString(formData, "assetTypeDescription"),
+    presetSource: presetSource === "library" || presetSource === "custom" ? presetSource : undefined,
+    presetKey: getOptionalString(formData, "presetKey"),
+    presetProfileId: getOptionalString(formData, "presetProfileId"),
+    metricTemplates: parseJsonField(formData, "metricTemplatesJson", presetUsageMetricTemplateSchema.array(), []),
+    scheduleTemplates: parseJsonField(formData, "scheduleTemplatesJson", presetScheduleTemplateSchema.array(), [])
+  };
+};
+
+const maybeCreatePresetProfileFromForm = async (
+  formData: FormData,
+  category: AssetCategory,
+  fieldDefinitions: AssetFieldDefinition[],
+  metricTemplates: PresetUsageMetricTemplate[],
+  scheduleTemplates: PresetScheduleTemplate[]
+): Promise<void> => {
+  if (!getOptionalBoolean(formData, "saveAsPreset")) {
+    return;
+  }
+
+  const householdId = getRequiredString(formData, "householdId");
+  const label = getRequiredString(formData, "presetLabel");
+  const input: CreatePresetProfileInput = {
+    label,
+    category,
+    tags: parsePresetTags(getOptionalString(formData, "presetTags")),
+    suggestedCustomFields: fieldDefinitions.map(toPresetFieldTemplate),
+    metricTemplates,
+    scheduleTemplates
+  };
+
+  const key = getOptionalString(formData, "presetKeyOverride");
+  const description = getOptionalString(formData, "presetDescription");
+
+  if (key !== undefined) {
+    input.key = key;
+  }
+
+  if (description !== undefined) {
+    input.description = description;
+  }
+
+  await createPresetProfile(householdId, input);
+};
+
 const toIsoString = (value: string | undefined): string | undefined => {
   if (!value) {
     return undefined;
@@ -82,12 +201,16 @@ export async function createHouseholdAction(formData: FormData): Promise<void> {
 }
 
 export async function createAssetAction(formData: FormData): Promise<void> {
+  const profile = parseAssetProfilePayload(formData);
   const input: CreateAssetInput = {
     householdId: getRequiredString(formData, "householdId"),
     name: getRequiredString(formData, "name"),
     category: getRequiredString(formData, "category") as AssetCategory,
     visibility: (getOptionalString(formData, "visibility") as AssetVisibility | undefined) ?? "shared",
-    customFields: {}
+    assetTypeSource: profile.assetTypeSource,
+    assetTypeVersion: profile.assetTypeVersion,
+    fieldDefinitions: profile.fieldDefinitions,
+    customFields: profile.fieldValues
   };
 
   const description = getOptionalString(formData, "description");
@@ -116,16 +239,109 @@ export async function createAssetAction(formData: FormData): Promise<void> {
     input.purchaseDate = purchaseDate;
   }
 
-  const asset = await createAsset(input);
-  const presetKey = getOptionalString(formData, "presetKey");
-
-  if (presetKey) {
-    await applyLibraryPreset(asset.id, presetKey);
+  if (profile.assetTypeKey) {
+    input.assetTypeKey = profile.assetTypeKey;
   }
+
+  if (profile.assetTypeLabel) {
+    input.assetTypeLabel = profile.assetTypeLabel;
+  }
+
+  if (profile.assetTypeDescription) {
+    input.assetTypeDescription = profile.assetTypeDescription;
+  }
+
+  const asset = await createAsset(input);
+  if (profile.presetSource === "library" && profile.presetKey) {
+    await applyPreset(asset.id, {
+      source: "library",
+      presetKey: profile.presetKey
+    });
+  }
+
+  if (profile.presetSource === "custom" && profile.presetProfileId) {
+    await applyPreset(asset.id, {
+      source: "custom",
+      presetProfileId: profile.presetProfileId
+    });
+  }
+
+  await maybeCreatePresetProfileFromForm(
+    formData,
+    input.category,
+    profile.fieldDefinitions,
+    profile.metricTemplates,
+    profile.scheduleTemplates
+  );
 
   revalidatePath("/");
   revalidatePath(`/assets/${asset.id}`);
   redirect(`/assets/${asset.id}`);
+}
+
+export async function updateAssetAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const profile = parseAssetProfilePayload(formData);
+  const input: CreateAssetInput = {
+    householdId: getRequiredString(formData, "householdId"),
+    name: getRequiredString(formData, "name"),
+    category: getRequiredString(formData, "category") as AssetCategory,
+    visibility: (getOptionalString(formData, "visibility") as AssetVisibility | undefined) ?? "shared",
+    assetTypeSource: profile.assetTypeSource,
+    assetTypeVersion: profile.assetTypeVersion,
+    fieldDefinitions: profile.fieldDefinitions,
+    customFields: profile.fieldValues
+  };
+
+  const description = getOptionalString(formData, "description");
+  const manufacturer = getOptionalString(formData, "manufacturer");
+  const model = getOptionalString(formData, "model");
+  const serialNumber = getOptionalString(formData, "serialNumber");
+  const purchaseDate = toIsoString(getOptionalString(formData, "purchaseDate"));
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (manufacturer) {
+    input.manufacturer = manufacturer;
+  }
+
+  if (model) {
+    input.model = model;
+  }
+
+  if (serialNumber) {
+    input.serialNumber = serialNumber;
+  }
+
+  if (purchaseDate) {
+    input.purchaseDate = purchaseDate;
+  }
+
+  if (profile.assetTypeKey) {
+    input.assetTypeKey = profile.assetTypeKey;
+  }
+
+  if (profile.assetTypeLabel) {
+    input.assetTypeLabel = profile.assetTypeLabel;
+  }
+
+  if (profile.assetTypeDescription) {
+    input.assetTypeDescription = profile.assetTypeDescription;
+  }
+
+  await updateAsset(assetId, input);
+  await maybeCreatePresetProfileFromForm(
+    formData,
+    input.category,
+    profile.fieldDefinitions,
+    profile.metricTemplates,
+    profile.scheduleTemplates
+  );
+
+  revalidatePath("/");
+  revalidatePath(`/assets/${assetId}`);
 }
 
 export async function markNotificationReadAction(formData: FormData): Promise<void> {
@@ -233,7 +449,10 @@ export async function createLogAction(formData: FormData): Promise<void> {
 
 export async function applyPresetToAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
-  await applyLibraryPreset(assetId, getRequiredString(formData, "presetKey"));
+  await applyPreset(assetId, {
+    source: "library",
+    presetKey: getRequiredString(formData, "presetKey")
+  });
   revalidatePath("/");
   revalidatePath(`/assets/${assetId}`);
 }

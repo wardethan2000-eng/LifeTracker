@@ -21,6 +21,8 @@ const listAssetsQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false)
 });
 
+const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
+
 export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets", async (request, reply) => {
     const query = listAssetsQuerySchema.parse(request.query);
@@ -65,6 +67,9 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       name: input.name,
       category: input.category,
       visibility: input.visibility,
+      assetTypeSource: input.assetTypeSource,
+      assetTypeVersion: input.assetTypeVersion,
+      fieldDefinitions: toInputJsonValue(input.fieldDefinitions),
       customFields: input.customFields
     };
 
@@ -86,6 +91,18 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.purchaseDate !== undefined) {
       data.purchaseDate = new Date(input.purchaseDate);
+    }
+
+    if (input.assetTypeKey !== undefined) {
+      data.assetTypeKey = input.assetTypeKey;
+    }
+
+    if (input.assetTypeLabel !== undefined) {
+      data.assetTypeLabel = input.assetTypeLabel;
+    }
+
+    if (input.assetTypeDescription !== undefined) {
+      data.assetTypeDescription = input.assetTypeDescription;
     }
 
     const asset = await app.prisma.asset.create({ data });
@@ -147,6 +164,30 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.purchaseDate !== undefined) {
       data.purchaseDate = new Date(input.purchaseDate);
+    }
+
+    if (input.assetTypeKey !== undefined) {
+      data.assetTypeKey = input.assetTypeKey;
+    }
+
+    if (input.assetTypeLabel !== undefined) {
+      data.assetTypeLabel = input.assetTypeLabel;
+    }
+
+    if (input.assetTypeDescription !== undefined) {
+      data.assetTypeDescription = input.assetTypeDescription;
+    }
+
+    if (input.assetTypeSource !== undefined) {
+      data.assetTypeSource = input.assetTypeSource;
+    }
+
+    if (input.assetTypeVersion !== undefined) {
+      data.assetTypeVersion = input.assetTypeVersion;
+    }
+
+    if (input.fieldDefinitions !== undefined) {
+      data.fieldDefinitions = toInputJsonValue(input.fieldDefinitions);
     }
 
     if (input.customFields !== undefined) {

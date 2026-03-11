@@ -21,15 +21,19 @@ export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
-export const customFieldTemplateTypeValues = [
+export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
+export const assetFieldTypeValues = [
   "string",
   "number",
   "boolean",
   "date",
   "select",
   "multiselect",
-  "textarea"
+  "textarea",
+  "url",
+  "currency"
 ] as const;
+export const customFieldTemplateTypeValues = assetFieldTypeValues;
 
 export const assetCategorySchema = z.enum(assetCategoryValues);
 export const assetVisibilitySchema = z.enum(assetVisibilityValues);
@@ -41,7 +45,39 @@ export const notificationChannelSchema = z.enum(notificationChannelValues);
 export const notificationStatusSchema = z.enum(notificationStatusValues);
 export const scheduleStatusSchema = z.enum(scheduleStatusValues);
 export const presetSourceSchema = z.enum(presetSourceValues);
-export const customFieldTemplateTypeSchema = z.enum(customFieldTemplateTypeValues);
+export const assetTypeSourceSchema = z.enum(assetTypeSourceValues);
+export const assetFieldTypeSchema = z.enum(assetFieldTypeValues);
+export const customFieldTemplateTypeSchema = assetFieldTypeSchema;
+
+export const assetFieldValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.string()),
+  z.null()
+]);
+
+export const assetFieldOptionSchema = z.object({
+  label: z.string().min(1).max(120),
+  value: z.string().min(1).max(120)
+});
+
+export const assetFieldDefinitionSchema = z.object({
+  key: z.string().min(1).max(80),
+  label: z.string().min(1).max(120),
+  type: assetFieldTypeSchema,
+  required: z.boolean().default(false),
+  helpText: z.string().max(500).optional(),
+  placeholder: z.string().max(160).optional(),
+  unit: z.string().max(40).optional(),
+  group: z.string().max(80).optional(),
+  wide: z.boolean().default(false),
+  order: z.number().int().min(0).default(0),
+  options: z.array(assetFieldOptionSchema).default([]),
+  defaultValue: assetFieldValueSchema.optional()
+});
+
+export const assetFieldDefinitionsSchema = z.array(assetFieldDefinitionSchema);
 
 export const notificationConfigSchema = z.object({
   channels: z.array(notificationChannelSchema).min(1).default(["push"]),
@@ -149,14 +185,13 @@ export const presetCustomFieldTemplateSchema = z.object({
   type: customFieldTemplateTypeSchema,
   required: z.boolean().default(false),
   helpText: z.string().max(500).optional(),
+  placeholder: z.string().max(160).optional(),
+  unit: z.string().max(40).optional(),
+  group: z.string().max(80).optional(),
+  wide: z.boolean().default(false),
+  order: z.number().int().min(0).default(0),
   options: z.array(z.string()).default([]),
-  defaultValue: z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.array(z.string()),
-    z.null()
-  ]).optional()
+  defaultValue: assetFieldValueSchema.optional()
 });
 
 export const presetUsageMetricTemplateSchema = z.object({
@@ -268,13 +303,7 @@ export const usageMetricResponseSchema = z.object({
   updatedAt: z.string().datetime()
 });
 
-export const assetCustomFieldsSchema = z.record(z.string(), z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.array(z.string()),
-  z.null()
-]));
+export const assetCustomFieldsSchema = z.record(z.string(), assetFieldValueSchema);
 
 export const createAssetSchema = z.object({
   householdId: z.string().cuid(),
@@ -286,6 +315,12 @@ export const createAssetSchema = z.object({
   model: z.string().max(120).optional(),
   serialNumber: z.string().max(120).optional(),
   purchaseDate: z.string().datetime().optional(),
+  assetTypeKey: z.string().min(1).max(120).optional(),
+  assetTypeLabel: z.string().min(1).max(160).optional(),
+  assetTypeDescription: z.string().max(2000).optional(),
+  assetTypeSource: assetTypeSourceSchema.default("manual"),
+  assetTypeVersion: z.number().int().positive().default(1),
+  fieldDefinitions: assetFieldDefinitionsSchema.default([]),
   customFields: assetCustomFieldsSchema.default({})
 });
 
@@ -303,6 +338,12 @@ export const assetSchema = z.object({
   model: z.string().nullable(),
   serialNumber: z.string().nullable(),
   purchaseDate: z.string().datetime().nullable(),
+  assetTypeKey: z.string().nullable(),
+  assetTypeLabel: z.string().nullable(),
+  assetTypeDescription: z.string().nullable(),
+  assetTypeSource: assetTypeSourceSchema,
+  assetTypeVersion: z.number().int().positive(),
+  fieldDefinitions: assetFieldDefinitionsSchema,
   customFields: assetCustomFieldsSchema,
   isArchived: z.boolean(),
   createdAt: z.string().datetime(),
@@ -552,7 +593,12 @@ export type NotificationChannel = z.infer<typeof notificationChannelSchema>;
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>;
 export type ScheduleStatus = z.infer<typeof scheduleStatusSchema>;
 export type PresetSource = z.infer<typeof presetSourceSchema>;
+export type AssetTypeSource = z.infer<typeof assetTypeSourceSchema>;
+export type AssetFieldType = z.infer<typeof assetFieldTypeSchema>;
 export type CustomFieldTemplateType = z.infer<typeof customFieldTemplateTypeSchema>;
+export type AssetFieldValue = z.infer<typeof assetFieldValueSchema>;
+export type AssetFieldOption = z.infer<typeof assetFieldOptionSchema>;
+export type AssetFieldDefinition = z.infer<typeof assetFieldDefinitionSchema>;
 export type NotificationConfig = z.infer<typeof notificationConfigSchema>;
 export type IntervalTriggerSchema = z.infer<typeof intervalTriggerSchema>;
 export type UsageTriggerSchema = z.infer<typeof usageTriggerSchema>;
