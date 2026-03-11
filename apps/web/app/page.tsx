@@ -1,9 +1,8 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { createAssetAction, createHouseholdAction, enqueueNotificationScanAction, markNotificationReadAction } from "./actions";
-import { AssetProfileWorkbench } from "../components/asset-profile-workbench";
-import { AssetCard } from "../components/asset-card";
-import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getHouseholdPresets, getLibraryPresets, getMe } from "../lib/api";
+import { createHouseholdAction, enqueueNotificationScanAction, markNotificationReadAction } from "./actions";
+import { AppShell } from "../components/app-shell";
+import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getMe } from "../lib/api";
 import { formatCategoryLabel, formatDateTime, formatDueLabel, formatNotificationTone } from "../lib/formatters";
 
 type HomePageProps = {
@@ -11,43 +10,17 @@ type HomePageProps = {
 };
 
 const getParam = (value: string | string[] | undefined): string | undefined => {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-
+  if (typeof value === "string" && value.length > 0) return value;
   return Array.isArray(value) ? value[0] : undefined;
 };
 
-const byAttention = (left: { overdueScheduleCount: number; dueScheduleCount: number }, right: { overdueScheduleCount: number; dueScheduleCount: number }): number => {
-  if (left.overdueScheduleCount !== right.overdueScheduleCount) {
-    return right.overdueScheduleCount - left.overdueScheduleCount;
-  }
-
-  return right.dueScheduleCount - left.dueScheduleCount;
-};
-
-const pluralize = (count: number, singular: string, plural = `${singular}s`): string => `${count} ${count === 1 ? singular : plural}`;
-
-const getSystemSummary = (assetCount: number, overdueAssets: number, dueAssets: number): string => {
-  if (assetCount === 0) {
-    return "No tracked assets. Create the first asset to start building maintenance coverage.";
-  }
-
-  if (overdueAssets > 0) {
-    return `${pluralize(overdueAssets, "asset")} are in recovery mode with missed maintenance windows.`;
-  }
-
-  if (dueAssets > 0) {
-    return `${pluralize(dueAssets, "asset")} currently have active service windows but nothing is overdue yet.`;
-  }
-
-  return "All tracked assets are clear of immediate maintenance risk.";
-};
+const pluralize = (count: number, singular: string, plural = `${singular}s`): string =>
+  `${count} ${count === 1 ? singular : plural}`;
 
 const DashboardError = ({ message }: { message: string }): JSX.Element => (
   <main className="error-shell">
     <section className="error-card">
-      <p className="eyebrow">Web dashboard</p>
+      <p className="eyebrow">Connection error</p>
       <h1>Dashboard could not load</h1>
       <p>{message}</p>
       <dl className="meta-list">
@@ -70,10 +43,9 @@ const EmptyHouseholds = (): JSX.Element => (
     <section className="error-card">
       <p className="eyebrow">First-run setup</p>
       <h1>Create your first household</h1>
-      <p>The dashboard is household-scoped. Start by creating one household, then add shared or personal assets into it.</p>
-
-      <form action={createHouseholdAction} className="form-grid">
-        <label className="field field--full">
+      <p>The dashboard is household-scoped. Create a household to start tracking assets.</p>
+      <form action={createHouseholdAction} className="form-grid form-grid--single" style={{ gap: 12 }}>
+        <label className="field">
           <span>Household name</span>
           <input type="text" name="name" placeholder="Main household" required />
         </label>
@@ -88,324 +60,254 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
   try {
     const me = await getMe();
-
     const fallbackHousehold = me.households[0];
 
-    if (!fallbackHousehold) {
-      return <EmptyHouseholds />;
-    }
+    if (!fallbackHousehold) return <EmptyHouseholds />;
 
     const requestedHouseholdId = getParam(params.householdId);
-    const selectedHousehold = me.households.find((household) => household.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, presets, customPresets] = await Promise.all([
-      getHouseholdDashboard(selectedHousehold.id),
-      getLibraryPresets(),
-      getHouseholdPresets(selectedHousehold.id)
-    ]);
-    const prioritizedAssets = [...dashboard.assets].sort(byAttention);
-    const overdueAssets = prioritizedAssets.filter((asset) => asset.overdueScheduleCount > 0).length;
-    const dueAssets = prioritizedAssets.filter((asset) => asset.overdueScheduleCount === 0 && asset.dueScheduleCount > 0).length;
-    const attentionAssets = prioritizedAssets.filter((asset) => asset.overdueScheduleCount > 0 || asset.dueScheduleCount > 0).length;
-    const clearAssets = Math.max(prioritizedAssets.length - attentionAssets, 0);
-    const leadItem = dashboard.dueWork[0] ?? null;
-    const latestNotification = dashboard.notifications[0] ?? null;
-    const firstAsset = prioritizedAssets[0] ?? null;
-    const systemSummary = getSystemSummary(dashboard.stats.assetCount, overdueAssets, dueAssets);
+    const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
+    const dashboard = await getHouseholdDashboard(selectedHousehold.id);
+
+    const sortedAssets = [...dashboard.assets].sort(
+      (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
+    );
+    const overdueAssets = sortedAssets.filter((a) => a.overdueScheduleCount > 0).length;
+    const dueAssets = sortedAssets.filter((a) => a.overdueScheduleCount === 0 && a.dueScheduleCount > 0).length;
 
     return (
-      <main className="ops-shell">
-        <aside className="ops-sidebar">
-          <div className="ops-brand">
-            <p className="eyebrow">AssetKeeper // Operations Console</p>
-            <h1>{dashboard.household.name}</h1>
-            <p>{systemSummary}</p>
+      <AppShell activePath="/">
+        <header className="page-header">
+          <h1>Dashboard</h1>
+          <div className="page-header__actions">
+            {me.households.length > 1 && (
+              <div className="household-switcher">
+                {me.households.map((h) => (
+                  <Link
+                    key={h.id}
+                    href={`/?householdId=${h.id}`}
+                    className={`household-chip${h.id === selectedHousehold.id ? " household-chip--active" : ""}`}
+                  >
+                    {h.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+            <form action={enqueueNotificationScanAction}>
+              <input type="hidden" name="householdId" value={selectedHousehold.id} />
+              <button type="submit" className="button button--ghost button--sm">Scan notifications</button>
+            </form>
           </div>
+        </header>
 
-          <nav className="ops-nav" aria-label="Dashboard sections">
-            <a href="#queue" className="ops-nav__link">Priority queue</a>
-            <a href="#registry" className="ops-nav__link">Asset registry</a>
-            <a href="#alerts" className="ops-nav__link">Alert feed</a>
-            <a href="#capture" className="ops-nav__link">Create asset</a>
-          </nav>
-
-          <section className="ops-sidebar__section">
-            <div className="ops-sidebar__heading">
-              <p className="eyebrow">Household context</p>
-              <h2>Switch household</h2>
+        <div className="page-body">
+          {/* ── System Overview ── */}
+          <section className="stats-row">
+            <div className="stat-card">
+              <span className="stat-card__label">Total Assets</span>
+              <strong className="stat-card__value">{dashboard.stats.assetCount}</strong>
+              <span className="stat-card__sub">{pluralize(dashboard.assets.length, "tracked system")}</span>
             </div>
-
-            <div className="ops-switcher">
-              {me.households.map((household) => (
-                <Link
-                  key={household.id}
-                  href={`/?householdId=${household.id}`}
-                  className={`ops-switcher__item${household.id === selectedHousehold.id ? " ops-switcher__item--active" : ""}`}
-                >
-                  <strong>{household.name}</strong>
-                  <span>{pluralize(household.memberCount, "member")}</span>
-                </Link>
-              ))}
+            <div className="stat-card stat-card--danger">
+              <span className="stat-card__label">Overdue</span>
+              <strong className="stat-card__value">{dashboard.stats.overdueScheduleCount}</strong>
+              <span className="stat-card__sub">{pluralize(overdueAssets, "asset")} affected</span>
+            </div>
+            <div className="stat-card stat-card--warning">
+              <span className="stat-card__label">Due Now</span>
+              <strong className="stat-card__value">{dashboard.stats.dueScheduleCount}</strong>
+              <span className="stat-card__sub">{pluralize(dueAssets, "asset")} need attention</span>
+            </div>
+            <div className="stat-card stat-card--accent">
+              <span className="stat-card__label">Unread Alerts</span>
+              <strong className="stat-card__value">{dashboard.stats.unreadNotificationCount}</strong>
+              <span className="stat-card__sub">{dashboard.notifications.length > 0 ? "Latest: " + formatDateTime(dashboard.notifications[0]?.scheduledFor) : "No pending alerts"}</span>
             </div>
           </section>
 
-          <section className="ops-sidebar__section">
-            <div className="ops-sidebar__heading">
-              <p className="eyebrow">Session</p>
-              <h2>Current operator</h2>
-            </div>
-
-            <dl className="ops-kv">
-              <div>
-                <dt>User</dt>
-                <dd>{me.user.displayName ?? me.user.email ?? me.user.id}</dd>
-              </div>
-              <div>
-                <dt>Role</dt>
-                <dd>{dashboard.household.myRole}</dd>
-              </div>
-              <div>
-                <dt>Auth</dt>
-                <dd>{me.auth.source}</dd>
-              </div>
-              <div>
-                <dt>Next action</dt>
-                <dd>{leadItem ? `${leadItem.assetName} / ${leadItem.scheduleName}` : "Queue clear"}</dd>
-              </div>
-            </dl>
-          </section>
-        </aside>
-
-        <section className="ops-main">
-          <header className="ops-header">
-            <div className="ops-header__meta">
-              <span className="pill">Household {dashboard.household.name}</span>
-              <span className="pill">Assets {dashboard.stats.assetCount}</span>
-              <span className="pill">Attention {attentionAssets}</span>
-              <span className="pill">Unread {dashboard.stats.unreadNotificationCount}</span>
-            </div>
-
-            <div className="ops-header__actions">
-              <form action={enqueueNotificationScanAction}>
-                <input type="hidden" name="householdId" value={selectedHousehold.id} />
-                <button type="submit" className="button button--ghost">Run notification scan</button>
-              </form>
-            </div>
-          </header>
-
-          <div className="ops-workspace">
-            <section className="ops-pane ops-pane--overview">
-              <div className="ops-panel__header">
-                <div>
-                  <p className="eyebrow">System overview</p>
-                  <h2>Maintenance posture</h2>
+          <div className="dashboard-grid">
+            <div className="dashboard-main">
+              {/* ── Upcoming Maintenance ── */}
+              <section className="panel">
+                <div className="panel__header">
+                  <h2>Upcoming Maintenance</h2>
                 </div>
-                <p className="ops-panel__copy">Compact state panes for the current household. This stays informational and always visible.</p>
-              </div>
-
-              <div className="ops-overview-grid" aria-label="System status">
-                <div className="ops-overview-cell ops-overview-cell--neutral">
-                  <span className="ops-status__label">Tracked assets</span>
-                  <strong>{dashboard.stats.assetCount}</strong>
-                  <span>{pluralize(clearAssets, "asset")} currently clear</span>
-                </div>
-                <div className="ops-overview-cell ops-overview-cell--danger">
-                  <span className="ops-status__label">Overdue schedules</span>
-                  <strong>{dashboard.stats.overdueScheduleCount}</strong>
-                  <span>{pluralize(overdueAssets, "asset")} affected</span>
-                </div>
-                <div className="ops-overview-cell ops-overview-cell--warning">
-                  <span className="ops-status__label">Due now</span>
-                  <strong>{dashboard.stats.dueScheduleCount}</strong>
-                  <span>{pluralize(dueAssets, "asset")} active</span>
-                </div>
-                <div className="ops-overview-cell ops-overview-cell--accent">
-                  <span className="ops-status__label">Unread alerts</span>
-                  <strong>{dashboard.stats.unreadNotificationCount}</strong>
-                  <span>{latestNotification ? formatDateTime(latestNotification.scheduledFor) : "No queued alerts"}</span>
-                </div>
-              </div>
-            </section>
-
-            <section id="queue" className="ops-pane ops-pane--queue">
-                <div className="ops-panel__header">
-                  <div>
-                    <p className="eyebrow">Upcoming maintenance</p>
-                    <h2>Priority queue</h2>
-                  </div>
-                  <p className="ops-panel__copy">Rows are ordered by urgency. Asset and schedule names are direct links into the detail surface.</p>
-                </div>
-
-                {dashboard.dueWork.length === 0 ? (
-                  <p className="ops-empty">No due or overdue work right now.</p>
-                ) : (
-                  <div className="ops-table-wrap">
-                    <table className="ops-table ops-table--queue">
+                <div className="panel__body">
+                  {dashboard.dueWork.length === 0 ? (
+                    <p className="panel__empty">No due or overdue maintenance right now.</p>
+                  ) : (
+                    <table className="data-table">
                       <thead>
                         <tr>
                           <th>Status</th>
                           <th>Asset</th>
-                          <th>Schedule</th>
-                          <th>Due trigger</th>
-                          <th>Current reading</th>
-                          <th>Action</th>
+                          <th>Task</th>
+                          <th>Next Due</th>
+                          <th>Priority</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {dashboard.dueWork.map((item) => (
-                          <tr key={item.scheduleId} className={`ops-table__row ops-table__row--${item.status}`}>
-                            <td><span className={`status-chip status-chip--${item.status}`}>{item.status}</span></td>
+                          <tr key={item.scheduleId} className={`row--${item.status}`}>
                             <td>
-                              <Link href={`/assets/${item.assetId}`} className="ops-table__primary-link">{item.assetName}</Link>
-                              <span className="ops-table__meta">{formatCategoryLabel(item.assetCategory)}</span>
+                              <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
                             </td>
                             <td>
-                              <Link href={`/assets/${item.assetId}`} className="ops-table__primary-link">{item.scheduleName}</Link>
-                              <span className="ops-table__meta">{item.summary}</span>
+                              <div className="data-table__primary">{item.assetName}</div>
+                              <div className="data-table__secondary">{formatCategoryLabel(item.assetCategory)}</div>
+                            </td>
+                            <td>
+                              <div className="data-table__primary">{item.scheduleName}</div>
+                              <div className="data-table__secondary">{item.summary}</div>
                             </td>
                             <td>
                               <strong>{formatDueLabel(item.nextDueAt, item.nextDueMetricValue, item.metricUnit)}</strong>
-                              <span className="ops-table__meta">{item.nextDueAt ? "Date-based trigger" : "Usage-based trigger"}</span>
                             </td>
                             <td>
-                              <strong>{item.currentMetricValue !== null ? `${item.currentMetricValue} ${item.metricUnit ?? "units"}` : "Not tracked"}</strong>
-                              <span className="ops-table__meta">{item.metricUnit ? `Metric ${item.metricUnit}` : "No metric attached"}</span>
+                              <span className={`status-chip status-chip--${item.status}`}>
+                                {item.status === "overdue" ? "High" : item.status === "due" ? "Medium" : "Low"}
+                              </span>
                             </td>
                             <td>
-                              <Link href={`/assets/${item.assetId}`} className="text-link">Open asset</Link>
+                              <Link href={`/assets/${item.assetId}`} className="data-table__link">View</Link>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                )}
-            </section>
-
-            <section id="registry" className="ops-pane ops-pane--registry">
-                <div className="ops-panel__header">
-                  <div>
-                    <p className="eyebrow">Equipment registry</p>
-                    <h2>Tracked systems</h2>
-                  </div>
-                  <p className="ops-panel__copy">This is the main comparison view. Every asset name and open action is clickable.</p>
+                  )}
                 </div>
+              </section>
 
-                {prioritizedAssets.length === 0 ? (
-                  <p className="ops-empty">Add your first asset from the capture panel to start tracking maintenance state.</p>
-                ) : (
-                  <div className="ops-table-wrap">
-                    <table className="ops-table ops-table--registry">
+              {/* ── Asset Registry ── */}
+              <section className="panel">
+                <div className="panel__header">
+                  <h2>Asset Registry</h2>
+                  <div className="panel__header-actions">
+                    <Link href="/assets/new" className="button button--primary button--sm">+ Add Asset</Link>
+                    <Link href="/assets" className="button button--ghost button--sm">View All</Link>
+                  </div>
+                </div>
+                <div className="panel__body">
+                  {sortedAssets.length === 0 ? (
+                    <p className="panel__empty">No assets tracked yet. <Link href="/assets/new" className="text-link">Add your first asset</Link> to get started.</p>
+                  ) : (
+                    <table className="data-table">
                       <thead>
                         <tr>
                           <th>Asset</th>
-                          <th>State</th>
+                          <th>Category</th>
+                          <th>Status</th>
                           <th>Overdue</th>
-                          <th>Due now</th>
-                          <th>Next due</th>
-                          <th>Last log</th>
-                          <th>Summary</th>
-                          <th>Open</th>
+                          <th>Due</th>
+                          <th>Next Due</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {prioritizedAssets.map((asset) => (
-                          <AssetCard key={asset.asset.id} asset={asset} />
-                        ))}
+                        {sortedAssets.slice(0, 10).map((item) => {
+                          const tone = item.overdueScheduleCount > 0
+                            ? "overdue"
+                            : item.dueScheduleCount > 0
+                              ? "due"
+                              : item.nextDueAt
+                                ? "upcoming"
+                                : "clear";
+                          const subtitle = [item.asset.manufacturer, item.asset.model].filter(Boolean).join(" ");
+
+                          return (
+                            <tr key={item.asset.id} className={`row--${tone}`}>
+                              <td>
+                                <div className="data-table__primary">
+                                  <Link href={`/assets/${item.asset.id}`} className="data-table__link">{item.asset.name}</Link>
+                                </div>
+                                {subtitle && <div className="data-table__secondary">{subtitle}</div>}
+                              </td>
+                              <td>{formatCategoryLabel(item.asset.category)}</td>
+                              <td><span className={`status-chip status-chip--${tone}`}>{tone}</span></td>
+                              <td><strong>{item.overdueScheduleCount}</strong></td>
+                              <td><strong>{item.dueScheduleCount}</strong></td>
+                              <td>{item.nextDueAt ? formatDateTime(item.nextDueAt) : "—"}</td>
+                              <td>
+                                <Link href={`/assets/${item.asset.id}`} className="data-table__link">Open</Link>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
-                  </div>
-                )}
-            </section>
-
-            <aside className="ops-side-panes">
-              <section id="alerts" className="ops-pane ops-pane--alerts ops-pane--compact">
-                <div className="ops-panel__header">
-                  <div>
-                    <p className="eyebrow">Alert feed</p>
-                    <h2>Notifications</h2>
-                  </div>
-                  <p className="ops-panel__copy">Notifications can be acknowledged here and deep-link into related assets when present.</p>
+                  )}
                 </div>
-
-                {dashboard.notifications.length === 0 ? (
-                  <p className="ops-empty">No notifications yet.</p>
-                ) : (
-                  <div className="ops-feed">
-                    {dashboard.notifications.map((notification) => {
-                      const tone = formatNotificationTone(notification);
-
-                      return (
-                        <article key={notification.id} className={`ops-feed__item ops-feed__item--${tone}`}>
-                          <div className="ops-feed__meta">
-                            <span className="pill">{notification.channel}</span>
-                            <span>{formatDateTime(notification.scheduledFor)}</span>
-                          </div>
-                          <div className="ops-feed__body">
-                            <h3>{notification.title}</h3>
-                            <p>{notification.body}</p>
-                          </div>
-                          <div className="ops-feed__actions">
-                            {notification.assetId ? <Link href={`/assets/${notification.assetId}`} className="text-link">Open asset</Link> : null}
-                            {!notification.readAt && notification.status !== "read" ? (
-                              <form action={markNotificationReadAction}>
-                                <input type="hidden" name="notificationId" value={notification.id} />
-                                <button type="submit" className="button button--subtle">Mark read</button>
-                              </form>
-                            ) : (
-                              <span className="pill">Read</span>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
               </section>
+            </div>
 
-              <section className="ops-pane ops-pane--actions ops-pane--compact">
-                <div className="ops-panel__header">
-                  <div>
-                    <p className="eyebrow">Quick actions</p>
-                    <h2>Shortcuts</h2>
-                  </div>
+            <div className="dashboard-aside">
+              {/* ── Quick Actions ── */}
+              <section className="panel">
+                <div className="panel__header">
+                  <h2>Quick Actions</h2>
                 </div>
-
-                <div className="ops-action-list">
-                  <a href="#queue" className="ops-action-link">View priority queue</a>
-                  <a href="#registry" className="ops-action-link">Open asset registry</a>
-                  <a href="#capture" className="ops-action-link">Create new asset</a>
-                  {leadItem ? <Link href={`/assets/${leadItem.assetId}`} className="ops-action-link">Open next due asset</Link> : null}
-                  {firstAsset ? <Link href={`/assets/${firstAsset.asset.id}`} className="ops-action-link">Open latest registry entry</Link> : null}
+                <div className="quick-actions">
+                  <Link href="/assets/new" className="quick-action">+ Add New Asset</Link>
+                  <Link href="/maintenance" className="quick-action">View Maintenance Queue</Link>
+                  <Link href="/assets" className="quick-action">Browse Asset Registry</Link>
+                  <Link href="/notifications" className="quick-action">View Notifications</Link>
+                  {dashboard.dueWork[0] && (
+                    <Link href={`/assets/${dashboard.dueWork[0].assetId}`} className="quick-action">
+                      Open Next Due: {dashboard.dueWork[0].assetName}
+                    </Link>
+                  )}
                 </div>
               </section>
 
-              <section id="capture" className="ops-pane ops-pane--capture ops-pane--compact">
-                <div className="ops-panel__header">
-                  <div>
-                    <p className="eyebrow">Capture panel</p>
-                    <h2>Create asset</h2>
-                  </div>
-                  <p className="ops-panel__copy">This stays narrow and operational. The primary flow is compare first, capture second.</p>
+              {/* ── Notifications ── */}
+              <section className="panel">
+                <div className="panel__header">
+                  <h2>Recent Notifications</h2>
+                  {dashboard.notifications.length > 5 && (
+                    <Link href="/notifications" className="text-link" style={{ fontSize: "0.85rem" }}>View all</Link>
+                  )}
                 </div>
+                <div className="panel__body">
+                  {dashboard.notifications.length === 0 ? (
+                    <p className="panel__empty">No notifications yet.</p>
+                  ) : (
+                    <div className="notification-feed">
+                      {dashboard.notifications.slice(0, 5).map((notification) => {
+                        const tone = formatNotificationTone(notification);
 
-                <AssetProfileWorkbench
-                  action={createAssetAction}
-                  householdId={selectedHousehold.id}
-                  submitLabel="Create asset"
-                  libraryPresets={presets}
-                  customPresets={customPresets}
-                />
+                        return (
+                          <div key={notification.id} className={`notification-item${tone === "pending" ? " notification-item--unread" : ""}`}>
+                            <div className="notification-item__body">
+                              <h4>{notification.title}</h4>
+                              <p>{notification.body}</p>
+                            </div>
+                            <div className="notification-item__actions">
+                              <span className="notification-item__meta">{formatDateTime(notification.scheduledFor)}</span>
+                              {notification.assetId && (
+                                <Link href={`/assets/${notification.assetId}`} className="text-link" style={{ fontSize: "0.8rem" }}>View</Link>
+                              )}
+                              {!notification.readAt && notification.status !== "read" && (
+                                <form action={markNotificationReadAction}>
+                                  <input type="hidden" name="notificationId" value={notification.id} />
+                                  <button type="submit" className="button button--ghost button--sm">Read</button>
+                                </form>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </section>
-            </aside>
+            </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </AppShell>
     );
   } catch (error) {
-    if (error instanceof ApiError) {
-      return <DashboardError message={error.message} />;
-    }
-
+    if (error instanceof ApiError) return <DashboardError message={error.message} />;
     throw error;
   }
 }
