@@ -15,7 +15,7 @@ type AssetCardProps = {
 
 export function AssetCard({ asset }: AssetCardProps): JSX.Element {
   const tone = getAssetTone(asset);
-  const subtitle = [asset.asset.manufacturer, asset.asset.model].filter(Boolean).join(" ") || asset.asset.description || "No extra details yet.";
+  const subtitle = [asset.asset.manufacturer, asset.asset.model].filter(Boolean).join(" ") || asset.asset.description || "No details yet.";
   const activitySummary = asset.overdueScheduleCount > 0
     ? `${asset.overdueScheduleCount} overdue ${asset.overdueScheduleCount === 1 ? "schedule needs" : "schedules need"} recovery.`
     : asset.dueScheduleCount > 0

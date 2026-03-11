@@ -1,6 +1,8 @@
 /* ── AssetKeeper – Professional Dashboard Theme ── */
 
 :root {
+  --font-body: "Segoe UI", "Inter", "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Aptos Display", "Segoe UI Semibold", "Space Grotesk", "Inter", system-ui, sans-serif;
   --bg: #f8f9fb;
   --bg-sidebar: #1e293b;
   --bg-sidebar-hover: #334155;
@@ -40,7 +42,7 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   color: var(--ink);
   background: var(--bg);
   line-height: 1.5;
@@ -51,7 +53,7 @@ button, input, select, textarea { font: inherit; }
 
 h1, h2, h3, h4 {
   margin: 0;
-  font-family: var(--font-display), system-ui, sans-serif;
+  font-family: var(--font-display);
   line-height: 1.2;
   color: var(--ink);
 }
@@ -275,7 +277,7 @@ p { margin: 0; color: var(--ink-light); }
 .stat-card__value {
   font-size: 2rem;
   font-weight: 700;
-  font-family: var(--font-display), system-ui, sans-serif;
+  font-family: var(--font-display);
   color: var(--ink);
   line-height: 1.1;
 }
@@ -822,6 +824,45 @@ textarea { resize: vertical; }
   gap: 24px;
 }
 
+.asset-studio__format-switcher {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.asset-studio__format-option {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface), var(--surface-alt));
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms, transform 150ms;
+}
+
+.asset-studio__format-option:hover {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, #ffffff, var(--accent-bg));
+}
+
+.asset-studio__format-option--active {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--accent-bg), #ffffff);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.08);
+}
+
+.asset-studio__format-option span {
+  font-weight: 600;
+}
+
+.asset-studio__format-option small {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
 .panel--studio {
   padding: 24px;
   border: 1px solid var(--border);
@@ -851,6 +892,216 @@ textarea { resize: vertical; }
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.asset-studio__core-grid {
+  gap: 14px;
+}
+
+.asset-studio__details-intro {
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+}
+
+.asset-studio__detail-builder {
+  display: grid;
+  gap: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.asset-studio__detail-builder--footer {
+  margin-top: 6px;
+}
+
+.asset-studio__detail-builder-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.asset-studio__detail-builder-header p,
+.asset-studio__detail-group-header p,
+.asset-studio__detail-card-header p {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.asset-studio__detail-toolbar,
+.asset-studio__section-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.asset-studio__toolbar-field {
+  min-width: min(320px, 100%);
+  flex: 1 1 260px;
+}
+
+.asset-studio__toolbar-field--section {
+  flex: 0 1 220px;
+}
+
+.asset-studio__detail-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.asset-studio__detail-group {
+  display: grid;
+  gap: 12px;
+}
+
+.asset-studio__detail-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asset-studio__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.asset-studio__detail-slot {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface-alt), #f8fbfc);
+}
+
+.asset-studio__detail-empty {
+  grid-column: 1 / -1;
+  padding: 20px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.asset-studio__detail-empty p {
+  color: var(--ink-muted);
+  font-size: 0.88rem;
+}
+
+.asset-studio__detail-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asset-studio__detail-card-header h4 {
+  font-size: 0.96rem;
+}
+
+.asset-studio__detail-value {
+  display: grid;
+  gap: 8px;
+}
+
+.asset-studio__detail-value--boolean {
+  padding-top: 4px;
+}
+
+.asset-studio__detail-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+}
+
+.asset-studio--compact {
+  gap: 18px;
+}
+
+.asset-studio--compact .panel--studio {
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.asset-studio--compact .asset-studio__detail-groups {
+  gap: 12px;
+}
+
+.asset-studio--compact .asset-studio__detail-grid {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.asset-studio--compact .asset-studio__detail-slot {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.asset-studio--compact .asset-studio__detail-slot:last-child {
+  border-bottom: 0;
+}
+
+.asset-studio--compact .asset-studio__detail-group {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.asset-studio--compact .asset-studio__detail-group-header {
+  padding: 12px 10px 0;
+}
+
+.asset-studio--compact .asset-studio__detail-empty {
+  margin: 10px 0 12px;
+  background: transparent;
+}
+
+.asset-studio--industrial .panel--studio {
+  padding: 20px;
+  border-radius: 4px;
+  border-color: #94a3b8;
+  box-shadow: none;
+  background: #f8fafc;
+}
+
+.asset-studio--industrial .panel-header h2,
+.asset-studio--industrial .asset-studio__detail-group-header h3 {
+  font-family: Consolas, "SFMono-Regular", "Cascadia Mono", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asset-studio--industrial .asset-studio__detail-grid {
+  gap: 10px;
+}
+
+.asset-studio--industrial .asset-studio__detail-slot,
+.asset-studio--industrial .asset-studio__format-option {
+  border-radius: 4px;
+  background: #ffffff;
+  border-color: #94a3b8;
+  box-shadow: inset 0 0 0 1px #cbd5e1;
+}
+
+.asset-studio--industrial input,
+.asset-studio--industrial select,
+.asset-studio--industrial textarea {
+  border-radius: 4px;
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+.asset-studio--industrial .asset-studio__detail-settings {
+  border-top-style: solid;
 }
 
 /* ── DL Grids ── */
@@ -919,7 +1170,7 @@ textarea { resize: vertical; }
 .metric-value {
   font-size: 2rem;
   font-weight: 700;
-  font-family: var(--font-display), system-ui, sans-serif;
+  font-family: var(--font-display);
   color: var(--ink);
   line-height: 1.1;
 }
@@ -1238,6 +1489,20 @@ textarea { resize: vertical; }
   }
 
   .detail-hero {
+    flex-direction: column;
+  }
+
+  .asset-studio__detail-grid,
+  .asset-studio__detail-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-studio__format-switcher {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-studio__detail-builder-header,
+  .asset-studio__detail-card-header {
     flex-direction: column;
   }
 }

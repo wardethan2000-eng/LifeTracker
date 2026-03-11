@@ -37,6 +37,14 @@ type Blueprint = {
   scheduleTemplates: PresetScheduleTemplate[];
 };
 
+type CoreDetailField = {
+  id: string;
+  section?: string;
+  render: () => JSX.Element;
+};
+
+type AssetLayoutMode = "cards" | "compact" | "industrial";
+
 const categoryOptions: Array<{ value: AssetCategory; label: string }> = [
   { value: "vehicle", label: "Vehicle" },
   { value: "home", label: "Home" },
@@ -59,6 +67,24 @@ const fieldTypeOptions: Array<{ value: AssetFieldType; label: string }> = [
   { value: "select", label: "Dropdown" },
   { value: "multiselect", label: "Multi-select" },
   { value: "url", label: "Link / URL" }
+];
+
+const assetLayoutModeOptions: Array<{ value: AssetLayoutMode; label: string; description: string }> = [
+  {
+    value: "cards",
+    label: "Cards",
+    description: "Current block layout with roomy detail cards."
+  },
+  {
+    value: "compact",
+    label: "Compact",
+    description: "Tighter rows with less visual weight and faster scanning."
+  },
+  {
+    value: "industrial",
+    label: "Industrial",
+    description: "Sharper, denser structure with a more operational feel."
+  }
 ];
 
 const commonDefaultFields: AssetFieldDefinition[] = [
@@ -130,12 +156,469 @@ const commonDefaultFields: AssetFieldDefinition[] = [
   },
 ];
 
+const sharedSuggestedFields: AssetFieldDefinition[] = [
+  {
+    key: "installed-date",
+    label: "Installed Date",
+    type: "date",
+    required: false,
+    wide: false,
+    order: 5,
+    options: [],
+    defaultValue: null,
+    group: "Location & Condition"
+  },
+  {
+    key: "service-provider",
+    label: "Service Provider",
+    type: "string",
+    required: false,
+    wide: false,
+    order: 6,
+    options: [],
+    defaultValue: null,
+    placeholder: "Installer, dealer, contractor, shop",
+    group: "Purchase & Warranty"
+  },
+  {
+    key: "manual-link",
+    label: "Manual / Reference Link",
+    type: "url",
+    required: false,
+    wide: true,
+    order: 7,
+    options: [],
+    defaultValue: null,
+    placeholder: "https://",
+    group: "Records"
+  },
+  {
+    key: "parts-model",
+    label: "Replacement Part Model",
+    type: "string",
+    required: false,
+    wide: false,
+    order: 8,
+    options: [],
+    defaultValue: null,
+    placeholder: "Filter, battery, blade, belt, etc.",
+    group: "Parts & Supplies"
+  },
+  {
+    key: "service-notes",
+    label: "Service Notes",
+    type: "textarea",
+    required: false,
+    wide: true,
+    order: 9,
+    options: [],
+    defaultValue: null,
+    placeholder: "Preferred service intervals, known issues, special steps",
+    group: "Records"
+  }
+];
+
+const categorySuggestedFields: Partial<Record<AssetCategory, AssetFieldDefinition[]>> = {
+  vehicle: [
+    {
+      key: "vin",
+      label: "VIN",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Identifiers"
+    },
+    {
+      key: "year",
+      label: "Year",
+      type: "number",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "license-plate",
+      label: "License Plate",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Identifiers"
+    },
+    {
+      key: "fuel-type",
+      label: "Fuel Type",
+      type: "select",
+      required: false,
+      wide: false,
+      order: 3,
+      options: [
+        { label: "Gasoline", value: "gasoline" },
+        { label: "Diesel", value: "diesel" },
+        { label: "Hybrid", value: "hybrid" },
+        { label: "Electric", value: "electric" },
+        { label: "Other", value: "other" }
+      ],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "registration-renewal",
+      label: "Registration Renewal",
+      type: "date",
+      required: false,
+      wide: false,
+      order: 4,
+      options: [],
+      defaultValue: null,
+      group: "Records"
+    }
+  ],
+  home: [
+    {
+      key: "room-area",
+      label: "Room / Area",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Location & Condition"
+    },
+    {
+      key: "installer",
+      label: "Installer",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Purchase & Warranty"
+    },
+    {
+      key: "material-finish",
+      label: "Material / Finish",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    }
+  ],
+  marine: [
+    {
+      key: "hull-id",
+      label: "Hull ID",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Identifiers"
+    },
+    {
+      key: "length",
+      label: "Length",
+      type: "number",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      unit: "ft",
+      group: "Specifications"
+    },
+    {
+      key: "dock-slip",
+      label: "Dock / Slip",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Location & Condition"
+    }
+  ],
+  yard: [
+    {
+      key: "power-source",
+      label: "Power Source",
+      type: "select",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [
+        { label: "Gas", value: "gas" },
+        { label: "Battery", value: "battery" },
+        { label: "Corded", value: "corded" },
+        { label: "Manual", value: "manual" }
+      ],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "blade-size",
+      label: "Blade Size",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Parts & Supplies"
+    },
+    {
+      key: "seasonal-storage",
+      label: "Seasonal Storage Prep",
+      type: "textarea",
+      required: false,
+      wide: true,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Location & Condition"
+    }
+  ],
+  workshop: [
+    {
+      key: "voltage",
+      label: "Voltage",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "accessory-system",
+      label: "Accessory System",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Parts & Supplies"
+    },
+    {
+      key: "shop-location",
+      label: "Shop Location",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Location & Condition"
+    }
+  ],
+  appliance: [
+    {
+      key: "capacity",
+      label: "Capacity",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "finish-color",
+      label: "Finish / Color",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "filter-model",
+      label: "Filter Model",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Parts & Supplies"
+    }
+  ],
+  hvac: [
+    {
+      key: "filter-size",
+      label: "Filter Size",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Parts & Supplies"
+    },
+    {
+      key: "tonnage",
+      label: "Tonnage",
+      type: "number",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      unit: "tons",
+      group: "Specifications"
+    },
+    {
+      key: "thermostat-model",
+      label: "Thermostat Model",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    }
+  ],
+  technology: [
+    {
+      key: "operating-system",
+      label: "Operating System",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "storage-capacity",
+      label: "Storage Capacity",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "memory-ram",
+      label: "Memory / RAM",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 2,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    }
+  ],
+  other: [
+    {
+      key: "size",
+      label: "Size",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 0,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    },
+    {
+      key: "material",
+      label: "Material",
+      type: "string",
+      required: false,
+      wide: false,
+      order: 1,
+      options: [],
+      defaultValue: null,
+      group: "Specifications"
+    }
+  ]
+};
+
 const slugify = (value: string): string => value
   .trim()
   .toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-+|-+$/g, "")
   .slice(0, 80);
+
+const cloneFieldDefinition = (field: AssetFieldDefinition): AssetFieldDefinition => ({
+  ...field,
+  options: field.options.map((option) => ({ ...option }))
+});
+
+const cloneFieldDefinitions = (fields: AssetFieldDefinition[]): AssetFieldDefinition[] => fields.map((field, index) => ({
+  ...cloneFieldDefinition(field),
+  order: index
+}));
+
+const getDistinctGroups = (fields: AssetFieldDefinition[]): string[] => Array.from(
+  new Set(
+    fields
+      .map((field) => field.group?.trim())
+      .filter((group): group is string => Boolean(group))
+  )
+);
+
+const buildUniqueFieldKey = (
+  preferred: string,
+  existingKeys: string[],
+  fallbackLabel = "detail"
+): string => {
+  const baseKey = slugify(preferred) || slugify(fallbackLabel) || "detail";
+  let nextKey = baseKey;
+  let counter = 2;
+
+  while (existingKeys.includes(nextKey)) {
+    nextKey = `${baseKey}-${counter}`;
+    counter += 1;
+  }
+
+  return nextKey;
+};
+
+const dedupeSuggestedFields = (fields: AssetFieldDefinition[]): AssetFieldDefinition[] => {
+  const byKey = new Map<string, AssetFieldDefinition>();
+
+  for (const field of fields) {
+    const normalizedKey = field.key.trim().toLowerCase() || slugify(field.label);
+
+    if (!normalizedKey || byKey.has(normalizedKey)) {
+      continue;
+    }
+
+    byKey.set(normalizedKey, cloneFieldDefinition(field));
+  }
+
+  return Array.from(byKey.values());
+};
+
+const getFieldTypeLabel = (type: AssetFieldType): string => fieldTypeOptions.find((option) => option.value === type)?.label ?? type;
 
 const toAssetFieldDefinition = (field: LibraryPreset["suggestedCustomFields"][number] | CustomPresetProfile["suggestedCustomFields"][number], index: number): AssetFieldDefinition => ({
   key: field.key,
@@ -200,14 +683,7 @@ const createFieldDefinition = (): AssetFieldDefinition => ({
   defaultValue: null
 });
 
-const mergeFieldDefinitions = (
-  templateFields: AssetFieldDefinition[],
-  defaults: AssetFieldDefinition[]
-): AssetFieldDefinition[] => {
-  const templateKeys = new Set(templateFields.map((f) => f.key));
-  const extraDefaults = defaults.filter((f) => !templateKeys.has(f.key));
-  return [...templateFields, ...extraDefaults].map((f, i) => ({ ...f, order: i }));
-};
+const mergeFieldDefinitions = (templateFields: AssetFieldDefinition[]): AssetFieldDefinition[] => cloneFieldDefinitions(templateFields);
 
 const renderFieldValueInput = (
   field: AssetFieldDefinition,
@@ -340,10 +816,10 @@ export function AssetProfileWorkbench({
       : undefined;
 
   const initialFieldDefs = initialAsset
-    ? (initialAsset.fieldDefinitions.length ? initialAsset.fieldDefinitions : commonDefaultFields)
+    ? cloneFieldDefinitions(initialAsset.fieldDefinitions)
     : initialBlueprint
-      ? mergeFieldDefinitions(initialBlueprint.fieldDefinitions, commonDefaultFields)
-      : commonDefaultFields;
+      ? mergeFieldDefinitions(initialBlueprint.fieldDefinitions)
+      : [];
 
   const [category, setCategory] = useState<AssetCategory>(initialAsset?.category ?? initialBlueprint?.category ?? "vehicle");
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string>(initialBlueprint?.id ?? "");
@@ -358,7 +834,12 @@ export function AssetProfileWorkbench({
   const [metricTemplates, setMetricTemplates] = useState<PresetUsageMetricTemplate[]>(initialBlueprint?.metricTemplates ?? []);
   const [scheduleTemplates, setScheduleTemplates] = useState<PresetScheduleTemplate[]>(initialBlueprint?.scheduleTemplates ?? []);
   const [saveAsPreset, setSaveAsPreset] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<AssetLayoutMode>("cards");
+  const [detailPickerValue, setDetailPickerValue] = useState("");
+  const [detailTargetSection, setDetailTargetSection] = useState("");
+  const [newSectionName, setNewSectionName] = useState("");
+  const [manualSections, setManualSections] = useState<string[]>([]);
+  const [expandedFieldEditors, setExpandedFieldEditors] = useState<number[]>([]);
 
   const selectedBlueprint = blueprintOptions.find((preset) => preset.id === selectedBlueprintId);
   const assetTypeSource: AssetTypeSource = selectedBlueprint
@@ -367,9 +848,101 @@ export function AssetProfileWorkbench({
       ? "inline"
       : "manual";
   const assetTypeKey = selectedBlueprint?.key ?? (assetTypeLabel ? slugify(assetTypeLabel) : "");
+  const coreDetailFields: CoreDetailField[] = [
+    {
+      id: "manufacturer",
+      render: () => (
+        <label className="field">
+          <span>Manufacturer / Brand</span>
+          <input type="text" name="manufacturer" defaultValue={initialAsset?.manufacturer ?? ""} placeholder='e.g. "Honda", "Samsung", "DeWalt"' />
+        </label>
+      )
+    },
+    {
+      id: "model",
+      render: () => (
+        <label className="field">
+          <span>Model</span>
+          <input type="text" name="model" defaultValue={initialAsset?.model ?? ""} placeholder='e.g. "HRX217", "RF28R7351SR"' />
+        </label>
+      )
+    },
+    {
+      id: "visibility",
+      render: () => (
+        <label className="field">
+          <span>Visibility</span>
+          <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
+            <option value="shared">Shared (visible to household)</option>
+            <option value="personal">Personal (only you)</option>
+          </select>
+        </label>
+      )
+    },
+    {
+      id: "description",
+      render: () => (
+        <label className="field field--full">
+          <span>Notes</span>
+          <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Anything helpful: where it&#39;s installed, special considerations, included accessories..." />
+        </label>
+      )
+    },
+    {
+      id: "serialNumber",
+      render: () => (
+        <label className="field">
+          <span>Serial Number</span>
+          <input type="text" name="serialNumber" defaultValue={initialAsset?.serialNumber ?? ""} placeholder="For warranty claims and service records" />
+        </label>
+      )
+    },
+    {
+      id: "purchaseDate",
+      render: () => (
+        <label className="field">
+          <span>Purchase Date</span>
+          <input type="date" name="purchaseDate" defaultValue={initialAsset?.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : ""} />
+        </label>
+      )
+    }
+  ];
+  const dynamicSections = getDistinctGroups(fieldDefinitions);
+  const detailSections = Array.from(new Set([...dynamicSections, ...manualSections]));
+  const suggestionPool = dedupeSuggestedFields([
+    ...commonDefaultFields,
+    ...sharedSuggestedFields,
+    ...(categorySuggestedFields[category] ?? []),
+    ...blueprintOptions
+      .filter((preset) => preset.category === category)
+      .flatMap((preset) => preset.fieldDefinitions)
+  ]);
+  const availableSuggestedFields = suggestionPool.filter((suggestion) => !fieldDefinitions.some((field) => field.key === suggestion.key));
+  const groupedFieldDefinitions = fieldDefinitions.reduce<Record<string, Array<{ field: AssetFieldDefinition; index: number }>>>((groups, field, index) => {
+    const key = field.group?.trim() || "General";
+
+    if (!field.group?.trim()) {
+      return groups;
+    }
+
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+
+    groups[key].push({ field, index });
+    return groups;
+  }, {});
+  const unsectionedFieldDefinitions = fieldDefinitions
+    .map((field, index) => ({ field, index }))
+    .filter(({ field }) => !field.group?.trim());
 
   const handleBlueprintChange = (nextId: string): void => {
     setSelectedBlueprintId(nextId);
+    setDetailPickerValue("");
+    setDetailTargetSection("");
+    setNewSectionName("");
+    setManualSections([]);
+    setExpandedFieldEditors([]);
 
     const nextBlueprint = blueprintOptions.find((preset) => preset.id === nextId);
 
@@ -378,8 +951,9 @@ export function AssetProfileWorkbench({
       setScheduleTemplates([]);
       setAssetTypeLabel("");
       setAssetTypeDescription("");
-      setFieldDefinitions(commonDefaultFields);
-      setFieldValues(buildFieldValueMap(commonDefaultFields));
+      const resetFields: AssetFieldDefinition[] = [];
+      setFieldDefinitions(resetFields);
+      setFieldValues(buildFieldValueMap(resetFields));
       return;
     }
 
@@ -388,9 +962,45 @@ export function AssetProfileWorkbench({
     setAssetTypeDescription(nextBlueprint.description ?? "");
     setMetricTemplates(nextBlueprint.metricTemplates);
     setScheduleTemplates(nextBlueprint.scheduleTemplates);
-    const merged = mergeFieldDefinitions(nextBlueprint.fieldDefinitions, commonDefaultFields);
+    const merged = mergeFieldDefinitions(nextBlueprint.fieldDefinitions);
     setFieldDefinitions(merged);
     setFieldValues(buildFieldValueMap(merged));
+  };
+
+  const removeSection = (sectionLabel: string): void => {
+    setManualSections((current) => current.filter((section) => section !== sectionLabel));
+
+    setFieldDefinitions((currentDefinitions) => currentDefinitions.map((field, index) => (
+      field.group?.trim() === sectionLabel
+        ? { ...field, group: undefined, order: index }
+        : field
+    )));
+
+    setDetailTargetSection((current) => (current === sectionLabel ? "" : current));
+  };
+
+  const toggleFieldEditor = (index: number): void => {
+    setExpandedFieldEditors((current) => current.includes(index)
+      ? current.filter((value) => value !== index)
+      : [...current, index]);
+  };
+
+  const handleFieldLabelChange = (index: number, nextLabel: string): void => {
+    const currentField = fieldDefinitions[index];
+
+    if (!currentField) {
+      return;
+    }
+
+    const shouldRefreshKey = currentField.key.startsWith("custom-detail-");
+    const nextKey = shouldRefreshKey
+      ? buildUniqueFieldKey(nextLabel, fieldDefinitions.filter((_, fieldIndex) => fieldIndex !== index).map((field) => field.key), "detail")
+      : currentField.key;
+
+    updateFieldDefinition(index, {
+      label: nextLabel,
+      key: nextKey
+    });
   };
 
   const updateFieldDefinition = (index: number, update: Partial<AssetFieldDefinition>): void => {
@@ -453,12 +1063,19 @@ export function AssetProfileWorkbench({
         order: fieldIndex
       }));
     });
+
+    setExpandedFieldEditors((current) => current
+      .filter((value) => value !== index)
+      .map((value) => (value > index ? value - 1 : value)));
   };
 
   const addFieldDefinition = (): void => {
     setFieldDefinitions((currentDefinitions) => {
+      const nextKey = buildUniqueFieldKey("custom-detail", currentDefinitions.map((field) => field.key), "detail");
       const nextField = {
         ...createFieldDefinition(),
+        key: nextKey,
+        group: detailTargetSection || undefined,
         order: currentDefinitions.length
       };
 
@@ -469,6 +1086,46 @@ export function AssetProfileWorkbench({
 
       return [...currentDefinitions, nextField];
     });
+
+    setExpandedFieldEditors((current) => [...current, fieldDefinitions.length]);
+  };
+
+  const addSuggestedField = (): void => {
+    const nextSuggestion = availableSuggestedFields.find((field) => field.key === detailPickerValue);
+
+    if (!nextSuggestion) {
+      return;
+    }
+
+    setFieldDefinitions((currentDefinitions) => {
+      const nextField = {
+        ...cloneFieldDefinition(nextSuggestion),
+        key: buildUniqueFieldKey(nextSuggestion.key, currentDefinitions.map((field) => field.key), nextSuggestion.label),
+        group: detailTargetSection || undefined,
+        order: currentDefinitions.length
+      };
+
+      setFieldValues((currentValues) => ({
+        ...currentValues,
+        [nextField.key]: buildDefaultFieldValue(nextField)
+      }));
+
+      return [...currentDefinitions, nextField];
+    });
+
+    setDetailPickerValue("");
+  };
+
+  const addSection = (): void => {
+    const normalizedSection = newSectionName.trim();
+
+    if (!normalizedSection || detailSections.includes(normalizedSection)) {
+      return;
+    }
+
+    setManualSections((current) => [...current, normalizedSection]);
+    setDetailTargetSection(normalizedSection);
+    setNewSectionName("");
   };
 
   const fieldDefinitionJson = JSON.stringify(fieldDefinitions.map((field, index) => ({
@@ -486,7 +1143,7 @@ export function AssetProfileWorkbench({
   );
 
   return (
-    <form action={action} className="asset-studio">
+    <form action={action} className={`asset-studio asset-studio--${layoutMode}`}>
       {initialAsset ? <input type="hidden" name="assetId" value={initialAsset.id} /> : null}
       <input type="hidden" name="householdId" value={householdId} />
       <input type="hidden" name="fieldDefinitionsJson" value={fieldDefinitionJson} />
@@ -502,6 +1159,31 @@ export function AssetProfileWorkbench({
       <input type="hidden" name="metricTemplatesJson" value={JSON.stringify(metricTemplates)} />
       <input type="hidden" name="scheduleTemplatesJson" value={JSON.stringify(scheduleTemplates)} />
       <input type="hidden" name="saveAsPreset" value={saveAsPreset ? "true" : "false"} />
+
+      <section className="panel panel--studio">
+        <div className="panel-header">
+          <h2>Page Format</h2>
+        </div>
+
+        <div className="asset-studio__format-switcher">
+          {assetLayoutModeOptions.map((option) => {
+            const isSelected = layoutMode === option.value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`asset-studio__format-option${isSelected ? " asset-studio__format-option--active" : ""}`}
+                onClick={() => setLayoutMode(option.value)}
+                aria-pressed={isSelected}
+              >
+                <span>{option.label}</span>
+                <small>{option.description}</small>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* ── Section 1: Basic Information ── */}
       <section className="panel panel--studio">
@@ -544,207 +1226,395 @@ export function AssetProfileWorkbench({
                 </optgroup>
               )}
             </select>
-            <small>Templates pre-fill extra fields for common asset types</small>
+            <small>Templates can pre-fill recommended details for common asset types</small>
           </label>
         </div>
       </section>
 
-      {/* ── Section 2: Asset Details ── */}
+      <datalist id={`${inputIdPrefix}-detail-sections`}>
+        {detailSections.map((section) => (
+          <option key={section} value={section} />
+        ))}
+      </datalist>
+
       <section className="panel panel--studio">
         <div className="panel-header">
           <h2>Details</h2>
         </div>
+        <p className="asset-studio__details-intro">
+          Everything below is part of the asset details. Core info, template details, and custom details all use the same section layout.
+        </p>
 
-        <div className="form-grid">
-          <label className="field">
-            <span>Manufacturer / Brand</span>
-            <input type="text" name="manufacturer" defaultValue={initialAsset?.manufacturer ?? ""} placeholder='e.g. "Honda", "Samsung", "DeWalt"' />
-          </label>
+        <div className="asset-studio__detail-groups">
+          <section className="asset-studio__detail-group">
+            <div className="asset-studio__detail-grid">
+              {coreDetailFields.map((field) => (
+                <div key={field.id} className="asset-studio__detail-slot">
+                  {field.render()}
+                </div>
+              ))}
 
-          <label className="field">
-            <span>Model</span>
-            <input type="text" name="model" defaultValue={initialAsset?.model ?? ""} placeholder='e.g. "HRX217", "RF28R7351SR"' />
-          </label>
+              {unsectionedFieldDefinitions.map(({ field, index }) => {
+                const optionsValue = field.options.map((option) => option.value).join(", ");
+                const isExpanded = expandedFieldEditors.includes(index);
 
-          <label className="field">
-            <span>Serial Number</span>
-            <input type="text" name="serialNumber" defaultValue={initialAsset?.serialNumber ?? ""} placeholder="For warranty claims and service records" />
-          </label>
+                return (
+                  <article key={`${field.key}-${index}`} className="asset-studio__detail-slot">
+                    <div className="asset-studio__detail-card-header">
+                      <div>
+                        <h4>{field.label || "New detail"}</h4>
+                        <p>{getFieldTypeLabel(field.type)}{field.unit ? ` • ${field.unit}` : ""}</p>
+                      </div>
+                      <div className="inline-actions">
+                        <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
+                          {isExpanded ? "Done" : "Edit"}
+                        </button>
+                        <button type="button" className="button button--subtle button--sm" onClick={() => removeFieldDefinition(index)}>
+                          Remove
+                        </button>
+                      </div>
+                    </div>
 
-          <label className="field">
-            <span>Purchase Date</span>
-            <input type="date" name="purchaseDate" defaultValue={initialAsset?.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : ""} />
-          </label>
+                    {isExpanded && (
+                      <label className="field">
+                        <span>Detail name</span>
+                        <input
+                          type="text"
+                          value={field.label}
+                          onChange={(event) => handleFieldLabelChange(index, event.target.value)}
+                          placeholder='e.g. "VIN", "Filter Size", "Paint Color"'
+                        />
+                      </label>
+                    )}
 
-          <label className="field">
-            <span>Visibility</span>
-            <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
-              <option value="shared">Shared (visible to household)</option>
-              <option value="personal">Personal (only you)</option>
-            </select>
-          </label>
+                    {field.type === "boolean" ? (
+                      <div className="asset-studio__detail-value asset-studio__detail-value--boolean">
+                        {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                          setFieldValues((currentValues) => ({
+                            ...currentValues,
+                            [field.key]: nextValue
+                          }));
+                        })}
+                      </div>
+                    ) : (
+                      <label className="field">
+                        <span>Value</span>
+                        {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                          setFieldValues((currentValues) => ({
+                            ...currentValues,
+                            [field.key]: nextValue
+                          }));
+                        })}
+                      </label>
+                    )}
 
-          <label className="field field--full">
-            <span>Notes</span>
-            <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Anything helpful: where it&#39;s installed, special considerations, included accessories..." />
-          </label>
-        </div>
-      </section>
+                    {field.helpText ? <small>{field.helpText}</small> : null}
 
-      {/* ── Section 3: Extra details from field definitions ── */}
-      {fieldDefinitions.length > 0 && (
-        <section className="panel panel--studio">
-          <div className="panel-header">
-            <h2>Additional Details</h2>
-          </div>
+                    {isExpanded && (
+                      <div className="asset-studio__detail-settings">
+                        <label className="field">
+                          <span>Value format</span>
+                          <select
+                            value={field.type}
+                            onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}
+                          >
+                            {fieldTypeOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
 
-          <div className="form-grid">
-            {fieldDefinitions.map((field, index) => (
-              <label key={`${field.key}-${index}`} className={`field${field.wide ? " field--full" : ""}`}>
-                <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
-                {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
-                  setFieldValues((currentValues) => ({
-                    ...currentValues,
-                    [field.key]: nextValue
-                  }));
-                })}
-                {field.helpText ? <small>{field.helpText}</small> : null}
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
+                        <label className="field">
+                          <span>Section</span>
+                          <input
+                            type="text"
+                            list={`${inputIdPrefix}-detail-sections`}
+                            value={field.group ?? ""}
+                            onChange={(event) => updateFieldDefinition(index, { group: event.target.value.trim() || undefined })}
+                            placeholder="Optional"
+                          />
+                        </label>
 
-      {/* ── Advanced Section (collapsed by default) ── */}
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <h2>Advanced</h2>
-          <button type="button" className="button button--ghost button--sm" onClick={() => setShowAdvanced(!showAdvanced)}>
-            {showAdvanced ? "Hide" : "Show"} advanced options
-          </button>
-        </div>
+                        <label className="field">
+                          <span>Unit</span>
+                          <input
+                            type="text"
+                            value={field.unit ?? ""}
+                            onChange={(event) => updateFieldDefinition(index, { unit: event.target.value.trim() || undefined })}
+                            placeholder="miles, psi, qt"
+                          />
+                        </label>
 
-        {showAdvanced && (
-          <div className="asset-studio" style={{ gap: 16 }}>
-            {/* Custom field editor */}
-            <div>
-              <div className="panel-header" style={{ paddingBottom: 8 }}>
-                <h3>Customize Fields</h3>
-                <button type="button" className="button button--ghost button--sm" onClick={addFieldDefinition}>+ Add field</button>
-              </div>
-              <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)", margin: "0 0 12px" }}>
-                Add, remove, or edit the extra detail fields for this asset. Changes here update the &ldquo;Additional Details&rdquo; section above.
-              </p>
+                        {(field.type === "select" || field.type === "multiselect") && (
+                          <label className="field field--full">
+                            <span>Choice options</span>
+                            <input
+                              type="text"
+                              value={optionsValue}
+                              onChange={(event) => updateFieldDefinition(index, {
+                                options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({
+                                  label: option,
+                                  value: option
+                                }))
+                              })}
+                              placeholder="gasoline, diesel, electric"
+                            />
+                          </label>
+                        )}
 
-              {fieldDefinitions.length === 0 ? (
-                <p className="empty-state">No extra fields. Click &ldquo;+ Add field&rdquo; to add one.</p>
-              ) : (
-                <div className="asset-studio__field-stack">
-                  {fieldDefinitions.map((field, index) => {
-                    const baseId = `${inputIdPrefix}-${index}`;
+                        <label className="field field--full">
+                          <span>Description</span>
+                          <input
+                            type="text"
+                            value={field.helpText ?? ""}
+                            onChange={(event) => updateFieldDefinition(index, { helpText: event.target.value.trim() || undefined })}
+                            placeholder="Optional notes about this detail"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          {detailSections.map((groupLabel) => {
+            const fields = groupedFieldDefinitions[groupLabel] ?? [];
+            const isEmpty = fields.length === 0;
+
+            return (
+              <section key={groupLabel} className="asset-studio__detail-group">
+                <div className="asset-studio__detail-group-header">
+                  <div>
+                    <h3>{groupLabel}</h3>
+                    <p>{fields.length} {fields.length === 1 ? "detail" : "details"}</p>
+                  </div>
+                  <button type="button" className="button button--subtle button--sm" onClick={() => removeSection(groupLabel)}>
+                    Remove section
+                  </button>
+                </div>
+
+                <div className="asset-studio__detail-grid">
+                  {fields.map(({ field, index }) => {
                     const optionsValue = field.options.map((option) => option.value).join(", ");
+                    const isExpanded = expandedFieldEditors.includes(index);
 
                     return (
-                      <article key={`${baseId}-${index}`} className="asset-studio__field-card">
-                        <div className="asset-studio__field-card-header">
-                          <h3>{field.label || "Untitled field"}</h3>
-                          <button type="button" className="button button--subtle button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
+                      <article key={`${field.key}-${index}`} className="asset-studio__detail-slot">
+                        <div className="asset-studio__detail-card-header">
+                          <div>
+                            <h4>{field.label || "New detail"}</h4>
+                            <p>{getFieldTypeLabel(field.type)}{field.unit ? ` • ${field.unit}` : ""}</p>
+                          </div>
+                          <div className="inline-actions">
+                            <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
+                              {isExpanded ? "Done" : "Edit"}
+                            </button>
+                            <button type="button" className="button button--subtle button--sm" onClick={() => removeFieldDefinition(index)}>
+                              Remove
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="form-grid">
+                        {isExpanded && (
                           <label className="field">
-                            <span>Label</span>
+                            <span>Detail name</span>
                             <input
-                              id={`${baseId}-label`}
                               type="text"
                               value={field.label}
-                              onChange={(event) => updateFieldDefinition(index, {
-                                label: event.target.value,
-                                key: field.key || slugify(event.target.value)
-                              })}
-                              placeholder='e.g. "VIN", "Fuel Type", "Filter Size"'
+                              onChange={(event) => handleFieldLabelChange(index, event.target.value)}
+                              placeholder='e.g. "VIN", "Filter Size", "Paint Color"'
                             />
                           </label>
+                        )}
 
+                        {field.type === "boolean" ? (
+                          <div className="asset-studio__detail-value asset-studio__detail-value--boolean">
+                            {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                              setFieldValues((currentValues) => ({
+                                ...currentValues,
+                                [field.key]: nextValue
+                              }));
+                            })}
+                          </div>
+                        ) : (
                           <label className="field">
-                            <span>Field Type</span>
-                            <select
-                              id={`${baseId}-type`}
-                              value={field.type}
-                              onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}
-                            >
-                              {fieldTypeOptions.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
-                            </select>
+                            <span>Value</span>
+                            {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                              setFieldValues((currentValues) => ({
+                                ...currentValues,
+                                [field.key]: nextValue
+                              }));
+                            })}
                           </label>
+                        )}
 
-                          {(field.type === "select" || field.type === "multiselect") && (
-                            <label className="field field--full">
-                              <span>Options (comma separated)</span>
+                        {field.helpText ? <small>{field.helpText}</small> : null}
+
+                        {isExpanded && (
+                          <div className="asset-studio__detail-settings">
+                            <label className="field">
+                              <span>Value format</span>
+                              <select
+                                value={field.type}
+                                onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}
+                              >
+                                {fieldTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="field">
+                              <span>Section</span>
                               <input
                                 type="text"
-                                value={optionsValue}
-                                onChange={(event) => updateFieldDefinition(index, {
-                                  options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({
-                                    label: option,
-                                    value: option
-                                  }))
-                                })}
-                                placeholder="gasoline, diesel, electric"
+                                list={`${inputIdPrefix}-detail-sections`}
+                                value={field.group ?? ""}
+                                onChange={(event) => updateFieldDefinition(index, { group: event.target.value.trim() || undefined })}
+                                placeholder="Optional"
                               />
                             </label>
-                          )}
 
-                          <label className="checkbox-field">
-                            <input
-                              type="checkbox"
-                              checked={field.required}
-                              onChange={(event) => updateFieldDefinition(index, { required: event.target.checked })}
-                            />
-                            <span>Required</span>
-                          </label>
-                        </div>
+                            <label className="field">
+                              <span>Unit</span>
+                              <input
+                                type="text"
+                                value={field.unit ?? ""}
+                                onChange={(event) => updateFieldDefinition(index, { unit: event.target.value.trim() || undefined })}
+                                placeholder="miles, psi, qt"
+                              />
+                            </label>
+
+                            {(field.type === "select" || field.type === "multiselect") && (
+                              <label className="field field--full">
+                                <span>Choice options</span>
+                                <input
+                                  type="text"
+                                  value={optionsValue}
+                                  onChange={(event) => updateFieldDefinition(index, {
+                                    options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({
+                                      label: option,
+                                      value: option
+                                    }))
+                                  })}
+                                  placeholder="gasoline, diesel, electric"
+                                />
+                              </label>
+                            )}
+
+                            <label className="field field--full">
+                              <span>Description</span>
+                              <input
+                                type="text"
+                                value={field.helpText ?? ""}
+                                onChange={(event) => updateFieldDefinition(index, { helpText: event.target.value.trim() || undefined })}
+                                placeholder="Optional notes about this detail"
+                              />
+                            </label>
+                          </div>
+                        )}
                       </article>
                     );
                   })}
+
+                  {isEmpty ? (
+                    <div className="asset-studio__detail-empty">
+                      <p>No details in this section yet.</p>
+                    </div>
+                  ) : null}
                 </div>
-              )}
+              </section>
+            );
+          })}
+        </div>
+
+        <div className="asset-studio__detail-builder asset-studio__detail-builder--footer">
+          <div className="asset-studio__detail-builder-header">
+            <div>
+              <h3>Add Details</h3>
+              <p>Add suggested fields, create custom ones, or create a new section and then place details into it.</p>
             </div>
+          </div>
 
-            {/* Save as template */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-              <div className="panel-header" style={{ paddingBottom: 8 }}>
-                <h3>Save as Reusable Template</h3>
-                <label className="checkbox-field">
-                  <input type="checkbox" checked={saveAsPreset} onChange={(event) => setSaveAsPreset(event.target.checked)} />
-                  <span>Save this setup as a template</span>
-                </label>
-              </div>
-              <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)", margin: "0 0 12px" }}>
-                Re-use these fields next time you add a similar asset.
-              </p>
+          <div className="asset-studio__detail-toolbar">
+            <label className="field asset-studio__toolbar-field">
+              <span>Add detail</span>
+              <select value={detailPickerValue} onChange={(event) => setDetailPickerValue(event.target.value)}>
+                <option value="">Choose a suggested detail</option>
+                {availableSuggestedFields.map((field) => (
+                  <option key={field.key} value={field.key}>
+                    {field.label}{field.group ? ` (${field.group})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              {saveAsPreset && (
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Template Name</span>
-                    <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder='e.g. "My Vehicle Profile"' required={saveAsPreset} />
-                  </label>
+            <label className="field asset-studio__toolbar-field asset-studio__toolbar-field--section">
+              <span>Place in section</span>
+              <select value={detailTargetSection} onChange={(event) => setDetailTargetSection(event.target.value)}>
+                <option value="">No section</option>
+                {detailSections.map((section) => (
+                  <option key={section} value={section}>{section}</option>
+                ))}
+              </select>
+            </label>
 
-                  <label className="field field--full">
-                    <span>Description</span>
-                    <textarea name="presetDescription" rows={2} defaultValue={assetTypeDescription} placeholder="What this template is for" />
-                  </label>
+            <button type="button" className="button button--ghost button--sm" onClick={addSuggestedField} disabled={!detailPickerValue}>
+              Add detail
+            </button>
+            <button type="button" className="button button--ghost button--sm" onClick={addFieldDefinition}>
+              New custom detail
+            </button>
+          </div>
 
-                  <label className="field field--full">
-                    <span>Tags (comma separated)</span>
-                    <input type="text" name="presetTags" placeholder="vehicle, outdoor, power-tool" />
-                  </label>
-                  <input type="hidden" name="presetKeyOverride" value={assetTypeKey} />
-                </div>
-              )}
-            </div>
+          <div className="asset-studio__section-row">
+            <label className="field asset-studio__toolbar-field">
+              <span>Create section</span>
+              <input
+                type="text"
+                value={newSectionName}
+                onChange={(event) => setNewSectionName(event.target.value)}
+                placeholder="Warranty, Accessories, Setup..."
+              />
+            </label>
+            <button type="button" className="button button--ghost button--sm" onClick={addSection} disabled={!newSectionName.trim()}>
+              Add section
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel panel--studio">
+        <div className="panel-header">
+          <h2>Save as Template</h2>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={saveAsPreset} onChange={(event) => setSaveAsPreset(event.target.checked)} />
+            <span>Save this setup as a template</span>
+          </label>
+        </div>
+        <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)", margin: 0 }}>
+          Re-use this exact detail structure the next time you add a similar asset.
+        </p>
+
+        {saveAsPreset && (
+          <div className="form-grid">
+            <label className="field">
+              <span>Template Name</span>
+              <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder='e.g. "My Vehicle Profile"' required={saveAsPreset} />
+            </label>
+
+            <label className="field field--full">
+              <span>Description</span>
+              <textarea name="presetDescription" rows={2} defaultValue={assetTypeDescription} placeholder="What this template is for" />
+            </label>
+
+            <label className="field field--full">
+              <span>Tags (comma separated)</span>
+              <input type="text" name="presetTags" placeholder="vehicle, outdoor, power-tool" />
+            </label>
+            <input type="hidden" name="presetKeyOverride" value={assetTypeKey} />
           </div>
         )}
       </section>

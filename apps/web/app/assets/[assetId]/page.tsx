@@ -112,7 +112,7 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
                   <h2>Asset Profile</h2>
                 </div>
                 {detail.asset.fieldDefinitions.length === 0 ? (
-                  <p className="panel__empty">No custom detail fields attached yet. Edit the asset to add fields.</p>
+                  <p className="panel__empty">No detail fields attached yet. Edit the asset to add details.</p>
                 ) : (
                   <div className="asset-detail-groups">
                     {Object.entries(groupedFields).map(([groupLabel, fields]) => (
