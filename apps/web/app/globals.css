@@ -1247,3 +1247,176 @@ textarea { resize: vertical; }
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Skeleton Loading ── */
+
+.skeleton-page {
+  min-height: 100vh;
+}
+
+.skeleton-bar {
+  background: linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 50%, var(--surface-alt) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  height: 18px;
+}
+
+.skeleton-pulse {
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.06) 50%, transparent 75%);
+  background-size: 200% 100%;
+  border-radius: var(--radius);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Schedule Form (dynamic trigger-aware) ── */
+
+.schedule-form__section-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.schedule-form__trigger-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schedule-form__trigger-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: all 150ms;
+}
+
+.schedule-form__trigger-option:hover {
+  border-color: var(--accent);
+}
+
+.schedule-form__trigger-option--active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.schedule-form__trigger-option input[type="radio"] {
+  width: auto;
+  margin: 0;
+}
+
+.schedule-form__trigger-hint {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.schedule-form__input-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-form__input-unit input {
+  flex: 1;
+}
+
+.schedule-form__input-unit > span {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.schedule-form__channel-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.schedule-form__channel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.schedule-form__channel-chip:hover {
+  border-color: var(--accent);
+}
+
+.schedule-form__channel-chip--active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.schedule-form__channel-chip input[type="checkbox"] {
+  display: none;
+}
+
+.schedule-form__warning {
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+/* ── Schedule Card Actions (collapsible) ── */
+
+.schedule-card__actions-area {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-card__complete-form {
+  padding: 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+
+.schedule-card__delete-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.button--active {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+}
+
+/* ── Field Value Tags ── */
+
+.field-value__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

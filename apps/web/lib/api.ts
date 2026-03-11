@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   assetDetailResponseSchema,
   assetSchema,
@@ -112,10 +113,10 @@ export const apiRequest = async <T>({
   return schema.parse(payload);
 };
 
-export const getMe = async (): Promise<MeResponse> => apiRequest({
+export const getMe = cache(async (): Promise<MeResponse> => apiRequest({
   path: "/v1/me",
   schema: meResponseSchema
-});
+}));
 
 export const getHouseholdDashboard = async (householdId: string): Promise<HouseholdDashboard> => apiRequest({
   path: `/v1/households/${householdId}/dashboard`,
@@ -127,10 +128,10 @@ export const getAssetDetail = async (assetId: string): Promise<AssetDetailRespon
   schema: assetDetailResponseSchema
 });
 
-export const getLibraryPresets = async (): Promise<LibraryPreset[]> => apiRequest({
+export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => apiRequest({
   path: "/v1/presets/library",
   schema: libraryPresetListSchema
-});
+}));
 
 export const createHousehold = async (input: CreateHouseholdInput): Promise<HouseholdSummary> => apiRequest({
   path: "/v1/households",

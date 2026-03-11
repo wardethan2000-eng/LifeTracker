@@ -41,8 +41,8 @@ const categoryOptions: Array<{ value: AssetCategory; label: string }> = [
   { value: "vehicle", label: "Vehicle" },
   { value: "home", label: "Home" },
   { value: "marine", label: "Marine" },
-  { value: "yard", label: "Yard" },
-  { value: "workshop", label: "Workshop" },
+  { value: "yard", label: "Yard & Garden" },
+  { value: "workshop", label: "Workshop & Tools" },
   { value: "appliance", label: "Appliance" },
   { value: "hvac", label: "HVAC" },
   { value: "technology", label: "Technology" },
@@ -54,11 +54,80 @@ const fieldTypeOptions: Array<{ value: AssetFieldType; label: string }> = [
   { value: "textarea", label: "Long text" },
   { value: "number", label: "Number" },
   { value: "currency", label: "Currency" },
-  { value: "boolean", label: "Boolean" },
+  { value: "boolean", label: "Yes / No" },
   { value: "date", label: "Date" },
-  { value: "select", label: "Single select" },
+  { value: "select", label: "Dropdown" },
   { value: "multiselect", label: "Multi-select" },
-  { value: "url", label: "URL" }
+  { value: "url", label: "Link / URL" }
+];
+
+const commonDefaultFields: AssetFieldDefinition[] = [
+  {
+    key: "purchase-price",
+    label: "Purchase Price",
+    type: "currency",
+    required: false,
+    wide: false,
+    order: 0,
+    options: [],
+    defaultValue: null,
+    unit: "$",
+    placeholder: "0.00",
+    group: "Purchase & Warranty",
+  },
+  {
+    key: "warranty-expiration",
+    label: "Warranty Expiration",
+    type: "date",
+    required: false,
+    wide: false,
+    order: 1,
+    options: [],
+    defaultValue: null,
+    group: "Purchase & Warranty",
+  },
+  {
+    key: "where-purchased",
+    label: "Where Purchased",
+    type: "string",
+    required: false,
+    wide: false,
+    order: 2,
+    options: [],
+    defaultValue: null,
+    placeholder: "Home Depot, Amazon, dealer, etc.",
+    group: "Purchase & Warranty",
+  },
+  {
+    key: "storage-location",
+    label: "Storage Location",
+    type: "string",
+    required: false,
+    wide: false,
+    order: 3,
+    options: [],
+    defaultValue: null,
+    placeholder: "Garage, Shed, Basement, Closet, etc.",
+    group: "Location & Condition",
+  },
+  {
+    key: "condition",
+    label: "Condition",
+    type: "select",
+    required: false,
+    wide: false,
+    order: 4,
+    options: [
+      { label: "New", value: "new" },
+      { label: "Excellent", value: "excellent" },
+      { label: "Good", value: "good" },
+      { label: "Fair", value: "fair" },
+      { label: "Poor", value: "poor" },
+      { label: "Needs Repair", value: "needs-repair" },
+    ],
+    defaultValue: null,
+    group: "Location & Condition",
+  },
 ];
 
 const slugify = (value: string): string => value
@@ -131,6 +200,15 @@ const createFieldDefinition = (): AssetFieldDefinition => ({
   defaultValue: null
 });
 
+const mergeFieldDefinitions = (
+  templateFields: AssetFieldDefinition[],
+  defaults: AssetFieldDefinition[]
+): AssetFieldDefinition[] => {
+  const templateKeys = new Set(templateFields.map((f) => f.key));
+  const extraDefaults = defaults.filter((f) => !templateKeys.has(f.key));
+  return [...templateFields, ...extraDefaults].map((f, i) => ({ ...f, order: i }));
+};
+
 const renderFieldValueInput = (
   field: AssetFieldDefinition,
   value: AssetFieldValue,
@@ -182,7 +260,7 @@ const renderFieldValueInput = (
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value || null)}
         >
-          <option value="">Select</option>
+          <option value="">Select...</option>
           {field.options.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
@@ -214,7 +292,7 @@ const renderFieldValueInput = (
         <input
           type="text"
           value={typeof value === "string" ? value : ""}
-          placeholder={field.placeholder ?? "Enter value"}
+          placeholder={field.placeholder ?? ""}
           onChange={(event) => onChange(event.target.value)}
         />
       );
@@ -261,23 +339,26 @@ export function AssetProfileWorkbench({
       ? customBlueprints.find((preset) => preset.key === initialAsset.assetTypeKey)
       : undefined;
 
+  const initialFieldDefs = initialAsset
+    ? (initialAsset.fieldDefinitions.length ? initialAsset.fieldDefinitions : commonDefaultFields)
+    : initialBlueprint
+      ? mergeFieldDefinitions(initialBlueprint.fieldDefinitions, commonDefaultFields)
+      : commonDefaultFields;
+
   const [category, setCategory] = useState<AssetCategory>(initialAsset?.category ?? initialBlueprint?.category ?? "vehicle");
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string>(initialBlueprint?.id ?? "");
-  const [fieldDefinitions, setFieldDefinitions] = useState<AssetFieldDefinition[]>(
-    initialAsset?.fieldDefinitions.length
-      ? initialAsset.fieldDefinitions
-      : initialBlueprint?.fieldDefinitions ?? []
-  );
+  const [fieldDefinitions, setFieldDefinitions] = useState<AssetFieldDefinition[]>(initialFieldDefs);
   const [fieldValues, setFieldValues] = useState<Record<string, AssetFieldValue>>(
     initialAsset
-      ? buildFieldValueMap(initialAsset.fieldDefinitions, initialAsset.customFields)
-      : buildFieldValueMap(initialBlueprint?.fieldDefinitions ?? [])
+      ? buildFieldValueMap(initialFieldDefs, initialAsset.customFields)
+      : buildFieldValueMap(initialFieldDefs)
   );
   const [assetTypeLabel, setAssetTypeLabel] = useState(initialAsset?.assetTypeLabel ?? initialBlueprint?.label ?? "");
   const [assetTypeDescription, setAssetTypeDescription] = useState(initialAsset?.assetTypeDescription ?? initialBlueprint?.description ?? "");
   const [metricTemplates, setMetricTemplates] = useState<PresetUsageMetricTemplate[]>(initialBlueprint?.metricTemplates ?? []);
   const [scheduleTemplates, setScheduleTemplates] = useState<PresetScheduleTemplate[]>(initialBlueprint?.scheduleTemplates ?? []);
   const [saveAsPreset, setSaveAsPreset] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const selectedBlueprint = blueprintOptions.find((preset) => preset.id === selectedBlueprintId);
   const assetTypeSource: AssetTypeSource = selectedBlueprint
@@ -297,8 +378,8 @@ export function AssetProfileWorkbench({
       setScheduleTemplates([]);
       setAssetTypeLabel("");
       setAssetTypeDescription("");
-      setFieldDefinitions([]);
-      setFieldValues({});
+      setFieldDefinitions(commonDefaultFields);
+      setFieldValues(buildFieldValueMap(commonDefaultFields));
       return;
     }
 
@@ -307,8 +388,9 @@ export function AssetProfileWorkbench({
     setAssetTypeDescription(nextBlueprint.description ?? "");
     setMetricTemplates(nextBlueprint.metricTemplates);
     setScheduleTemplates(nextBlueprint.scheduleTemplates);
-    setFieldDefinitions(nextBlueprint.fieldDefinitions);
-    setFieldValues(buildFieldValueMap(nextBlueprint.fieldDefinitions));
+    const merged = mergeFieldDefinitions(nextBlueprint.fieldDefinitions, commonDefaultFields);
+    setFieldDefinitions(merged);
+    setFieldValues(buildFieldValueMap(merged));
   };
 
   const updateFieldDefinition = (index: number, update: Partial<AssetFieldDefinition>): void => {
@@ -421,19 +503,17 @@ export function AssetProfileWorkbench({
       <input type="hidden" name="scheduleTemplatesJson" value={JSON.stringify(scheduleTemplates)} />
       <input type="hidden" name="saveAsPreset" value={saveAsPreset ? "true" : "false"} />
 
+      {/* ── Section 1: Basic Information ── */}
       <section className="panel panel--studio">
         <div className="panel-header">
-          <div>
-            <p className="eyebrow">Asset intake</p>
-            <h2>{submitLabel}</h2>
-          </div>
-          <p className="ops-panel__copy">Choose a reusable asset blueprint or build one inline. The field schema below becomes part of the asset record.</p>
+          <h2>Basic Information</h2>
+          <button type="submit" className="button button--primary">{submitLabel}</button>
         </div>
 
         <div className="form-grid">
           <label className="field field--full">
-            <span>Name</span>
-            <input type="text" name="name" defaultValue={initialAsset?.name ?? ""} placeholder="Primary vehicle" required />
+            <span>Asset Name *</span>
+            <input type="text" name="name" defaultValue={initialAsset?.name ?? ""} placeholder='e.g. "Riding Mower", "Water Heater", "Family SUV"' required />
           </label>
 
           <label className="field">
@@ -446,258 +526,82 @@ export function AssetProfileWorkbench({
           </label>
 
           <label className="field">
-            <span>Visibility</span>
-            <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
-              <option value="shared">Shared</option>
-              <option value="personal">Personal</option>
+            <span>Start from Template</span>
+            <select value={selectedBlueprintId} onChange={(event) => handleBlueprintChange(event.target.value)}>
+              <option value="">None (blank)</option>
+              {libraryBlueprints.length > 0 && (
+                <optgroup label="Built-in Templates">
+                  {libraryBlueprints.map((preset) => (
+                    <option key={preset.id} value={preset.id}>{preset.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {customBlueprints.length > 0 && (
+                <optgroup label="My Templates">
+                  {customBlueprints.map((preset) => (
+                    <option key={preset.id} value={preset.id}>{preset.label}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
+            <small>Templates pre-fill extra fields for common asset types</small>
           </label>
+        </div>
+      </section>
 
+      {/* ── Section 2: Asset Details ── */}
+      <section className="panel panel--studio">
+        <div className="panel-header">
+          <h2>Details</h2>
+        </div>
+
+        <div className="form-grid">
           <label className="field">
-            <span>Manufacturer</span>
-            <input type="text" name="manufacturer" defaultValue={initialAsset?.manufacturer ?? ""} placeholder="Ford" />
+            <span>Manufacturer / Brand</span>
+            <input type="text" name="manufacturer" defaultValue={initialAsset?.manufacturer ?? ""} placeholder='e.g. "Honda", "Samsung", "DeWalt"' />
           </label>
 
           <label className="field">
             <span>Model</span>
-            <input type="text" name="model" defaultValue={initialAsset?.model ?? ""} placeholder="F-150" />
+            <input type="text" name="model" defaultValue={initialAsset?.model ?? ""} placeholder='e.g. "HRX217", "RF28R7351SR"' />
           </label>
 
           <label className="field">
-            <span>Serial number</span>
-            <input type="text" name="serialNumber" defaultValue={initialAsset?.serialNumber ?? ""} placeholder="Optional" />
+            <span>Serial Number</span>
+            <input type="text" name="serialNumber" defaultValue={initialAsset?.serialNumber ?? ""} placeholder="For warranty claims and service records" />
           </label>
 
           <label className="field">
-            <span>Purchase date</span>
+            <span>Purchase Date</span>
             <input type="date" name="purchaseDate" defaultValue={initialAsset?.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : ""} />
           </label>
 
-          <label className="field field--full">
-            <span>Description</span>
-            <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Notes, location context, trim, ownership details, or operational scope" />
-          </label>
-        </div>
-      </section>
-
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Asset type</p>
-            <h2>Blueprint and form version</h2>
-          </div>
-          <p className="ops-panel__copy">Library presets provide structured starting points. Household presets are your reusable custom asset types.</p>
-        </div>
-
-        <div className="form-grid">
-          <label className="field field--full">
-            <span>Starting blueprint</span>
-            <select value={selectedBlueprintId} onChange={(event) => handleBlueprintChange(event.target.value)}>
-              <option value="">Blank custom asset</option>
-              <optgroup label="Library blueprints">
-                {libraryBlueprints.map((preset) => (
-                  <option key={preset.id} value={preset.id}>{preset.label}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Household blueprints">
-                {customBlueprints.map((preset) => (
-                  <option key={preset.id} value={preset.id}>{preset.label}</option>
-                ))}
-              </optgroup>
+          <label className="field">
+            <span>Visibility</span>
+            <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
+              <option value="shared">Shared (visible to household)</option>
+              <option value="personal">Personal (only you)</option>
             </select>
           </label>
 
-          <label className="field">
-            <span>Asset type label</span>
-            <input
-              type="text"
-              value={assetTypeLabel}
-              onChange={(event) => setAssetTypeLabel(event.target.value)}
-              placeholder="Tow vehicle / boiler / camera rig"
-            />
-          </label>
-
-          <label className="field">
-            <span>Asset type key</span>
-            <input type="text" value={assetTypeKey} readOnly />
-          </label>
-
           <label className="field field--full">
-            <span>Type description</span>
-            <textarea
-              rows={3}
-              value={assetTypeDescription}
-              onChange={(event) => setAssetTypeDescription(event.target.value)}
-              placeholder="What this asset type covers, what details matter, and how it should be maintained"
-            />
+            <span>Notes</span>
+            <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Anything helpful: where it&#39;s installed, special considerations, included accessories..." />
           </label>
         </div>
       </section>
 
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Detail fields</p>
-            <h2>Structured asset schema</h2>
+      {/* ── Section 3: Extra details from field definitions ── */}
+      {fieldDefinitions.length > 0 && (
+        <section className="panel panel--studio">
+          <div className="panel-header">
+            <h2>Additional Details</h2>
           </div>
-          <button type="button" className="button button--ghost" onClick={addFieldDefinition}>Add field</button>
-        </div>
 
-        {fieldDefinitions.length === 0 ? (
-          <p className="empty-state">No detail fields yet. Add fields for whatever matters to this asset type: configuration, location, consumables, compliance data, URLs, or owner notes.</p>
-        ) : (
-          <div className="asset-studio__field-stack">
-            {fieldDefinitions.map((field, index) => {
-              const baseId = `${inputIdPrefix}-${index}`;
-              const optionsValue = field.options.map((option) => option.value).join(", ");
-
-              return (
-                <article key={`${baseId}-${index}`} className="asset-studio__field-card">
-                  <div className="asset-studio__field-card-header">
-                    <div>
-                      <p className="eyebrow">Field {index + 1}</p>
-                      <h3>{field.label || "Untitled field"}</h3>
-                    </div>
-                    <button type="button" className="button button--subtle" onClick={() => removeFieldDefinition(index)}>Remove</button>
-                  </div>
-
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Label</span>
-                      <input
-                        id={`${baseId}-label`}
-                        type="text"
-                        value={field.label}
-                        onChange={(event) => updateFieldDefinition(index, {
-                          label: event.target.value,
-                          key: field.key || slugify(event.target.value)
-                        })}
-                        placeholder="VIN"
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Key</span>
-                      <input
-                        id={`${baseId}-key`}
-                        type="text"
-                        value={field.key}
-                        onChange={(event) => updateFieldDefinition(index, { key: slugify(event.target.value) })}
-                        placeholder="vin"
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Type</span>
-                      <select
-                        id={`${baseId}-type`}
-                        value={field.type}
-                        onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}
-                      >
-                        {fieldTypeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="field">
-                      <span>Group</span>
-                      <input
-                        type="text"
-                        value={field.group ?? ""}
-                        onChange={(event) => updateFieldDefinition(index, { group: event.target.value || undefined })}
-                        placeholder="Identity / service / storage"
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Unit</span>
-                      <input
-                        type="text"
-                        value={field.unit ?? ""}
-                        onChange={(event) => updateFieldDefinition(index, { unit: event.target.value || undefined })}
-                        placeholder="miles / amps / gallons"
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Placeholder</span>
-                      <input
-                        type="text"
-                        value={field.placeholder ?? ""}
-                        onChange={(event) => updateFieldDefinition(index, { placeholder: event.target.value || undefined })}
-                        placeholder="Enter a value"
-                      />
-                    </label>
-
-                    <label className="field field--full">
-                      <span>Help text</span>
-                      <input
-                        type="text"
-                        value={field.helpText ?? ""}
-                        onChange={(event) => updateFieldDefinition(index, { helpText: event.target.value || undefined })}
-                        placeholder="Explain what belongs in this field"
-                      />
-                    </label>
-
-                    {field.type === "select" || field.type === "multiselect" ? (
-                      <label className="field field--full">
-                        <span>Options</span>
-                        <input
-                          type="text"
-                          value={optionsValue}
-                          onChange={(event) => updateFieldDefinition(index, {
-                            options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({
-                              label: option,
-                              value: option
-                            }))
-                          })}
-                          placeholder="gasoline, diesel, electric"
-                        />
-                      </label>
-                    ) : null}
-
-                    <label className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={field.required}
-                        onChange={(event) => updateFieldDefinition(index, { required: event.target.checked })}
-                      />
-                      <span>Required</span>
-                    </label>
-
-                    <label className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={field.wide}
-                        onChange={(event) => updateFieldDefinition(index, { wide: event.target.checked })}
-                      />
-                      <span>Wide field</span>
-                    </label>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Current values</p>
-            <h2>Fill the asset details</h2>
-          </div>
-          <p className="ops-panel__copy">These values are stored against the resolved schema above, so each asset can have a rich detail surface without hardcoding every asset type.</p>
-        </div>
-
-        {fieldDefinitions.length === 0 ? (
-          <p className="empty-state">Add schema fields first, then fill their values here.</p>
-        ) : (
           <div className="form-grid">
             {fieldDefinitions.map((field, index) => (
               <label key={`${field.key}-${index}`} className={`field${field.wide ? " field--full" : ""}`}>
-                <span>{field.label}</span>
+                <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
                 {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
                   setFieldValues((currentValues) => ({
                     ...currentValues,
@@ -708,48 +612,146 @@ export function AssetProfileWorkbench({
               </label>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ── Advanced Section (collapsed by default) ── */}
+      <section className="panel panel--studio">
+        <div className="panel-header">
+          <h2>Advanced</h2>
+          <button type="button" className="button button--ghost button--sm" onClick={() => setShowAdvanced(!showAdvanced)}>
+            {showAdvanced ? "Hide" : "Show"} advanced options
+          </button>
+        </div>
+
+        {showAdvanced && (
+          <div className="asset-studio" style={{ gap: 16 }}>
+            {/* Custom field editor */}
+            <div>
+              <div className="panel-header" style={{ paddingBottom: 8 }}>
+                <h3>Customize Fields</h3>
+                <button type="button" className="button button--ghost button--sm" onClick={addFieldDefinition}>+ Add field</button>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)", margin: "0 0 12px" }}>
+                Add, remove, or edit the extra detail fields for this asset. Changes here update the &ldquo;Additional Details&rdquo; section above.
+              </p>
+
+              {fieldDefinitions.length === 0 ? (
+                <p className="empty-state">No extra fields. Click &ldquo;+ Add field&rdquo; to add one.</p>
+              ) : (
+                <div className="asset-studio__field-stack">
+                  {fieldDefinitions.map((field, index) => {
+                    const baseId = `${inputIdPrefix}-${index}`;
+                    const optionsValue = field.options.map((option) => option.value).join(", ");
+
+                    return (
+                      <article key={`${baseId}-${index}`} className="asset-studio__field-card">
+                        <div className="asset-studio__field-card-header">
+                          <h3>{field.label || "Untitled field"}</h3>
+                          <button type="button" className="button button--subtle button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
+                        </div>
+
+                        <div className="form-grid">
+                          <label className="field">
+                            <span>Label</span>
+                            <input
+                              id={`${baseId}-label`}
+                              type="text"
+                              value={field.label}
+                              onChange={(event) => updateFieldDefinition(index, {
+                                label: event.target.value,
+                                key: field.key || slugify(event.target.value)
+                              })}
+                              placeholder='e.g. "VIN", "Fuel Type", "Filter Size"'
+                            />
+                          </label>
+
+                          <label className="field">
+                            <span>Field Type</span>
+                            <select
+                              id={`${baseId}-type`}
+                              value={field.type}
+                              onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}
+                            >
+                              {fieldTypeOptions.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+
+                          {(field.type === "select" || field.type === "multiselect") && (
+                            <label className="field field--full">
+                              <span>Options (comma separated)</span>
+                              <input
+                                type="text"
+                                value={optionsValue}
+                                onChange={(event) => updateFieldDefinition(index, {
+                                  options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({
+                                    label: option,
+                                    value: option
+                                  }))
+                                })}
+                                placeholder="gasoline, diesel, electric"
+                              />
+                            </label>
+                          )}
+
+                          <label className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={field.required}
+                              onChange={(event) => updateFieldDefinition(index, { required: event.target.checked })}
+                            />
+                            <span>Required</span>
+                          </label>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Save as template */}
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+              <div className="panel-header" style={{ paddingBottom: 8 }}>
+                <h3>Save as Reusable Template</h3>
+                <label className="checkbox-field">
+                  <input type="checkbox" checked={saveAsPreset} onChange={(event) => setSaveAsPreset(event.target.checked)} />
+                  <span>Save this setup as a template</span>
+                </label>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)", margin: "0 0 12px" }}>
+                Re-use these fields next time you add a similar asset.
+              </p>
+
+              {saveAsPreset && (
+                <div className="form-grid">
+                  <label className="field">
+                    <span>Template Name</span>
+                    <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder='e.g. "My Vehicle Profile"' required={saveAsPreset} />
+                  </label>
+
+                  <label className="field field--full">
+                    <span>Description</span>
+                    <textarea name="presetDescription" rows={2} defaultValue={assetTypeDescription} placeholder="What this template is for" />
+                  </label>
+
+                  <label className="field field--full">
+                    <span>Tags (comma separated)</span>
+                    <input type="text" name="presetTags" placeholder="vehicle, outdoor, power-tool" />
+                  </label>
+                  <input type="hidden" name="presetKeyOverride" value={assetTypeKey} />
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </section>
 
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Reusable form</p>
-            <h2>Save as household blueprint</h2>
-          </div>
-          <label className="checkbox-field">
-            <input type="checkbox" checked={saveAsPreset} onChange={(event) => setSaveAsPreset(event.target.checked)} />
-            <span>Save this schema as a reusable asset type</span>
-          </label>
-        </div>
-
-        {saveAsPreset ? (
-          <div className="form-grid">
-            <label className="field">
-              <span>Blueprint label</span>
-              <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder="Tow vehicle profile" required={saveAsPreset} />
-            </label>
-
-            <label className="field">
-              <span>Optional key override</span>
-              <input type="text" name="presetKeyOverride" defaultValue={assetTypeKey} placeholder="tow-vehicle-profile" />
-            </label>
-
-            <label className="field field--full">
-              <span>Description</span>
-              <textarea name="presetDescription" rows={3} defaultValue={assetTypeDescription} placeholder="What this type is for and which details it expects" />
-            </label>
-
-            <label className="field field--full">
-              <span>Tags</span>
-              <input type="text" name="presetTags" placeholder="vehicle, towing, fleet" />
-            </label>
-          </div>
-        ) : null}
-      </section>
-
+      {/* ── Submit ── */}
       <div className="inline-actions inline-actions--end">
-        <button type="submit" className="button button--primary">{submitLabel}</button>
+        <button type="submit" className="button button--primary" style={{ padding: "12px 32px", fontSize: "1rem" }}>{submitLabel}</button>
       </div>
     </form>
   );

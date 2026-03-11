@@ -14,6 +14,8 @@ import {
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
+import { ScheduleCardActions } from "../../../components/schedule-card-actions";
+import { ScheduleForm } from "../../../components/schedule-form";
 import { ApiError, getAssetDetail, getHouseholdPresets, getLibraryPresets } from "../../../lib/api";
 import {
   formatCategoryLabel,
@@ -46,14 +48,26 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
       return groups;
     }, {});
 
-    const formatFieldValue = (fieldKey: string): string => {
+    const formatFieldValue = (fieldKey: string): JSX.Element | string => {
       const field = detail.asset.fieldDefinitions.find((f) => f.key === fieldKey);
       const value = detail.asset.customFields[fieldKey];
       if (value === null || value === undefined || value === "") return "—";
-      if (Array.isArray(value)) return value.join(", ");
+      if (Array.isArray(value)) {
+        return (
+          <span className="field-value__tags">
+            {value.map((v) => <span key={String(v)} className="pill">{String(v)}</span>)}
+          </span>
+        );
+      }
+      if (field?.type === "boolean") return value ? "✓ Yes" : "✗ No";
       if (field?.type === "currency" && typeof value === "number") return formatCurrency(value);
       if (field?.type === "date" && typeof value === "string") return formatDate(value, "—");
-      return String(value);
+      if (field?.type === "url" && typeof value === "string") {
+        return <a href={value} target="_blank" rel="noopener noreferrer" className="text-link">{value}</a>;
+      }
+      const text = String(value);
+      if (field?.unit) return `${text} ${field.unit}`;
+      return text;
     };
 
     return (
@@ -182,10 +196,11 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
               <section className="panel">
                 <div className="panel__header">
                   <h2>Maintenance Schedules</h2>
+                  <span className="pill">{detail.schedules.length}</span>
                 </div>
                 <div className="panel__body">
                   {detail.schedules.length === 0 ? (
-                    <p className="panel__empty">No maintenance schedules active yet.</p>
+                    <p className="panel__empty">No maintenance schedules active yet. Use the form below to create one.</p>
                   ) : (
                     <div className="schedule-stack">
                       {detail.schedules.map((schedule) => (
@@ -215,49 +230,21 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
                               <dt>Channels</dt>
                               <dd>{schedule.notificationConfig.channels.join(", ")}</dd>
                             </div>
+                            <div>
+                              <dt>Trigger</dt>
+                              <dd>{schedule.triggerConfig.type}</dd>
+                            </div>
                           </dl>
 
-                          <form action={completeScheduleAction} className="form-grid">
-                            <input type="hidden" name="assetId" value={detail.asset.id} />
-                            <input type="hidden" name="scheduleId" value={schedule.id} />
-                            <label className="field">
-                              <span>Log title</span>
-                              <input type="text" name="title" placeholder={schedule.name} />
-                            </label>
-                            <label className="field">
-                              <span>Completed at</span>
-                              <input type="datetime-local" name="completedAt" />
-                            </label>
-                            <label className="field">
-                              <span>Usage value</span>
-                              <input type="number" name="usageValue" min="0" step="0.1" placeholder="Optional" />
-                            </label>
-                            <label className="field">
-                              <span>Cost</span>
-                              <input type="number" name="cost" min="0" step="0.01" placeholder="Optional" />
-                            </label>
-                            <label className="field field--full">
-                              <span>Notes</span>
-                              <textarea name="notes" rows={3} placeholder="What was done, parts used, vendor, or findings" />
-                            </label>
-                            <button type="submit" className="button button--primary">Complete Schedule</button>
-                          </form>
-
-                          <div className="inline-actions">
-                            <form action={toggleScheduleActiveAction}>
-                              <input type="hidden" name="assetId" value={detail.asset.id} />
-                              <input type="hidden" name="scheduleId" value={schedule.id} />
-                              <input type="hidden" name="isActive" value={schedule.isActive ? "false" : "true"} />
-                              <button type="submit" className="button button--ghost button--sm">
-                                {schedule.isActive ? "Pause" : "Resume"}
-                              </button>
-                            </form>
-                            <form action={deleteScheduleAction}>
-                              <input type="hidden" name="assetId" value={detail.asset.id} />
-                              <input type="hidden" name="scheduleId" value={schedule.id} />
-                              <button type="submit" className="button button--danger button--sm">Delete</button>
-                            </form>
-                          </div>
+                          <ScheduleCardActions
+                            assetId={detail.asset.id}
+                            scheduleId={schedule.id}
+                            scheduleName={schedule.name}
+                            isActive={schedule.isActive}
+                            completeAction={completeScheduleAction}
+                            toggleAction={toggleScheduleActiveAction}
+                            deleteAction={deleteScheduleAction}
+                          />
                         </article>
                       ))}
                     </div>
@@ -316,79 +303,11 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps):
                 <div className="panel__header">
                   <h2>Add Schedule</h2>
                 </div>
-                <div className="panel__body--padded">
-                  <form action={createScheduleAction} className="form-grid">
-                    <input type="hidden" name="assetId" value={detail.asset.id} />
-
-                    <label className="field field--full">
-                      <span>Name</span>
-                      <input type="text" name="name" placeholder="Brake inspection" required />
-                    </label>
-                    <label className="field field--full">
-                      <span>Description</span>
-                      <textarea name="description" rows={2} placeholder="What should be done" />
-                    </label>
-                    <label className="field">
-                      <span>Trigger type</span>
-                      <select name="triggerType" defaultValue="interval">
-                        <option value="interval">Interval</option>
-                        <option value="usage">Usage</option>
-                        <option value="compound">Compound</option>
-                        <option value="seasonal">Seasonal</option>
-                        <option value="one_time">One time</option>
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Metric</span>
-                      <select name="metricId" defaultValue="">
-                        <option value="">No metric</option>
-                        {detail.metrics.map((metric) => (
-                          <option key={metric.id} value={metric.id}>{metric.name} ({metric.unit})</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Interval days</span>
-                      <input type="number" name="intervalDays" min="1" step="1" placeholder="90" />
-                    </label>
-                    <label className="field">
-                      <span>Lead days</span>
-                      <input type="number" name="leadTimeDays" min="0" step="1" placeholder="7" />
-                    </label>
-                    <label className="field">
-                      <span>Interval value</span>
-                      <input type="number" name="intervalValue" min="0" step="0.1" placeholder="5000" />
-                    </label>
-                    <label className="field">
-                      <span>Lead value</span>
-                      <input type="number" name="leadTimeValue" min="0" step="0.1" placeholder="250" />
-                    </label>
-                    <label className="field">
-                      <span>Season month</span>
-                      <input type="number" name="month" min="1" max="12" step="1" placeholder="10" />
-                    </label>
-                    <label className="field">
-                      <span>Season day</span>
-                      <input type="number" name="day" min="1" max="31" step="1" placeholder="15" />
-                    </label>
-                    <label className="field">
-                      <span>One-time due at</span>
-                      <input type="datetime-local" name="dueAt" />
-                    </label>
-                    <label className="field">
-                      <span>Compound logic</span>
-                      <select name="logic" defaultValue="whichever_first">
-                        <option value="whichever_first">Whichever comes first</option>
-                        <option value="whichever_last">Whichever comes last</option>
-                      </select>
-                    </label>
-                    <label className="field field--checkbox field--full">
-                      <input type="checkbox" name="digest" />
-                      <span>Include digest notifications</span>
-                    </label>
-                    <button type="submit" className="button button--primary">Create Schedule</button>
-                  </form>
-                </div>
+                <ScheduleForm
+                  assetId={detail.asset.id}
+                  metrics={detail.metrics.map((m) => ({ id: m.id, name: m.name, unit: m.unit }))}
+                  action={createScheduleAction}
+                />
               </section>
 
               {/* ── Quick Log ── */}
