@@ -26,6 +26,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   applyPreset,
+  archiveAsset,
   completeSchedule,
   createMetric,
   createAsset,
@@ -36,6 +37,9 @@ import {
   deleteSchedule,
   enqueueNotificationScan,
   markNotificationRead,
+  restoreAsset,
+  softDeleteAsset,
+  unarchiveAsset,
   updateAsset,
   updateSchedule,
   updateMetric
@@ -201,17 +205,31 @@ export async function createHouseholdAction(formData: FormData): Promise<void> {
 }
 
 export async function createAssetAction(formData: FormData): Promise<void> {
-  const profile = parseAssetProfilePayload(formData);
-  const input: CreateAssetInput = {
-    householdId: getRequiredString(formData, "householdId"),
-    name: getRequiredString(formData, "name"),
-    category: getRequiredString(formData, "category") as AssetCategory,
-    visibility: (getOptionalString(formData, "visibility") as AssetVisibility | undefined) ?? "shared",
-    assetTypeSource: profile.assetTypeSource,
-    assetTypeVersion: profile.assetTypeVersion,
-    fieldDefinitions: profile.fieldDefinitions,
-    customFields: profile.fieldValues
-  };
+  let profile: AssetProfilePayload;
+  let input: CreateAssetInput;
+
+  try {
+    profile = parseAssetProfilePayload(formData);
+  } catch (error) {
+    console.error("[createAssetAction] Failed to parse profile payload:", error);
+    throw error;
+  }
+
+  try {
+    input = {
+      householdId: getRequiredString(formData, "householdId"),
+      name: getRequiredString(formData, "name"),
+      category: getRequiredString(formData, "category") as AssetCategory,
+      visibility: (getOptionalString(formData, "visibility") as AssetVisibility | undefined) ?? "shared",
+      assetTypeSource: profile.assetTypeSource,
+      assetTypeVersion: profile.assetTypeVersion,
+      fieldDefinitions: profile.fieldDefinitions,
+      customFields: profile.fieldValues
+    };
+  } catch (error) {
+    console.error("[createAssetAction] Failed to build input:", error);
+    throw error;
+  }
 
   const description = getOptionalString(formData, "description");
   const manufacturer = getOptionalString(formData, "manufacturer");
@@ -251,19 +269,34 @@ export async function createAssetAction(formData: FormData): Promise<void> {
     input.assetTypeDescription = profile.assetTypeDescription;
   }
 
-  const asset = await createAsset(input);
+  let asset;
+  try {
+    asset = await createAsset(input);
+  } catch (error) {
+    console.error("[createAssetAction] API createAsset failed:", error);
+    throw error;
+  }
+
   if (profile.presetSource === "library" && profile.presetKey) {
-    await applyPreset(asset.id, {
-      source: "library",
-      presetKey: profile.presetKey
-    });
+    try {
+      await applyPreset(asset.id, {
+        source: "library",
+        presetKey: profile.presetKey
+      });
+    } catch (error) {
+      console.error("[createAssetAction] applyPreset (library) failed:", error);
+    }
   }
 
   if (profile.presetSource === "custom" && profile.presetProfileId) {
-    await applyPreset(asset.id, {
-      source: "custom",
-      presetProfileId: profile.presetProfileId
-    });
+    try {
+      await applyPreset(asset.id, {
+        source: "custom",
+        presetProfileId: profile.presetProfileId
+      });
+    } catch (error) {
+      console.error("[createAssetAction] applyPreset (custom) failed:", error);
+    }
   }
 
   await maybeCreatePresetProfileFromForm(
@@ -594,6 +627,36 @@ export async function deleteScheduleAction(formData: FormData): Promise<void> {
   const scheduleId = getRequiredString(formData, "scheduleId");
 
   await deleteSchedule(assetId, scheduleId);
+  revalidatePath("/");
+  revalidatePath(`/assets/${assetId}`);
+}
+
+export async function archiveAssetAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  await archiveAsset(assetId);
+  revalidatePath("/");
+  revalidatePath("/assets");
+  redirect("/assets");
+}
+
+export async function unarchiveAssetAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  await unarchiveAsset(assetId);
+  revalidatePath("/");
+  revalidatePath(`/assets/${assetId}`);
+}
+
+export async function softDeleteAssetAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  await softDeleteAsset(assetId);
+  revalidatePath("/");
+  revalidatePath("/assets");
+  redirect("/assets");
+}
+
+export async function restoreAssetAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  await restoreAsset(assetId);
   revalidatePath("/");
   revalidatePath(`/assets/${assetId}`);
 }

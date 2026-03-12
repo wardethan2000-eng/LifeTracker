@@ -239,7 +239,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     await enqueueNotificationScan({ householdId: asset.householdId });
 
     return reply.code(201).send({
-      log: toMaintenanceLogResponse(result.log),
+      log: toMaintenanceLogResponse(result.log, []),
       schedule: toMaintenanceScheduleResponse(result.schedule)
     });
   });

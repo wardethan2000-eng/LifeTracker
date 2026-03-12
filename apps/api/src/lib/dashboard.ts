@@ -222,6 +222,8 @@ export const buildAssetDetail = async (
   const detail = await prisma.asset.findUnique({
     where: { id: asset.id },
     include: {
+      parentAsset: { select: { id: true, name: true, category: true } },
+      childAssets: { select: { id: true, name: true, category: true } },
       usageMetrics: {
         orderBy: { createdAt: "asc" }
       },
@@ -237,6 +239,7 @@ export const buildAssetDetail = async (
         orderBy: { createdAt: "asc" }
       },
       logs: {
+        include: { parts: true },
         orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
         take: logLimit
       }
@@ -250,10 +253,13 @@ export const buildAssetDetail = async (
   const schedules = detail.schedules.map(toMaintenanceScheduleResponse);
 
   return assetDetailResponseSchema.parse({
-    asset: toAssetResponse(detail),
+    asset: toAssetResponse(detail, {
+      parentAsset: detail.parentAsset,
+      childAssets: detail.childAssets
+    }),
     metrics: detail.usageMetrics.map(toUsageMetricResponse),
     schedules,
-    recentLogs: detail.logs.map(toMaintenanceLogResponse),
+    recentLogs: detail.logs.map(log => toMaintenanceLogResponse(log, log.parts)),
     dueScheduleCount: schedules.filter((schedule) => schedule.status === "due").length,
     overdueScheduleCount: schedules.filter((schedule) => schedule.status === "overdue").length
   });

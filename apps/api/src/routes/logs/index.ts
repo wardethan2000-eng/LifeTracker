@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import {
   createMaintenanceLogSchema,
+  createMaintenanceLogPartSchema,
   updateMaintenanceLogSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
@@ -11,6 +12,7 @@ import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
+import { toMaintenanceLogPartResponse } from "../../lib/presenters.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -54,13 +56,14 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
         assetId: asset.id,
         ...(query.scheduleId ? { scheduleId: query.scheduleId } : {})
       },
+      include: { parts: true },
       orderBy: [
         { completedAt: "desc" },
         { createdAt: "desc" }
       ]
     });
 
-    return logs.map(toMaintenanceLogResponse);
+    return logs.map(log => toMaintenanceLogResponse(log, log.parts));
   });
 
   app.post("/v1/assets/:assetId/logs", async (request, reply) => {
@@ -99,11 +102,24 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // Validate serviceProviderId if provided
+    if (input.serviceProviderId) {
+      const provider = await app.prisma.serviceProvider.findFirst({
+        where: { id: input.serviceProviderId, householdId: asset.householdId },
+        select: { id: true }
+      });
+
+      if (!provider) {
+        return reply.code(400).send({ message: "Service provider not found or belongs to a different household." });
+      }
+    }
+
     const completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
     const data: Prisma.MaintenanceLogUncheckedCreateInput = {
       assetId: asset.id,
       scheduleId: input.scheduleId ?? null,
       completedById: request.auth.userId,
+      serviceProviderId: input.serviceProviderId ?? null,
       title: input.title ?? scheduleName ?? "Maintenance completed",
       completedAt,
       metadata: toInputJsonValue(input.metadata)
@@ -121,7 +137,29 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       data.cost = input.cost;
     }
 
-    const log = await app.prisma.maintenanceLog.create({ data });
+    // Create log and parts in a single transaction
+    const log = await app.prisma.$transaction(async (tx) => {
+      const createdLog = await tx.maintenanceLog.create({ data });
+
+      if (input.parts && input.parts.length > 0) {
+        await tx.maintenanceLogPart.createMany({
+          data: input.parts.map(part => ({
+            logId: createdLog.id,
+            name: part.name,
+            partNumber: part.partNumber ?? null,
+            quantity: part.quantity ?? 1,
+            unitCost: part.unitCost ?? null,
+            supplier: part.supplier ?? null,
+            notes: part.notes ?? null
+          }))
+        });
+      }
+
+      return tx.maintenanceLog.findUniqueOrThrow({
+        where: { id: createdLog.id },
+        include: { parts: true }
+      });
+    });
 
     if (log.scheduleId) {
       await syncScheduleCompletionFromLogs(app.prisma, log.scheduleId);
@@ -129,7 +167,7 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 
-    return reply.code(201).send(toMaintenanceLogResponse(log));
+    return reply.code(201).send(toMaintenanceLogResponse(log, log.parts));
   });
 
   app.get("/v1/assets/:assetId/logs/:logId", async (request, reply) => {
@@ -144,14 +182,15 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       where: {
         id: params.logId,
         assetId: asset.id
-      }
+      },
+      include: { parts: true }
     });
 
     if (!log) {
       return reply.code(404).send({ message: "Maintenance log not found." });
     }
 
-    return toMaintenanceLogResponse(log);
+    return toMaintenanceLogResponse(log, log.parts);
   });
 
   app.patch("/v1/assets/:assetId/logs/:logId", async (request, reply) => {
@@ -202,7 +241,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     const log = await app.prisma.maintenanceLog.update({
       where: { id: existing.id },
-      data
+      data,
+      include: { parts: true }
     });
 
     if (log.scheduleId) {
@@ -211,7 +251,7 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 
-    return toMaintenanceLogResponse(log);
+    return toMaintenanceLogResponse(log, log.parts);
   });
 
   app.delete("/v1/assets/:assetId/logs/:logId", async (request, reply) => {
@@ -242,6 +282,100 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await enqueueNotificationScan({ householdId: asset.householdId });
+
+    return reply.code(204).send();
+  });
+
+  // ── Log Parts CRUD ─────────────────────────────────────────────────
+
+  const partParamsSchema = logParamsSchema.extend({
+    partId: z.string().cuid()
+  });
+
+  app.post("/v1/assets/:assetId/logs/:logId/parts", async (request, reply) => {
+    const params = logParamsSchema.parse(request.params);
+    const input = createMaintenanceLogPartSchema.parse(request.body);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const log = await app.prisma.maintenanceLog.findFirst({
+      where: { id: params.logId, assetId: asset.id },
+      select: { id: true }
+    });
+
+    if (!log) {
+      return reply.code(404).send({ message: "Maintenance log not found." });
+    }
+
+    const part = await app.prisma.maintenanceLogPart.create({
+      data: {
+        logId: log.id,
+        name: input.name,
+        partNumber: input.partNumber ?? null,
+        quantity: input.quantity ?? 1,
+        unitCost: input.unitCost ?? null,
+        supplier: input.supplier ?? null,
+        notes: input.notes ?? null
+      }
+    });
+
+    return reply.code(201).send(toMaintenanceLogPartResponse(part));
+  });
+
+  app.get("/v1/assets/:assetId/logs/:logId/parts", async (request, reply) => {
+    const params = logParamsSchema.parse(request.params);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const log = await app.prisma.maintenanceLog.findFirst({
+      where: { id: params.logId, assetId: asset.id },
+      select: { id: true }
+    });
+
+    if (!log) {
+      return reply.code(404).send({ message: "Maintenance log not found." });
+    }
+
+    const parts = await app.prisma.maintenanceLogPart.findMany({
+      where: { logId: log.id },
+      orderBy: { createdAt: "asc" }
+    });
+
+    return parts.map(toMaintenanceLogPartResponse);
+  });
+
+  app.delete("/v1/assets/:assetId/logs/:logId/parts/:partId", async (request, reply) => {
+    const params = partParamsSchema.parse(request.params);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const log = await app.prisma.maintenanceLog.findFirst({
+      where: { id: params.logId, assetId: asset.id },
+      select: { id: true }
+    });
+
+    if (!log) {
+      return reply.code(404).send({ message: "Maintenance log not found." });
+    }
+
+    const part = await app.prisma.maintenanceLogPart.findFirst({
+      where: { id: params.partId, logId: log.id }
+    });
+
+    if (!part) {
+      return reply.code(404).send({ message: "Part not found." });
+    }
+
+    await app.prisma.maintenanceLogPart.delete({ where: { id: part.id } });
 
     return reply.code(204).send();
   });

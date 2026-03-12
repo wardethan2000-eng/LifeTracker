@@ -11,6 +11,7 @@ import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications/index.js";
 import { presetRoutes } from "./routes/presets/index.js";
 import { scheduleRoutes } from "./routes/schedules/index.js";
+import { serviceProviderRoutes } from "./routes/service-providers/index.js";
 import { usageMetricRoutes } from "./routes/usage-metrics/index.js";
 
 export const buildApp = () => {
@@ -33,6 +34,7 @@ export const buildApp = () => {
   app.register(scheduleRoutes);
   app.register(maintenanceLogRoutes);
   app.register(presetRoutes);
+  app.register(serviceProviderRoutes);
 
   return app;
 };

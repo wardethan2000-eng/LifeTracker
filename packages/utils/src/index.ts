@@ -201,6 +201,49 @@ export const isScheduleOverdue = (
   return false;
 };
 
+export interface ValueDatePair {
+  value: number;
+  date: Date;
+}
+
+export const calculateUsageRate = (entries: ValueDatePair[]): number => {
+  if (entries.length < 2) return 0;
+
+  const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const n = sorted.length;
+
+  // Simple linear regression: value = slope * daysSinceFirst + intercept
+  const firstTime = sorted[0]!.date.getTime();
+  const xs = sorted.map(e => (e.date.getTime() - firstTime) / (1000 * 60 * 60 * 24));
+  const ys = sorted.map(e => e.value);
+
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = xs.reduce((acc, x, i) => acc + x * ys[i]!, 0);
+  const sumXX = xs.reduce((acc, x) => acc + x * x, 0);
+
+  const denominator = n * sumXX - sumX * sumX;
+  if (denominator === 0) return 0;
+
+  return (n * sumXY - sumX * sumY) / denominator;
+};
+
+export const projectNextDueValue = (
+  currentValue: number,
+  ratePerDay: number,
+  targetThreshold: number
+): Date | null => {
+  if (ratePerDay <= 0) return null;
+
+  const remaining = targetThreshold - currentValue;
+  if (remaining <= 0) return null;
+
+  const daysUntil = remaining / ratePerDay;
+  const projected = new Date();
+  projected.setTime(projected.getTime() + daysUntil * 24 * 60 * 60 * 1000);
+  return projected;
+};
+
 export const calculateScheduleStatus = (
   trigger: MaintenanceTrigger,
   due: DueDateResult,

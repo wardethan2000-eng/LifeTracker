@@ -85,6 +85,7 @@ model Household {
   assets        Asset[]
   presetProfiles PresetProfile[]
   notifications Notification[]
+  serviceProviders ServiceProvider[]
 
   @@index([createdById])
 }
@@ -108,6 +109,7 @@ model Asset {
   id             String                @id @default(cuid())
   householdId    String
   createdById    String
+  parentAssetId  String?
   name           String
   category       AssetCategory
   visibility     AssetVisibility       @default(shared)
@@ -116,6 +118,13 @@ model Asset {
   model          String?
   serialNumber   String?
   purchaseDate   DateTime?
+  purchaseDetails    Json?
+  warrantyDetails    Json?
+  locationDetails    Json?
+  insuranceDetails   Json?
+  dispositionDetails Json?
+  conditionScore     Int?
+  conditionHistory   Json              @default("[]")
   assetTypeKey   String?
   assetTypeLabel String?
   assetTypeDescription String?
@@ -124,10 +133,13 @@ model Asset {
   fieldDefinitions Json                 @default("[]")
   customFields   Json                  @default("{}")
   isArchived     Boolean               @default(false)
+  deletedAt      DateTime?
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   household      Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
   createdBy      User                  @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  parentAsset    Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id], onDelete: SetNull)
+  childAssets    Asset[]               @relation("AssetHierarchy")
   usageMetrics   UsageMetric[]
   schedules      MaintenanceSchedule[]
   logs           MaintenanceLog[]
@@ -136,6 +148,7 @@ model Asset {
   @@index([householdId, isArchived])
   @@index([createdById])
   @@index([category])
+  @@index([parentAssetId])
 }
 
 model UsageMetric {
@@ -148,9 +161,24 @@ model UsageMetric {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   asset          Asset                 @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  entries        UsageMetricEntry[]
   schedules      MaintenanceSchedule[]
 
   @@index([assetId])
+}
+
+model UsageMetricEntry {
+  id         String      @id @default(cuid())
+  metricId   String
+  value      Float
+  recordedAt DateTime    @default(now())
+  source     String      @default("manual")
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  metric     UsageMetric @relation(fields: [metricId], references: [id], onDelete: Cascade)
+
+  @@index([metricId, recordedAt])
 }
 
 model MaintenanceSchedule {
@@ -201,26 +229,65 @@ model PresetProfile {
   @@unique([householdId, key])
 }
 
-model MaintenanceLog {
-  id            String               @id @default(cuid())
-  assetId       String
-  scheduleId    String?
-  completedById String
-  title         String
+model ServiceProvider {
+  id            String           @id @default(cuid())
+  householdId   String
+  name          String
+  specialty     String?
+  phone         String?
+  email         String?
+  website       String?
+  address       String?
+  rating        Int?
   notes         String?
-  completedAt   DateTime
-  usageValue    Float?
-  cost          Float?
-  metadata      Json                 @default("{}")
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  asset         Asset                @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  schedule      MaintenanceSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
-  completedBy   User                 @relation("MaintenanceLogUser", fields: [completedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  maintenanceLogs MaintenanceLog[]
+
+  @@index([householdId])
+}
+
+model MaintenanceLog {
+  id                String               @id @default(cuid())
+  assetId           String
+  scheduleId        String?
+  completedById     String
+  serviceProviderId String?
+  title             String
+  notes             String?
+  completedAt       DateTime
+  usageValue        Float?
+  cost              Float?
+  metadata          Json                 @default("{}")
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  asset             Asset                @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  schedule          MaintenanceSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  completedBy       User                 @relation("MaintenanceLogUser", fields: [completedById], references: [id], onDelete: Restrict)
+  serviceProvider   ServiceProvider?     @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+  parts             MaintenanceLogPart[]
 
   @@index([assetId, completedAt])
   @@index([scheduleId])
   @@index([completedById])
+  @@index([serviceProviderId])
+}
+
+model MaintenanceLogPart {
+  id         String         @id @default(cuid())
+  logId      String
+  name       String
+  partNumber String?
+  quantity   Float          @default(1)
+  unitCost   Float?
+  supplier   String?
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  log        MaintenanceLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@index([logId])
 }
 
 model Notification {

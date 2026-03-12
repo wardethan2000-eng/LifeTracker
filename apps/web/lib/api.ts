@@ -273,6 +273,31 @@ export const updateMetric = async (
   });
 };
 
+export const archiveAsset = async (assetId: string): Promise<Asset> => apiRequest({
+  path: `/v1/assets/${assetId}/archive`,
+  method: "POST",
+  schema: assetSchema
+});
+
+export const unarchiveAsset = async (assetId: string): Promise<Asset> => apiRequest({
+  path: `/v1/assets/${assetId}/unarchive`,
+  method: "POST",
+  schema: assetSchema
+});
+
+export const softDeleteAsset = async (assetId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/assets/${assetId}`,
+    method: "DELETE"
+  });
+};
+
+export const restoreAsset = async (assetId: string): Promise<Asset> => apiRequest({
+  path: `/v1/assets/${assetId}/restore`,
+  method: "POST",
+  schema: assetSchema
+});
+
 export const markNotificationRead = async (notificationId: string): Promise<Notification> => apiRequest({
   path: `/v1/notifications/${notificationId}/read`,
   method: "PATCH",

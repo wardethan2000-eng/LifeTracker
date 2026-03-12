@@ -305,6 +305,152 @@ export const usageMetricResponseSchema = z.object({
 
 export const assetCustomFieldsSchema = z.record(z.string(), assetFieldValueSchema);
 
+// ── Structured Asset Detail Schemas ──────────────────────────────────
+
+export const purchaseConditionValues = ["new", "used", "refurbished"] as const;
+export const purchaseConditionSchema = z.enum(purchaseConditionValues);
+
+export const purchaseDetailsSchema = z.object({
+  price: z.number().min(0).optional(),
+  vendor: z.string().max(200).optional(),
+  condition: purchaseConditionSchema.optional(),
+  financing: z.string().max(500).optional(),
+  receiptRef: z.string().max(500).optional()
+});
+
+export const warrantyDetailsSchema = z.object({
+  provider: z.string().max(200).optional(),
+  policyNumber: z.string().max(120).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  coverageType: z.string().max(200).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const locationDetailsSchema = z.object({
+  propertyName: z.string().max(200).optional(),
+  building: z.string().max(200).optional(),
+  room: z.string().max(200).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const insuranceDetailsSchema = z.object({
+  provider: z.string().max(200).optional(),
+  policyNumber: z.string().max(120).optional(),
+  coverageAmount: z.number().min(0).optional(),
+  deductible: z.number().min(0).optional(),
+  renewalDate: z.string().datetime().optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const disposalMethodValues = ["sold", "donated", "scrapped", "recycled", "lost"] as const;
+export const disposalMethodSchema = z.enum(disposalMethodValues);
+
+export const dispositionDetailsSchema = z.object({
+  method: disposalMethodSchema.optional(),
+  date: z.string().datetime().optional(),
+  salePrice: z.number().min(0).optional(),
+  buyerInfo: z.string().max(500).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const conditionEntrySchema = z.object({
+  score: z.number().int().min(1).max(10),
+  assessedAt: z.string().datetime(),
+  notes: z.string().max(2000).optional()
+});
+
+export const createConditionAssessmentSchema = z.object({
+  score: z.number().int().min(1).max(10),
+  notes: z.string().max(2000).optional()
+});
+
+// ── Usage Metric Entry Schemas ───────────────────────────────────────
+
+export const usageMetricEntrySchema = z.object({
+  id: z.string().cuid(),
+  metricId: z.string().cuid(),
+  value: z.number(),
+  recordedAt: z.string().datetime(),
+  source: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createUsageMetricEntrySchema = z.object({
+  value: z.number(),
+  recordedAt: z.string().datetime().optional(),
+  source: z.string().max(80).default("manual"),
+  notes: z.string().max(2000).optional()
+});
+
+export const usageProjectionSchema = z.object({
+  metricId: z.string().cuid(),
+  currentRate: z.number(),
+  rateUnit: z.string(),
+  projectedValues: z.array(z.object({
+    date: z.string().datetime(),
+    value: z.number()
+  }))
+});
+
+// ── Service Provider Schemas ─────────────────────────────────────────
+
+export const serviceProviderSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string(),
+  specialty: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  website: z.string().nullable(),
+  address: z.string().nullable(),
+  rating: z.number().int().min(1).max(5).nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createServiceProviderSchema = z.object({
+  name: z.string().min(1).max(200),
+  specialty: z.string().max(120).optional(),
+  phone: z.string().max(40).optional(),
+  email: z.string().email().max(255).optional(),
+  website: z.string().max(500).optional(),
+  address: z.string().max(500).optional(),
+  rating: z.number().int().min(1).max(5).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const updateServiceProviderSchema = createServiceProviderSchema.partial();
+
+// ── Maintenance Log Part Schemas ─────────────────────────────────────
+
+export const maintenanceLogPartSchema = z.object({
+  id: z.string().cuid(),
+  logId: z.string().cuid(),
+  name: z.string(),
+  partNumber: z.string().nullable(),
+  quantity: z.number(),
+  unitCost: z.number().nullable(),
+  supplier: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createMaintenanceLogPartSchema = z.object({
+  name: z.string().min(1).max(200),
+  partNumber: z.string().max(120).optional(),
+  quantity: z.number().min(0).default(1),
+  unitCost: z.number().min(0).optional(),
+  supplier: z.string().max(200).optional(),
+  notes: z.string().max(2000).optional()
+});
+
 export const createAssetSchema = z.object({
   householdId: z.string().cuid(),
   name: z.string().min(1).max(120),
@@ -315,6 +461,13 @@ export const createAssetSchema = z.object({
   model: z.string().max(120).optional(),
   serialNumber: z.string().max(120).optional(),
   purchaseDate: z.string().datetime().optional(),
+  parentAssetId: z.string().cuid().optional(),
+  purchaseDetails: z.lazy(() => purchaseDetailsSchema).optional(),
+  warrantyDetails: z.lazy(() => warrantyDetailsSchema).optional(),
+  locationDetails: z.lazy(() => locationDetailsSchema).optional(),
+  insuranceDetails: z.lazy(() => insuranceDetailsSchema).optional(),
+  dispositionDetails: z.lazy(() => dispositionDetailsSchema).optional(),
+  conditionScore: z.number().int().min(1).max(10).optional(),
   assetTypeKey: z.string().min(1).max(120).optional(),
   assetTypeLabel: z.string().min(1).max(160).optional(),
   assetTypeDescription: z.string().max(2000).optional(),
@@ -326,10 +479,17 @@ export const createAssetSchema = z.object({
 
 export const updateAssetSchema = createAssetSchema.omit({ householdId: true }).partial();
 
+export const shallowAssetSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  category: assetCategorySchema
+});
+
 export const assetSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
   createdById: z.string().cuid(),
+  parentAssetId: z.string().cuid().nullable().default(null),
   name: z.string(),
   category: assetCategorySchema,
   visibility: assetVisibilitySchema,
@@ -338,6 +498,15 @@ export const assetSchema = z.object({
   model: z.string().nullable(),
   serialNumber: z.string().nullable(),
   purchaseDate: z.string().datetime().nullable(),
+  purchaseDetails: z.lazy(() => purchaseDetailsSchema).nullable().default(null),
+  warrantyDetails: z.lazy(() => warrantyDetailsSchema).nullable().default(null),
+  locationDetails: z.lazy(() => locationDetailsSchema).nullable().default(null),
+  insuranceDetails: z.lazy(() => insuranceDetailsSchema).nullable().default(null),
+  dispositionDetails: z.lazy(() => dispositionDetailsSchema).nullable().default(null),
+  conditionScore: z.number().int().min(1).max(10).nullable().default(null),
+  conditionHistory: z.lazy(() => z.array(conditionEntrySchema)).default([]),
+  parentAsset: shallowAssetSchema.nullable().default(null),
+  childAssets: z.array(shallowAssetSchema).default([]),
   assetTypeKey: z.string().nullable(),
   assetTypeLabel: z.string().nullable(),
   assetTypeDescription: z.string().nullable(),
@@ -346,6 +515,7 @@ export const assetSchema = z.object({
   fieldDefinitions: assetFieldDefinitionsSchema,
   customFields: assetCustomFieldsSchema,
   isArchived: z.boolean(),
+  deletedAt: z.string().datetime().nullable().default(null),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 });
@@ -533,12 +703,14 @@ export const maintenanceLogMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createMaintenanceLogSchema = z.object({
   scheduleId: z.string().cuid().optional(),
+  serviceProviderId: z.string().cuid().optional(),
   title: z.string().min(1).max(120).optional(),
   notes: z.string().max(2000).optional(),
   completedAt: z.string().datetime().optional(),
   usageValue: z.number().min(0).optional(),
   cost: z.number().min(0).optional(),
-  metadata: maintenanceLogMetadataSchema.default({})
+  metadata: maintenanceLogMetadataSchema.default({}),
+  parts: z.array(createMaintenanceLogPartSchema).optional()
 });
 
 export const updateMaintenanceLogSchema = z.object({
@@ -564,12 +736,15 @@ export const maintenanceLogSchema = z.object({
   assetId: z.string().cuid(),
   scheduleId: z.string().cuid().nullable(),
   completedById: z.string().cuid(),
+  serviceProviderId: z.string().cuid().nullable().default(null),
   title: z.string(),
   notes: z.string().nullable(),
   completedAt: z.string().datetime(),
   usageValue: z.number().nullable(),
   cost: z.number().nullable(),
   metadata: maintenanceLogMetadataSchema,
+  parts: z.array(maintenanceLogPartSchema).default([]),
+  totalPartsCost: z.number().default(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 });
@@ -647,4 +822,23 @@ export type CreateMaintenanceLogInput = z.infer<typeof createMaintenanceLogSchem
 export type UpdateMaintenanceLogInput = z.infer<typeof updateMaintenanceLogSchema>;
 export type CompleteMaintenanceScheduleInput = z.infer<typeof completeMaintenanceScheduleSchema>;
 export type MaintenanceLog = z.infer<typeof maintenanceLogSchema>;
+
+export type ShallowAsset = z.infer<typeof shallowAssetSchema>;
+export type PurchaseDetails = z.infer<typeof purchaseDetailsSchema>;
+export type WarrantyDetails = z.infer<typeof warrantyDetailsSchema>;
+export type LocationDetails = z.infer<typeof locationDetailsSchema>;
+export type InsuranceDetails = z.infer<typeof insuranceDetailsSchema>;
+export type DispositionDetails = z.infer<typeof dispositionDetailsSchema>;
+export type ConditionEntry = z.infer<typeof conditionEntrySchema>;
+export type CreateConditionAssessmentInput = z.infer<typeof createConditionAssessmentSchema>;
+export type UsageMetricEntry = z.infer<typeof usageMetricEntrySchema>;
+export type CreateUsageMetricEntryInput = z.infer<typeof createUsageMetricEntrySchema>;
+export type UsageProjection = z.infer<typeof usageProjectionSchema>;
+export type ServiceProvider = z.infer<typeof serviceProviderSchema>;
+export type CreateServiceProviderInput = z.infer<typeof createServiceProviderSchema>;
+export type UpdateServiceProviderInput = z.infer<typeof updateServiceProviderSchema>;
+export type MaintenanceLogPart = z.infer<typeof maintenanceLogPartSchema>;
+export type CreateMaintenanceLogPartInput = z.infer<typeof createMaintenanceLogPartSchema>;
+export type PurchaseCondition = z.infer<typeof purchaseConditionSchema>;
+export type DisposalMethod = z.infer<typeof disposalMethodSchema>;
 

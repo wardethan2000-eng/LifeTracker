@@ -69,22 +69,10 @@ const fieldTypeOptions: Array<{ value: AssetFieldType; label: string }> = [
   { value: "url", label: "Link / URL" }
 ];
 
-const assetLayoutModeOptions: Array<{ value: AssetLayoutMode; label: string; description: string }> = [
-  {
-    value: "cards",
-    label: "Cards",
-    description: "Current block layout with roomy detail cards."
-  },
-  {
-    value: "compact",
-    label: "Compact",
-    description: "Tighter rows with less visual weight and faster scanning."
-  },
-  {
-    value: "industrial",
-    label: "Industrial",
-    description: "Sharper, denser structure with a more operational feel."
-  }
+const assetLayoutModeOptions: Array<{ value: AssetLayoutMode; label: string }> = [
+  { value: "cards", label: "Cards" },
+  { value: "compact", label: "Compact" },
+  { value: "industrial", label: "Dense" }
 ];
 
 const commonDefaultFields: AssetFieldDefinition[] = [
@@ -1160,36 +1148,23 @@ export function AssetProfileWorkbench({
       <input type="hidden" name="scheduleTemplatesJson" value={JSON.stringify(scheduleTemplates)} />
       <input type="hidden" name="saveAsPreset" value={saveAsPreset ? "true" : "false"} />
 
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <h2>Page Format</h2>
-        </div>
-
-        <div className="asset-studio__format-switcher">
-          {assetLayoutModeOptions.map((option) => {
-            const isSelected = layoutMode === option.value;
-
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className={`asset-studio__format-option${isSelected ? " asset-studio__format-option--active" : ""}`}
-                onClick={() => setLayoutMode(option.value)}
-                aria-pressed={isSelected}
-              >
-                <span>{option.label}</span>
-                <small>{option.description}</small>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
       {/* ── Section 1: Basic Information ── */}
       <section className="panel panel--studio">
         <div className="panel-header">
           <h2>Basic Information</h2>
-          <button type="submit" className="button button--primary">{submitLabel}</button>
+          <div className="panel-header__actions">
+            <select
+              className="layout-mode-select"
+              value={layoutMode}
+              onChange={(event) => setLayoutMode(event.target.value as AssetLayoutMode)}
+              aria-label="Page layout"
+            >
+              {assetLayoutModeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <button type="submit" className="button button--primary">{submitLabel}</button>
+          </div>
         </div>
 
         <div className="form-grid">
