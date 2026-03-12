@@ -1,19 +1,36 @@
 "use server";
 
 import type {
+  AcceptInvitationInput,
   AssetCategory,
   AssetFieldDefinition,
   AssetTypeSource,
   AssetVisibility,
   CompleteMaintenanceScheduleInput,
   CreateAssetInput,
+  CreateCommentInput,
+  CreateConditionAssessmentInput,
+  CreateInvitationInput,
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
+  CreateProjectAssetInput,
+  CreateProjectExpenseInput,
+  CreateProjectInput,
+  CreateProjectTaskInput,
   CreatePresetProfileInput,
+  CreateServiceProviderInput,
+  CreateUsageMetricEntryInput,
   CreateUsageMetricInput,
   MaintenanceTrigger,
   PresetScheduleTemplate,
   PresetUsageMetricTemplate,
+  ProjectStatus,
+  ProjectTaskStatus,
+  UpdateCommentInput,
+  UpdateServiceProviderInput,
+  UpdateProjectExpenseInput,
+  UpdateProjectInput,
+  UpdateProjectTaskInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
 import {
@@ -25,23 +42,47 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  acceptInvitation,
+  addProjectAsset,
   applyPreset,
   archiveAsset,
   completeSchedule,
+  createComment,
+  createInvitation,
+  createMetricEntry,
+  createProject,
+  createProjectExpense,
+  createProjectTask,
   createMetric,
   createAsset,
   createHousehold,
   createMaintenanceLog,
   createPresetProfile,
   createSchedule,
+  createServiceProvider,
+  deleteComment,
+  deleteMetric,
+  deleteProject,
+  deleteProjectExpense,
+  deleteProjectTask,
+  deleteServiceProvider,
   deleteSchedule,
   enqueueNotificationScan,
   markNotificationRead,
+  recordConditionAssessment,
+  removeProjectAsset,
+  revokeInvitation,
   restoreAsset,
   softDeleteAsset,
   unarchiveAsset,
   updateAsset,
+  updateComment,
+  updateProject,
+  updateProjectExpense,
+  updateProjectStatus,
+  updateProjectTask,
   updateSchedule,
+  updateServiceProvider,
   updateMetric
 } from "../lib/api";
 
@@ -90,6 +131,11 @@ const getOptionalBoolean = (formData: FormData, key: string): boolean | undefine
 
   return value === "true" || value === "on" || value === "1";
 };
+
+const getRepeatedStrings = (formData: FormData, key: string): string[] => formData
+  .getAll(key)
+  .map((value) => typeof value === "string" ? value.trim() : "")
+  .filter((value, index, values) => index < values.length);
 
 const parseJsonField = <T>(
   formData: FormData,
@@ -195,6 +241,214 @@ const toIsoString = (value: string | undefined): string | undefined => {
   return new Date(value).toISOString();
 };
 
+const buildStructuredAssetInput = (formData: FormData): Partial<CreateAssetInput> => {
+  const input: Partial<CreateAssetInput> = {};
+
+  const parentAssetId = getOptionalString(formData, "parentAssetId");
+  const conditionScore = getOptionalNumber(formData, "conditionScore");
+
+  const purchasePrice = getOptionalNumber(formData, "purchaseDetails.price");
+  const purchaseVendor = getOptionalString(formData, "purchaseDetails.vendor");
+  const purchaseCondition = getOptionalString(formData, "purchaseDetails.condition");
+  const purchaseFinancing = getOptionalString(formData, "purchaseDetails.financing");
+  const purchaseReceiptRef = getOptionalString(formData, "purchaseDetails.receiptRef");
+
+  const warrantyProvider = getOptionalString(formData, "warrantyDetails.provider");
+  const warrantyPolicyNumber = getOptionalString(formData, "warrantyDetails.policyNumber");
+  const warrantyStartDate = toIsoString(getOptionalString(formData, "warrantyDetails.startDate"));
+  const warrantyEndDate = toIsoString(getOptionalString(formData, "warrantyDetails.endDate"));
+  const warrantyCoverageType = getOptionalString(formData, "warrantyDetails.coverageType");
+  const warrantyNotes = getOptionalString(formData, "warrantyDetails.notes");
+
+  const locationPropertyName = getOptionalString(formData, "locationDetails.propertyName");
+  const locationBuilding = getOptionalString(formData, "locationDetails.building");
+  const locationRoom = getOptionalString(formData, "locationDetails.room");
+  const locationLatitude = getOptionalNumber(formData, "locationDetails.latitude");
+  const locationLongitude = getOptionalNumber(formData, "locationDetails.longitude");
+  const locationNotes = getOptionalString(formData, "locationDetails.notes");
+
+  const insuranceProvider = getOptionalString(formData, "insuranceDetails.provider");
+  const insurancePolicyNumber = getOptionalString(formData, "insuranceDetails.policyNumber");
+  const insuranceCoverageAmount = getOptionalNumber(formData, "insuranceDetails.coverageAmount");
+  const insuranceDeductible = getOptionalNumber(formData, "insuranceDetails.deductible");
+  const insuranceRenewalDate = toIsoString(getOptionalString(formData, "insuranceDetails.renewalDate"));
+  const insuranceNotes = getOptionalString(formData, "insuranceDetails.notes");
+
+  const dispositionMethod = getOptionalString(formData, "dispositionDetails.method");
+  const dispositionDate = toIsoString(getOptionalString(formData, "dispositionDetails.date"));
+  const dispositionSalePrice = getOptionalNumber(formData, "dispositionDetails.salePrice");
+  const dispositionBuyerInfo = getOptionalString(formData, "dispositionDetails.buyerInfo");
+  const dispositionNotes = getOptionalString(formData, "dispositionDetails.notes");
+
+  if (parentAssetId) {
+    input.parentAssetId = parentAssetId;
+  }
+
+  if (conditionScore !== undefined) {
+    input.conditionScore = conditionScore;
+  }
+
+  if (
+    purchasePrice !== undefined
+    || purchaseVendor
+    || purchaseCondition
+    || purchaseFinancing
+    || purchaseReceiptRef
+  ) {
+    input.purchaseDetails = {
+      ...(purchasePrice !== undefined ? { price: purchasePrice } : {}),
+      ...(purchaseVendor ? { vendor: purchaseVendor } : {}),
+      ...(purchaseCondition ? { condition: purchaseCondition as "new" | "used" | "refurbished" } : {}),
+      ...(purchaseFinancing ? { financing: purchaseFinancing } : {}),
+      ...(purchaseReceiptRef ? { receiptRef: purchaseReceiptRef } : {})
+    };
+  }
+
+  if (
+    warrantyProvider
+    || warrantyPolicyNumber
+    || warrantyStartDate
+    || warrantyEndDate
+    || warrantyCoverageType
+    || warrantyNotes
+  ) {
+    input.warrantyDetails = {
+      ...(warrantyProvider ? { provider: warrantyProvider } : {}),
+      ...(warrantyPolicyNumber ? { policyNumber: warrantyPolicyNumber } : {}),
+      ...(warrantyStartDate ? { startDate: warrantyStartDate } : {}),
+      ...(warrantyEndDate ? { endDate: warrantyEndDate } : {}),
+      ...(warrantyCoverageType ? { coverageType: warrantyCoverageType } : {}),
+      ...(warrantyNotes ? { notes: warrantyNotes } : {})
+    };
+  }
+
+  if (
+    locationPropertyName
+    || locationBuilding
+    || locationRoom
+    || locationLatitude !== undefined
+    || locationLongitude !== undefined
+    || locationNotes
+  ) {
+    input.locationDetails = {
+      ...(locationPropertyName ? { propertyName: locationPropertyName } : {}),
+      ...(locationBuilding ? { building: locationBuilding } : {}),
+      ...(locationRoom ? { room: locationRoom } : {}),
+      ...(locationLatitude !== undefined ? { latitude: locationLatitude } : {}),
+      ...(locationLongitude !== undefined ? { longitude: locationLongitude } : {}),
+      ...(locationNotes ? { notes: locationNotes } : {})
+    };
+  }
+
+  if (
+    insuranceProvider
+    || insurancePolicyNumber
+    || insuranceCoverageAmount !== undefined
+    || insuranceDeductible !== undefined
+    || insuranceRenewalDate
+    || insuranceNotes
+  ) {
+    input.insuranceDetails = {
+      ...(insuranceProvider ? { provider: insuranceProvider } : {}),
+      ...(insurancePolicyNumber ? { policyNumber: insurancePolicyNumber } : {}),
+      ...(insuranceCoverageAmount !== undefined ? { coverageAmount: insuranceCoverageAmount } : {}),
+      ...(insuranceDeductible !== undefined ? { deductible: insuranceDeductible } : {}),
+      ...(insuranceRenewalDate ? { renewalDate: insuranceRenewalDate } : {}),
+      ...(insuranceNotes ? { notes: insuranceNotes } : {})
+    };
+  }
+
+  if (
+    dispositionMethod
+    || dispositionDate
+    || dispositionSalePrice !== undefined
+    || dispositionBuyerInfo
+    || dispositionNotes
+  ) {
+    input.dispositionDetails = {
+      ...(dispositionMethod ? { method: dispositionMethod as "sold" | "donated" | "scrapped" | "recycled" | "lost" } : {}),
+      ...(dispositionDate ? { date: dispositionDate } : {}),
+      ...(dispositionSalePrice !== undefined ? { salePrice: dispositionSalePrice } : {}),
+      ...(dispositionBuyerInfo ? { buyerInfo: dispositionBuyerInfo } : {}),
+      ...(dispositionNotes ? { notes: dispositionNotes } : {})
+    };
+  }
+
+  return input;
+};
+
+const buildLogPartsInput = (formData: FormData): NonNullable<CreateMaintenanceLogInput["parts"]> => {
+  const partNames = getRepeatedStrings(formData, "partName");
+  const partNumbers = getRepeatedStrings(formData, "partNumber");
+  const quantities = getRepeatedStrings(formData, "partQuantity");
+  const unitCosts = getRepeatedStrings(formData, "partUnitCost");
+  const suppliers = getRepeatedStrings(formData, "partSupplier");
+  const notes = getRepeatedStrings(formData, "partNotes");
+
+  return partNames
+    .map((name, index) => {
+      if (!name) {
+        return null;
+      }
+
+      const quantityValue = quantities[index] ? Number(quantities[index]) : 1;
+      const unitCostValue = unitCosts[index] ? Number(unitCosts[index]) : undefined;
+
+      if (Number.isNaN(quantityValue)) {
+        throw new Error("partQuantity must be a number.");
+      }
+
+      if (unitCosts[index] && Number.isNaN(unitCostValue)) {
+        throw new Error("partUnitCost must be a number.");
+      }
+
+      return {
+        name,
+        ...(partNumbers[index] ? { partNumber: partNumbers[index] } : {}),
+        quantity: quantityValue,
+        ...(unitCostValue !== undefined ? { unitCost: unitCostValue } : {}),
+        ...(suppliers[index] ? { supplier: suppliers[index] } : {}),
+        ...(notes[index] ? { notes: notes[index] } : {})
+      };
+    })
+    .filter((part): part is NonNullable<typeof part> => part !== null);
+};
+
+const revalidateAssetPaths = (assetId: string): void => {
+  revalidatePath("/");
+  revalidatePath("/assets");
+  revalidatePath(`/assets/${assetId}`);
+};
+
+const revalidateServiceProviderPaths = (householdId: string): void => {
+  revalidatePath("/");
+  revalidatePath("/service-providers");
+  revalidatePath(`/service-providers?householdId=${householdId}`);
+};
+
+const revalidateActivityPaths = (householdId: string): void => {
+  revalidatePath("/");
+  revalidatePath("/activity");
+  revalidatePath(`/activity?householdId=${householdId}`);
+};
+
+const revalidateInvitationPaths = (householdId: string): void => {
+  revalidatePath("/");
+  revalidatePath("/invitations");
+  revalidatePath(`/invitations?householdId=${householdId}`);
+};
+
+const revalidateProjectPaths = (householdId: string, projectId?: string): void => {
+  revalidatePath("/");
+  revalidatePath(`/projects?householdId=${householdId}`);
+  revalidatePath("/projects");
+
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}?householdId=${householdId}`);
+    revalidatePath(`/projects/${projectId}`);
+  }
+};
+
 export async function createHouseholdAction(formData: FormData): Promise<void> {
   const household = await createHousehold({
     name: getRequiredString(formData, "name")
@@ -269,6 +523,8 @@ export async function createAssetAction(formData: FormData): Promise<void> {
     input.assetTypeDescription = profile.assetTypeDescription;
   }
 
+  Object.assign(input, buildStructuredAssetInput(formData));
+
   let asset;
   try {
     asset = await createAsset(input);
@@ -307,8 +563,7 @@ export async function createAssetAction(formData: FormData): Promise<void> {
     profile.scheduleTemplates
   );
 
-  revalidatePath("/");
-  revalidatePath(`/assets/${asset.id}`);
+  revalidateAssetPaths(asset.id);
   redirect(`/assets/${asset.id}`);
 }
 
@@ -364,6 +619,8 @@ export async function updateAssetAction(formData: FormData): Promise<void> {
     input.assetTypeDescription = profile.assetTypeDescription;
   }
 
+  Object.assign(input, buildStructuredAssetInput(formData));
+
   await updateAsset(assetId, input);
   await maybeCreatePresetProfileFromForm(
     formData,
@@ -373,8 +630,7 @@ export async function updateAssetAction(formData: FormData): Promise<void> {
     profile.scheduleTemplates
   );
 
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
 }
 
 export async function markNotificationReadAction(formData: FormData): Promise<void> {
@@ -396,8 +652,42 @@ export async function updateMetricAction(formData: FormData): Promise<void> {
   };
 
   await updateMetric(assetId, metricId, input);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+}
+
+export async function deleteMetricAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const metricId = getRequiredString(formData, "metricId");
+
+  await deleteMetric(assetId, metricId);
+  revalidateAssetPaths(assetId);
+}
+
+export async function createMetricEntryAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const metricId = getRequiredString(formData, "metricId");
+  const input: CreateUsageMetricEntryInput = {
+    value: getRequiredString(formData, "value") ? Number(getRequiredString(formData, "value")) : 0,
+    source: getOptionalString(formData, "source") ?? "manual"
+  };
+
+  if (Number.isNaN(input.value)) {
+    throw new Error("value must be a number.");
+  }
+
+  const recordedAt = toIsoString(getOptionalString(formData, "recordedAt"));
+  const notes = getOptionalString(formData, "notes");
+
+  if (recordedAt) {
+    input.recordedAt = recordedAt;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await createMetricEntry(assetId, metricId, input);
+  revalidateAssetPaths(assetId);
 }
 
 export async function completeScheduleAction(formData: FormData): Promise<void> {
@@ -434,8 +724,7 @@ export async function completeScheduleAction(formData: FormData): Promise<void> 
   }
 
   await completeSchedule(assetId, scheduleId, input);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
 }
 
 export async function createLogAction(formData: FormData): Promise<void> {
@@ -450,6 +739,8 @@ export async function createLogAction(formData: FormData): Promise<void> {
   const completedAt = toIsoString(getOptionalString(formData, "completedAt"));
   const usageValue = getOptionalNumber(formData, "usageValue");
   const cost = getOptionalNumber(formData, "cost");
+  const serviceProviderId = getOptionalString(formData, "serviceProviderId");
+  const parts = buildLogPartsInput(formData);
 
   if (scheduleId) {
     input.scheduleId = scheduleId;
@@ -475,9 +766,16 @@ export async function createLogAction(formData: FormData): Promise<void> {
     input.cost = cost;
   }
 
+  if (serviceProviderId) {
+    input.serviceProviderId = serviceProviderId;
+  }
+
+  if (parts.length > 0) {
+    input.parts = parts;
+  }
+
   await createMaintenanceLog(assetId, input);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
 }
 
 export async function applyPresetToAssetAction(formData: FormData): Promise<void> {
@@ -505,8 +803,72 @@ export async function createMetricAction(formData: FormData): Promise<void> {
   }
 
   await createMetric(assetId, input);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+}
+
+export async function recordConditionAssessmentAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const input: CreateConditionAssessmentInput = {
+    score: getRequiredString(formData, "score") ? Number(getRequiredString(formData, "score")) : 0
+  };
+
+  if (Number.isNaN(input.score)) {
+    throw new Error("score must be a number.");
+  }
+
+  const notes = getOptionalString(formData, "notes");
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await recordConditionAssessment(assetId, input);
+  revalidateAssetPaths(assetId);
+}
+
+export async function createCommentAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const householdId = getOptionalString(formData, "householdId");
+  const input: CreateCommentInput = {
+    body: getRequiredString(formData, "body")
+  };
+
+  const parentCommentId = getOptionalString(formData, "parentCommentId");
+
+  if (parentCommentId) {
+    input.parentCommentId = parentCommentId;
+  }
+
+  await createComment(assetId, input);
+  revalidateAssetPaths(assetId);
+
+  if (householdId) {
+    revalidateActivityPaths(householdId);
+  }
+}
+
+export async function updateCommentAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const commentId = getRequiredString(formData, "commentId");
+  const input: UpdateCommentInput = {
+    body: getRequiredString(formData, "body")
+  };
+
+  await updateComment(assetId, commentId, input);
+  revalidateAssetPaths(assetId);
+}
+
+export async function deleteCommentAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const commentId = getRequiredString(formData, "commentId");
+  const householdId = getOptionalString(formData, "householdId");
+
+  await deleteComment(assetId, commentId);
+  revalidateAssetPaths(assetId);
+
+  if (householdId) {
+    revalidateActivityPaths(householdId);
+  }
 }
 
 const buildTriggerConfig = (formData: FormData): MaintenanceTrigger => {
@@ -657,6 +1019,408 @@ export async function softDeleteAssetAction(formData: FormData): Promise<void> {
 export async function restoreAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   await restoreAsset(assetId);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+}
+
+export async function createServiceProviderAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const input: CreateServiceProviderInput = {
+    name: getRequiredString(formData, "name")
+  };
+
+  const specialty = getOptionalString(formData, "specialty");
+  const phone = getOptionalString(formData, "phone");
+  const email = getOptionalString(formData, "email");
+  const website = getOptionalString(formData, "website");
+  const address = getOptionalString(formData, "address");
+  const rating = getOptionalNumber(formData, "rating");
+  const notes = getOptionalString(formData, "notes");
+
+  if (specialty) input.specialty = specialty;
+  if (phone) input.phone = phone;
+  if (email) input.email = email;
+  if (website) input.website = website;
+  if (address) input.address = address;
+  if (rating !== undefined) input.rating = rating;
+  if (notes) input.notes = notes;
+
+  await createServiceProvider(householdId, input);
+  revalidateServiceProviderPaths(householdId);
+}
+
+export async function updateServiceProviderAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const providerId = getRequiredString(formData, "providerId");
+  const input: UpdateServiceProviderInput = {
+    name: getRequiredString(formData, "name")
+  };
+
+  const specialty = getOptionalString(formData, "specialty");
+  const phone = getOptionalString(formData, "phone");
+  const email = getOptionalString(formData, "email");
+  const website = getOptionalString(formData, "website");
+  const address = getOptionalString(formData, "address");
+  const rating = getOptionalNumber(formData, "rating");
+  const notes = getOptionalString(formData, "notes");
+
+  if (specialty) input.specialty = specialty;
+  if (phone) input.phone = phone;
+  if (email) input.email = email;
+  if (website) input.website = website;
+  if (address) input.address = address;
+  if (rating !== undefined) input.rating = rating;
+  if (notes) input.notes = notes;
+
+  await updateServiceProvider(householdId, providerId, input);
+  revalidateServiceProviderPaths(householdId);
+}
+
+export async function deleteServiceProviderAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const providerId = getRequiredString(formData, "providerId");
+
+  await deleteServiceProvider(householdId, providerId);
+  revalidateServiceProviderPaths(householdId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function createInvitationAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const input: CreateInvitationInput = {
+    email: getRequiredString(formData, "email"),
+    expirationHours: getOptionalNumber(formData, "expirationHours") ?? 72
+  };
+
+  await createInvitation(householdId, input);
+  revalidateInvitationPaths(householdId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function revokeInvitationAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const invitationId = getRequiredString(formData, "invitationId");
+
+  await revokeInvitation(householdId, invitationId);
+  revalidateInvitationPaths(householdId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function acceptInvitationAction(formData: FormData): Promise<void> {
+  const input: AcceptInvitationInput = {
+    token: getRequiredString(formData, "token")
+  };
+
+  const household = await acceptInvitation(input);
+  revalidateInvitationPaths(household.id);
+  revalidateActivityPaths(household.id);
+  redirect(`/invitations?householdId=${household.id}`);
+}
+
+export async function createProjectAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const input: CreateProjectInput = {
+    name: getRequiredString(formData, "name"),
+    status: (getOptionalString(formData, "status") as ProjectStatus | undefined) ?? "planning"
+  };
+
+  const description = getOptionalString(formData, "description");
+  const startDate = toIsoString(getOptionalString(formData, "startDate"));
+  const targetEndDate = toIsoString(getOptionalString(formData, "targetEndDate"));
+  const budgetAmount = getOptionalNumber(formData, "budgetAmount");
+  const notes = getOptionalString(formData, "notes");
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (startDate) {
+    input.startDate = startDate;
+  }
+
+  if (targetEndDate) {
+    input.targetEndDate = targetEndDate;
+  }
+
+  if (budgetAmount !== undefined) {
+    input.budgetAmount = budgetAmount;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  const project = await createProject(householdId, input);
+  revalidateProjectPaths(householdId, project.id);
+  redirect(`/projects/${project.id}?householdId=${householdId}`);
+}
+
+export async function updateProjectAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: UpdateProjectInput = {
+    name: getRequiredString(formData, "name"),
+    status: getRequiredString(formData, "status") as ProjectStatus
+  };
+
+  const description = getOptionalString(formData, "description");
+  const startDate = toIsoString(getOptionalString(formData, "startDate"));
+  const targetEndDate = toIsoString(getOptionalString(formData, "targetEndDate"));
+  const budgetAmount = getOptionalNumber(formData, "budgetAmount");
+  const notes = getOptionalString(formData, "notes");
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (startDate) {
+    input.startDate = startDate;
+  }
+
+  if (targetEndDate) {
+    input.targetEndDate = targetEndDate;
+  }
+
+  if (budgetAmount !== undefined) {
+    input.budgetAmount = budgetAmount;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await updateProject(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectStatusAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const status = getRequiredString(formData, "status") as ProjectStatus;
+
+  await updateProjectStatus(householdId, projectId, status);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+
+  await deleteProject(householdId, projectId);
+  revalidateProjectPaths(householdId);
+  redirect(`/projects?householdId=${householdId}`);
+}
+
+export async function addProjectAssetAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateProjectAssetInput = {
+    assetId: getRequiredString(formData, "assetId")
+  };
+
+  const role = getOptionalString(formData, "role");
+  const notes = getOptionalString(formData, "notes");
+
+  if (role) {
+    input.role = role;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await addProjectAsset(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function removeProjectAssetAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const projectAssetId = getRequiredString(formData, "projectAssetId");
+
+  await removeProjectAsset(householdId, projectId, projectAssetId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectTaskAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateProjectTaskInput = {
+    title: getRequiredString(formData, "title"),
+    status: (getOptionalString(formData, "status") as ProjectTaskStatus | undefined) ?? "pending"
+  };
+
+  const description = getOptionalString(formData, "description");
+  const assignedToId = getOptionalString(formData, "assignedToId");
+  const dueDate = toIsoString(getOptionalString(formData, "dueDate"));
+  const estimatedCost = getOptionalNumber(formData, "estimatedCost");
+  const actualCost = getOptionalNumber(formData, "actualCost");
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (assignedToId) {
+    input.assignedToId = assignedToId;
+  }
+
+  if (dueDate) {
+    input.dueDate = dueDate;
+  }
+
+  if (estimatedCost !== undefined) {
+    input.estimatedCost = estimatedCost;
+  }
+
+  if (actualCost !== undefined) {
+    input.actualCost = actualCost;
+  }
+
+  if (sortOrder !== undefined) {
+    input.sortOrder = sortOrder;
+  }
+
+  await createProjectTask(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectTaskAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+  const input: UpdateProjectTaskInput = {
+    title: getRequiredString(formData, "title"),
+    status: getRequiredString(formData, "status") as ProjectTaskStatus
+  };
+
+  const description = getOptionalString(formData, "description");
+  const assignedToId = getOptionalString(formData, "assignedToId");
+  const dueDate = toIsoString(getOptionalString(formData, "dueDate"));
+  const estimatedCost = getOptionalNumber(formData, "estimatedCost");
+  const actualCost = getOptionalNumber(formData, "actualCost");
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (assignedToId) {
+    input.assignedToId = assignedToId;
+  }
+
+  if (dueDate) {
+    input.dueDate = dueDate;
+  }
+
+  if (estimatedCost !== undefined) {
+    input.estimatedCost = estimatedCost;
+  }
+
+  if (actualCost !== undefined) {
+    input.actualCost = actualCost;
+  }
+
+  if (sortOrder !== undefined) {
+    input.sortOrder = sortOrder;
+  }
+
+  if (input.status === "completed") {
+    input.completedAt = new Date().toISOString();
+  }
+
+  await updateProjectTask(householdId, projectId, taskId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectTaskAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+
+  await deleteProjectTask(householdId, projectId, taskId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectExpenseAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateProjectExpenseInput = {
+    description: getRequiredString(formData, "description"),
+    amount: getRequiredString(formData, "amount") ? Number(getRequiredString(formData, "amount")) : 0
+  };
+
+  if (Number.isNaN(input.amount)) {
+    throw new Error("amount must be a number.");
+  }
+
+  const category = getOptionalString(formData, "category");
+  const date = toIsoString(getOptionalString(formData, "date"));
+  const taskId = getOptionalString(formData, "taskId");
+  const notes = getOptionalString(formData, "notes");
+
+  if (category) {
+    input.category = category;
+  }
+
+  if (date) {
+    input.date = date;
+  }
+
+  if (taskId) {
+    input.taskId = taskId;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await createProjectExpense(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectExpenseAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const expenseId = getRequiredString(formData, "expenseId");
+  const input: UpdateProjectExpenseInput = {
+    description: getRequiredString(formData, "description"),
+    amount: getRequiredString(formData, "amount") ? Number(getRequiredString(formData, "amount")) : 0
+  };
+
+  if (Number.isNaN(input.amount)) {
+    throw new Error("amount must be a number.");
+  }
+
+  const category = getOptionalString(formData, "category");
+  const date = toIsoString(getOptionalString(formData, "date"));
+  const taskId = getOptionalString(formData, "taskId");
+  const notes = getOptionalString(formData, "notes");
+
+  if (category) {
+    input.category = category;
+  }
+
+  if (date) {
+    input.date = date;
+  }
+
+  if (taskId) {
+    input.taskId = taskId;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await updateProjectExpense(householdId, projectId, expenseId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectExpenseAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const expenseId = getRequiredString(formData, "expenseId");
+
+  await deleteProjectExpense(householdId, projectId, expenseId);
+  revalidateProjectPaths(householdId, projectId);
 }

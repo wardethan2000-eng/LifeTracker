@@ -32,6 +32,7 @@ interface ScheduleCandidate {
   lastCompletedAt: Date | null;
   nextDueAt: Date | null;
   nextDueMetricValue: number | null;
+  assignedToId: string | null;
   asset: {
     id: string;
     name: string;
@@ -46,6 +47,7 @@ interface ScheduleCandidate {
     };
     createdBy: Pick<User, "id" | "notificationPreferences">;
   };
+  assignedTo: Pick<User, "id" | "notificationPreferences"> | null;
   metric: {
     currentValue: number;
     unit: string;
@@ -294,6 +296,13 @@ const isUniqueConstraintError = (error: unknown): boolean => Boolean(
 );
 
 const getRecipients = (schedule: ScheduleCandidate): Recipient[] => {
+  if (schedule.assignedToId && schedule.assignedTo) {
+    return [{
+      userId: schedule.assignedTo.id,
+      preferences: parsePreferences(schedule.assignedTo.notificationPreferences)
+    }];
+  }
+
   if (schedule.asset.visibility === "personal") {
     return [{
       userId: schedule.asset.createdBy.id,
@@ -370,6 +379,12 @@ export const scanAndCreateNotifications = async (
         select: {
           currentValue: true,
           unit: true
+        }
+      },
+      assignedTo: {
+        select: {
+          id: true,
+          notificationPreferences: true
         }
       },
       asset: {

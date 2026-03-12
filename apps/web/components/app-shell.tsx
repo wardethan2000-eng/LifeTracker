@@ -11,8 +11,12 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: "grid" },
   { href: "/assets", label: "Assets", icon: "box" },
   { href: "/assets/new", label: "Add Asset", icon: "plus" },
+  { href: "/projects", label: "Projects", icon: "folder" },
   { href: "/maintenance", label: "Maintenance", icon: "wrench" },
+  { href: "/activity", label: "Activity", icon: "pulse" },
   { href: "/notifications", label: "Notifications", icon: "bell" },
+  { href: "/invitations", label: "Invitations", icon: "mail" },
+  { href: "/service-providers", label: "Providers", icon: "briefcase" },
 ];
 
 const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
@@ -21,6 +25,14 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
     case "box":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
+    case "folder":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>;
+    case "briefcase":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
+    case "pulse":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>;
+    case "mail":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>;
     case "plus":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>;
     case "wrench":
@@ -61,14 +73,22 @@ export async function AppShell({ children, activePath }: AppShellProps): Promise
         <div className="sidebar__nav">
           <div className="sidebar__section-label">Main</div>
           {navItems.map((item) => (
+            (() => {
+              const isActive = item.href === "/"
+                ? activePath === "/"
+                : activePath === item.href || activePath.startsWith(`${item.href}/`);
+
+              return (
             <Link
               key={item.href}
               href={item.href}
-              className={`sidebar__link${activePath === item.href ? " sidebar__link--active" : ""}`}
+              className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
             >
               <NavIcon icon={item.icon} />
               {item.label}
             </Link>
+              );
+            })()
           ))}
         </div>
 

@@ -1,0 +1,80 @@
+import Link from "next/link";
+import type { JSX } from "react";
+import { createProjectAction } from "../../actions";
+import { AppShell } from "../../../components/app-shell";
+import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
+import { ApiError, getMe } from "../../../lib/api";
+
+type NewProjectPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function NewProjectPage({ searchParams }: NewProjectPageProps): Promise<JSX.Element> {
+  const params = searchParams ? await searchParams : {};
+  const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
+
+  try {
+    const me = await getMe();
+    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+
+    if (!household) {
+      return (
+        <AppShell activePath="/projects">
+          <header className="page-header"><h1>New Project</h1></header>
+          <div className="page-body">
+            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+          </div>
+        </AppShell>
+      );
+    }
+
+    return (
+      <AppShell activePath="/projects">
+        <header className="page-header">
+          <div>
+            <h1>Create Project</h1>
+            <p style={{ marginTop: 6 }}>Track household work with a budget, timeline, linked assets, tasks, and expenses.</p>
+          </div>
+          <div className="page-header__actions">
+            <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">Back to Projects</Link>
+          </div>
+        </header>
+
+        <div className="page-body">
+          <section className="form-section">
+            <div className="form-section__header">
+              <div>
+                <h2>Project Setup</h2>
+                <p className="form-section__description">Start with the basics. You can add linked assets, tasks, and expenses right after the project is created.</p>
+              </div>
+            </div>
+
+            <form action={createProjectAction}>
+              <ProjectCoreFormFields householdId={household.id} />
+              <div className="inline-actions" style={{ marginTop: 20 }}>
+                <button type="submit" className="button">Create Project</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </AppShell>
+    );
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return (
+        <AppShell activePath="/projects">
+          <header className="page-header"><h1>Create Project</h1></header>
+          <div className="page-body">
+            <div className="panel">
+              <div className="panel__body--padded">
+                <p>Failed to load project creation page: {error.message}</p>
+              </div>
+            </div>
+          </div>
+        </AppShell>
+      );
+    }
+
+    throw error;
+  }
+}

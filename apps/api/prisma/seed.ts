@@ -8,14 +8,17 @@ const memberUserId = "clkeeperuser0000000000002";
 const householdId = "clkeeperhouse000000000001";
 const assetId = "clkeeperasset0000000000001";
 const personalAssetId = "clkeeperasset0000000000002";
+const childAssetId = "clkeeperasset0000000000003";
 const usageMetricId = "clkeepermetric000000000001";
 const maintenanceScheduleId = "clkeeperschedule000000001";
 const overdueScheduleId = "clkeeperschedule000000002";
 const maintenanceLogId = "clkeeperlog00000000000001";
+const maintenanceLogFollowUpId = "clkeeperlog00000000000002";
 const presetProfileId = "clkeeperpreset000000000001";
 const serviceProviderId = "clkeeperprovider0000000001";
 const projectId = "clkeeperproject0000000001";
 const invitationId = "clkeeperinvite00000000001";
+const acceptedInvitationId = "clkeeperinvite00000000002";
 
 async function main(): Promise<void> {
   await prisma.user.upsert({
@@ -119,7 +122,22 @@ async function main(): Promise<void> {
       name: "Primary Vehicle",
       category: "vehicle",
       visibility: "shared",
-      description: "Seeded demo asset for API verification"
+      description: "Seeded demo asset for API verification",
+      purchaseDetails: {
+        price: 36500,
+        vendor: "Northside Ford",
+        condition: "used",
+        financing: "60-month auto loan",
+        receiptRef: "receipt://vehicle/purchase/2024-03"
+      },
+      warrantyDetails: {
+        provider: "Ford Protect",
+        policyNumber: "FORD-ESP-2024-001",
+        startDate: "2024-03-01T00:00:00.000Z",
+        endDate: "2029-03-01T00:00:00.000Z",
+        coverageType: "powertrain",
+        notes: "Seeded extended warranty"
+      }
     },
     create: {
       id: assetId,
@@ -131,6 +149,21 @@ async function main(): Promise<void> {
       description: "Seeded demo asset for API verification",
       manufacturer: "Ford",
       model: "F-150",
+      purchaseDetails: {
+        price: 36500,
+        vendor: "Northside Ford",
+        condition: "used",
+        financing: "60-month auto loan",
+        receiptRef: "receipt://vehicle/purchase/2024-03"
+      },
+      warrantyDetails: {
+        provider: "Ford Protect",
+        policyNumber: "FORD-ESP-2024-001",
+        startDate: "2024-03-01T00:00:00.000Z",
+        endDate: "2029-03-01T00:00:00.000Z",
+        coverageType: "powertrain",
+        notes: "Seeded extended warranty"
+      },
       customFields: {
         engine: "3.5L EcoBoost",
         odometer: 42500
@@ -164,6 +197,36 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.asset.upsert({
+    where: { id: childAssetId },
+    update: {
+      householdId,
+      createdById: ownerUserId,
+      parentAssetId: assetId,
+      name: "Primary Vehicle Battery",
+      category: "vehicle",
+      visibility: "shared",
+      description: "Seeded child asset for hierarchy verification",
+      manufacturer: "Motorcraft",
+      model: "AGM-48"
+    },
+    create: {
+      id: childAssetId,
+      householdId,
+      createdById: ownerUserId,
+      parentAssetId: assetId,
+      name: "Primary Vehicle Battery",
+      category: "vehicle",
+      visibility: "shared",
+      description: "Seeded child asset for hierarchy verification",
+      manufacturer: "Motorcraft",
+      model: "AGM-48",
+      customFields: {
+        coldCrankingAmps: 760
+      }
+    }
+  });
+
   await prisma.usageMetric.upsert({
     where: { id: usageMetricId },
     update: {
@@ -178,6 +241,36 @@ async function main(): Promise<void> {
       currentValue: 42500,
       lastRecordedAt: new Date("2026-03-09T00:00:00.000Z")
     }
+  });
+
+  await prisma.usageMetricEntry.deleteMany({
+    where: { metricId: usageMetricId }
+  });
+
+  await prisma.usageMetricEntry.createMany({
+    data: [
+      {
+        metricId: usageMetricId,
+        value: 41750,
+        recordedAt: new Date("2026-02-01T00:00:00.000Z"),
+        source: "manual",
+        notes: "Monthly odometer check"
+      },
+      {
+        metricId: usageMetricId,
+        value: 42125,
+        recordedAt: new Date("2026-02-20T00:00:00.000Z"),
+        source: "manual",
+        notes: "Road trip return"
+      },
+      {
+        metricId: usageMetricId,
+        value: 42500,
+        recordedAt: new Date("2026-03-09T00:00:00.000Z"),
+        source: "manual",
+        notes: "Current seeded reading"
+      }
+    ]
   });
 
   await prisma.maintenanceSchedule.upsert({
@@ -239,6 +332,7 @@ async function main(): Promise<void> {
     where: { id: overdueScheduleId },
     update: {
       triggerType: "interval",
+      assignedToId: null,
       triggerConfig: {
         type: "interval",
         intervalDays: 90,
@@ -259,6 +353,7 @@ async function main(): Promise<void> {
     create: {
       id: overdueScheduleId,
       assetId,
+      assignedToId: null,
       name: "Rotate tires",
       triggerType: "interval",
       triggerConfig: {
@@ -392,6 +487,32 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.maintenanceLog.upsert({
+    where: { id: maintenanceLogFollowUpId },
+    update: {
+      title: "Tire rotation and balance",
+      completedAt: new Date("2026-02-18T00:00:00.000Z"),
+      cost: 49.99,
+      metadata: {
+        source: "seed",
+        visitType: "shop-service"
+      }
+    },
+    create: {
+      id: maintenanceLogFollowUpId,
+      assetId,
+      scheduleId: overdueScheduleId,
+      completedById: ownerUserId,
+      title: "Tire rotation and balance",
+      completedAt: new Date("2026-02-18T00:00:00.000Z"),
+      cost: 49.99,
+      metadata: {
+        source: "seed",
+        visitType: "shop-service"
+      }
+    }
+  });
+
   // ── Tier 2: Service Provider ──────────────────────────────────────────────
   await prisma.serviceProvider.upsert({
     where: { id: serviceProviderId },
@@ -413,19 +534,42 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.maintenanceLog.updateMany({
+    where: { id: { in: [maintenanceLogId, maintenanceLogFollowUpId] } },
+    data: { serviceProviderId }
+  });
+
   // ── Tier 2: Maintenance Log Part ──────────────────────────────────────────
   await prisma.maintenanceLogPart.deleteMany({
-    where: { logId: maintenanceLogId }
+    where: { logId: { in: [maintenanceLogId, maintenanceLogFollowUpId] } }
   });
-  await prisma.maintenanceLogPart.create({
-    data: {
-      logId: maintenanceLogId,
-      name: "Motorcraft FL-500S Oil Filter",
-      partNumber: "FL-500S",
-      quantity: 1,
-      unitCost: 8.97,
-      supplier: "AutoZone"
-    }
+  await prisma.maintenanceLogPart.createMany({
+    data: [
+      {
+        logId: maintenanceLogId,
+        name: "Motorcraft FL-500S Oil Filter",
+        partNumber: "FL-500S",
+        quantity: 1,
+        unitCost: 8.97,
+        supplier: "AutoZone"
+      },
+      {
+        logId: maintenanceLogId,
+        name: "Full Synthetic 5W-30 Oil",
+        partNumber: "SYN-5W30",
+        quantity: 6,
+        unitCost: 6.49,
+        supplier: "AutoZone"
+      },
+      {
+        logId: maintenanceLogFollowUpId,
+        name: "Wheel Weights",
+        partNumber: "WW-025",
+        quantity: 1,
+        unitCost: 3.5,
+        supplier: "Quick Lube Express"
+      }
+    ]
   });
 
   // ── Tier 2: Project ───────────────────────────────────────────────────────
@@ -459,6 +603,22 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.projectAsset.upsert({
+    where: {
+      projectId_assetId: { projectId, assetId: childAssetId }
+    },
+    update: {
+      role: "affected subsystem",
+      notes: "Battery health check during seasonal prep"
+    },
+    create: {
+      projectId,
+      assetId: childAssetId,
+      role: "affected subsystem",
+      notes: "Battery health check during seasonal prep"
+    }
+  });
+
   // Project tasks
   const taskIds = [
     "clkeepertask00000000000001",
@@ -466,9 +626,9 @@ async function main(): Promise<void> {
     "clkeepertask00000000000003"
   ];
   const tasks = [
-    { id: taskIds[0], title: "Oil change", description: "Full synthetic 5W-30", status: "completed" as const, assignedToId: memberUserId },
+    { id: taskIds[0], title: "Oil change", description: "Full synthetic 5W-30", status: "completed" as const, assignedToId: memberUserId, completedAt: new Date("2026-03-10T00:00:00.000Z") },
     { id: taskIds[1], title: "Brake inspection", description: "Check pads and rotors", status: "in_progress" as const, assignedToId: ownerUserId },
-    { id: taskIds[2], title: "Cabin air filter", description: "Replace cabin filter", status: "not_started" as const, assignedToId: null }
+    { id: taskIds[2], title: "Cabin air filter", description: "Replace cabin filter", status: "pending" as const, assignedToId: null }
   ];
 
   for (const task of tasks) {
@@ -477,7 +637,8 @@ async function main(): Promise<void> {
       update: {
         title: task.title,
         status: task.status,
-        assignedToId: task.assignedToId
+        assignedToId: task.assignedToId,
+        completedAt: task.completedAt ?? null
       },
       create: {
         id: task.id!,
@@ -485,7 +646,8 @@ async function main(): Promise<void> {
         title: task.title,
         description: task.description,
         status: task.status,
-        assignedToId: task.assignedToId
+        assignedToId: task.assignedToId,
+        completedAt: task.completedAt ?? null
       }
     });
   }
@@ -531,6 +693,26 @@ async function main(): Promise<void> {
       token: crypto.randomUUID(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       status: "pending"
+    }
+  });
+
+  await prisma.householdInvitation.upsert({
+    where: { id: acceptedInvitationId },
+    update: {
+      status: "accepted",
+      acceptedAt: new Date("2026-03-10T00:00:00.000Z"),
+      acceptedByUserId: memberUserId
+    },
+    create: {
+      id: acceptedInvitationId,
+      householdId,
+      invitedByUserId: ownerUserId,
+      email: "member@lifekeeper.app",
+      token: crypto.randomUUID(),
+      expiresAt: new Date("2026-03-13T00:00:00.000Z"),
+      status: "accepted",
+      acceptedAt: new Date("2026-03-10T00:00:00.000Z"),
+      acceptedByUserId: memberUserId
     }
   });
 

@@ -164,6 +164,21 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: schedule.name, assetId: asset.id }
     });
 
+    if (schedule.assignedToId) {
+      await logActivity(app.prisma, {
+        householdId: asset.householdId,
+        userId: request.auth.userId,
+        action: "schedule.assigned",
+        entityType: "schedule",
+        entityId: schedule.id,
+        metadata: {
+          name: schedule.name,
+          assetId: asset.id,
+          assignedToId: schedule.assignedToId
+        }
+      });
+    }
+
     await enqueueNotificationScan({ householdId: asset.householdId });
 
     return reply.code(201).send(toMaintenanceScheduleResponse(schedule));
@@ -387,6 +402,22 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       }
 
       data.assignedToId = input.assignedToId;
+    }
+
+    if (input.assignedToId !== undefined && input.assignedToId !== existing.assignedToId) {
+      await logActivity(app.prisma, {
+        householdId: asset.householdId,
+        userId: request.auth.userId,
+        action: "schedule.assigned",
+        entityType: "schedule",
+        entityId: existing.id,
+        metadata: {
+          name: existing.name,
+          assetId: asset.id,
+          previousAssignedToId: existing.assignedToId,
+          newAssignedToId: input.assignedToId
+        }
+      });
     }
 
     await app.prisma.maintenanceSchedule.update({

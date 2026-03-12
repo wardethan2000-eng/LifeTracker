@@ -548,6 +548,20 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.scheduleId) {
+      const schedule = await app.prisma.maintenanceSchedule.findFirst({
+        where: {
+          id: input.scheduleId,
+          asset: { householdId: params.householdId }
+        },
+        select: { id: true }
+      });
+
+      if (!schedule) {
+        return reply.code(400).send({ message: "Linked schedule not found or belongs to a different household." });
+      }
+    }
+
     const task = await app.prisma.projectTask.create({
       data: {
         projectId: project.id,
@@ -611,6 +625,20 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.scheduleId !== undefined && input.scheduleId !== null) {
+      const schedule = await app.prisma.maintenanceSchedule.findFirst({
+        where: {
+          id: input.scheduleId,
+          asset: { householdId: params.householdId }
+        },
+        select: { id: true }
+      });
+
+      if (!schedule) {
+        return reply.code(400).send({ message: "Linked schedule not found or belongs to a different household." });
+      }
+    }
+
     const data: Prisma.ProjectTaskUncheckedUpdateInput = {};
 
     if (input.title !== undefined) data.title = input.title;
@@ -622,6 +650,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
     if (input.scheduleId !== undefined) data.scheduleId = input.scheduleId;
 
+    const effectiveScheduleId = input.scheduleId !== undefined ? input.scheduleId : existing.scheduleId;
+
     // Handle status change to completed
     if (input.status !== undefined) {
       data.status = input.status;
@@ -630,13 +660,13 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         data.completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
 
         // If linked to a maintenance schedule, optionally trigger schedule completion
-        if (existing.scheduleId) {
+        if (effectiveScheduleId) {
           const schedule = await app.prisma.maintenanceSchedule.findUnique({
-            where: { id: existing.scheduleId },
+            where: { id: effectiveScheduleId },
             include: { asset: { select: { id: true, householdId: true } } }
           });
 
-          if (schedule) {
+          if (schedule && schedule.asset.householdId === params.householdId) {
             await app.prisma.$transaction(async (tx) => {
               const logData: Prisma.MaintenanceLogUncheckedCreateInput = {
                 assetId: schedule.assetId,
@@ -764,6 +794,28 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
+    if (input.taskId) {
+      const task = await app.prisma.projectTask.findFirst({
+        where: { id: input.taskId, projectId: project.id },
+        select: { id: true }
+      });
+
+      if (!task) {
+        return reply.code(400).send({ message: "Referenced task not found in this project." });
+      }
+    }
+
+    if (input.serviceProviderId) {
+      const provider = await app.prisma.serviceProvider.findFirst({
+        where: { id: input.serviceProviderId, householdId: params.householdId },
+        select: { id: true }
+      });
+
+      if (!provider) {
+        return reply.code(400).send({ message: "Service provider not found or belongs to a different household." });
+      }
+    }
+
     const expense = await app.prisma.projectExpense.create({
       data: {
         projectId: project.id,
@@ -799,6 +851,28 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (!existing) {
       return reply.code(404).send({ message: "Project expense not found." });
+    }
+
+    if (input.taskId !== undefined && input.taskId !== null) {
+      const task = await app.prisma.projectTask.findFirst({
+        where: { id: input.taskId, projectId: params.projectId },
+        select: { id: true }
+      });
+
+      if (!task) {
+        return reply.code(400).send({ message: "Referenced task not found in this project." });
+      }
+    }
+
+    if (input.serviceProviderId !== undefined && input.serviceProviderId !== null) {
+      const provider = await app.prisma.serviceProvider.findFirst({
+        where: { id: input.serviceProviderId, householdId: params.householdId },
+        select: { id: true }
+      });
+
+      if (!provider) {
+        return reply.code(400).send({ message: "Service provider not found or belongs to a different household." });
+      }
     }
 
     const data: Prisma.ProjectExpenseUncheckedUpdateInput = {};

@@ -249,6 +249,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                 </div>
                 <div className="quick-actions">
                   <Link href="/assets/new" className="quick-action">+ Add New Asset</Link>
+                  <Link href="/projects" className="quick-action">View Project Tracker</Link>
                   <Link href="/maintenance" className="quick-action">View Maintenance Queue</Link>
                   <Link href="/assets" className="quick-action">Browse Asset Registry</Link>
                   <Link href="/notifications" className="quick-action">View Notifications</Link>

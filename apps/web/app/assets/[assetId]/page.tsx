@@ -1,3 +1,4 @@
+import type { AssetDetailResponse, MaintenanceLog, UsageMetricEntry, UsageProjection } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -5,22 +6,37 @@ import {
   applyPresetToAssetAction,
   archiveAssetAction,
   completeScheduleAction,
+  createCommentAction,
   createLogAction,
   createMetricAction,
+  createMetricEntryAction,
   createScheduleAction,
+  deleteCommentAction,
+  deleteMetricAction,
   deleteScheduleAction,
+  recordConditionAssessmentAction,
   softDeleteAssetAction,
   toggleScheduleActiveAction,
   unarchiveAssetAction,
   updateAssetAction,
-  updateMetricAction,
+  updateCommentAction,
+  updateMetricAction
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
 import { ScheduleCardActions } from "../../../components/schedule-card-actions";
 import { ScheduleForm } from "../../../components/schedule-form";
-import { ApiError, getAssetDetail, getHouseholdPresets, getLibraryPresets } from "../../../lib/api";
+import {
+  ApiError,
+  getAssetComments,
+  getAssetDetail,
+  getHouseholdAssets,
+  getHouseholdPresets,
+  getLibraryPresets,
+  getMetricEntries,
+  getMetricProjection
+} from "../../../lib/api";
 import {
   formatCategoryLabel,
   formatCurrency,
@@ -29,7 +45,7 @@ import {
   formatDueLabel,
   formatScheduleStatus,
   formatTriggerSummary,
-  formatVisibilityLabel,
+  formatVisibilityLabel
 } from "../../../lib/formatters";
 
 type AssetDetailPageProps = {
@@ -37,122 +53,222 @@ type AssetDetailPageProps = {
   searchParams: Promise<{ tab?: string }>;
 };
 
+type MetricInsight = {
+  metricId: string;
+  entries: UsageMetricEntry[];
+  projection: UsageProjection | null;
+};
+
+const tabs = [
+  { id: "overview", label: "Overview" },
+  { id: "details", label: "Structured Details" },
+  { id: "metrics", label: "Usage Metrics" },
+  { id: "maintenance", label: "Maintenance" },
+  { id: "comments", label: "Comments" },
+  { id: "settings", label: "Settings" }
+] as const;
+
+const renderMetaRow = (label: string, value: string | null | undefined): JSX.Element => (
+  <div>
+    <dt>{label}</dt>
+    <dd>{value && value.trim().length > 0 ? value : "Not set"}</dd>
+  </div>
+);
+
+const renderMoneyMetaRow = (label: string, value: number | null | undefined): JSX.Element => (
+  <div>
+    <dt>{label}</dt>
+    <dd>{value === null || value === undefined ? "Not set" : formatCurrency(value)}</dd>
+  </div>
+);
+
+const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
+  <article key={log.id} className="log-card">
+    <div>
+      <h4>{log.title}</h4>
+      <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>
+        {log.notes ?? "No notes recorded."}
+      </p>
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
+        <span className="pill">{formatDateTime(log.completedAt)}</span>
+        <span className="pill">Labor {formatCurrency(log.cost, "$0.00")}</span>
+        <span className="pill">Parts {formatCurrency(log.totalPartsCost, "$0.00")}</span>
+        {log.serviceProviderId ? <span className="pill">Provider linked</span> : null}
+      </div>
+    </div>
+    {log.parts.length > 0 ? (
+      <div style={{ minWidth: "260px" }}>
+        <div className="eyebrow">Parts Used</div>
+        <ul style={{ margin: "8px 0 0 0", paddingLeft: "18px" }}>
+          {log.parts.map((part) => (
+            <li key={part.id}>
+              {part.name}
+              {part.partNumber ? ` (${part.partNumber})` : ""}
+              {` x${part.quantity}`}
+              {part.unitCost !== null ? ` • ${formatCurrency(part.unitCost)}` : ""}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null}
+  </article>
+);
+
+async function loadMetricInsights(assetId: string, detail: AssetDetailResponse): Promise<Record<string, MetricInsight>> {
+  const metricPayloads = await Promise.all(
+    detail.metrics.map(async (metric) => {
+      const [entries, projection] = await Promise.all([
+        getMetricEntries(assetId, metric.id),
+        getMetricProjection(assetId, metric.id).catch(() => null)
+      ]);
+
+      return {
+        metricId: metric.id,
+        entries,
+        projection
+      } satisfies MetricInsight;
+    })
+  );
+
+  return Object.fromEntries(metricPayloads.map((item) => [item.metricId, item]));
+}
+
 export default async function AssetDetailPage({ params, searchParams }: AssetDetailPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
   const { tab = "overview" } = await searchParams;
 
   try {
-    const [detail, presets] = await Promise.all([getAssetDetail(assetId), getLibraryPresets()]);
-    const customPresets = await getHouseholdPresets(detail.asset.householdId);
-    const matchingPresets = presets.filter((p) => p.category === detail.asset.category);
-    const visiblePresets = matchingPresets.length > 0 ? matchingPresets : presets;
+    const detail = await getAssetDetail(assetId);
+    const [libraryPresets, customPresets, householdAssets, metricInsights, comments] = await Promise.all([
+      getLibraryPresets(),
+      getHouseholdPresets(detail.asset.householdId),
+      getHouseholdAssets(detail.asset.householdId),
+      loadMetricInsights(assetId, detail),
+      getAssetComments(assetId)
+    ]);
 
-    const groupedFields = detail.asset.fieldDefinitions.reduce<Record<string, typeof detail.asset.fieldDefinitions>>((groups, field) => {
-      const key = field.group?.trim() || "Asset Details";
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(field);
-      return groups;
-    }, {});
+    const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
+    const visiblePresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
+    const dueNow = detail.schedules.filter((schedule) => schedule.status === "due" || schedule.status === "overdue");
+    const sortedConditionHistory = [...detail.asset.conditionHistory].sort((left, right) => (
+      right.assessedAt.localeCompare(left.assessedAt)
+    ));
 
-    const formatFieldValue = (fieldKey: string): JSX.Element | string => {
-      const field = detail.asset.fieldDefinitions.find((f) => f.key === fieldKey);
-      const value = detail.asset.customFields[fieldKey];
-      if (value === null || value === undefined || value === "") return "—";
-      if (Array.isArray(value)) {
-        return (
-          <span className="field-value__tags">
-            {value.map((v) => <span key={String(v)} className="pill">{String(v)}</span>)}
-          </span>
-        );
-      }
-      if (field?.type === "boolean") return value ? "✓ Yes" : "✗ No";
-      if (field?.type === "currency" && typeof value === "number") return formatCurrency(value);
-      if (field?.type === "date" && typeof value === "string") return formatDate(value, "—");
-      if (field?.type === "url" && typeof value === "string") {
-        return <a href={value} target="_blank" rel="noopener noreferrer" className="text-link">{value}</a>;
-      }
-      const text = String(value);
-      if (field?.unit) return `${text} ${field.unit}`;
-      return text;
-    };
+    const renderOverviewTab = (): JSX.Element => (
+      <div style={{ display: "grid", gap: "24px" }}>
+        <section className="stats-row">
+          <div className="stat-card stat-card--accent">
+            <span className="stat-card__label">Condition</span>
+            <strong className="stat-card__value">{detail.asset.conditionScore ?? "-"}</strong>
+            <span className="stat-card__sub">Latest assessment score</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__label">Hierarchy</span>
+            <strong className="stat-card__value">{detail.asset.childAssets.length}</strong>
+            <span className="stat-card__sub">Child assets linked</span>
+          </div>
+          <div className="stat-card stat-card--warning">
+            <span className="stat-card__label">Due Now</span>
+            <strong className="stat-card__value">{dueNow.length}</strong>
+            <span className="stat-card__sub">Schedules requiring action</span>
+          </div>
+          <div className="stat-card stat-card--danger">
+            <span className="stat-card__label">Latest Spend</span>
+            <strong className="stat-card__value">
+              {detail.recentLogs[0] ? formatCurrency(detail.recentLogs[0].cost, "$0.00") : "$0.00"}
+            </strong>
+            <span className="stat-card__sub">Most recent labor cost</span>
+          </div>
+        </section>
 
-    const tabs = [
-      { id: "overview", label: "Overview" },
-      { id: "details", label: "Details & Specs" },
-      { id: "schedules", label: "Maintenance" },
-      { id: "history", label: "History" },
-      { id: "settings", label: "Settings" }
-    ];
-
-    // OVERVIEW TAB
-    const renderOverviewTab = () => (
-      <div className="tab-pane">
-        <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
-          
-          {/* Action Callout */}
-          <section className="panel" style={{ borderTop: detail.overdueScheduleCount > 0 ? "4px solid var(--danger-color)" : "4px solid var(--accent-color)" }}>
-            <div className="panel__header"><h2>Needs Attention</h2></div>
-            <div className="panel__body">
-              {detail.schedules.filter(s => s.status === 'overdue' || s.status === 'due').length > 0 ? (
-                <ul className="action-list" style={{ listStyle: "none", padding: 0 }}>
-                  {detail.schedules.filter(s => s.status === 'overdue' || s.status === 'due').map(s => (
-                    <li key={s.id} style={{ padding: "12px 0", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                         <span className={`status-chip status-chip--${s.status}`}>{formatScheduleStatus(s.status)}</span>
-                         <strong style={{ marginLeft: "8px" }}>{s.name}</strong>
-                      </div>
-                      <span style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>{formatDueLabel(s.nextDueAt, s.nextDueMetricValue, null)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="panel__empty">Asset is in good standing. No immediate maintenance due.</p>
-              )}
-            </div>
-          </section>
-
-          {/* Key Metrics */}
+        <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
           <section className="panel">
-            <div className="panel__header"><h2>Key Metrics</h2></div>
-            <div className="panel__body">
-              {detail.metrics.length === 0 ? (
-                <p className="panel__empty">No usage metrics being tracked.</p>
+            <div className="panel__header">
+              <h2>Hierarchy</h2>
+            </div>
+            <div className="panel__body--padded">
+              <dl className="data-list">
+                <div>
+                  <dt>Parent Asset</dt>
+                  <dd>
+                    {detail.asset.parentAsset ? (
+                      <Link href={`/assets/${detail.asset.parentAsset.id}`} className="text-link">
+                        {detail.asset.parentAsset.name}
+                      </Link>
+                    ) : "Top-level asset"}
+                  </dd>
+                </div>
+              </dl>
+              {detail.asset.childAssets.length === 0 ? (
+                <p className="panel__empty" style={{ marginTop: "16px" }}>No direct child assets linked.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  {detail.metrics.map(m => (
-                    <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.name}</p>
-                        <strong style={{ fontSize: "1.5rem" }}>{m.currentValue} <span style={{ fontSize: "1rem", fontWeight: "normal" }}>{m.unit}</span></strong>
-                      </div>
-                      <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>Updated {formatDateTime(m.lastRecordedAt, "never")}</span>
-                    </div>
+                <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>
+                  {detail.asset.childAssets.map((child) => (
+                    <Link key={child.id} href={`/assets/${child.id}`} className="data-table__link">
+                      {child.name} · {formatCategoryLabel(child.category)}
+                    </Link>
                   ))}
                 </div>
               )}
             </div>
           </section>
 
-          {/* Recent Activity Mini-Feed */}
           <section className="panel">
-            <div className="panel__header"><h2>Recent Activity</h2></div>
+            <div className="panel__header">
+              <h2>Structured Records</h2>
+            </div>
+            <div className="panel__body--padded">
+              <dl className="data-list">
+                {renderMoneyMetaRow("Purchase Price", detail.asset.purchaseDetails?.price ?? null)}
+                {renderMetaRow("Purchase Vendor", detail.asset.purchaseDetails?.vendor)}
+                {renderMetaRow("Warranty Ends", formatDate(detail.asset.warrantyDetails?.endDate, "Not set"))}
+                {renderMetaRow("Location", detail.asset.locationDetails?.room ?? detail.asset.locationDetails?.propertyName ?? null)}
+                {renderMetaRow("Insurance Provider", detail.asset.insuranceDetails?.provider)}
+                {renderMetaRow("Disposition", detail.asset.dispositionDetails?.method ?? null)}
+              </dl>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Due Work</h2>
+            </div>
             <div className="panel__body">
-              {detail.recentLogs.slice(0, 3).length === 0 ? (
-                <p className="panel__empty">No recent maintenance activity.</p>
+              {dueNow.length === 0 ? (
+                <p className="panel__empty">No maintenance items are currently due.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  {detail.recentLogs.slice(0, 3).map(log => (
-                    <div key={log.id}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <strong>{log.title}</strong>
-                        <span style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>{formatDate(log.completedAt)}</span>
+                <div className="schedule-stack">
+                  {dueNow.map((schedule) => (
+                    <article key={schedule.id} className={`schedule-card schedule-card--${schedule.status}`}>
+                      <div className="schedule-card__summary">
+                        <div>
+                          <p className="eyebrow">{formatTriggerSummary(schedule.triggerConfig)}</p>
+                          <h3>{schedule.name}</h3>
+                          <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                            {formatDueLabel(schedule.nextDueAt, schedule.nextDueMetricValue, null)}
+                          </p>
+                        </div>
+                        <span className={`status-chip status-chip--${schedule.status}`}>
+                          {formatScheduleStatus(schedule.status)}
+                        </span>
                       </div>
-                      {log.cost != null && log.cost > 0 && <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>Cost: {formatCurrency(log.cost)}</div>}
-                    </div>
+                    </article>
                   ))}
-                  {detail.recentLogs.length > 3 && (
-                    <Link href={`/assets/${detail.asset.id}?tab=history`} className="text-link" style={{ textAlign: "center", display: "block", marginTop: "8px" }}>View all history</Link>
-                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Recent Maintenance</h2>
+            </div>
+            <div className="panel__body">
+              {detail.recentLogs.length === 0 ? (
+                <p className="panel__empty">No maintenance logs recorded yet.</p>
+              ) : (
+                <div className="log-list">
+                  {detail.recentLogs.slice(0, 3).map(renderLogSummary)}
                 </div>
               )}
             </div>
@@ -161,47 +277,309 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       </div>
     );
 
-    // DETAILS & SPECS TAB
-    const renderDetailsTab = () => (
-      <div className="tab-pane" style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))" }}>
+    const renderDetailsTab = (): JSX.Element => (
+      <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
         <section className="panel">
-          <div className="panel__header"><h2>Asset Profile</h2></div>
-          {detail.asset.fieldDefinitions.length === 0 ? (
-            <p className="panel__empty">No detail fields attached yet. Edit the asset in settings to add details.</p>
-          ) : (
-            <div className="asset-detail-groups">
-              {Object.entries(groupedFields).map(([groupLabel, fields]) => (
-                <section key={groupLabel} className="asset-detail-group">
-                  <p className="eyebrow">{groupLabel}</p>
-                  <dl className="data-list">
-                    {fields.map((field) => (
-                      <div key={field.key}><dt>{field.label}</dt><dd>{formatFieldValue(field.key)}</dd></div>
-                    ))}
-                  </dl>
-                </section>
-              ))}
-            </div>
-          )}
+          <div className="panel__header">
+            <h2>Purchase Details</h2>
+          </div>
+          <div className="panel__body--padded">
+            <dl className="data-list">
+              {renderMoneyMetaRow("Price", detail.asset.purchaseDetails?.price ?? null)}
+              {renderMetaRow("Vendor", detail.asset.purchaseDetails?.vendor)}
+              {renderMetaRow("Condition", detail.asset.purchaseDetails?.condition ?? null)}
+              {renderMetaRow("Financing", detail.asset.purchaseDetails?.financing)}
+              {renderMetaRow("Receipt Reference", detail.asset.purchaseDetails?.receiptRef)}
+            </dl>
+          </div>
         </section>
 
-        {Object.keys(detail.asset.customFields).length > 0 && (
-          <section className="panel">
-            <div className="panel__header"><h2>Raw Field Data</h2></div>
-            <div className="panel__body--padded">
-              <dl className="data-list">
-                {Object.entries(detail.asset.customFields).map(([key, value]) => (
-                  <div key={key}><dt>{key}</dt><dd>{Array.isArray(value) ? value.join(", ") : String(value)}</dd></div>
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Warranty Details</h2>
+          </div>
+          <div className="panel__body--padded">
+            <dl className="data-list">
+              {renderMetaRow("Provider", detail.asset.warrantyDetails?.provider)}
+              {renderMetaRow("Policy Number", detail.asset.warrantyDetails?.policyNumber)}
+              {renderMetaRow("Coverage Type", detail.asset.warrantyDetails?.coverageType)}
+              {renderMetaRow("Start", formatDate(detail.asset.warrantyDetails?.startDate, "Not set"))}
+              {renderMetaRow("End", formatDate(detail.asset.warrantyDetails?.endDate, "Not set"))}
+              {renderMetaRow("Notes", detail.asset.warrantyDetails?.notes)}
+            </dl>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Location Details</h2>
+          </div>
+          <div className="panel__body--padded">
+            <dl className="data-list">
+              {renderMetaRow("Property", detail.asset.locationDetails?.propertyName)}
+              {renderMetaRow("Building", detail.asset.locationDetails?.building)}
+              {renderMetaRow("Room", detail.asset.locationDetails?.room)}
+              {renderMetaRow(
+                "Coordinates",
+                detail.asset.locationDetails?.latitude !== undefined && detail.asset.locationDetails?.longitude !== undefined
+                  ? `${detail.asset.locationDetails.latitude}, ${detail.asset.locationDetails.longitude}`
+                  : null
+              )}
+              {renderMetaRow("Notes", detail.asset.locationDetails?.notes)}
+            </dl>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Insurance & Disposition</h2>
+          </div>
+          <div className="panel__body--padded">
+            <dl className="data-list">
+              {renderMetaRow("Insurance Provider", detail.asset.insuranceDetails?.provider)}
+              {renderMetaRow("Policy Number", detail.asset.insuranceDetails?.policyNumber)}
+              {renderMoneyMetaRow("Coverage Amount", detail.asset.insuranceDetails?.coverageAmount ?? null)}
+              {renderMoneyMetaRow("Deductible", detail.asset.insuranceDetails?.deductible ?? null)}
+              {renderMetaRow("Renewal Date", formatDate(detail.asset.insuranceDetails?.renewalDate, "Not set"))}
+              {renderMetaRow("Disposition Method", detail.asset.dispositionDetails?.method ?? null)}
+              {renderMetaRow("Disposition Date", formatDate(detail.asset.dispositionDetails?.date, "Not set"))}
+              {renderMoneyMetaRow("Sale Price", detail.asset.dispositionDetails?.salePrice ?? null)}
+              {renderMetaRow("Buyer Info", detail.asset.dispositionDetails?.buyerInfo)}
+            </dl>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Condition History</h2>
+          </div>
+          <div className="panel__body--padded">
+            <form action={recordConditionAssessmentAction} className="form-grid" style={{ marginBottom: "24px" }}>
+              <input type="hidden" name="assetId" value={detail.asset.id} />
+              <label className="field">
+                <span>Score</span>
+                <input type="number" name="score" min="1" max="10" step="1" required />
+              </label>
+              <label className="field field--full">
+                <span>Notes</span>
+                <textarea name="notes" rows={2} placeholder="Capture condition changes, findings, or observations" />
+              </label>
+              <button type="submit" className="button button--primary">Record Assessment</button>
+            </form>
+
+            {sortedConditionHistory.length === 0 ? (
+              <p className="panel__empty">No condition assessments recorded yet.</p>
+            ) : (
+              <div className="schedule-stack">
+                {sortedConditionHistory.map((entry) => (
+                  <article key={`${entry.assessedAt}-${entry.score}`} className="schedule-card">
+                    <div className="schedule-card__summary">
+                      <div>
+                        <h3>Score {entry.score}/10</h3>
+                        <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                          {entry.notes ?? "No notes recorded."}
+                        </p>
+                      </div>
+                      <span className="pill">{formatDateTime(entry.assessedAt)}</span>
+                    </div>
+                  </article>
                 ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Profile Fields</h2>
+          </div>
+          <div className="panel__body--padded">
+            {detail.asset.fieldDefinitions.length === 0 ? (
+              <p className="panel__empty">No custom profile fields defined.</p>
+            ) : (
+              <dl className="data-list">
+                {detail.asset.fieldDefinitions.map((field) => {
+                  const rawValue = detail.asset.customFields[field.key];
+                  const renderedValue = rawValue === null || rawValue === undefined || rawValue === ""
+                    ? "Not set"
+                    : Array.isArray(rawValue)
+                      ? rawValue.join(", ")
+                      : String(rawValue);
+
+                  return (
+                    <div key={field.key}>
+                      <dt>{field.label}</dt>
+                      <dd>{renderedValue}</dd>
+                    </div>
+                  );
+                })}
               </dl>
+            )}
+          </div>
+        </section>
+      </div>
+    );
+
+    const renderMetricsTab = (): JSX.Element => (
+      <div style={{ display: "grid", gap: "24px" }}>
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Add Usage Metric</h2>
+          </div>
+          <div className="panel__body--padded">
+            <form action={createMetricAction} className="form-grid">
+              <input type="hidden" name="assetId" value={detail.asset.id} />
+              <label className="field">
+                <span>Name</span>
+                <input type="text" name="name" placeholder="Odometer" required />
+              </label>
+              <label className="field">
+                <span>Unit</span>
+                <input type="text" name="unit" placeholder="miles" required />
+              </label>
+              <label className="field">
+                <span>Starting Value</span>
+                <input type="number" name="currentValue" min="0" step="0.1" defaultValue="0" />
+              </label>
+              <label className="field">
+                <span>Recorded At</span>
+                <input type="datetime-local" name="lastRecordedAt" />
+              </label>
+              <button type="submit" className="button button--primary">Create Metric</button>
+            </form>
+          </div>
+        </section>
+
+        {detail.metrics.length === 0 ? (
+          <section className="panel">
+            <div className="panel__body">
+              <p className="panel__empty">No usage metrics yet.</p>
             </div>
           </section>
+        ) : (
+          <div style={{ display: "grid", gap: "24px" }}>
+            {detail.metrics.map((metric) => {
+              const insight = metricInsights[metric.id];
+
+              return (
+                <section key={metric.id} className="panel">
+                  <div className="panel__header">
+                    <div>
+                      <h2>{metric.name}</h2>
+                      <p style={{ margin: "6px 0 0 0", color: "var(--ink-muted)" }}>
+                        {metric.currentValue} {metric.unit} • Last recorded {formatDateTime(metric.lastRecordedAt, "never")}
+                      </p>
+                    </div>
+                    <form action={deleteMetricAction}>
+                      <input type="hidden" name="assetId" value={detail.asset.id} />
+                      <input type="hidden" name="metricId" value={metric.id} />
+                      <button type="submit" className="button button--danger button--sm">Delete Metric</button>
+                    </form>
+                  </div>
+                  <div className="panel__body--padded" style={{ display: "grid", gap: "24px" }}>
+                    <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+                      <form action={updateMetricAction} className="form-grid">
+                        <input type="hidden" name="assetId" value={detail.asset.id} />
+                        <input type="hidden" name="metricId" value={metric.id} />
+                        <label className="field">
+                          <span>Current Value</span>
+                          <input type="number" name="currentValue" min="0" step="0.1" defaultValue={metric.currentValue} required />
+                        </label>
+                        <label className="field">
+                          <span>Recorded At</span>
+                          <input type="datetime-local" name="lastRecordedAt" />
+                        </label>
+                        <button type="submit" className="button button--ghost">Update Snapshot</button>
+                      </form>
+
+                      <form action={createMetricEntryAction} className="form-grid">
+                        <input type="hidden" name="assetId" value={detail.asset.id} />
+                        <input type="hidden" name="metricId" value={metric.id} />
+                        <label className="field">
+                          <span>New Reading</span>
+                          <input type="number" name="value" min="0" step="0.1" required />
+                        </label>
+                        <label className="field">
+                          <span>Recorded At</span>
+                          <input type="datetime-local" name="recordedAt" />
+                        </label>
+                        <label className="field">
+                          <span>Source</span>
+                          <input type="text" name="source" defaultValue="manual" />
+                        </label>
+                        <label className="field field--full">
+                          <span>Notes</span>
+                          <textarea name="notes" rows={2} placeholder="Trip complete, service visit, seasonal reading" />
+                        </label>
+                        <button type="submit" className="button button--primary">Add Entry</button>
+                      </form>
+                    </div>
+
+                    <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+                      <section>
+                        <div className="eyebrow">Projection</div>
+                        {insight?.projection ? (
+                          <div style={{ display: "grid", gap: "12px", marginTop: "10px" }}>
+                            <div className="pill">Rate {insight.projection.currentRate.toFixed(2)} {insight.projection.rateUnit}</div>
+                            {insight.projection.projectedValues.length === 0 ? (
+                              <p className="panel__empty">No projected values available.</p>
+                            ) : (
+                              <div className="schedule-stack">
+                                {insight.projection.projectedValues.map((projection) => (
+                                  <article key={projection.date} className="schedule-card">
+                                    <div className="schedule-card__summary">
+                                      <div>
+                                        <h3>{projection.value.toFixed(1)} {metric.unit}</h3>
+                                      </div>
+                                      <span className="pill">{formatDate(projection.date)}</span>
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="panel__empty" style={{ marginTop: "10px" }}>
+                            Not enough entry history to compute a projection yet.
+                          </p>
+                        )}
+                      </section>
+
+                      <section>
+                        <div className="eyebrow">Recent Entries</div>
+                        {insight?.entries.length ? (
+                          <div className="schedule-stack" style={{ marginTop: "10px" }}>
+                            {insight.entries.slice(0, 8).map((entry) => (
+                              <article key={entry.id} className="schedule-card">
+                                <div className="schedule-card__summary">
+                                  <div>
+                                    <h3>{entry.value} {metric.unit}</h3>
+                                    <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                                      {entry.source}
+                                      {entry.notes ? ` • ${entry.notes}` : ""}
+                                    </p>
+                                  </div>
+                                  <span className="pill">{formatDateTime(entry.recordedAt)}</span>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="panel__empty" style={{ marginTop: "10px" }}>No metric entries recorded yet.</p>
+                        )}
+                      </section>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         )}
       </div>
     );
 
-    // SCHEDULES TAB
-    const renderSchedulesTab = () => (
-      <div className="tab-pane" style={{ display: "grid", gap: "24px" }}>
+    const renderMaintenanceTab = (): JSX.Element => (
+      <div style={{ display: "grid", gap: "24px" }}>
         <section className="panel">
           <div className="panel__header">
             <h2>Maintenance Schedules</h2>
@@ -218,17 +596,21 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                       <div>
                         <p className="eyebrow">{formatTriggerSummary(schedule.triggerConfig)}</p>
                         <h3>{schedule.name}</h3>
-                        <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>{schedule.description ?? "No description."}</p>
+                        <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                          {schedule.description ?? "No description."}
+                        </p>
                       </div>
                       <div className="schedule-card__badges">
-                        <span className={`status-chip status-chip--${schedule.status}`}>{formatScheduleStatus(schedule.status)}</span>
-                        {!schedule.isActive && <span className="status-chip status-chip--paused">Paused</span>}
+                        <span className={`status-chip status-chip--${schedule.status}`}>
+                          {formatScheduleStatus(schedule.status)}
+                        </span>
+                        {!schedule.isActive ? <span className="status-chip status-chip--paused">Paused</span> : null}
                       </div>
                     </div>
                     <dl className="schedule-meta">
                       <div><dt>Next due</dt><dd>{formatDueLabel(schedule.nextDueAt, schedule.nextDueMetricValue, null)}</dd></div>
                       <div><dt>Last completed</dt><dd>{formatDateTime(schedule.lastCompletedAt, "Never")}</dd></div>
-                      <div><dt>Channels</dt><dd>{schedule.notificationConfig.channels.join(", ")}</dd></div>
+                      <div><dt>Assignee</dt><dd>{schedule.assignee?.displayName ?? "Unassigned"}</dd></div>
                       <div><dt>Trigger</dt><dd>{schedule.triggerConfig.type}</dd></div>
                     </dl>
                     <ScheduleCardActions
@@ -248,61 +630,77 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         </section>
 
         <section className="panel">
-          <div className="panel__header"><h2>Add Schedule</h2></div>
+          <div className="panel__header">
+            <h2>Add Schedule</h2>
+          </div>
           <ScheduleForm
             assetId={detail.asset.id}
-            metrics={detail.metrics.map((m) => ({ id: m.id, name: m.name, unit: m.unit }))}
+            metrics={detail.metrics.map((metric) => ({ id: metric.id, name: metric.name, unit: metric.unit }))}
             action={createScheduleAction}
           />
         </section>
-      </div>
-    );
 
-    // HISTORY TAB
-    const renderHistoryTab = () => (
-      <div className="tab-pane" style={{ display: "grid", gap: "24px" }}>
         <section className="panel">
-          <div className="panel__header"><h2>Maintenance History</h2></div>
+          <div className="panel__header">
+            <h2>Maintenance Log</h2>
+          </div>
           <div className="panel__body">
             {detail.recentLogs.length === 0 ? (
               <p className="panel__empty">No maintenance history logged yet.</p>
             ) : (
               <div className="log-list">
-                {detail.recentLogs.map((log) => (
-                  <div key={log.id} className="log-card">
-                    <div>
-                      <h4>{log.title}</h4>
-                      <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>{log.notes ?? "No notes."}</p>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>Completed</div>
-                      <strong style={{ fontSize: "0.88rem" }}>{formatDateTime(log.completedAt)}</strong>
-                      <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", marginTop: "4px" }}>Cost</div>
-                      <strong style={{ fontSize: "0.88rem" }}>{formatCurrency(log.cost)}</strong>
-                    </div>
-                  </div>
-                ))}
+                {detail.recentLogs.map(renderLogSummary)}
               </div>
             )}
           </div>
         </section>
 
         <section className="panel">
-          <div className="panel__header"><h2>Log Maintenance</h2></div>
+          <div className="panel__header">
+            <h2>Log Maintenance</h2>
+          </div>
           <div className="panel__body--padded">
             <form action={createLogAction} className="form-grid">
               <input type="hidden" name="assetId" value={detail.asset.id} />
-              <label className="field field--full"><span>Schedule (optional)</span>
+              <label className="field field--full">
+                <span>Schedule</span>
                 <select name="scheduleId" defaultValue="">
                   <option value="">No linked schedule</option>
-                  {detail.schedules.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                  {detail.schedules.map((schedule) => (
+                    <option key={schedule.id} value={schedule.id}>{schedule.name}</option>
+                  ))}
                 </select>
               </label>
-              <label className="field field--full"><span>Title</span><input type="text" name="title" placeholder="Brake inspection" required /></label>
-              <label className="field"><span>Completed at</span><input type="datetime-local" name="completedAt" required /></label>
-              <label className="field"><span>Usage value</span><input type="number" name="usageValue" min="0" step="0.1" /></label>
-              <label className="field"><span>Cost</span><input type="number" name="cost" min="0" step="0.01" /></label>
-              <label className="field field--full"><span>Notes</span><textarea name="notes" rows={3} placeholder="Service notes or findings" /></label>
+              <label className="field field--full">
+                <span>Title</span>
+                <input type="text" name="title" placeholder="Brake inspection" required />
+              </label>
+              <label className="field">
+                <span>Completed At</span>
+                <input type="datetime-local" name="completedAt" required />
+              </label>
+              <label className="field">
+                <span>Usage Value</span>
+                <input type="number" name="usageValue" min="0" step="0.1" />
+              </label>
+              <label className="field">
+                <span>Cost</span>
+                <input type="number" name="cost" min="0" step="0.01" />
+              </label>
+              <label className="field">
+                <span>Service Provider Id</span>
+                <input type="text" name="serviceProviderId" placeholder="Optional structured provider id" />
+              </label>
+              <label className="field field--full">
+                <span>Notes</span>
+                <textarea name="notes" rows={3} placeholder="Service notes or findings" />
+              </label>
+              <label className="field"><span>Part Name</span><input type="text" name="partName" placeholder="Oil filter" /></label>
+              <label className="field"><span>Part Number</span><input type="text" name="partNumber" placeholder="FL-500S" /></label>
+              <label className="field"><span>Quantity</span><input type="number" name="partQuantity" min="0" step="0.1" placeholder="1" /></label>
+              <label className="field"><span>Unit Cost</span><input type="number" name="partUnitCost" min="0" step="0.01" placeholder="8.97" /></label>
+              <label className="field"><span>Supplier</span><input type="text" name="partSupplier" placeholder="AutoZone" /></label>
+              <label className="field field--full"><span>Part Notes</span><textarea name="partNotes" rows={2} placeholder="Optional part note" /></label>
               <button type="submit" className="button button--primary">Add Log Entry</button>
             </form>
           </div>
@@ -310,15 +708,115 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       </div>
     );
 
-    // SETTINGS TAB
-    const renderSettingsTab = () => (
-      <div className="tab-pane" style={{ display: "grid", gap: "24px" }}>
+    const renderCommentsTab = (): JSX.Element => (
+      <div style={{ display: "grid", gap: "24px" }}>
         <section className="panel">
-          <div className="panel__header"><h2>Edit Asset</h2></div>
+          <div className="panel__header">
+            <h2>New Comment</h2>
+          </div>
+          <div className="panel__body--padded">
+            <form action={createCommentAction} className="form-grid">
+              <input type="hidden" name="assetId" value={detail.asset.id} />
+              <input type="hidden" name="householdId" value={detail.asset.householdId} />
+              <label className="field field--full">
+                <span>Comment</span>
+                <textarea name="body" rows={3} placeholder="Leave a note, issue, or handoff for other household members" required />
+              </label>
+              <button type="submit" className="button button--primary">Post Comment</button>
+            </form>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Discussion</h2>
+            <span className="pill">{comments.length}</span>
+          </div>
+          <div className="panel__body">
+            {comments.length === 0 ? (
+              <p className="panel__empty">No comments on this asset yet.</p>
+            ) : (
+              <div className="schedule-stack">
+                {comments.map((comment) => (
+                  <article key={comment.id} className="schedule-card">
+                    <div className="schedule-card__summary">
+                      <div>
+                        <h3>{comment.author.displayName ?? "Household member"}</h3>
+                        <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                          {formatDateTime(comment.createdAt)}
+                          {comment.editedAt ? ` • edited ${formatDateTime(comment.editedAt)}` : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p style={{ margin: "0 0 16px 0", whiteSpace: "pre-wrap" }}>{comment.body}</p>
+
+                    <form action={updateCommentAction} className="form-grid" style={{ marginBottom: "16px" }}>
+                      <input type="hidden" name="assetId" value={detail.asset.id} />
+                      <input type="hidden" name="commentId" value={comment.id} />
+                      <label className="field field--full">
+                        <span>Edit Comment</span>
+                        <textarea name="body" rows={2} defaultValue={comment.body} required />
+                      </label>
+                      <button type="submit" className="button button--ghost">Save Edit</button>
+                    </form>
+
+                    <form action={createCommentAction} className="form-grid" style={{ marginBottom: "16px" }}>
+                      <input type="hidden" name="assetId" value={detail.asset.id} />
+                      <input type="hidden" name="householdId" value={detail.asset.householdId} />
+                      <input type="hidden" name="parentCommentId" value={comment.id} />
+                      <label className="field field--full">
+                        <span>Reply</span>
+                        <textarea name="body" rows={2} placeholder="Add a threaded reply" required />
+                      </label>
+                      <button type="submit" className="button button--primary">Reply</button>
+                    </form>
+
+                    <form action={deleteCommentAction} className="inline-actions inline-actions--end">
+                      <input type="hidden" name="assetId" value={detail.asset.id} />
+                      <input type="hidden" name="householdId" value={detail.asset.householdId} />
+                      <input type="hidden" name="commentId" value={comment.id} />
+                      <button type="submit" className="button button--danger button--sm">Delete Comment</button>
+                    </form>
+
+                    {comment.replies.length > 0 ? (
+                      <div style={{ display: "grid", gap: "12px", marginTop: "18px", paddingLeft: "18px", borderLeft: "2px solid var(--border-color)" }}>
+                        {comment.replies.map((reply) => (
+                          <div key={reply.id} className="schedule-card">
+                            <div className="schedule-card__summary">
+                              <div>
+                                <h3>{reply.author.displayName ?? "Household member"}</h3>
+                                <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                                  {formatDateTime(reply.createdAt)}
+                                  {reply.editedAt ? ` • edited ${formatDateTime(reply.editedAt)}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{reply.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    );
+
+    const renderSettingsTab = (): JSX.Element => (
+      <div style={{ display: "grid", gap: "24px" }}>
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Edit Asset</h2>
+          </div>
           <div className="panel__body--padded">
             <AssetProfileWorkbench
               action={updateAssetAction}
               householdId={detail.asset.householdId}
+              householdAssets={householdAssets}
               submitLabel="Update Asset"
               libraryPresets={visiblePresets}
               customPresets={customPresets}
@@ -328,51 +826,18 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         </section>
 
         <section className="panel">
-          <div className="panel__header"><h2>Update Metrics</h2></div>
-          <div className="panel__body">
-            <form action={createMetricAction} className="form-grid form-grid--create" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "24px", marginBottom: "24px" }}>
-              <input type="hidden" name="assetId" value={detail.asset.id} />
-              <label className="field"><span>Name</span><input type="text" name="name" placeholder="Odometer" required /></label>
-              <label className="field"><span>Unit</span><input type="text" name="unit" placeholder="miles" required /></label>
-              <label className="field"><span>Starting value</span><input type="number" name="currentValue" min="0" step="0.1" defaultValue="0" /></label>
-              <label className="field"><span>Recorded at</span><input type="datetime-local" name="lastRecordedAt" /></label>
-              <button type="submit" className="button button--ghost" style={{ alignSelf: "end" }}>Add Metric</button>
-            </form>
-            {detail.metrics.length === 0 ? (
-              <p className="panel__empty">No usage metrics yet.</p>
-            ) : (
-              <div className="metric-grid">
-                {detail.metrics.map((metric) => (
-                  <article key={metric.id} className="metric-card">
-                    <div>
-                      <p className="eyebrow">{metric.unit}</p>
-                      <h3>{metric.name}</h3>
-                      <p className="metric-value">{metric.currentValue}</p>
-                      <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Last updated {formatDateTime(metric.lastRecordedAt, "never")}</span>
-                    </div>
-                    <form action={updateMetricAction} className="form-grid form-grid--compact">
-                      <input type="hidden" name="assetId" value={detail.asset.id} />
-                      <input type="hidden" name="metricId" value={metric.id} />
-                      <label className="field"><span>New reading</span><input type="number" name="currentValue" min="0" step="0.1" defaultValue={metric.currentValue} required /></label>
-                      <label className="field"><span>Recorded at</span><input type="datetime-local" name="lastRecordedAt" /></label>
-                      <button type="submit" className="button button--primary button--sm" style={{ alignSelf: "end", gridColumn: "-1" }}>Update</button>
-                    </form>
-                  </article>
-                ))}
-              </div>
-            )}
+          <div className="panel__header">
+            <h2>Apply a Preset</h2>
           </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel__header"><h2>Apply a Preset</h2></div>
           <div className="preset-grid">
             {visiblePresets.map((preset) => (
               <article key={preset.key} className="preset-card">
                 <div>
                   <p className="eyebrow">{formatCategoryLabel(preset.category)}</p>
                   <h3>{preset.label}</h3>
-                  <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>{preset.description ?? "No description."}</p>
+                  <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
+                    {preset.description ?? "No description."}
+                  </p>
                 </div>
                 <div className="preset-card__meta">
                   <span>{preset.metricTemplates.length} metrics</span>
@@ -395,7 +860,9 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         <div className="detail-topbar">
           <Link href="/assets" className="text-link">&larr; Back to Assets</Link>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <Link href={`/assets/${detail.asset.id}?tab=history`} className="button button--primary button--sm">Log Maintenance</Link>
+            <Link href={`/assets/${detail.asset.id}?tab=maintenance`} className="button button--primary button--sm">
+              Log Maintenance
+            </Link>
             <AssetDangerActions
               assetId={detail.asset.id}
               isArchived={detail.asset.isArchived}
@@ -411,47 +878,54 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             <div className="detail-hero__info">
               <p className="eyebrow">{formatCategoryLabel(detail.asset.category)}</p>
               <h1>{detail.asset.name}</h1>
-              <p>{[detail.asset.manufacturer, detail.asset.model].filter(Boolean).join(" ") || detail.asset.description || "No description."}</p>
+              <p>
+                {[detail.asset.manufacturer, detail.asset.model].filter(Boolean).join(" ")
+                  || detail.asset.description
+                  || "No description."}
+              </p>
             </div>
             <dl className="detail-hero__meta">
               <div className="detail-hero__meta-item"><dt>Visibility</dt><dd>{formatVisibilityLabel(detail.asset.visibility)}</dd></div>
-              <div className="detail-hero__meta-item"><dt>Overdue</dt><dd>{detail.overdueScheduleCount}</dd></div>
+              <div className="detail-hero__meta-item"><dt>Purchased</dt><dd>{formatDate(detail.asset.purchaseDate, "-")}</dd></div>
+              <div className="detail-hero__meta-item"><dt>Parent</dt><dd>{detail.asset.parentAsset?.name ?? "None"}</dd></div>
+              <div className="detail-hero__meta-item"><dt>Children</dt><dd>{detail.asset.childAssets.length}</dd></div>
               <div className="detail-hero__meta-item"><dt>Due</dt><dd>{detail.dueScheduleCount}</dd></div>
-              <div className="detail-hero__meta-item"><dt>Purchased</dt><dd>{formatDate(detail.asset.purchaseDate, "—")}</dd></div>
-              {detail.asset.serialNumber && (
+              <div className="detail-hero__meta-item"><dt>Overdue</dt><dd>{detail.overdueScheduleCount}</dd></div>
+              {detail.asset.serialNumber ? (
                 <div className="detail-hero__meta-item"><dt>Serial</dt><dd>{detail.asset.serialNumber}</dd></div>
-              )}
+              ) : null}
             </dl>
           </section>
 
           <nav className="tab-navigation" aria-label="Asset sections">
             <ul style={{ display: "flex", gap: "24px", listStyle: "none", padding: "0 0 12px 0", margin: "16px 0 24px 0", borderBottom: "1px solid var(--border-color)", overflowX: "auto" }}>
-              {tabs.map((t) => (
-                <li key={t.id}>
-                  <Link 
-                    href={`/assets/${detail.asset.id}?tab=${t.id}`}
-                    style={{ 
-                      textDecoration: "none", 
-                      color: tab === t.id ? "var(--ink-base)" : "var(--ink-muted)",
-                      fontWeight: tab === t.id ? "600" : "normal",
+              {tabs.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={`/assets/${detail.asset.id}?tab=${item.id}`}
+                    style={{
+                      textDecoration: "none",
+                      color: tab === item.id ? "var(--ink-base)" : "var(--ink-muted)",
+                      fontWeight: tab === item.id ? "600" : "normal",
                       paddingBottom: "12px",
-                      borderBottom: tab === t.id ? "2px solid var(--ink-base)" : "none",
+                      borderBottom: tab === item.id ? "2px solid var(--ink-base)" : "none",
                       display: "block"
                     }}
                   >
-                    {t.label}
+                    {item.label}
                   </Link>
                 </li>
               ))}
             </ul>
           </nav>
 
-          <main className="tab-content">
-            {tab === "overview" && renderOverviewTab()}
-            {tab === "details" && renderDetailsTab()}
-            {tab === "schedules" && renderSchedulesTab()}
-            {tab === "history" && renderHistoryTab()}
-            {tab === "settings" && renderSettingsTab()}
+          <main>
+            {tab === "overview" ? renderOverviewTab() : null}
+            {tab === "details" ? renderDetailsTab() : null}
+            {tab === "metrics" ? renderMetricsTab() : null}
+            {tab === "maintenance" ? renderMaintenanceTab() : null}
+            {tab === "comments" ? renderCommentsTab() : null}
+            {tab === "settings" ? renderSettingsTab() : null}
           </main>
         </div>
       </AppShell>
@@ -460,6 +934,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
     if (error instanceof ApiError && error.status === 404) {
       notFound();
     }
+
     throw error;
   }
 }

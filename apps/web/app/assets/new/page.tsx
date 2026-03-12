@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import { createAssetAction } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
-import { ApiError, getHouseholdPresets, getLibraryPresets, getMe } from "../../../lib/api";
+import { ApiError, getHouseholdAssets, getHouseholdPresets, getLibraryPresets, getMe } from "../../../lib/api";
 import Link from "next/link";
 
 export default async function NewAssetPage(): Promise<JSX.Element> {
@@ -21,9 +21,10 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
       );
     }
 
-    const [presets, customPresets] = await Promise.all([
+    const [presets, customPresets, householdAssets] = await Promise.all([
       getLibraryPresets(),
-      getHouseholdPresets(household.id)
+      getHouseholdPresets(household.id),
+      getHouseholdAssets(household.id)
     ]);
 
     return (
@@ -38,6 +39,7 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
           <AssetProfileWorkbench
             action={createAssetAction}
             householdId={household.id}
+            householdAssets={householdAssets}
             submitLabel="Create Asset"
             libraryPresets={presets}
             customPresets={customPresets}
