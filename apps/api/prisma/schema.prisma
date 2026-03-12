@@ -58,34 +58,58 @@ enum NotificationStatus {
   read
 }
 
+enum ProjectStatus {
+  planning
+  active
+  on_hold
+  completed
+  cancelled
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  expired
+  revoked
+}
+
 model User {
-  id                  String             @id @default(cuid())
-  clerkUserId         String             @unique
-  email               String?            @unique
-  displayName         String?
-  notificationPreferences Json           @default("{}")
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  householdMemberships HouseholdMember[]
-  householdsCreated   Household[]        @relation("HouseholdCreator")
-  createdAssets       Asset[]            @relation("AssetCreator")
-  createdPresetProfiles PresetProfile[]  @relation("PresetProfileCreator")
-  maintenanceLogs     MaintenanceLog[]   @relation("MaintenanceLogUser")
-  notifications       Notification[]
+  id                      String                @id @default(cuid())
+  clerkUserId             String                @unique
+  email                   String?               @unique
+  displayName             String?
+  notificationPreferences Json                  @default("{}")
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  householdMemberships    HouseholdMember[]
+  householdsCreated       Household[]           @relation("HouseholdCreator")
+  createdAssets           Asset[]               @relation("AssetCreator")
+  createdPresetProfiles   PresetProfile[]       @relation("PresetProfileCreator")
+  maintenanceLogs         MaintenanceLog[]      @relation("MaintenanceLogUser")
+  notifications           Notification[]
+  assignedSchedules       MaintenanceSchedule[] @relation("ScheduleAssignee")
+  assignedProjectTasks    ProjectTask[]         @relation("ProjectTaskAssignee")
+  activityLogs            ActivityLog[]
+  sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
+  acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
+  authoredComments        Comment[]             @relation("CommentAuthor")
 }
 
 model Household {
-  id            String             @id @default(cuid())
-  name          String
-  createdById   String
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  createdBy     User               @relation("HouseholdCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members       HouseholdMember[]
-  assets        Asset[]
-  presetProfiles PresetProfile[]
-  notifications Notification[]
+  id               String                @id @default(cuid())
+  name             String
+  createdById      String
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  createdBy        User                  @relation("HouseholdCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members          HouseholdMember[]
+  assets           Asset[]
+  presetProfiles   PresetProfile[]
+  notifications    Notification[]
   serviceProviders ServiceProvider[]
+  projects         Project[]
+  activityLogs     ActivityLog[]
+  invitations      HouseholdInvitation[]
 
   @@index([createdById])
 }
@@ -106,44 +130,46 @@ model HouseholdMember {
 }
 
 model Asset {
-  id             String                @id @default(cuid())
-  householdId    String
-  createdById    String
-  parentAssetId  String?
-  name           String
-  category       AssetCategory
-  visibility     AssetVisibility       @default(shared)
-  description    String?
-  manufacturer   String?
-  model          String?
-  serialNumber   String?
-  purchaseDate   DateTime?
-  purchaseDetails    Json?
-  warrantyDetails    Json?
-  locationDetails    Json?
-  insuranceDetails   Json?
-  dispositionDetails Json?
-  conditionScore     Int?
-  conditionHistory   Json              @default("[]")
-  assetTypeKey   String?
-  assetTypeLabel String?
+  id                   String                @id @default(cuid())
+  householdId          String
+  createdById          String
+  parentAssetId        String?
+  name                 String
+  category             AssetCategory
+  visibility           AssetVisibility       @default(shared)
+  description          String?
+  manufacturer         String?
+  model                String?
+  serialNumber         String?
+  purchaseDate         DateTime?
+  purchaseDetails      Json?
+  warrantyDetails      Json?
+  locationDetails      Json?
+  insuranceDetails     Json?
+  dispositionDetails   Json?
+  conditionScore       Int?
+  conditionHistory     Json                  @default("[]")
+  assetTypeKey         String?
+  assetTypeLabel       String?
   assetTypeDescription String?
-  assetTypeSource String                @default("manual")
-  assetTypeVersion Int                  @default(1)
-  fieldDefinitions Json                 @default("[]")
-  customFields   Json                  @default("{}")
-  isArchived     Boolean               @default(false)
-  deletedAt      DateTime?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  household      Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  createdBy      User                  @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  parentAsset    Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id], onDelete: SetNull)
-  childAssets    Asset[]               @relation("AssetHierarchy")
-  usageMetrics   UsageMetric[]
-  schedules      MaintenanceSchedule[]
-  logs           MaintenanceLog[]
-  notifications  Notification[]
+  assetTypeSource      String                @default("manual")
+  assetTypeVersion     Int                   @default(1)
+  fieldDefinitions     Json                  @default("[]")
+  customFields         Json                  @default("{}")
+  isArchived           Boolean               @default(false)
+  deletedAt            DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  household            Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy            User                  @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  parentAsset          Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id], onDelete: SetNull)
+  childAssets          Asset[]               @relation("AssetHierarchy")
+  usageMetrics         UsageMetric[]
+  schedules            MaintenanceSchedule[]
+  logs                 MaintenanceLog[]
+  notifications        Notification[]
+  projectAssets        ProjectAsset[]
+  comments             Comment[]
 
   @@index([householdId, isArchived])
   @@index([createdById])
@@ -182,68 +208,73 @@ model UsageMetricEntry {
 }
 
 model MaintenanceSchedule {
-  id             String          @id @default(cuid())
-  assetId        String
-  metricId       String?
-  name           String
-  description    String?
-  triggerType    TriggerType
-  triggerConfig  Json
-  notificationConfig Json        @default("{}")
-  presetKey      String?
-  isActive       Boolean         @default(true)
-  lastCompletedAt DateTime?
-  nextDueAt      DateTime?
+  id                 String           @id @default(cuid())
+  assetId            String
+  metricId           String?
+  name               String
+  description        String?
+  triggerType        TriggerType
+  triggerConfig      Json
+  notificationConfig Json             @default("{}")
+  presetKey          String?
+  isActive           Boolean          @default(true)
+  lastCompletedAt    DateTime?
+  nextDueAt          DateTime?
   nextDueMetricValue Float?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  metric         UsageMetric?    @relation(fields: [metricId], references: [id], onDelete: SetNull)
-  logs           MaintenanceLog[]
-  notifications  Notification[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  asset              Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  metric             UsageMetric?     @relation(fields: [metricId], references: [id], onDelete: SetNull)
+  assignedToId       String?
+  logs               MaintenanceLog[]
+  notifications      Notification[]
+  linkedProjectTasks ProjectTask[]    @relation("ProjectTaskSchedule")
+  assignedTo         User?            @relation("ScheduleAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([assetId, isActive])
   @@index([metricId])
   @@index([nextDueAt])
+  @@index([assignedToId])
 }
 
 model PresetProfile {
-  id                  String    @id @default(cuid())
-  householdId         String
-  createdById         String
-  key                 String
-  name                String
-  category            AssetCategory
-  description         String?
-  tags                String[]  @default([])
-  customFieldTemplates Json     @default("[]")
-  metricTemplates     Json      @default("[]")
-  scheduleTemplates   Json      @default("[]")
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  household           Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  createdBy           User      @relation("PresetProfileCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  id                   String        @id @default(cuid())
+  householdId          String
+  createdById          String
+  key                  String
+  name                 String
+  category             AssetCategory
+  description          String?
+  tags                 String[]      @default([])
+  customFieldTemplates Json          @default("[]")
+  metricTemplates      Json          @default("[]")
+  scheduleTemplates    Json          @default("[]")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  household            Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy            User          @relation("PresetProfileCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
+  @@unique([householdId, key])
   @@index([householdId])
   @@index([createdById])
-  @@unique([householdId, key])
 }
 
 model ServiceProvider {
-  id            String           @id @default(cuid())
-  householdId   String
-  name          String
-  specialty     String?
-  phone         String?
-  email         String?
-  website       String?
-  address       String?
-  rating        Int?
-  notes         String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  householdId     String
+  name            String
+  specialty       String?
+  phone           String?
+  email           String?
+  website         String?
+  address         String?
+  rating          Int?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
   maintenanceLogs MaintenanceLog[]
+  projectExpenses ProjectExpense[]
 
   @@index([householdId])
 }
@@ -291,27 +322,27 @@ model MaintenanceLogPart {
 }
 
 model Notification {
-  id              String             @id @default(cuid())
+  id              String               @id @default(cuid())
   userId          String
   householdId     String?
   assetId         String?
   scheduleId      String?
-  dedupeKey       String             @unique
+  dedupeKey       String               @unique
   type            NotificationType
   channel         NotificationChannel
-  status          NotificationStatus @default(pending)
+  status          NotificationStatus   @default(pending)
   title           String
   body            String
   scheduledFor    DateTime
   sentAt          DateTime?
   readAt          DateTime?
-  escalationLevel Int                @default(0)
-  payload         Json               @default("{}")
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  household       Household?         @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  asset           Asset?             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  escalationLevel Int                  @default(0)
+  payload         Json                 @default("{}")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household       Household?           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  asset           Asset?               @relation(fields: [assetId], references: [id], onDelete: Cascade)
   schedule        MaintenanceSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
@@ -319,4 +350,146 @@ model Notification {
   @@index([householdId])
   @@index([assetId])
   @@index([scheduleId])
+}
+
+// ── Projects Domain ──────────────────────────────────────────────────
+
+model Project {
+  id            String           @id @default(cuid())
+  householdId   String
+  name          String
+  description   String?
+  status        ProjectStatus    @default(planning)
+  startDate     DateTime?
+  targetEndDate DateTime?
+  actualEndDate DateTime?
+  budgetAmount  Float?
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assets        ProjectAsset[]
+  tasks         ProjectTask[]
+  expenses      ProjectExpense[]
+
+  @@index([householdId, status])
+}
+
+model ProjectAsset {
+  id        String   @id @default(cuid())
+  projectId String
+  assetId   String
+  role      String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, assetId])
+  @@index([projectId])
+  @@index([assetId])
+}
+
+model ProjectTask {
+  id            String               @id @default(cuid())
+  projectId     String
+  title         String
+  description   String?
+  status        String               @default("pending")
+  assignedToId  String?
+  dueDate       DateTime?
+  completedAt   DateTime?
+  estimatedCost Float?
+  actualCost    Float?
+  sortOrder     Int?
+  scheduleId    String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  project       Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedTo    User?                @relation("ProjectTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  schedule      MaintenanceSchedule? @relation("ProjectTaskSchedule", fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([assignedToId])
+}
+
+model ProjectExpense {
+  id                String           @id @default(cuid())
+  projectId         String
+  description       String
+  amount            Float
+  category          String?
+  date              DateTime?
+  taskId            String?
+  serviceProviderId String?
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+// ── Activity Log ─────────────────────────────────────────────────────
+
+model ActivityLog {
+  id          String    @id @default(cuid())
+  householdId String
+  userId      String
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, createdAt])
+  @@index([userId])
+  @@index([entityType, entityId])
+}
+
+// ── Household Invitations ────────────────────────────────────────────
+
+model HouseholdInvitation {
+  id               String           @id @default(cuid())
+  householdId      String
+  invitedByUserId  String
+  email            String
+  status           InvitationStatus @default(pending)
+  token            String           @unique
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  household        Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  invitedBy        User             @relation("InvitationSender", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  acceptedBy       User?            @relation("InvitationAcceptor", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([householdId])
+  @@index([email])
+}
+
+// ── Comments ─────────────────────────────────────────────────────────
+
+model Comment {
+  id              String    @id @default(cuid())
+  assetId         String
+  authorId        String
+  body            String
+  parentCommentId String?
+  editedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  author          User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parentComment   Comment?  @relation("CommentThread", fields: [parentCommentId], references: [id], onDelete: SetNull)
+  replies         Comment[] @relation("CommentThread")
+
+  @@index([assetId, createdAt])
+  @@index([authorId])
+  @@index([parentCommentId])
 }

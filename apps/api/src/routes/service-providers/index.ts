@@ -7,6 +7,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { toServiceProviderResponse } from "../../lib/presenters.js";
+import { logActivity } from "../../lib/activity-log.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -43,6 +44,15 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
         rating: input.rating ?? null,
         notes: input.notes ?? null
       }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "service_provider.created",
+      entityType: "service_provider",
+      entityId: provider.id,
+      metadata: { name: provider.name }
     });
 
     return reply.code(201).send(toServiceProviderResponse(provider));

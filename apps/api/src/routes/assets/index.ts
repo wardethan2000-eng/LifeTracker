@@ -18,6 +18,7 @@ import {
   getAccessibleAsset
 } from "../../lib/asset-access.js";
 import { toAssetResponse } from "../../lib/presenters.js";
+import { logActivity } from "../../lib/activity-log.js";
 
 const assetIdParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -112,6 +113,15 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
 
     const asset = await app.prisma.asset.create({ data });
 
+    await logActivity(app.prisma, {
+      householdId: input.householdId,
+      userId: request.auth.userId,
+      action: "asset.created",
+      entityType: "asset",
+      entityId: asset.id,
+      metadata: { name: asset.name, category: asset.category }
+    });
+
     return reply.code(201).send(toAssetResponse(asset));
   });
 
@@ -196,6 +206,15 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
+    await logActivity(app.prisma, {
+      householdId: existing.householdId,
+      userId: request.auth.userId,
+      action: "asset.updated",
+      entityType: "asset",
+      entityId: asset.id,
+      metadata: { name: asset.name }
+    });
+
     return toAssetResponse(asset);
   });
 
@@ -214,6 +233,16 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id },
       data: { isArchived: true }
     });
+
+    await logActivity(app.prisma, {
+      householdId: existing.householdId,
+      userId: request.auth.userId,
+      action: "asset.archived",
+      entityType: "asset",
+      entityId: asset.id,
+      metadata: { name: existing.name }
+    });
+
     return toAssetResponse(asset);
   });
 
@@ -295,6 +324,15 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
         conditionScore: input.score,
         conditionHistory: [...history, newEntry] as Prisma.InputJsonValue
       }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: existing.householdId,
+      userId: request.auth.userId,
+      action: "asset.condition_recorded",
+      entityType: "asset",
+      entityId: asset.id,
+      metadata: { name: existing.name, score: input.score }
     });
 
     return toAssetResponse(asset);

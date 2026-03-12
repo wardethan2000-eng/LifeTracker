@@ -11,6 +11,7 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from "fastify"
 import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
 import { toUserProfileResponse } from "../../lib/presenters.js";
+import { logActivity } from "../../lib/activity-log.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -303,6 +304,15 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "member.added",
+      entityType: "household",
+      entityId: params.householdId,
+      metadata: { addedUserId: user.id, role: input.role }
+    });
+
     return reply.code(201).send(toHouseholdMember(membership));
   });
 
@@ -377,6 +387,15 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
         await tx.householdMember.delete({
           where: { id: existing.id }
         });
+      });
+
+      await logActivity(app.prisma, {
+        householdId: params.householdId,
+        userId: request.auth.userId,
+        action: "member.removed",
+        entityType: "household",
+        entityId: params.householdId,
+        metadata: { removedUserId: existing.userId }
       });
 
       return reply.code(204).send();

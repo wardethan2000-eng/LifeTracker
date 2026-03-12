@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import crypto from "node:crypto";
 
 const prisma = new PrismaClient();
 
@@ -12,6 +13,9 @@ const maintenanceScheduleId = "clkeeperschedule000000001";
 const overdueScheduleId = "clkeeperschedule000000002";
 const maintenanceLogId = "clkeeperlog00000000000001";
 const presetProfileId = "clkeeperpreset000000000001";
+const serviceProviderId = "clkeeperprovider0000000001";
+const projectId = "clkeeperproject0000000001";
+const invitationId = "clkeeperinvite00000000001";
 
 async function main(): Promise<void> {
   await prisma.user.upsert({
@@ -388,13 +392,204 @@ async function main(): Promise<void> {
     }
   });
 
+  // ── Tier 2: Service Provider ──────────────────────────────────────────────
+  await prisma.serviceProvider.upsert({
+    where: { id: serviceProviderId },
+    update: {
+      name: "Quick Lube Express",
+      specialty: "oil change",
+      phone: "555-0100",
+      rating: 4
+    },
+    create: {
+      id: serviceProviderId,
+      householdId,
+      name: "Quick Lube Express",
+      specialty: "oil change",
+      phone: "555-0100",
+      email: "service@quicklube.example",
+      rating: 4,
+      notes: "Fast service, open on weekends"
+    }
+  });
+
+  // ── Tier 2: Maintenance Log Part ──────────────────────────────────────────
+  await prisma.maintenanceLogPart.deleteMany({
+    where: { logId: maintenanceLogId }
+  });
+  await prisma.maintenanceLogPart.create({
+    data: {
+      logId: maintenanceLogId,
+      name: "Motorcraft FL-500S Oil Filter",
+      partNumber: "FL-500S",
+      quantity: 1,
+      unitCost: 8.97,
+      supplier: "AutoZone"
+    }
+  });
+
+  // ── Tier 2: Project ───────────────────────────────────────────────────────
+  await prisma.project.upsert({
+    where: { id: projectId },
+    update: {
+      name: "Spring Vehicle Maintenance",
+      status: "active"
+    },
+    create: {
+      id: projectId,
+      householdId,
+      name: "Spring Vehicle Maintenance",
+      description: "Complete set of spring maintenance tasks for 2026",
+      status: "active",
+      budgetAmount: 800,
+      startDate: new Date("2026-03-01T00:00:00.000Z"),
+      targetEndDate: new Date("2026-04-30T00:00:00.000Z")
+    }
+  });
+
+  // Link the primary vehicle asset to the project
+  await prisma.projectAsset.upsert({
+    where: {
+      projectId_assetId: { projectId, assetId }
+    },
+    update: {},
+    create: {
+      projectId,
+      assetId
+    }
+  });
+
+  // Project tasks
+  const taskIds = [
+    "clkeepertask00000000000001",
+    "clkeepertask00000000000002",
+    "clkeepertask00000000000003"
+  ];
+  const tasks = [
+    { id: taskIds[0], title: "Oil change", description: "Full synthetic 5W-30", status: "completed" as const, assignedToId: memberUserId },
+    { id: taskIds[1], title: "Brake inspection", description: "Check pads and rotors", status: "in_progress" as const, assignedToId: ownerUserId },
+    { id: taskIds[2], title: "Cabin air filter", description: "Replace cabin filter", status: "not_started" as const, assignedToId: null }
+  ];
+
+  for (const task of tasks) {
+    await prisma.projectTask.upsert({
+      where: { id: task.id! },
+      update: {
+        title: task.title,
+        status: task.status,
+        assignedToId: task.assignedToId
+      },
+      create: {
+        id: task.id!,
+        projectId,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        assignedToId: task.assignedToId
+      }
+    });
+  }
+
+  // Project expenses
+  const expenseIds = [
+    "clkeeperexpense000000000001",
+    "clkeeperexpense000000000002"
+  ];
+  await prisma.projectExpense.upsert({
+    where: { id: expenseIds[0]! },
+    update: { amount: 65.0 },
+    create: {
+      id: expenseIds[0]!,
+      projectId,
+      description: "Oil change supplies",
+      amount: 65.0,
+      date: new Date("2026-03-10T00:00:00.000Z"),
+      serviceProviderId
+    }
+  });
+  await prisma.projectExpense.upsert({
+    where: { id: expenseIds[1]! },
+    update: { amount: 12.99 },
+    create: {
+      id: expenseIds[1]!,
+      projectId,
+      description: "Cabin air filter",
+      amount: 12.99,
+      date: new Date("2026-03-11T00:00:00.000Z")
+    }
+  });
+
+  // ── Tier 2: Household Invitation ──────────────────────────────────────────
+  await prisma.householdInvitation.upsert({
+    where: { id: invitationId },
+    update: { status: "pending" },
+    create: {
+      id: invitationId,
+      householdId,
+      invitedByUserId: ownerUserId,
+      email: "invited@lifekeeper.app",
+      token: crypto.randomUUID(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      status: "pending"
+    }
+  });
+
+  // ── Tier 2: Activity Log Entries ──────────────────────────────────────────
+  // Seed a few representative activity log entries
+  await prisma.activityLog.deleteMany({ where: { householdId } });
+  const activityEntries = [
+    { action: "asset.created", entityType: "asset", entityId: assetId, userId: ownerUserId, metadata: { name: "Primary Vehicle" } },
+    { action: "schedule.created", entityType: "schedule", entityId: maintenanceScheduleId, userId: ownerUserId, metadata: { name: "Engine oil and filter" } },
+    { action: "project.created", entityType: "project", entityId: projectId, userId: ownerUserId, metadata: { name: "Spring Vehicle Maintenance" } },
+    { action: "member.invited", entityType: "household", entityId: householdId, userId: ownerUserId, metadata: { email: "invited@lifekeeper.app" } }
+  ];
+  for (const entry of activityEntries) {
+    await prisma.activityLog.create({
+      data: {
+        householdId,
+        userId: entry.userId,
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        metadata: entry.metadata
+      }
+    });
+  }
+
+  // ── Tier 2: Task Assignment on schedule ───────────────────────────────────
+  await prisma.maintenanceSchedule.update({
+    where: { id: maintenanceScheduleId },
+    data: { assignedToId: memberUserId }
+  });
+
+  // ── Tier 2: Comments ──────────────────────────────────────────────────────
+  await prisma.comment.deleteMany({ where: { assetId } });
+  const rootComment = await prisma.comment.create({
+    data: {
+      assetId,
+      authorId: ownerUserId,
+      body: "The oil light flickered briefly last week — worth watching."
+    }
+  });
+  await prisma.comment.create({
+    data: {
+      assetId,
+      authorId: memberUserId,
+      parentCommentId: rootComment.id,
+      body: "I noticed that too. It might just be the sensor, but let's check the level after the next oil change."
+    }
+  });
+
   console.log(JSON.stringify({
     ownerUserId,
     memberUserId,
     householdId,
     sharedAssetId: assetId,
     personalAssetId,
-    overdueScheduleId
+    overdueScheduleId,
+    serviceProviderId,
+    projectId,
+    invitationId
   }, null, 2));
 }
 

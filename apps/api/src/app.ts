@@ -13,6 +13,10 @@ import { presetRoutes } from "./routes/presets/index.js";
 import { scheduleRoutes } from "./routes/schedules/index.js";
 import { serviceProviderRoutes } from "./routes/service-providers/index.js";
 import { usageMetricRoutes } from "./routes/usage-metrics/index.js";
+import { activityLogRoutes } from "./routes/activity-logs/index.js";
+import { commentRoutes } from "./routes/comments/index.js";
+import { invitationRoutes } from "./routes/invitations/index.js";
+import { projectRoutes } from "./routes/projects/index.js";
 
 export const buildApp = () => {
   const app = Fastify({
@@ -35,6 +39,10 @@ export const buildApp = () => {
   app.register(maintenanceLogRoutes);
   app.register(presetRoutes);
   app.register(serviceProviderRoutes);
+  app.register(activityLogRoutes);
+  app.register(commentRoutes);
+  app.register(invitationRoutes);
+  app.register(projectRoutes);
 
   return app;
 };

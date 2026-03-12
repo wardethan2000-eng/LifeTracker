@@ -13,6 +13,7 @@ import {
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
 import { toMaintenanceLogPartResponse } from "../../lib/presenters.js";
+import { logActivity } from "../../lib/activity-log.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -164,6 +165,15 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     if (log.scheduleId) {
       await syncScheduleCompletionFromLogs(app.prisma, log.scheduleId);
     }
+
+    await logActivity(app.prisma, {
+      householdId: asset.householdId,
+      userId: request.auth.userId,
+      action: "log.created",
+      entityType: "log",
+      entityId: log.id,
+      metadata: { title: log.title, assetId: asset.id }
+    });
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 

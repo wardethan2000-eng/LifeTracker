@@ -19,6 +19,7 @@ import {
   toMaintenanceScheduleResponse,
   updateScheduleDueState
 } from "../../lib/schedule-state.js";
+import { logActivity } from "../../lib/activity-log.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -66,6 +67,12 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
         metric: {
           select: {
             currentValue: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            displayName: true
           }
         }
       },
@@ -119,6 +126,18 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       data.presetKey = input.presetKey;
     }
 
+    if (input.assignedToId !== undefined) {
+      const membership = await app.prisma.householdMember.findUnique({
+        where: { householdId_userId: { householdId: asset.householdId, userId: input.assignedToId } }
+      });
+
+      if (!membership) {
+        return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+      }
+
+      data.assignedToId = input.assignedToId;
+    }
+
     const schedule = await app.prisma.maintenanceSchedule.create({
       data,
       include: {
@@ -126,8 +145,23 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
           select: {
             currentValue: true
           }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            displayName: true
+          }
         }
       }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: asset.householdId,
+      userId: request.auth.userId,
+      action: "schedule.created",
+      entityType: "schedule",
+      entityId: schedule.id,
+      metadata: { name: schedule.name, assetId: asset.id }
     });
 
     await enqueueNotificationScan({ householdId: asset.householdId });
@@ -152,6 +186,12 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
         metric: {
           select: {
             currentValue: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            displayName: true
           }
         }
       }
@@ -235,6 +275,15 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     if (!result.schedule) {
       return reply.code(404).send({ message: "Maintenance schedule not found." });
     }
+
+    await logActivity(app.prisma, {
+      householdId: asset.householdId,
+      userId: request.auth.userId,
+      action: "schedule.completed",
+      entityType: "schedule",
+      entityId: existing.id,
+      metadata: { name: existing.name, assetId: asset.id }
+    });
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 
@@ -324,6 +373,20 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.lastCompletedAt !== undefined) {
       data.lastCompletedAt = new Date(input.lastCompletedAt);
+    }
+
+    if (input.assignedToId !== undefined) {
+      if (input.assignedToId !== null) {
+        const membership = await app.prisma.householdMember.findUnique({
+          where: { householdId_userId: { householdId: asset.householdId, userId: input.assignedToId } }
+        });
+
+        if (!membership) {
+          return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+        }
+      }
+
+      data.assignedToId = input.assignedToId;
     }
 
     await app.prisma.maintenanceSchedule.update({

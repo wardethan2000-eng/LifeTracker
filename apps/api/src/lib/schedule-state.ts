@@ -119,6 +119,12 @@ export const updateScheduleDueState = async (
           id: true,
           currentValue: true
         }
+      },
+      assignedTo: {
+        select: {
+          id: true,
+          displayName: true
+        }
       }
     }
   });
@@ -138,7 +144,7 @@ export const recalculateAssetSchedules = async (
   }));
 };
 
-export const toMaintenanceScheduleResponse = (schedule: Pick<MaintenanceSchedule, "id" | "assetId" | "metricId" | "name" | "description" | "triggerType" | "triggerConfig" | "notificationConfig" | "presetKey" | "isActive" | "lastCompletedAt" | "nextDueAt" | "nextDueMetricValue" | "createdAt" | "updatedAt"> & { metric?: Pick<UsageMetric, "currentValue"> | null }) => {
+export const toMaintenanceScheduleResponse = (schedule: Pick<MaintenanceSchedule, "id" | "assetId" | "metricId" | "name" | "description" | "triggerType" | "triggerConfig" | "notificationConfig" | "presetKey" | "isActive" | "lastCompletedAt" | "nextDueAt" | "nextDueMetricValue" | "assignedToId" | "createdAt" | "updatedAt"> & { metric?: Pick<UsageMetric, "currentValue"> | null; assignedTo?: { id: string; displayName: string | null } | null }) => {
   const trigger = maintenanceTriggerSchema.parse(schedule.triggerConfig);
   const notificationConfig = notificationConfigSchema.parse(schedule.notificationConfig);
   const statusOptions: {
@@ -168,6 +174,8 @@ export const toMaintenanceScheduleResponse = (schedule: Pick<MaintenanceSchedule
     lastCompletedAt: schedule.lastCompletedAt?.toISOString() ?? null,
     nextDueAt: schedule.nextDueAt?.toISOString() ?? null,
     nextDueMetricValue: schedule.nextDueMetricValue,
+    assignedToId: schedule.assignedToId ?? null,
+    assignee: schedule.assignedTo ? { id: schedule.assignedTo.id, displayName: schedule.assignedTo.displayName } : null,
     status,
     createdAt: schedule.createdAt.toISOString(),
     updatedAt: schedule.updatedAt.toISOString()

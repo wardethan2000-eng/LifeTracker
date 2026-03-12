@@ -666,7 +666,8 @@ export const createMaintenanceScheduleSchema = z.object({
     digest: false
   }),
   metricId: z.string().cuid().optional(),
-  presetKey: z.string().max(160).optional()
+  presetKey: z.string().max(160).optional(),
+  assignedToId: z.string().cuid().optional()
 });
 
 export const updateMaintenanceScheduleSchema = z.object({
@@ -677,7 +678,13 @@ export const updateMaintenanceScheduleSchema = z.object({
   metricId: z.string().cuid().optional(),
   presetKey: z.string().max(160).optional(),
   isActive: z.boolean().optional(),
-  lastCompletedAt: z.string().datetime().optional()
+  lastCompletedAt: z.string().datetime().optional(),
+  assignedToId: z.string().cuid().nullable().optional()
+});
+
+export const shallowUserSchema = z.object({
+  id: z.string().cuid(),
+  displayName: z.string().nullable()
 });
 
 export const maintenanceScheduleSchema = z.object({
@@ -694,6 +701,8 @@ export const maintenanceScheduleSchema = z.object({
   lastCompletedAt: z.string().datetime().nullable(),
   nextDueAt: z.string().datetime().nullable(),
   nextDueMetricValue: z.number().nullable(),
+  assignedToId: z.string().cuid().nullable().default(null),
+  assignee: shallowUserSchema.nullable().default(null),
   status: scheduleStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
@@ -756,6 +765,209 @@ export const assetDetailResponseSchema = z.object({
   recentLogs: z.array(maintenanceLogSchema),
   dueScheduleCount: z.number().int().min(0),
   overdueScheduleCount: z.number().int().min(0)
+});
+
+// ── Project Schemas ──────────────────────────────────────────────────
+
+export const projectStatusValues = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
+export const projectStatusSchema = z.enum(projectStatusValues);
+
+export const projectTaskStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
+export const projectTaskStatusSchema = z.enum(projectTaskStatusValues);
+
+export const projectSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: projectStatusSchema,
+  startDate: z.string().datetime().nullable(),
+  targetEndDate: z.string().datetime().nullable(),
+  actualEndDate: z.string().datetime().nullable(),
+  budgetAmount: z.number().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  status: projectStatusSchema.default("planning"),
+  startDate: z.string().datetime().optional(),
+  targetEndDate: z.string().datetime().optional(),
+  budgetAmount: z.number().min(0).optional(),
+  notes: z.string().max(5000).optional()
+});
+
+export const updateProjectSchema = createProjectSchema.partial();
+
+export const projectAssetSchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  assetId: z.string().cuid(),
+  role: z.string().nullable(),
+  notes: z.string().nullable(),
+  asset: shallowAssetSchema.optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectAssetSchema = z.object({
+  assetId: z.string().cuid(),
+  role: z.string().max(200).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const projectTaskSchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  status: z.string(),
+  assignedToId: z.string().cuid().nullable(),
+  assignee: shallowUserSchema.nullable().default(null),
+  dueDate: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+  estimatedCost: z.number().nullable(),
+  actualCost: z.number().nullable(),
+  sortOrder: z.number().int().nullable(),
+  scheduleId: z.string().cuid().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectTaskSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  status: projectTaskStatusSchema.default("pending"),
+  assignedToId: z.string().cuid().optional(),
+  dueDate: z.string().datetime().optional(),
+  estimatedCost: z.number().min(0).optional(),
+  actualCost: z.number().min(0).optional(),
+  sortOrder: z.number().int().optional(),
+  scheduleId: z.string().cuid().optional()
+});
+
+export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend({
+  completedAt: z.string().datetime().optional()
+});
+
+export const projectExpenseSchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  description: z.string(),
+  amount: z.number(),
+  category: z.string().nullable(),
+  date: z.string().datetime().nullable(),
+  taskId: z.string().cuid().nullable(),
+  serviceProviderId: z.string().cuid().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectExpenseSchema = z.object({
+  description: z.string().min(1).max(500),
+  amount: z.number().min(0),
+  category: z.string().max(120).optional(),
+  date: z.string().datetime().optional(),
+  taskId: z.string().cuid().optional(),
+  serviceProviderId: z.string().cuid().optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const updateProjectExpenseSchema = createProjectExpenseSchema.partial();
+
+export const projectSummarySchema = projectSchema.extend({
+  totalBudgeted: z.number().nullable(),
+  totalSpent: z.number(),
+  taskCount: z.number().int(),
+  completedTaskCount: z.number().int(),
+  percentComplete: z.number()
+});
+
+export const projectDetailSchema = projectSchema.extend({
+  assets: z.array(projectAssetSchema),
+  tasks: z.array(projectTaskSchema),
+  expenses: z.array(projectExpenseSchema)
+});
+
+// ── Activity Log Schemas ─────────────────────────────────────────────
+
+export const activityLogSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  userId: z.string().cuid(),
+  action: z.string(),
+  entityType: z.string(),
+  entityId: z.string(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
+  createdAt: z.string().datetime()
+});
+
+export const activityLogQuerySchema = z.object({
+  entityType: z.string().optional(),
+  entityId: z.string().optional(),
+  userId: z.string().cuid().optional(),
+  since: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().cuid().optional()
+});
+
+// ── Invitation Schemas ───────────────────────────────────────────────
+
+export const invitationStatusValues = ["pending", "accepted", "expired", "revoked"] as const;
+export const invitationStatusSchema = z.enum(invitationStatusValues);
+
+export const householdInvitationSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  invitedByUserId: z.string().cuid(),
+  email: z.string(),
+  status: invitationStatusSchema,
+  token: z.string(),
+  expiresAt: z.string().datetime(),
+  acceptedAt: z.string().datetime().nullable(),
+  acceptedByUserId: z.string().cuid().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createInvitationSchema = z.object({
+  email: z.string().email().max(255),
+  expirationHours: z.number().int().min(1).max(720).default(72)
+});
+
+export const acceptInvitationSchema = z.object({
+  token: z.string().min(1)
+});
+
+// ── Comment Schemas ──────────────────────────────────────────────────
+
+export const commentSchema = z.object({
+  id: z.string().cuid(),
+  assetId: z.string().cuid(),
+  authorId: z.string().cuid(),
+  author: shallowUserSchema,
+  body: z.string(),
+  parentCommentId: z.string().cuid().nullable(),
+  editedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const threadedCommentSchema = commentSchema.extend({
+  replies: z.array(commentSchema).default([])
+});
+
+export const createCommentSchema = z.object({
+  body: z.string().min(1).max(5000),
+  parentCommentId: z.string().cuid().optional()
+});
+
+export const updateCommentSchema = z.object({
+  body: z.string().min(1).max(5000)
 });
 
 export type AssetCategory = z.infer<typeof assetCategorySchema>;
@@ -841,4 +1053,31 @@ export type MaintenanceLogPart = z.infer<typeof maintenanceLogPartSchema>;
 export type CreateMaintenanceLogPartInput = z.infer<typeof createMaintenanceLogPartSchema>;
 export type PurchaseCondition = z.infer<typeof purchaseConditionSchema>;
 export type DisposalMethod = z.infer<typeof disposalMethodSchema>;
+
+export type ShallowUser = z.infer<typeof shallowUserSchema>;
+export type ProjectStatus = z.infer<typeof projectStatusSchema>;
+export type ProjectTaskStatus = z.infer<typeof projectTaskStatusSchema>;
+export type Project = z.infer<typeof projectSchema>;
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type ProjectAsset = z.infer<typeof projectAssetSchema>;
+export type CreateProjectAssetInput = z.infer<typeof createProjectAssetSchema>;
+export type ProjectTask = z.infer<typeof projectTaskSchema>;
+export type CreateProjectTaskInput = z.infer<typeof createProjectTaskSchema>;
+export type UpdateProjectTaskInput = z.infer<typeof updateProjectTaskSchema>;
+export type ProjectExpense = z.infer<typeof projectExpenseSchema>;
+export type CreateProjectExpenseInput = z.infer<typeof createProjectExpenseSchema>;
+export type UpdateProjectExpenseInput = z.infer<typeof updateProjectExpenseSchema>;
+export type ProjectSummary = z.infer<typeof projectSummarySchema>;
+export type ProjectDetail = z.infer<typeof projectDetailSchema>;
+export type ActivityLog = z.infer<typeof activityLogSchema>;
+export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;
+export type InvitationStatus = z.infer<typeof invitationStatusSchema>;
+export type HouseholdInvitation = z.infer<typeof householdInvitationSchema>;
+export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
+export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>;
+export type Comment = z.infer<typeof commentSchema>;
+export type ThreadedComment = z.infer<typeof threadedCommentSchema>;
+export type CreateCommentInput = z.infer<typeof createCommentSchema>;
+export type UpdateCommentInput = z.infer<typeof updateCommentSchema>;
 
