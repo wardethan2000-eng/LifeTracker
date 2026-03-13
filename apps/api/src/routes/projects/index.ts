@@ -326,12 +326,12 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const data: Prisma.ProjectUncheckedUpdateInput = {};
 
     if (input.name !== undefined) data.name = input.name;
-    if (input.description !== undefined) data.description = input.description;
+    if (input.description !== undefined) data.description = input.description ?? null;
     if (input.status !== undefined) data.status = input.status;
-    if (input.startDate !== undefined) data.startDate = new Date(input.startDate);
-    if (input.targetEndDate !== undefined) data.targetEndDate = new Date(input.targetEndDate);
-    if (input.budgetAmount !== undefined) data.budgetAmount = input.budgetAmount;
-    if (input.notes !== undefined) data.notes = input.notes;
+    if (input.startDate !== undefined) data.startDate = input.startDate ? new Date(input.startDate) : null;
+    if (input.targetEndDate !== undefined) data.targetEndDate = input.targetEndDate ? new Date(input.targetEndDate) : null;
+    if (input.budgetAmount !== undefined) data.budgetAmount = input.budgetAmount ?? null;
+    if (input.notes !== undefined) data.notes = input.notes ?? null;
 
     const project = await app.prisma.project.update({
       where: { id: existing.id },
@@ -651,13 +651,13 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const data: Prisma.ProjectTaskUncheckedUpdateInput = {};
 
     if (input.title !== undefined) data.title = input.title;
-    if (input.description !== undefined) data.description = input.description;
-    if (input.assignedToId !== undefined) data.assignedToId = input.assignedToId;
-    if (input.dueDate !== undefined) data.dueDate = new Date(input.dueDate);
-    if (input.estimatedCost !== undefined) data.estimatedCost = input.estimatedCost;
-    if (input.actualCost !== undefined) data.actualCost = input.actualCost;
-    if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
-    if (input.scheduleId !== undefined) data.scheduleId = input.scheduleId;
+    if (input.description !== undefined) data.description = input.description ?? null;
+    if (input.assignedToId !== undefined) data.assignedToId = input.assignedToId ?? null;
+    if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
+    if (input.estimatedCost !== undefined) data.estimatedCost = input.estimatedCost ?? null;
+    if (input.actualCost !== undefined) data.actualCost = input.actualCost ?? null;
+    if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder ?? null;
+    if (input.scheduleId !== undefined) data.scheduleId = input.scheduleId ?? null;
 
     const effectiveScheduleId = input.scheduleId !== undefined ? input.scheduleId : existing.scheduleId;
 
@@ -707,9 +707,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
           entityId: existing.id,
           metadata: { taskTitle: existing.title }
         });
+      } else if (input.status !== "completed") {
+        data.completedAt = null;
       }
     } else if (input.completedAt !== undefined) {
-      data.completedAt = new Date(input.completedAt);
+      data.completedAt = input.completedAt ? new Date(input.completedAt) : null;
     }
 
     // Track assignment changes
@@ -896,11 +898,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.description !== undefined) data.description = input.description;
     if (input.amount !== undefined) data.amount = input.amount;
-    if (input.category !== undefined) data.category = input.category;
-    if (input.date !== undefined) data.date = new Date(input.date);
-    if (input.taskId !== undefined) data.taskId = input.taskId;
-    if (input.serviceProviderId !== undefined) data.serviceProviderId = input.serviceProviderId;
-    if (input.notes !== undefined) data.notes = input.notes;
+    if (input.category !== undefined) data.category = input.category ?? null;
+    if (input.date !== undefined) data.date = input.date ? new Date(input.date) : null;
+    if (input.taskId !== undefined) data.taskId = input.taskId ?? null;
+    if (input.serviceProviderId !== undefined) data.serviceProviderId = input.serviceProviderId ?? null;
+    if (input.notes !== undefined) data.notes = input.notes ?? null;
 
     const expense = await app.prisma.projectExpense.update({
       where: { id: existing.id },

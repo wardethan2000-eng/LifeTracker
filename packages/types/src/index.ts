@@ -1057,7 +1057,13 @@ export const createProjectSchema = z.object({
   notes: z.string().max(5000).optional()
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.partial().extend({
+  description: z.string().max(2000).nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  targetEndDate: z.string().datetime().nullable().optional(),
+  budgetAmount: z.number().min(0).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional()
+});
 
 export const projectAssetSchema = z.object({
   id: z.string().cuid(),
@@ -1107,7 +1113,14 @@ export const createProjectTaskSchema = z.object({
 });
 
 export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend({
-  completedAt: z.string().datetime().optional()
+  description: z.string().max(2000).nullable().optional(),
+  assignedToId: z.string().cuid().nullable().optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  estimatedCost: z.number().min(0).nullable().optional(),
+  actualCost: z.number().min(0).nullable().optional(),
+  sortOrder: z.number().int().nullable().optional(),
+  scheduleId: z.string().cuid().nullable().optional(),
+  completedAt: z.string().datetime().nullable().optional()
 });
 
 export const projectExpenseSchema = z.object({
@@ -1134,7 +1147,13 @@ export const createProjectExpenseSchema = z.object({
   notes: z.string().max(2000).optional()
 });
 
-export const updateProjectExpenseSchema = createProjectExpenseSchema.partial();
+export const updateProjectExpenseSchema = createProjectExpenseSchema.partial().extend({
+  category: z.string().max(120).nullable().optional(),
+  date: z.string().datetime().nullable().optional(),
+  taskId: z.string().cuid().nullable().optional(),
+  serviceProviderId: z.string().cuid().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional()
+});
 
 export const projectSummarySchema = projectSchema.extend({
   totalBudgeted: z.number().nullable(),

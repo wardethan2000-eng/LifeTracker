@@ -41,21 +41,69 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
         </header>
 
         <div className="page-body">
-          <section className="form-section">
-            <div className="form-section__header">
-              <div>
-                <h2>Project Setup</h2>
-                <p className="form-section__description">Start with the basics. You can add linked assets, tasks, and expenses right after the project is created.</p>
+          <form action={createProjectAction} className="asset-studio asset-studio--industrial project-creation-studio">
+            <section className="panel panel--studio">
+              <div className="panel-header">
+                <div>
+                  <h2>Project Setup</h2>
+                  <p className="project-creation-studio__intro">Start with the operational basics, then layer in assets, tasks, inventory, and expenses after the project exists.</p>
+                </div>
+                <div className="panel-header__actions">
+                  <button type="submit" className="button button--primary">Create Project</button>
+                </div>
               </div>
-            </div>
 
-            <form action={createProjectAction}>
-              <ProjectCoreFormFields householdId={household.id} />
-              <div className="inline-actions" style={{ marginTop: 20 }}>
-                <button type="submit" className="button">Create Project</button>
+              <ProjectCoreFormFields householdId={household.id} variant="studio" />
+            </section>
+
+            <section className="panel panel--studio">
+              <div className="panel-header">
+                <h2>What You Unlock Next</h2>
               </div>
-            </form>
-          </section>
+
+              <div className="project-creation-studio__next-grid">
+                <article className="asset-studio__field-card">
+                  <div className="asset-studio__field-card-header">
+                    <div>
+                      <h3>Link Assets</h3>
+                      <p>Attach the equipment, rooms, systems, or vehicles affected by the project.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="asset-studio__field-card">
+                  <div className="asset-studio__field-card-header">
+                    <div>
+                      <h3>Build Tasks</h3>
+                      <p>Break the work into sequenced tasks, owners, due dates, and tracked completion.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="asset-studio__field-card">
+                  <div className="asset-studio__field-card-header">
+                    <div>
+                      <h3>Reserve Inventory</h3>
+                      <p>Convert required materials into project inventory lines and allocate stock from household inventory.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="asset-studio__field-card">
+                  <div className="asset-studio__field-card-header">
+                    <div>
+                      <h3>Track Spend</h3>
+                      <p>Add expenses, providers, and budget pressure as the project moves from planning into execution.</p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <div className="inline-actions inline-actions--end">
+                <button type="submit" className="button button--primary">Create Project</button>
+              </div>
+            </section>
+          </form>
         </div>
       </AppShell>
     );

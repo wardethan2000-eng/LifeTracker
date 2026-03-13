@@ -13,6 +13,8 @@ import {
   maintenanceScheduleSchema,
   householdDashboardSchema,
   householdSummarySchema,
+  inventoryProjectLinkDetailSchema,
+  inventoryTransactionSchema,
   inventoryItemSummarySchema,
   libraryPresetSchema,
   lowStockInventoryItemSchema,
@@ -39,6 +41,7 @@ import {
   type CreateInvitationInput,
   type CreateProjectAssetInput,
   type CreateProjectExpenseInput,
+  type CreateProjectInventoryItemInput,
   type CreateProjectInput,
   type CreateProjectTaskInput,
   type CreatePresetProfileInput,
@@ -57,6 +60,7 @@ import {
   type HouseholdSummary,
   type CreateInventoryItemInput,
   type InventoryItemSummary,
+  type InventoryProjectLinkDetail,
   type LibraryPreset,
   type LowStockInventoryItem,
   type MaintenanceLog,
@@ -77,10 +81,12 @@ import {
   type UpdateCommentInput,
   type UpdateAssetInput,
   type UpdateProjectExpenseInput,
+  type UpdateProjectInventoryItemInput,
   type UpdateProjectInput,
   type UpdateProjectTaskInput,
   type UpdateServiceProviderInput,
   type UpdateUsageMetricInput,
+  type AllocateProjectInventoryInput,
   type UsageMetricEntry,
   type UsageProjection,
   usageMetricEntrySchema,
@@ -126,9 +132,25 @@ const householdInventoryListSchema = {
 };
 const householdLowStockListSchema = lowStockInventoryItemSchema.array();
 const maintenanceLogListSchema = maintenanceLogSchema.array();
+const projectInventoryListSchema = inventoryProjectLinkDetailSchema.array();
 const projectSummaryListSchema = projectSummarySchema.array();
 const serviceProviderListSchema = serviceProviderSchema.array();
 const usageMetricEntryListSchema = usageMetricEntrySchema.array();
+const projectInventoryAllocationSchema = {
+  parse: (value: unknown) => {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Invalid project inventory allocation response.");
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return {
+      projectInventoryItem: inventoryProjectLinkDetailSchema.parse(record.projectInventoryItem),
+      inventoryItem: inventoryItemSummarySchema.parse(record.inventoryItem),
+      transaction: inventoryTransactionSchema.parse(record.transaction)
+    };
+  }
+};
 
 export class ApiError extends Error {
   readonly status: number;
@@ -277,10 +299,25 @@ export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => api
   schema: libraryPresetListSchema
 }));
 
-export const getHouseholdProjects = async (householdId: string): Promise<ProjectSummary[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects`,
-  schema: projectSummaryListSchema
-});
+export const getHouseholdProjects = async (
+  householdId: string,
+  options?: {
+    status?: ProjectStatus;
+  }
+): Promise<ProjectSummary[]> => {
+  const params = new URLSearchParams();
+
+  if (options?.status) {
+    params.set("status", options.status);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/projects${suffix}`,
+    schema: projectSummaryListSchema
+  });
+};
 
 export const searchHousehold = async (
   householdId: string,
@@ -383,6 +420,14 @@ export const deleteComment = async (assetId: string, commentId: string): Promise
 export const getProjectDetail = async (householdId: string, projectId: string): Promise<ProjectDetail> => apiRequest({
   path: `/v1/households/${householdId}/projects/${projectId}`,
   schema: projectDetailSchema
+});
+
+export const getProjectInventory = async (
+  householdId: string,
+  projectId: string
+): Promise<InventoryProjectLinkDetail[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/inventory`,
+  schema: projectInventoryListSchema
 });
 
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => apiRequest({
@@ -651,6 +696,56 @@ export const deleteProjectExpense = async (
 ): Promise<void> => {
   await apiRequest({
     path: `/v1/households/${householdId}/projects/${projectId}/expenses/${expenseId}`,
+    method: "DELETE"
+  });
+};
+
+export const createProjectInventoryItem = async (
+  householdId: string,
+  projectId: string,
+  input: CreateProjectInventoryItemInput
+): Promise<InventoryProjectLinkDetail> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/inventory`,
+  method: "POST",
+  body: input,
+  schema: inventoryProjectLinkDetailSchema
+});
+
+export const updateProjectInventoryItem = async (
+  householdId: string,
+  projectId: string,
+  inventoryItemId: string,
+  input: UpdateProjectInventoryItemInput
+): Promise<InventoryProjectLinkDetail> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/inventory/${inventoryItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: inventoryProjectLinkDetailSchema
+});
+
+export const allocateProjectInventory = async (
+  householdId: string,
+  projectId: string,
+  inventoryItemId: string,
+  input: AllocateProjectInventoryInput
+): Promise<{
+  projectInventoryItem: InventoryProjectLinkDetail;
+  inventoryItem: InventoryItemSummary;
+  transaction: Awaited<ReturnType<typeof projectInventoryAllocationSchema.parse>>["transaction"];
+}> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/inventory/${inventoryItemId}/allocate`,
+  method: "POST",
+  body: input,
+  schema: projectInventoryAllocationSchema
+});
+
+export const deleteProjectInventoryItem = async (
+  householdId: string,
+  projectId: string,
+  inventoryItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/inventory/${inventoryItemId}`,
     method: "DELETE"
   });
 };

@@ -2,14 +2,18 @@ import Link from "next/link";
 import type { JSX } from "react";
 import {
   addProjectAssetAction,
+  allocateProjectInventoryItemAction,
+  createProjectInventoryItemAction,
   createProjectExpenseAction,
   createProjectTaskAction,
   deleteProjectAction,
   deleteProjectExpenseAction,
+  deleteProjectInventoryItemAction,
   deleteProjectTaskAction,
   removeProjectAssetAction,
   updateProjectAction,
   updateProjectExpenseAction,
+  updateProjectInventoryItemAction,
   updateProjectStatusAction,
   updateProjectTaskAction
 } from "../../actions";
@@ -18,9 +22,12 @@ import { ProjectCoreFormFields } from "../../../components/project-core-form-fie
 import {
   ApiError,
   getHouseholdAssets,
+  getHouseholdInventory,
   getHouseholdMembers,
+  getHouseholdServiceProviders,
   getMe,
-  getProjectDetail
+  getProjectDetail,
+  getProjectInventory
 } from "../../../lib/api";
 import { formatCurrency, formatDate } from "../../../lib/formatters";
 
@@ -69,17 +76,28 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, householdAssets, householdMembers] = await Promise.all([
+    const [project, householdAssets, householdMembers, householdInventory, serviceProviders, projectInventory] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getHouseholdAssets(household.id),
-      getHouseholdMembers(household.id)
+      getHouseholdMembers(household.id),
+      getHouseholdInventory(household.id, { limit: 200 }),
+      getHouseholdServiceProviders(household.id),
+      getProjectInventory(household.id, routeParams.projectId)
     ]);
 
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const completedTaskCount = project.tasks.filter((task) => task.status === "completed").length;
     const percentComplete = project.tasks.length === 0 ? 0 : Math.round((completedTaskCount / project.tasks.length) * 100);
     const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
+    const linkedInventoryIds = new Set(projectInventory.map((item) => item.inventoryItemId));
     const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
+    const availableInventoryItems = householdInventory.items.filter((item) => !linkedInventoryIds.has(item.id));
+    const totalInventoryBudget = projectInventory.reduce(
+      (sum, item) => sum + ((item.budgetedUnitCost ?? 0) * item.quantityNeeded),
+      0
+    );
+    const totalInventoryAllocated = projectInventory.reduce((sum, item) => sum + item.quantityAllocated, 0);
+    const providerLookup = new Map(serviceProviders.map((provider) => [provider.id, provider]));
 
     return (
       <AppShell activePath="/projects">
@@ -121,21 +139,14 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             <div className="detail-tiles__grid">
               <section className="panel detail-tile" data-tile="edit">
                 <div className="panel__header">
-                  <h2>Project Settings</h2>
-                  <form action={updateProjectStatusAction} className="inline-actions">
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <select name="status" defaultValue={project.status} aria-label="Update project status">
-                      {projectStatusOptions.map((status) => (
-                        <option key={status} value={status}>{projectStatusLabels[status] ?? status}</option>
-                      ))}
-                    </select>
-                    <button type="submit" className="button button--ghost">Update Status</button>
-                  </form>
+                  <div>
+                    <h2>Project Settings</h2>
+                    <p className="data-table__secondary">Use the same structured setup view as project creation, including optional template re-application.</p>
+                  </div>
                 </div>
                 <div className="panel__body--padded">
-                  <form action={updateProjectAction}>
-                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
+                  <form action={updateProjectAction} className="asset-studio asset-studio--industrial project-creation-studio">
+                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId variant="studio" />
                     <div className="inline-actions" style={{ marginTop: 20 }}>
                       <button type="submit" className="button">Save Project</button>
                     </div>
@@ -197,6 +208,187 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                               <button type="submit" className="button button--ghost">Remove</button>
                             </form>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="panel detail-tile">
+                <div className="panel__header">
+                  <div>
+                    <h2>Project Inventory ({projectInventory.length})</h2>
+                    <p className="data-table__secondary">Plan required parts, reserve stock, and track budgeted material spend.</p>
+                  </div>
+                </div>
+                <div className="panel__body--padded">
+                  <div className="stats-row" style={{ marginBottom: 20 }}>
+                    <div className="stat-card">
+                      <span className="stat-card__label">Material Budget</span>
+                      <strong className="stat-card__value">{formatCurrency(totalInventoryBudget, "$0.00")}</strong>
+                      <span className="stat-card__sub">Budgeted unit cost x required quantity</span>
+                    </div>
+                    <div className="stat-card stat-card--warning">
+                      <span className="stat-card__label">Units Allocated</span>
+                      <strong className="stat-card__value">{totalInventoryAllocated}</strong>
+                      <span className="stat-card__sub">Reserved from household stock</span>
+                    </div>
+                  </div>
+
+                  <form action={createProjectInventoryItemAction}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <div className="form-grid">
+                      <div className="field field--full">
+                        <label htmlFor="new-project-inventory-item">Inventory Item</label>
+                        <select id="new-project-inventory-item" name="inventoryItemId" required defaultValue="">
+                          <option value="" disabled>Select an inventory item</option>
+                          {availableInventoryItems.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit} on hand</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="new-project-inventory-needed">Quantity Needed</label>
+                        <input id="new-project-inventory-needed" name="quantityNeeded" type="number" min="0.01" step="0.01" placeholder="1" required />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="new-project-inventory-budget">Budgeted Unit Cost</label>
+                        <input id="new-project-inventory-budget" name="budgetedUnitCost" type="number" min="0" step="0.01" placeholder="0.00" />
+                      </div>
+                      <div className="field field--full">
+                        <label htmlFor="new-project-inventory-notes">Notes</label>
+                        <textarea id="new-project-inventory-notes" name="notes" rows={2} placeholder="Part choice, source, staging notes" />
+                      </div>
+                    </div>
+                    <div className="inline-actions" style={{ marginTop: 20 }}>
+                      <button type="submit" className="button" disabled={availableInventoryItems.length === 0}>Add Inventory Item</button>
+                      {availableInventoryItems.length === 0 ? (
+                        <Link href={`/inventory?householdId=${household.id}`} className="button button--ghost">Review Inventory</Link>
+                      ) : null}
+                    </div>
+                  </form>
+                </div>
+                <div className="panel__body">
+                  {projectInventory.length === 0 ? (
+                    <p className="panel__empty">No inventory requirements are linked to this project yet.</p>
+                  ) : (
+                    <div className="schedule-stack">
+                      {projectInventory.map((item) => (
+                        <div key={item.inventoryItemId} className="schedule-card">
+                          <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
+                            <div>
+                              <div className="data-table__primary">{item.inventoryItem.name}</div>
+                              <div className="data-table__secondary">
+                                {item.quantityNeeded} {item.inventoryItem.unit} needed · {item.quantityAllocated} allocated · {item.quantityRemaining} remaining
+                              </div>
+                              <div className="data-table__secondary">
+                                {item.inventoryItem.quantityOnHand} {item.inventoryItem.unit} on hand · {formatCurrency(item.inventoryItem.unitCost, "No unit cost")}
+                              </div>
+                            </div>
+                            <span className="pill">{formatCurrency(item.budgetedUnitCost, "Unbudgeted")}</span>
+                          </div>
+
+                          <form action={updateProjectInventoryItemAction}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="inventoryItemId" value={item.inventoryItemId} />
+                            <div className="form-grid">
+                              <div className="field">
+                                <label htmlFor={`project-inventory-needed-${item.inventoryItemId}`}>Quantity Needed</label>
+                                <input
+                                  id={`project-inventory-needed-${item.inventoryItemId}`}
+                                  name="quantityNeeded"
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  defaultValue={item.quantityNeeded}
+                                  required
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor={`project-inventory-budget-${item.inventoryItemId}`}>Budgeted Unit Cost</label>
+                                <input
+                                  id={`project-inventory-budget-${item.inventoryItemId}`}
+                                  name="budgetedUnitCost"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  defaultValue={item.budgetedUnitCost ?? ""}
+                                />
+                              </div>
+                              <div className="field field--full">
+                                <label htmlFor={`project-inventory-notes-${item.inventoryItemId}`}>Notes</label>
+                                <textarea
+                                  id={`project-inventory-notes-${item.inventoryItemId}`}
+                                  name="notes"
+                                  rows={2}
+                                  defaultValue={item.notes ?? ""}
+                                />
+                              </div>
+                            </div>
+                            <div className="inline-actions" style={{ marginTop: 16 }}>
+                              <button type="submit" className="button button--ghost">Save Inventory Plan</button>
+                            </div>
+                          </form>
+
+                          <form action={allocateProjectInventoryItemAction} style={{ marginTop: 16 }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="inventoryItemId" value={item.inventoryItemId} />
+                            <div className="form-grid">
+                              <div className="field">
+                                <label htmlFor={`project-inventory-allocate-${item.inventoryItemId}`}>Allocate Quantity</label>
+                                <input
+                                  id={`project-inventory-allocate-${item.inventoryItemId}`}
+                                  name="quantity"
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  max={Math.min(item.quantityRemaining, item.inventoryItem.quantityOnHand)}
+                                  placeholder="0"
+                                  required
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor={`project-inventory-unit-cost-${item.inventoryItemId}`}>Actual Unit Cost</label>
+                                <input
+                                  id={`project-inventory-unit-cost-${item.inventoryItemId}`}
+                                  name="unitCost"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="Optional"
+                                />
+                              </div>
+                              <div className="field field--full">
+                                <label htmlFor={`project-inventory-allocation-notes-${item.inventoryItemId}`}>Allocation Notes</label>
+                                <textarea
+                                  id={`project-inventory-allocation-notes-${item.inventoryItemId}`}
+                                  name="notes"
+                                  rows={2}
+                                  placeholder="Reserved for install, consumed during prep, etc."
+                                />
+                              </div>
+                            </div>
+                            <div className="inline-actions" style={{ marginTop: 16 }}>
+                              <button
+                                type="submit"
+                                className="button"
+                                disabled={item.quantityRemaining <= 0 || item.inventoryItem.quantityOnHand <= 0}
+                              >
+                                Allocate From Stock
+                              </button>
+                            </div>
+                          </form>
+
+                          <form action={deleteProjectInventoryItemAction} className="inline-actions inline-actions--end" style={{ marginTop: 16 }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="inventoryItemId" value={item.inventoryItemId} />
+                            <button type="submit" className="button button--danger">Remove Inventory Item</button>
+                          </form>
                         </div>
                       ))}
                     </div>
@@ -377,6 +569,15 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                           ))}
                         </select>
                       </div>
+                      <div className="field">
+                        <label htmlFor="new-expense-provider">Service Provider</label>
+                        <select id="new-expense-provider" name="serviceProviderId" defaultValue="">
+                          <option value="">No provider</option>
+                          {serviceProviders.map((provider) => (
+                            <option key={provider.id} value={provider.id}>{provider.name}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="field field--full">
                         <label htmlFor="new-expense-notes">Notes</label>
                         <textarea id="new-expense-notes" name="notes" rows={2} placeholder="Receipt details, reimbursement notes, vendor context" />
@@ -384,6 +585,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     </div>
                     <div className="inline-actions" style={{ marginTop: 20 }}>
                       <button type="submit" className="button">Add Expense</button>
+                      <Link href={`/service-providers?householdId=${household.id}`} className="button button--ghost">Manage Providers</Link>
                     </div>
                   </form>
                 </div>
@@ -430,6 +632,15 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                                   ))}
                                 </select>
                               </div>
+                              <div className="field">
+                                <label htmlFor={`expense-provider-${expense.id}`}>Service Provider</label>
+                                <select id={`expense-provider-${expense.id}`} name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
+                                  <option value="">No provider</option>
+                                  {serviceProviders.map((provider) => (
+                                    <option key={provider.id} value={provider.id}>{provider.name}</option>
+                                  ))}
+                                </select>
+                              </div>
                               <div className="field field--full">
                                 <label htmlFor={`expense-notes-${expense.id}`}>Notes</label>
                                 <textarea id={`expense-notes-${expense.id}`} name="notes" rows={2} defaultValue={expense.notes ?? ""} />
@@ -443,7 +654,11 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                             <span className="pill">{formatCurrency(expense.amount, "$0.00")}</span>
                             <span className="data-table__secondary">{expense.category ?? "Uncategorized"}</span>
                             <span className="data-table__secondary">{formatDate(expense.date, "No date")}</span>
-                            {expense.serviceProviderId ? <span className="data-table__secondary">Provider {expense.serviceProviderId}</span> : null}
+                            {expense.serviceProviderId ? (
+                              <span className="data-table__secondary">
+                                Provider {providerLookup.get(expense.serviceProviderId)?.name ?? expense.serviceProviderId}
+                              </span>
+                            ) : null}
                           </div>
                           <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end">
                             <input type="hidden" name="householdId" value={household.id} />

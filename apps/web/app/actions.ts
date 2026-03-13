@@ -2,6 +2,7 @@
 
 import type {
   AcceptInvitationInput,
+  AllocateProjectInventoryInput,
   AssetCategory,
   AssetFieldDefinition,
   AssetTransferType,
@@ -18,6 +19,7 @@ import type {
   CreateMaintenanceScheduleInput,
   CreateProjectAssetInput,
   CreateProjectExpenseInput,
+  CreateProjectInventoryItemInput,
   CreateProjectInput,
   CreateProjectTaskInput,
   CreatePresetProfileInput,
@@ -30,6 +32,7 @@ import type {
   ProjectStatus,
   ProjectTaskStatus,
   UpdateCommentInput,
+  UpdateProjectInventoryItemInput,
   UpdateServiceProviderInput,
   UpdateProjectExpenseInput,
   UpdateProjectInput,
@@ -47,6 +50,7 @@ import { redirect } from "next/navigation";
 import {
   acceptInvitation,
   addProjectAsset,
+  allocateProjectInventory,
   applyPreset,
   archiveAsset,
   completeSchedule,
@@ -63,12 +67,14 @@ import {
   createInventoryItem,
   createMaintenanceLog,
   createPresetProfile,
+  createProjectInventoryItem,
   createSchedule,
   createServiceProvider,
   deleteComment,
   deleteMetric,
   deleteProject,
   deleteProjectExpense,
+  deleteProjectInventoryItem,
   deleteProjectTask,
   deleteServiceProvider,
   deleteSchedule,
@@ -84,6 +90,7 @@ import {
   updateComment,
   updateProject,
   updateProjectExpense,
+  updateProjectInventoryItem,
   updateProjectStatus,
   updateProjectTask,
   updateSchedule,
@@ -101,6 +108,11 @@ const getOptionalString = (formData: FormData, key: string): string | undefined 
   return value.length > 0 ? value : undefined;
 };
 
+const getNullableString = (formData: FormData, key: string): string | null => {
+  const value = getString(formData, key);
+  return value.length > 0 ? value : null;
+};
+
 const getRequiredString = (formData: FormData, key: string): string => {
   const value = getString(formData, key);
 
@@ -116,6 +128,22 @@ const getOptionalNumber = (formData: FormData, key: string): number | undefined 
 
   if (value === undefined) {
     return undefined;
+  }
+
+  const parsed = Number(value);
+
+  if (Number.isNaN(parsed)) {
+    throw new Error(`${key} must be a number.`);
+  }
+
+  return parsed;
+};
+
+const getNullableNumber = (formData: FormData, key: string): number | null => {
+  const value = getString(formData, key);
+
+  if (!value) {
+    return null;
   }
 
   const parsed = Number(value);
@@ -241,6 +269,14 @@ const maybeCreatePresetProfileFromForm = async (
 const toIsoString = (value: string | undefined): string | undefined => {
   if (!value) {
     return undefined;
+  }
+
+  return new Date(value).toISOString();
+};
+
+const toNullableIsoString = (value: string | null): string | null => {
+  if (!value) {
+    return null;
   }
 
   return new Date(value).toISOString();
@@ -1272,34 +1308,13 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
   const projectId = getRequiredString(formData, "projectId");
   const input: UpdateProjectInput = {
     name: getRequiredString(formData, "name"),
-    status: getRequiredString(formData, "status") as ProjectStatus
+    status: getRequiredString(formData, "status") as ProjectStatus,
+    description: getNullableString(formData, "description"),
+    startDate: toNullableIsoString(getNullableString(formData, "startDate")),
+    targetEndDate: toNullableIsoString(getNullableString(formData, "targetEndDate")),
+    budgetAmount: getNullableNumber(formData, "budgetAmount"),
+    notes: getNullableString(formData, "notes")
   };
-
-  const description = getOptionalString(formData, "description");
-  const startDate = toIsoString(getOptionalString(formData, "startDate"));
-  const targetEndDate = toIsoString(getOptionalString(formData, "targetEndDate"));
-  const budgetAmount = getOptionalNumber(formData, "budgetAmount");
-  const notes = getOptionalString(formData, "notes");
-
-  if (description) {
-    input.description = description;
-  }
-
-  if (startDate) {
-    input.startDate = startDate;
-  }
-
-  if (targetEndDate) {
-    input.targetEndDate = targetEndDate;
-  }
-
-  if (budgetAmount !== undefined) {
-    input.budgetAmount = budgetAmount;
-  }
-
-  if (notes) {
-    input.notes = notes;
-  }
 
   await updateProject(householdId, projectId, input);
   revalidateProjectPaths(householdId, projectId);
@@ -1403,39 +1418,15 @@ export async function updateProjectTaskAction(formData: FormData): Promise<void>
   const taskId = getRequiredString(formData, "taskId");
   const input: UpdateProjectTaskInput = {
     title: getRequiredString(formData, "title"),
-    status: getRequiredString(formData, "status") as ProjectTaskStatus
+    status: getRequiredString(formData, "status") as ProjectTaskStatus,
+    description: getNullableString(formData, "description"),
+    assignedToId: getNullableString(formData, "assignedToId"),
+    dueDate: toNullableIsoString(getNullableString(formData, "dueDate")),
+    estimatedCost: getNullableNumber(formData, "estimatedCost"),
+    actualCost: getNullableNumber(formData, "actualCost"),
+    sortOrder: getNullableNumber(formData, "sortOrder"),
+    completedAt: null
   };
-
-  const description = getOptionalString(formData, "description");
-  const assignedToId = getOptionalString(formData, "assignedToId");
-  const dueDate = toIsoString(getOptionalString(formData, "dueDate"));
-  const estimatedCost = getOptionalNumber(formData, "estimatedCost");
-  const actualCost = getOptionalNumber(formData, "actualCost");
-  const sortOrder = getOptionalNumber(formData, "sortOrder");
-
-  if (description) {
-    input.description = description;
-  }
-
-  if (assignedToId) {
-    input.assignedToId = assignedToId;
-  }
-
-  if (dueDate) {
-    input.dueDate = dueDate;
-  }
-
-  if (estimatedCost !== undefined) {
-    input.estimatedCost = estimatedCost;
-  }
-
-  if (actualCost !== undefined) {
-    input.actualCost = actualCost;
-  }
-
-  if (sortOrder !== undefined) {
-    input.sortOrder = sortOrder;
-  }
 
   if (input.status === "completed") {
     input.completedAt = new Date().toISOString();
@@ -1469,6 +1460,7 @@ export async function createProjectExpenseAction(formData: FormData): Promise<vo
   const category = getOptionalString(formData, "category");
   const date = toIsoString(getOptionalString(formData, "date"));
   const taskId = getOptionalString(formData, "taskId");
+  const serviceProviderId = getOptionalString(formData, "serviceProviderId");
   const notes = getOptionalString(formData, "notes");
 
   if (category) {
@@ -1481,6 +1473,10 @@ export async function createProjectExpenseAction(formData: FormData): Promise<vo
 
   if (taskId) {
     input.taskId = taskId;
+  }
+
+  if (serviceProviderId) {
+    input.serviceProviderId = serviceProviderId;
   }
 
   if (notes) {
@@ -1497,32 +1493,16 @@ export async function updateProjectExpenseAction(formData: FormData): Promise<vo
   const expenseId = getRequiredString(formData, "expenseId");
   const input: UpdateProjectExpenseInput = {
     description: getRequiredString(formData, "description"),
-    amount: getRequiredString(formData, "amount") ? Number(getRequiredString(formData, "amount")) : 0
+    amount: getRequiredString(formData, "amount") ? Number(getRequiredString(formData, "amount")) : 0,
+    category: getNullableString(formData, "category"),
+    date: toNullableIsoString(getNullableString(formData, "date")),
+    taskId: getNullableString(formData, "taskId"),
+    serviceProviderId: getNullableString(formData, "serviceProviderId"),
+    notes: getNullableString(formData, "notes")
   };
 
   if (Number.isNaN(input.amount)) {
     throw new Error("amount must be a number.");
-  }
-
-  const category = getOptionalString(formData, "category");
-  const date = toIsoString(getOptionalString(formData, "date"));
-  const taskId = getOptionalString(formData, "taskId");
-  const notes = getOptionalString(formData, "notes");
-
-  if (category) {
-    input.category = category;
-  }
-
-  if (date) {
-    input.date = date;
-  }
-
-  if (taskId) {
-    input.taskId = taskId;
-  }
-
-  if (notes) {
-    input.notes = notes;
   }
 
   await updateProjectExpense(householdId, projectId, expenseId, input);
@@ -1535,5 +1515,93 @@ export async function deleteProjectExpenseAction(formData: FormData): Promise<vo
   const expenseId = getRequiredString(formData, "expenseId");
 
   await deleteProjectExpense(householdId, projectId, expenseId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const quantityNeeded = getOptionalNumber(formData, "quantityNeeded");
+
+  if (quantityNeeded === undefined) {
+    throw new Error("quantityNeeded is required.");
+  }
+
+  const input: CreateProjectInventoryItemInput = {
+    inventoryItemId: getRequiredString(formData, "inventoryItemId"),
+    quantityNeeded
+  };
+
+  const budgetedUnitCost = getOptionalNumber(formData, "budgetedUnitCost");
+  const notes = getOptionalString(formData, "notes");
+
+  if (budgetedUnitCost !== undefined) {
+    input.budgetedUnitCost = budgetedUnitCost;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await createProjectInventoryItem(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const quantityNeeded = getOptionalNumber(formData, "quantityNeeded");
+
+  if (quantityNeeded === undefined) {
+    throw new Error("quantityNeeded is required.");
+  }
+
+  const input: UpdateProjectInventoryItemInput = {
+    quantityNeeded,
+    budgetedUnitCost: getNullableNumber(formData, "budgetedUnitCost"),
+    notes: getNullableString(formData, "notes")
+  };
+
+  await updateProjectInventoryItem(householdId, projectId, inventoryItemId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function allocateProjectInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const quantity = getOptionalNumber(formData, "quantity");
+
+  if (quantity === undefined) {
+    throw new Error("quantity is required.");
+  }
+
+  const input: AllocateProjectInventoryInput = {
+    quantity
+  };
+
+  const unitCost = getOptionalNumber(formData, "unitCost");
+  const notes = getOptionalString(formData, "notes");
+
+  if (unitCost !== undefined) {
+    input.unitCost = unitCost;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await allocateProjectInventory(householdId, projectId, inventoryItemId, input);
+  revalidateProjectPaths(householdId, projectId);
+  revalidateInventoryPaths(householdId);
+}
+
+export async function deleteProjectInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+
+  await deleteProjectInventoryItem(householdId, projectId, inventoryItemId);
   revalidateProjectPaths(householdId, projectId);
 }
