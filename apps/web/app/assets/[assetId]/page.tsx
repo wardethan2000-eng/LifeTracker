@@ -16,6 +16,7 @@ import {
   deleteScheduleAction,
   recordConditionAssessmentAction,
   softDeleteAssetAction,
+  transferAssetAction,
   toggleScheduleActiveAction,
   unarchiveAssetAction,
   updateAssetAction,
@@ -32,7 +33,9 @@ import {
   ApiError,
   getAssetComments,
   getAssetDetail,
+  getAssetTransferHistory,
   getHouseholdAssets,
+  getHouseholdMembers,
   getHouseholdPresets,
   getLibraryPresets,
   getMetricEntries,
@@ -115,6 +118,10 @@ const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
   </article>
 );
 
+const formatTransferTypeLabel = (value: "reassignment" | "household_transfer"): string => value === "reassignment"
+  ? "Reassignment"
+  : "Household Transfer";
+
 async function loadMetricInsights(assetId: string, detail: AssetDetailResponse): Promise<Record<string, MetricInsight>> {
   const metricPayloads = await Promise.all(
     detail.metrics.map(async (metric) => {
@@ -140,12 +147,14 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
   try {
     const detail = await getAssetDetail(assetId);
-    const [libraryPresets, customPresets, householdAssets, metricInsights, comments] = await Promise.all([
+    const [libraryPresets, customPresets, householdAssets, householdMembers, metricInsights, comments, transferHistory] = await Promise.all([
       getLibraryPresets(),
       getHouseholdPresets(detail.asset.householdId),
       getHouseholdAssets(detail.asset.householdId),
+      getHouseholdMembers(detail.asset.householdId),
       loadMetricInsights(assetId, detail),
-      getAssetComments(assetId)
+      getAssetComments(assetId),
+      getAssetTransferHistory(assetId)
     ]);
 
     const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
@@ -302,6 +311,46 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             </div>
           </section>
         </div>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Transfer History</h2>
+          </div>
+          <div className="panel__body--padded">
+            {transferHistory.items.length === 0 ? (
+              <p className="panel__empty">This asset has not been transferred.</p>
+            ) : (
+              <div style={{ display: "grid", gap: "16px" }}>
+                {transferHistory.items.map((transfer) => (
+                  <article
+                    key={transfer.id}
+                    style={{
+                      display: "grid",
+                      gap: "8px",
+                      paddingLeft: "18px",
+                      borderLeft: "3px solid var(--border-strong)",
+                      position: "relative"
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                      <strong>{transfer.fromUser.displayName ?? "Unknown user"}</strong>
+                      <span style={{ color: "var(--ink-muted)" }}>to</span>
+                      <strong>{transfer.toUser.displayName ?? "Unknown user"}</strong>
+                      <span className="pill">{formatTransferTypeLabel(transfer.transferType)}</span>
+                      <span className="pill">{formatDateTime(transfer.transferredAt)}</span>
+                    </div>
+                    <p style={{ margin: 0, color: "var(--ink-muted)" }}>
+                      Initiated by {transfer.initiatedBy.displayName ?? "Unknown user"}
+                      {transfer.toHouseholdId ? ` into household ${transfer.toHouseholdId}` : " within the current household"}
+                    </p>
+                    {transfer.reason ? <p style={{ margin: 0 }}><strong>Reason:</strong> {transfer.reason}</p> : null}
+                    {transfer.notes ? <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{transfer.notes}</p> : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     );
 
@@ -855,6 +904,53 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
         <section className="panel">
           <div className="panel__header">
+            <h2>Transfer Asset</h2>
+          </div>
+          <div className="panel__body--padded">
+            <form action={transferAssetAction} className="form-grid">
+              <input type="hidden" name="assetId" value={detail.asset.id} />
+              <input type="hidden" name="householdId" value={detail.asset.householdId} />
+              <label className="field">
+                <span>Transfer Type</span>
+                <select name="transferType" defaultValue="reassignment">
+                  <option value="reassignment">Reassignment within household</option>
+                  <option value="household_transfer">Transfer to another household</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Reassign To</span>
+                <select name="reassignmentToUserId" defaultValue={detail.asset.ownerId ?? ""}>
+                  <option value="">Select a household member</option>
+                  {householdMembers.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.user.displayName ?? member.user.email ?? member.userId}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Target Household Id</span>
+                <input type="text" name="toHouseholdId" placeholder="Required for household transfers" />
+              </label>
+              <label className="field">
+                <span>Target User Id</span>
+                <input type="text" name="householdTransferToUserId" placeholder="Destination household member user id" />
+              </label>
+              <label className="field">
+                <span>Reason</span>
+                <input type="text" name="reason" placeholder="sold, gifted, reassigned responsibility" />
+              </label>
+              <label className="field field--full">
+                <span>Notes</span>
+                <textarea name="notes" rows={3} placeholder="Optional handoff notes, sale details, or household context" />
+              </label>
+              <button type="submit" className="button button--primary">Transfer Asset</button>
+            </form>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
             <h2>Apply a Preset</h2>
           </div>
           <div className="preset-grid">
@@ -890,6 +986,9 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <Link href={`/assets/${detail.asset.id}?tab=maintenance`} className="button button--primary button--sm">
               Log Maintenance
+            </Link>
+            <Link href={`/assets/${detail.asset.id}?tab=settings`} className="button button--ghost button--sm">
+              Transfer Asset
             </Link>
             <AssetDangerActions
               assetId={detail.asset.id}

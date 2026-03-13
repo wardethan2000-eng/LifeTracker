@@ -4,10 +4,12 @@ import type {
   AcceptInvitationInput,
   AssetCategory,
   AssetFieldDefinition,
+  AssetTransferType,
   AssetTypeSource,
   AssetVisibility,
   CompleteMaintenanceScheduleInput,
   CreateAssetInput,
+  CreateAssetTransferInput,
   CreateCommentInput,
   CreateConditionAssessmentInput,
   CreateInvitationInput,
@@ -50,6 +52,7 @@ import {
   completeSchedule,
   createComment,
   createInvitation,
+  createAssetTransfer,
   createMetricEntry,
   createProject,
   createProjectExpense,
@@ -703,6 +706,44 @@ export async function updateAssetAction(formData: FormData): Promise<void> {
   );
 
   revalidateAssetPaths(assetId);
+}
+
+export async function transferAssetAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const currentHouseholdId = getRequiredString(formData, "householdId");
+  const transferType = getRequiredString(formData, "transferType") as AssetTransferType;
+  const input: CreateAssetTransferInput = {
+    transferType,
+    toUserId: transferType === "household_transfer"
+      ? getRequiredString(formData, "householdTransferToUserId")
+      : getRequiredString(formData, "reassignmentToUserId")
+  };
+
+  const toHouseholdId = getOptionalString(formData, "toHouseholdId");
+  const reason = getOptionalString(formData, "reason");
+  const notes = getOptionalString(formData, "notes");
+
+  if (transferType === "household_transfer") {
+    input.toHouseholdId = getRequiredString(formData, "toHouseholdId");
+  } else if (toHouseholdId) {
+    input.toHouseholdId = toHouseholdId;
+  }
+
+  if (reason) {
+    input.reason = reason;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await createAssetTransfer(assetId, input);
+  revalidateAssetPaths(assetId);
+  revalidateActivityPaths(currentHouseholdId);
+
+  if (transferType === "household_transfer") {
+    redirect("/assets");
+  }
 }
 
 export async function markNotificationReadAction(formData: FormData): Promise<void> {

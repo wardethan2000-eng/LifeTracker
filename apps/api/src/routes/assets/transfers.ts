@@ -154,8 +154,8 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
             fromUserId,
             toUserId: input.toUserId,
             initiatedById: request.auth.userId,
-            reason: input.reason,
-            notes: input.notes
+            reason: input.reason ?? null,
+            notes: input.notes ?? null
           },
           include: {
             fromUser: { select: { id: true, displayName: true } },
@@ -181,14 +181,20 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
         return created;
       });
 
-      return reply.code(201).send(toAssetTransferResponse(transfer, transfer));
+      return reply.code(201).send(toAssetTransferResponse(transfer, {
+        fromUser: transfer.fromUser,
+        toUser: transfer.toUser,
+        initiatedBy: transfer.initiatedBy
+      }));
     }
 
     if (!input.toHouseholdId) {
       return reply.code(400).send({ message: "toHouseholdId is required for household transfers." });
     }
 
-    if (input.toHouseholdId === asset.householdId) {
+    const targetHouseholdId = input.toHouseholdId;
+
+    if (targetHouseholdId === asset.householdId) {
       return reply.code(400).send({ message: "Use reassignment for transfers within the same household." });
     }
 
@@ -198,7 +204,7 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "Only household owners can initiate inter-household transfers." });
     }
 
-    const targetMembership = await getMembership(app.prisma, input.toHouseholdId, input.toUserId);
+    const targetMembership = await getMembership(app.prisma, targetHouseholdId, input.toUserId);
     if (!targetMembership) {
       return reply.code(400).send({ message: "Target user must be a member of the destination household." });
     }
@@ -211,32 +217,37 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
       await tx.asset.updateMany({
         where: { id: { in: assetIds } },
         data: {
-          householdId: input.toHouseholdId,
+          householdId: targetHouseholdId,
           ownerId: input.toUserId
         }
       });
 
-      await tx.notification.updateMany({
+      const notifications = await tx.notification.findMany({
         where: {
           OR: [
             { assetId: { in: assetIds } },
             { schedule: { assetId: { in: assetIds } } }
           ]
         },
-        data: { householdId: input.toHouseholdId }
+        select: { id: true }
       });
+
+      await Promise.all(notifications.map((notification) => tx.notification.update({
+        where: { id: notification.id },
+        data: { householdId: targetHouseholdId }
+      })));
 
       await tx.assetTransfer.createMany({
         data: scopeAssets.map((entry) => ({
           assetId: entry.id,
           transferType: "household_transfer",
           fromHouseholdId: entry.householdId,
-          toHouseholdId: input.toHouseholdId,
+          toHouseholdId: targetHouseholdId,
           fromUserId: getResponsibleUserId(entry),
           toUserId: input.toUserId,
           initiatedById: request.auth.userId,
-          reason: input.reason,
-          notes: input.notes,
+          reason: input.reason ?? null,
+          notes: input.notes ?? null,
           transferredAt: now,
           createdAt: now
         }))
@@ -266,14 +277,14 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
           assetName: asset.name,
           movedAssetIds: assetIds,
           movedAssetCount: assetIds.length,
-          toHouseholdId: input.toHouseholdId,
+          toHouseholdId: targetHouseholdId,
           toUserId: input.toUserId,
           reason: input.reason ?? null
         }
       });
 
       await logActivity(tx, {
-        householdId: input.toHouseholdId,
+        householdId: targetHouseholdId,
         userId: request.auth.userId,
         action: "asset.household_transferred_in",
         entityType: "asset",
@@ -291,7 +302,11 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
       return created;
     });
 
-    return reply.code(201).send(toAssetTransferResponse(transfer, transfer));
+    return reply.code(201).send(toAssetTransferResponse(transfer, {
+      fromUser: transfer.fromUser,
+      toUser: transfer.toUser,
+      initiatedBy: transfer.initiatedBy
+    }));
   });
 
   app.get("/v1/assets/:assetId/transfers", async (request, reply) => {
@@ -328,7 +343,11 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return assetTransferListSchema.parse({
-      items: transfers.map((entry) => toAssetTransferResponse(entry, entry)),
+      items: transfers.map((entry) => toAssetTransferResponse(entry, {
+        fromUser: entry.fromUser,
+        toUser: entry.toUser,
+        initiatedBy: entry.initiatedBy
+      })),
       nextCursor: null
     });
   });
@@ -369,10 +388,17 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
     });
 
     const page = transfers.slice(0, query.limit);
-    const nextCursor = transfers.length > query.limit ? transfers[query.limit]?.id ?? null : null;
+    const overflowTransfer = transfers[query.limit];
+    const nextCursor = transfers.length > query.limit && overflowTransfer
+      ? overflowTransfer.id
+      : null;
 
     return assetTransferListSchema.parse({
-      items: page.map((entry) => toAssetTransferResponse(entry, entry)),
+      items: page.map((entry) => toAssetTransferResponse(entry, {
+        fromUser: entry.fromUser,
+        toUser: entry.toUser,
+        initiatedBy: entry.initiatedBy
+      })),
       nextCursor
     });
   });
