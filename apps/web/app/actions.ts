@@ -18,9 +18,14 @@ import type {
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
   CreateProjectAssetInput,
+  CreateProjectBudgetCategoryInput,
   CreateProjectExpenseInput,
+  CreateProjectPhaseChecklistItemInput,
+  CreateProjectPhaseInput,
+  CreateProjectPhaseSupplyInput,
   CreateProjectInventoryItemInput,
   CreateProjectInput,
+  CreateProjectTaskChecklistItemInput,
   CreateProjectTaskInput,
   CreatePresetProfileInput,
   CreateServiceProviderInput,
@@ -32,10 +37,15 @@ import type {
   ProjectStatus,
   ProjectTaskStatus,
   UpdateCommentInput,
+  UpdateProjectBudgetCategoryInput,
   UpdateProjectInventoryItemInput,
+  UpdateProjectPhaseChecklistItemInput,
+  UpdateProjectPhaseInput,
+  UpdateProjectPhaseSupplyInput,
   UpdateServiceProviderInput,
   UpdateProjectExpenseInput,
   UpdateProjectInput,
+  UpdateProjectTaskChecklistItemInput,
   UpdateProjectTaskInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
@@ -51,6 +61,7 @@ import {
   acceptInvitation,
   addProjectAsset,
   allocateProjectInventory,
+  allocateSupplyFromInventory,
   applyPreset,
   archiveAsset,
   completeSchedule,
@@ -59,8 +70,13 @@ import {
   createAssetTransfer,
   createMetricEntry,
   createProject,
+  createProjectBudgetCategory,
   createProjectExpense,
+  createProjectPhase,
+  createPhaseChecklistItem,
+  createProjectPhaseSupply,
   createProjectTask,
+  createTaskChecklistItem,
   createMetric,
   createAsset,
   createHousehold,
@@ -73,15 +89,21 @@ import {
   deleteComment,
   deleteMetric,
   deleteProject,
+  deleteProjectBudgetCategory,
   deleteProjectExpense,
+  deleteProjectPhase,
   deleteProjectInventoryItem,
+  deletePhaseChecklistItem,
+  deleteProjectPhaseSupply,
   deleteProjectTask,
+  deleteTaskChecklistItem,
   deleteServiceProvider,
   deleteSchedule,
   enqueueNotificationScan,
   markNotificationRead,
   recordConditionAssessment,
   removeProjectAsset,
+  reorderProjectPhases,
   revokeInvitation,
   restoreAsset,
   softDeleteAsset,
@@ -89,10 +111,15 @@ import {
   updateAsset,
   updateComment,
   updateProject,
+  updateProjectBudgetCategory,
   updateProjectExpense,
   updateProjectInventoryItem,
+  updateProjectPhase,
+  updatePhaseChecklistItem,
+  updateProjectPhaseSupply,
   updateProjectStatus,
   updateProjectTask,
+  updateTaskChecklistItem,
   updateSchedule,
   updateServiceProvider,
   updateMetric
@@ -1299,6 +1326,24 @@ export async function createProjectAction(formData: FormData): Promise<void> {
   }
 
   const project = await createProject(householdId, input);
+
+  const rawSuggestedPhases = getOptionalString(formData, "suggestedPhasesJson");
+  if (rawSuggestedPhases) {
+    const suggestedPhases = JSON.parse(rawSuggestedPhases) as string[];
+
+    for (const [index, phaseName] of suggestedPhases.entries()) {
+      if (!phaseName || !phaseName.trim()) {
+        continue;
+      }
+
+      await createProjectPhase(householdId, project.id, {
+        name: phaseName.trim(),
+        status: "pending",
+        sortOrder: index
+      });
+    }
+  }
+
   revalidateProjectPaths(householdId, project.id);
   redirect(`/projects/${project.id}?householdId=${householdId}`);
 }
@@ -1515,6 +1560,310 @@ export async function deleteProjectExpenseAction(formData: FormData): Promise<vo
   const expenseId = getRequiredString(formData, "expenseId");
 
   await deleteProjectExpense(householdId, projectId, expenseId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectPhaseAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const status = getOptionalString(formData, "status");
+  const input: CreateProjectPhaseInput = {
+    name: getRequiredString(formData, "name"),
+    status: (status as CreateProjectPhaseInput["status"] | undefined) ?? "pending"
+  };
+
+  const description = getOptionalString(formData, "description");
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+  const startDate = toIsoString(getOptionalString(formData, "startDate"));
+  const targetEndDate = toIsoString(getOptionalString(formData, "targetEndDate"));
+  const budgetAmount = getOptionalNumber(formData, "budgetAmount");
+  const notes = getOptionalString(formData, "notes");
+
+  if (description) input.description = description;
+  if (status) input.status = status as CreateProjectPhaseInput["status"];
+  if (sortOrder !== undefined) input.sortOrder = sortOrder;
+  if (startDate) input.startDate = startDate;
+  if (targetEndDate) input.targetEndDate = targetEndDate;
+  if (budgetAmount !== undefined) input.budgetAmount = budgetAmount;
+  if (notes) input.notes = notes;
+
+  await createProjectPhase(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectPhaseAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const input: UpdateProjectPhaseInput = {
+    name: getRequiredString(formData, "name"),
+    status: getRequiredString(formData, "status") as UpdateProjectPhaseInput["status"],
+    description: getNullableString(formData, "description"),
+    sortOrder: getOptionalNumber(formData, "sortOrder"),
+    startDate: toIsoString(getOptionalString(formData, "startDate")),
+    targetEndDate: toIsoString(getOptionalString(formData, "targetEndDate")),
+    budgetAmount: getOptionalNumber(formData, "budgetAmount"),
+    notes: getNullableString(formData, "notes")
+  };
+
+  const actualEndDate = toIsoString(getOptionalString(formData, "actualEndDate"));
+  if (actualEndDate) {
+    input.actualEndDate = actualEndDate;
+  }
+
+  await updateProjectPhase(householdId, projectId, phaseId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectPhaseAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+
+  await deleteProjectPhase(householdId, projectId, phaseId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function reorderProjectPhasesAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const rawPhaseIds = getRequiredString(formData, "phaseIds");
+  const phaseIds = JSON.parse(rawPhaseIds) as string[];
+
+  await reorderProjectPhases(householdId, projectId, phaseIds);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createPhaseChecklistItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const input: CreateProjectPhaseChecklistItemInput = {
+    title: getRequiredString(formData, "title")
+  };
+
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+  if (sortOrder !== undefined) input.sortOrder = sortOrder;
+
+  await createPhaseChecklistItem(householdId, projectId, phaseId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updatePhaseChecklistItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const checklistItemId = getRequiredString(formData, "checklistItemId");
+  const input: UpdateProjectPhaseChecklistItemInput = {
+    title: getOptionalString(formData, "title"),
+    isCompleted: getOptionalBoolean(formData, "isCompleted"),
+    sortOrder: getNullableNumber(formData, "sortOrder")
+  };
+
+  await updatePhaseChecklistItem(householdId, projectId, phaseId, checklistItemId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deletePhaseChecklistItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const checklistItemId = getRequiredString(formData, "checklistItemId");
+
+  await deletePhaseChecklistItem(householdId, projectId, phaseId, checklistItemId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createTaskChecklistItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+  const input: CreateProjectTaskChecklistItemInput = {
+    title: getRequiredString(formData, "title")
+  };
+
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+  if (sortOrder !== undefined) input.sortOrder = sortOrder;
+
+  await createTaskChecklistItem(householdId, projectId, taskId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateTaskChecklistItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+  const checklistItemId = getRequiredString(formData, "checklistItemId");
+  const input: UpdateProjectTaskChecklistItemInput = {
+    title: getOptionalString(formData, "title"),
+    isCompleted: getOptionalBoolean(formData, "isCompleted"),
+    sortOrder: getNullableNumber(formData, "sortOrder")
+  };
+
+  await updateTaskChecklistItem(householdId, projectId, taskId, checklistItemId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteTaskChecklistItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+  const checklistItemId = getRequiredString(formData, "checklistItemId");
+
+  await deleteTaskChecklistItem(householdId, projectId, taskId, checklistItemId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectBudgetCategoryAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateProjectBudgetCategoryInput = {
+    name: getRequiredString(formData, "name")
+  };
+
+  const budgetAmount = getOptionalNumber(formData, "budgetAmount");
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+  const notes = getOptionalString(formData, "notes");
+
+  if (budgetAmount !== undefined) input.budgetAmount = budgetAmount;
+  if (sortOrder !== undefined) input.sortOrder = sortOrder;
+  if (notes) input.notes = notes;
+
+  await createProjectBudgetCategory(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectBudgetCategoryAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const categoryId = getRequiredString(formData, "categoryId");
+  const input: UpdateProjectBudgetCategoryInput = {
+    name: getRequiredString(formData, "name"),
+    budgetAmount: getOptionalNumber(formData, "budgetAmount"),
+    sortOrder: getOptionalNumber(formData, "sortOrder"),
+    notes: getNullableString(formData, "notes")
+  };
+
+  await updateProjectBudgetCategory(householdId, projectId, categoryId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectBudgetCategoryAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const categoryId = getRequiredString(formData, "categoryId");
+
+  await deleteProjectBudgetCategory(householdId, projectId, categoryId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectPhaseSupplyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const quantityNeeded = getOptionalNumber(formData, "quantityNeeded");
+
+  if (quantityNeeded === undefined) {
+    throw new Error("quantityNeeded is required.");
+  }
+
+  const input: CreateProjectPhaseSupplyInput = {
+    name: getRequiredString(formData, "name"),
+    quantityNeeded,
+    quantityOnHand: 0,
+    unit: "each",
+    isProcured: false,
+    isStaged: false
+  };
+
+  const description = getOptionalString(formData, "description");
+  const quantityOnHand = getOptionalNumber(formData, "quantityOnHand");
+  const unit = getOptionalString(formData, "unit");
+  const estimatedUnitCost = getOptionalNumber(formData, "estimatedUnitCost");
+  const actualUnitCost = getOptionalNumber(formData, "actualUnitCost");
+  const supplier = getOptionalString(formData, "supplier");
+  const supplierUrl = getOptionalString(formData, "supplierUrl");
+  const isProcured = getOptionalBoolean(formData, "isProcured");
+  const isStaged = getOptionalBoolean(formData, "isStaged");
+  const inventoryItemId = getOptionalString(formData, "inventoryItemId");
+  const notes = getOptionalString(formData, "notes");
+  const sortOrder = getOptionalNumber(formData, "sortOrder");
+
+  if (description) input.description = description;
+  if (quantityOnHand !== undefined) input.quantityOnHand = quantityOnHand;
+  if (unit) input.unit = unit;
+  if (estimatedUnitCost !== undefined) input.estimatedUnitCost = estimatedUnitCost;
+  if (actualUnitCost !== undefined) input.actualUnitCost = actualUnitCost;
+  if (supplier) input.supplier = supplier;
+  if (supplierUrl) input.supplierUrl = supplierUrl;
+  if (isProcured !== undefined) input.isProcured = isProcured;
+  if (isStaged !== undefined) input.isStaged = isStaged;
+  if (inventoryItemId) input.inventoryItemId = inventoryItemId;
+  if (notes) input.notes = notes;
+  if (sortOrder !== undefined) input.sortOrder = sortOrder;
+
+  await createProjectPhaseSupply(householdId, projectId, phaseId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectPhaseSupplyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const supplyId = getRequiredString(formData, "supplyId");
+  const input: UpdateProjectPhaseSupplyInput = {
+    name: getRequiredString(formData, "name"),
+    description: getNullableString(formData, "description"),
+    quantityNeeded: getOptionalNumber(formData, "quantityNeeded"),
+    quantityOnHand: getOptionalNumber(formData, "quantityOnHand"),
+    unit: getOptionalString(formData, "unit"),
+    estimatedUnitCost: getOptionalNumber(formData, "estimatedUnitCost"),
+    actualUnitCost: getOptionalNumber(formData, "actualUnitCost"),
+    supplier: getNullableString(formData, "supplier"),
+    supplierUrl: getNullableString(formData, "supplierUrl"),
+    isProcured: getOptionalBoolean(formData, "isProcured"),
+    isStaged: getOptionalBoolean(formData, "isStaged"),
+    inventoryItemId: getOptionalString(formData, "inventoryItemId"),
+    notes: getNullableString(formData, "notes"),
+    sortOrder: getOptionalNumber(formData, "sortOrder")
+  };
+
+  await updateProjectPhaseSupply(householdId, projectId, phaseId, supplyId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectPhaseSupplyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const supplyId = getRequiredString(formData, "supplyId");
+
+  await deleteProjectPhaseSupply(householdId, projectId, phaseId, supplyId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function allocateSupplyFromInventoryAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const supplyId = getRequiredString(formData, "supplyId");
+  const quantity = getOptionalNumber(formData, "quantity");
+
+  if (quantity === undefined) {
+    throw new Error("quantity is required.");
+  }
+
+  const input: AllocateProjectInventoryInput = {
+    quantity
+  };
+
+  const unitCost = getOptionalNumber(formData, "unitCost");
+  const notes = getOptionalString(formData, "notes");
+
+  if (unitCost !== undefined) input.unitCost = unitCost;
+  if (notes) input.notes = notes;
+
+  await allocateSupplyFromInventory(householdId, projectId, phaseId, supplyId, input);
   revalidateProjectPaths(householdId, projectId);
 }
 

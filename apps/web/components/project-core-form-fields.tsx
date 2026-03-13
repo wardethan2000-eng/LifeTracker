@@ -26,9 +26,10 @@ type ProjectTemplate = {
   scopeSummary: string;
   executionNotes: string;
   checklist: string[];
+  suggestedPhases: string[];
 };
 
-const projectTemplates: ProjectTemplate[] = [
+export const projectTemplates: ProjectTemplate[] = [
   {
     key: "renovation",
     label: "Renovation / Improvement",
@@ -36,7 +37,8 @@ const projectTemplates: ProjectTemplate[] = [
     status: "planning",
     scopeSummary: "Define the area being improved, the target outcome, and any structural, finish, or contractor dependencies.",
     executionNotes: "Capture bid comparisons, permit constraints, lead-time items, finish selections, and any sequencing dependencies across trades.",
-    checklist: ["Link affected assets or spaces", "Add procurement-driven inventory lines", "Track outside vendor quotes"]
+    checklist: ["Link affected assets or spaces", "Add procurement-driven inventory lines", "Track outside vendor quotes"],
+    suggestedPhases: ["Planning & Permitting", "Demolition & Prep", "Rough-In Work", "Finish Work", "Punch List & Closeout"]
   },
   {
     key: "seasonal-maintenance",
@@ -45,7 +47,8 @@ const projectTemplates: ProjectTemplate[] = [
     status: "planning",
     scopeSummary: "Bundle the recurring work to prepare equipment, property systems, or vehicles for the next operating season.",
     executionNotes: "Call out consumables, inspection checkpoints, weather windows, and the list of systems that must be closed out before completion.",
-    checklist: ["Break work into repeatable tasks", "Reserve common consumables", "Use due dates to pace completion"]
+    checklist: ["Break work into repeatable tasks", "Reserve common consumables", "Use due dates to pace completion"],
+    suggestedPhases: ["Inspection & Assessment", "Parts & Supplies Procurement", "Execution", "Verification & Storage"]
   },
   {
     key: "repair-response",
@@ -54,7 +57,8 @@ const projectTemplates: ProjectTemplate[] = [
     status: "active",
     scopeSummary: "Describe the fault, the impact, and the definition of done needed to return the asset or system to service.",
     executionNotes: "Track diagnostic findings, temporary mitigations, parts on order, and any safety or downtime considerations until the repair is closed.",
-    checklist: ["Document the failure clearly", "Track spent vs estimate closely", "Flag missing parts immediately"]
+    checklist: ["Document the failure clearly", "Track spent vs estimate closely", "Flag missing parts immediately"],
+    suggestedPhases: ["Diagnosis & Scoping", "Parts Procurement", "Repair Execution", "Testing & Verification"]
   },
   {
     key: "equipment-upgrade",
@@ -63,7 +67,8 @@ const projectTemplates: ProjectTemplate[] = [
     status: "planning",
     scopeSummary: "Outline what is being upgraded, what capability is changing, and what installation or commissioning steps are required.",
     executionNotes: "Include compatibility checks, retirement or transfer plans for old equipment, and the validation steps needed before cutover.",
-    checklist: ["Link old and new assets", "Stage install materials", "Plan testing or commissioning"]
+    checklist: ["Link old and new assets", "Stage install materials", "Plan testing or commissioning"],
+    suggestedPhases: ["Research & Selection", "Procurement & Delivery", "Installation & Configuration", "Commissioning & Validation"]
   },
   {
     key: "vendor-coordination",
@@ -72,7 +77,8 @@ const projectTemplates: ProjectTemplate[] = [
     status: "planning",
     scopeSummary: "Summarize the contracted scope, the service window, and the external deliverables expected from the provider.",
     executionNotes: "Store provider notes, approval checkpoints, warranty follow-up, and any household prep needed before the vendor arrives.",
-    checklist: ["Assign the primary provider", "Track quoted and actual costs", "Capture follow-up and warranty notes"]
+    checklist: ["Assign the primary provider", "Track quoted and actual costs", "Capture follow-up and warranty notes"],
+    suggestedPhases: ["Scope Definition & Quotes", "Vendor Selection & Scheduling", "Execution & Supervision", "Inspection & Acceptance"]
   }
 ];
 
@@ -129,6 +135,8 @@ export function ProjectCoreFormFields({
       <>
         <input type="hidden" name="householdId" value={householdId} />
         {includeProjectId && project ? <input type="hidden" name="projectId" value={project.id} /> : null}
+        <input type="hidden" name="templateKey" value={selectedTemplate?.key ?? ""} />
+        <input type="hidden" name="suggestedPhasesJson" value={JSON.stringify(selectedTemplate?.suggestedPhases ?? [])} />
 
         <div className="asset-studio__field-stack">
           <section className="asset-studio__field-card project-template-card">
@@ -165,6 +173,9 @@ export function ProjectCoreFormFields({
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
+                <div className="data-table__secondary" style={{ marginTop: 12 }}>
+                  Suggested phases: {selectedTemplate.suggestedPhases.join(" -> ")}
+                </div>
               </div>
             ) : null}
           </section>

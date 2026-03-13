@@ -83,6 +83,15 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
                 <article className="asset-studio__field-card">
                   <div className="asset-studio__field-card-header">
                     <div>
+                      <h3>Plan Phases</h3>
+                      <p>Break the project into sequential phases with their own checklists, budgets, supply lists, and timelines.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="asset-studio__field-card">
+                  <div className="asset-studio__field-card-header">
+                    <div>
                       <h3>Reserve Inventory</h3>
                       <p>Convert required materials into project inventory lines and allocate stock from household inventory.</p>
                     </div>

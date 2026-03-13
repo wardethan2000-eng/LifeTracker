@@ -422,6 +422,8 @@ model Project {
   household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
   assets        ProjectAsset[]
   inventoryItems ProjectInventoryItem[]
+  phases        ProjectPhase[]
+  budgetCategories ProjectBudgetCategory[]
   tasks         ProjectTask[]
   expenses      ProjectExpense[]
 
@@ -450,6 +452,7 @@ model InventoryItem {
   household          Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
   assetLinks         AssetInventoryItem[]
   projectLinks       ProjectInventoryItem[]
+  projectPhaseSupplies ProjectPhaseSupply[]
   transactions       InventoryTransaction[]
   maintenanceLogParts MaintenanceLogPart[]
 
@@ -531,6 +534,7 @@ model ProjectAsset {
 model ProjectTask {
   id            String               @id @default(cuid())
   projectId     String
+  phaseId       String?
   title         String
   description   String?
   status        String               @default("pending")
@@ -544,16 +548,21 @@ model ProjectTask {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   project       Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase         ProjectPhase?        @relation(fields: [phaseId], references: [id], onDelete: SetNull)
   assignedTo    User?                @relation("ProjectTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   schedule      MaintenanceSchedule? @relation("ProjectTaskSchedule", fields: [scheduleId], references: [id], onDelete: SetNull)
+  checklistItems ProjectTaskChecklistItem[]
 
   @@index([projectId, status])
+  @@index([phaseId, sortOrder])
   @@index([assignedToId])
 }
 
 model ProjectExpense {
   id                String           @id @default(cuid())
   projectId         String
+  phaseId           String?
+  budgetCategoryId  String?
   description       String
   amount            Float
   category          String?
@@ -564,9 +573,109 @@ model ProjectExpense {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase             ProjectPhase?    @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  budgetCategory    ProjectBudgetCategory? @relation(fields: [budgetCategoryId], references: [id], onDelete: SetNull)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@index([phaseId])
+  @@index([budgetCategoryId])
+}
+
+model ProjectPhase {
+  id             String                      @id @default(cuid())
+  projectId      String
+  name           String
+  description    String?
+  status         String                      @default("pending")
+  sortOrder      Int?
+  startDate      DateTime?
+  targetEndDate  DateTime?
+  actualEndDate  DateTime?
+  budgetAmount   Float?
+  notes          String?
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  project        Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks          ProjectTask[]
+  checklistItems ProjectPhaseChecklistItem[]
+  expenses       ProjectExpense[]
+  supplies       ProjectPhaseSupply[]
+
+  @@index([projectId, sortOrder])
+  @@index([projectId, status])
+}
+
+model ProjectPhaseChecklistItem {
+  id           String       @id @default(cuid())
+  phaseId      String
+  title        String
+  isCompleted  Boolean      @default(false)
+  completedAt  DateTime?
+  sortOrder    Int?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  phase        ProjectPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+
+  @@index([phaseId, sortOrder])
+}
+
+model ProjectTaskChecklistItem {
+  id           String      @id @default(cuid())
+  taskId       String
+  title        String
+  isCompleted  Boolean     @default(false)
+  completedAt  DateTime?
+  sortOrder    Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  task         ProjectTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, sortOrder])
+}
+
+model ProjectBudgetCategory {
+  id           String           @id @default(cuid())
+  projectId    String
+  name         String
+  budgetAmount Float?
+  sortOrder    Int?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  expenses     ProjectExpense[]
+
+  @@index([projectId, sortOrder])
+}
+
+model ProjectPhaseSupply {
+  id                String         @id @default(cuid())
+  phaseId           String
+  name              String
+  description       String?
+  quantityNeeded    Float
+  quantityOnHand    Float          @default(0)
+  unit              String         @default("each")
+  estimatedUnitCost Float?
+  actualUnitCost    Float?
+  supplier          String?
+  supplierUrl       String?
+  isProcured        Boolean        @default(false)
+  procuredAt        DateTime?
+  isStaged          Boolean        @default(false)
+  stagedAt          DateTime?
+  inventoryItemId   String?
+  notes             String?
+  sortOrder         Int?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  phase             ProjectPhase   @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([phaseId, sortOrder])
+  @@index([phaseId, isProcured])
+  @@index([inventoryItemId])
 }
 
 model SearchIndex {

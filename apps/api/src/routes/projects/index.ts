@@ -60,11 +60,14 @@ const toProjectSummary = (
     expenses: { amount: number }[];
     _count: { tasks: number };
     tasks: { status: string }[];
+    phases: { status: string }[];
   }
 ) => {
   const totalSpent = project.expenses.reduce((sum, e) => sum + e.amount, 0);
   const taskCount = project._count.tasks;
   const completedTaskCount = project.tasks.filter((t) => t.status === "completed").length;
+  const phaseCount = project.phases.length;
+  const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
   const percentComplete = taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0;
 
   return {
@@ -84,9 +87,95 @@ const toProjectSummary = (
     totalSpent,
     taskCount,
     completedTaskCount,
+    phaseCount,
+    completedPhaseCount,
     percentComplete
   };
 };
+
+const toProjectTaskChecklistItemResponse = (item: {
+  id: string;
+  taskId: string;
+  title: string;
+  isCompleted: boolean;
+  completedAt: Date | null;
+  sortOrder: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => ({
+  id: item.id,
+  taskId: item.taskId,
+  title: item.title,
+  isCompleted: item.isCompleted,
+  completedAt: item.completedAt?.toISOString() ?? null,
+  sortOrder: item.sortOrder,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString()
+});
+
+const toProjectBudgetCategoryResponse = (category: {
+  id: string;
+  projectId: string;
+  name: string;
+  budgetAmount: number | null;
+  sortOrder: number | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  expenses?: { amount: number }[];
+}) => ({
+  id: category.id,
+  projectId: category.projectId,
+  name: category.name,
+  budgetAmount: category.budgetAmount,
+  sortOrder: category.sortOrder,
+  notes: category.notes,
+  createdAt: category.createdAt.toISOString(),
+  updatedAt: category.updatedAt.toISOString(),
+  expenseCount: category.expenses?.length ?? 0,
+  actualSpend: category.expenses?.reduce((sum, expense) => sum + expense.amount, 0) ?? 0
+});
+
+const toProjectPhaseSummaryResponse = (phase: {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  sortOrder: number | null;
+  startDate: Date | null;
+  targetEndDate: Date | null;
+  actualEndDate: Date | null;
+  budgetAmount: number | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  tasks: { status: string }[];
+  checklistItems: { isCompleted: boolean }[];
+  supplies: { isProcured: boolean }[];
+  expenses: { amount: number }[];
+}) => ({
+  id: phase.id,
+  projectId: phase.projectId,
+  name: phase.name,
+  description: phase.description,
+  status: phase.status,
+  sortOrder: phase.sortOrder,
+  startDate: phase.startDate?.toISOString() ?? null,
+  targetEndDate: phase.targetEndDate?.toISOString() ?? null,
+  actualEndDate: phase.actualEndDate?.toISOString() ?? null,
+  budgetAmount: phase.budgetAmount,
+  notes: phase.notes,
+  createdAt: phase.createdAt.toISOString(),
+  updatedAt: phase.updatedAt.toISOString(),
+  taskCount: phase.tasks.length,
+  completedTaskCount: phase.tasks.filter((task) => task.status === "completed").length,
+  checklistItemCount: phase.checklistItems.length,
+  completedChecklistItemCount: phase.checklistItems.filter((item) => item.isCompleted).length,
+  supplyCount: phase.supplies.length,
+  procuredSupplyCount: phase.supplies.filter((supply) => supply.isProcured).length,
+  expenseTotal: phase.expenses.reduce((sum, expense) => sum + expense.amount, 0)
+});
 
 const toProjectResponse = (project: {
   id: string;
@@ -139,6 +228,7 @@ const toProjectAssetResponse = (pa: {
 const toProjectTaskResponse = (task: {
   id: string;
   projectId: string;
+  phaseId: string | null;
   title: string;
   description: string | null;
   status: string;
@@ -152,9 +242,20 @@ const toProjectTaskResponse = (task: {
   createdAt: Date;
   updatedAt: Date;
   assignedTo?: { id: string; displayName: string | null } | null;
+  checklistItems?: {
+    id: string;
+    taskId: string;
+    title: string;
+    isCompleted: boolean;
+    completedAt: Date | null;
+    sortOrder: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }[];
 }) => ({
   id: task.id,
   projectId: task.projectId,
+  phaseId: task.phaseId,
   title: task.title,
   description: task.description,
   status: task.status,
@@ -166,6 +267,7 @@ const toProjectTaskResponse = (task: {
   actualCost: task.actualCost,
   sortOrder: task.sortOrder,
   scheduleId: task.scheduleId,
+  checklistItems: (task.checklistItems ?? []).map(toProjectTaskChecklistItemResponse),
   createdAt: task.createdAt.toISOString(),
   updatedAt: task.updatedAt.toISOString()
 });
@@ -173,6 +275,8 @@ const toProjectTaskResponse = (task: {
 const toProjectExpenseResponse = (expense: {
   id: string;
   projectId: string;
+  phaseId: string | null;
+  budgetCategoryId: string | null;
   description: string;
   amount: number;
   category: string | null;
@@ -185,6 +289,8 @@ const toProjectExpenseResponse = (expense: {
 }) => ({
   id: expense.id,
   projectId: expense.projectId,
+  phaseId: expense.phaseId,
+  budgetCategoryId: expense.budgetCategoryId,
   description: expense.description,
   amount: expense.amount,
   category: expense.category,
@@ -219,6 +325,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       include: {
         expenses: { select: { amount: true } },
         tasks: { select: { status: true } },
+        phases: { select: { status: true } },
         _count: { select: { tasks: true } }
       },
       orderBy: { createdAt: "desc" }
@@ -283,12 +390,30 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         },
         tasks: {
           include: {
-            assignedTo: { select: { id: true, displayName: true } }
+            assignedTo: { select: { id: true, displayName: true } },
+            checklistItems: {
+              orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+            }
           },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         },
         expenses: {
           orderBy: { createdAt: "desc" }
+        },
+        phases: {
+          include: {
+            tasks: { select: { status: true } },
+            checklistItems: { select: { isCompleted: true } },
+            supplies: { select: { isProcured: true } },
+            expenses: { select: { amount: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
+        budgetCategories: {
+          include: {
+            expenses: { select: { amount: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         }
       }
     });
@@ -301,7 +426,9 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       ...toProjectResponse(project),
       assets: project.assets.map(toProjectAssetResponse),
       tasks: project.tasks.map(toProjectTaskResponse),
-      expenses: project.expenses.map(toProjectExpenseResponse)
+      expenses: project.expenses.map(toProjectExpenseResponse),
+      phases: project.phases.map(toProjectPhaseSummaryResponse),
+      budgetCategories: project.budgetCategories.map(toProjectBudgetCategoryResponse)
     };
   });
 
@@ -520,7 +647,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const tasks = await app.prisma.projectTask.findMany({
       where: { projectId: project.id },
       include: {
-        assignedTo: { select: { id: true, displayName: true } }
+        assignedTo: { select: { id: true, displayName: true } },
+        checklistItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
@@ -557,6 +687,17 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.phaseId) {
+      const phase = await app.prisma.projectPhase.findFirst({
+        where: { id: input.phaseId, projectId: project.id },
+        select: { id: true }
+      });
+
+      if (!phase) {
+        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+      }
+    }
+
     if (input.scheduleId) {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
         where: {
@@ -574,6 +715,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const task = await app.prisma.projectTask.create({
       data: {
         projectId: project.id,
+        phaseId: input.phaseId ?? null,
         title: input.title,
         description: input.description ?? null,
         status: input.status,
@@ -585,7 +727,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         scheduleId: input.scheduleId ?? null
       },
       include: {
-        assignedTo: { select: { id: true, displayName: true } }
+        assignedTo: { select: { id: true, displayName: true } },
+        checklistItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
       }
     });
 
@@ -634,6 +779,17 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.phaseId !== undefined && input.phaseId !== null) {
+      const phase = await app.prisma.projectPhase.findFirst({
+        where: { id: input.phaseId, projectId: params.projectId },
+        select: { id: true }
+      });
+
+      if (!phase) {
+        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+      }
+    }
+
     if (input.scheduleId !== undefined && input.scheduleId !== null) {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
         where: {
@@ -652,6 +808,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.title !== undefined) data.title = input.title;
     if (input.description !== undefined) data.description = input.description ?? null;
+    if (input.phaseId !== undefined) data.phaseId = input.phaseId ?? null;
     if (input.assignedToId !== undefined) data.assignedToId = input.assignedToId ?? null;
     if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
     if (input.estimatedCost !== undefined) data.estimatedCost = input.estimatedCost ?? null;
@@ -734,7 +891,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id },
       data,
       include: {
-        assignedTo: { select: { id: true, displayName: true } }
+        assignedTo: { select: { id: true, displayName: true } },
+        checklistItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
       }
     });
 
@@ -824,6 +984,28 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.phaseId) {
+      const phase = await app.prisma.projectPhase.findFirst({
+        where: { id: input.phaseId, projectId: project.id },
+        select: { id: true }
+      });
+
+      if (!phase) {
+        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+      }
+    }
+
+    if (input.budgetCategoryId) {
+      const budgetCategory = await app.prisma.projectBudgetCategory.findFirst({
+        where: { id: input.budgetCategoryId, projectId: project.id },
+        select: { id: true }
+      });
+
+      if (!budgetCategory) {
+        return reply.code(400).send({ message: "Referenced budget category not found in this project." });
+      }
+    }
+
     if (input.serviceProviderId) {
       const provider = await app.prisma.serviceProvider.findFirst({
         where: { id: input.serviceProviderId, householdId: params.householdId },
@@ -838,6 +1020,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const expense = await app.prisma.projectExpense.create({
       data: {
         projectId: project.id,
+        phaseId: input.phaseId ?? null,
+        budgetCategoryId: input.budgetCategoryId ?? null,
         description: input.description,
         amount: input.amount,
         category: input.category ?? null,
@@ -883,6 +1067,28 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.phaseId !== undefined && input.phaseId !== null) {
+      const phase = await app.prisma.projectPhase.findFirst({
+        where: { id: input.phaseId, projectId: params.projectId },
+        select: { id: true }
+      });
+
+      if (!phase) {
+        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+      }
+    }
+
+    if (input.budgetCategoryId !== undefined && input.budgetCategoryId !== null) {
+      const budgetCategory = await app.prisma.projectBudgetCategory.findFirst({
+        where: { id: input.budgetCategoryId, projectId: params.projectId },
+        select: { id: true }
+      });
+
+      if (!budgetCategory) {
+        return reply.code(400).send({ message: "Referenced budget category not found in this project." });
+      }
+    }
+
     if (input.serviceProviderId !== undefined && input.serviceProviderId !== null) {
       const provider = await app.prisma.serviceProvider.findFirst({
         where: { id: input.serviceProviderId, householdId: params.householdId },
@@ -900,6 +1106,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.amount !== undefined) data.amount = input.amount;
     if (input.category !== undefined) data.category = input.category ?? null;
     if (input.date !== undefined) data.date = input.date ? new Date(input.date) : null;
+    if (input.phaseId !== undefined) data.phaseId = input.phaseId ?? null;
+    if (input.budgetCategoryId !== undefined) data.budgetCategoryId = input.budgetCategoryId ?? null;
     if (input.taskId !== undefined) data.taskId = input.taskId ?? null;
     if (input.serviceProviderId !== undefined) data.serviceProviderId = input.serviceProviderId ?? null;
     if (input.notes !== undefined) data.notes = input.notes ?? null;

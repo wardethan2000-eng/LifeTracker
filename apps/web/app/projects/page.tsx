@@ -487,9 +487,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                                 <small>{project.inventoryLineCount} linked inventory lines</small>
                               </div>
                               <div className="project-metric">
-                                <span>Target</span>
-                                <strong>{getTargetLabel(project)}</strong>
-                                <small>{formatDate(project.targetEndDate, "No target date")}</small>
+                                <span>Phases</span>
+                                <strong>{project.completedPhaseCount} / {project.phaseCount}</strong>
+                                <small>{getTargetLabel(project)}</small>
                               </div>
                             </div>
 

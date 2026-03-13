@@ -427,7 +427,21 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
       householdId: true,
       name: true,
       description: true,
-      status: true
+      status: true,
+      phases: {
+        select: {
+          name: true,
+          description: true,
+          supplies: {
+            select: {
+              name: true,
+              description: true,
+              supplier: true,
+              notes: true
+            }
+          }
+        }
+      }
     }
   });
 
@@ -436,13 +450,19 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     return;
   }
 
+  const phaseText = project.phases.flatMap((phase) => [
+    phase.name,
+    phase.description,
+    ...phase.supplies.flatMap((supply) => [supply.name, supply.description, supply.supplier, supply.notes])
+  ]).filter(Boolean).join(" ");
+
   await upsertSearchIndexEntry(prisma, {
     householdId: project.householdId,
     entityType: "project",
     entityId: project.id,
     title: project.name,
     subtitle: project.status,
-    body: project.description,
+    body: joinText(project.description, phaseText),
     entityUrl: `/projects/${project.id}?householdId=${project.householdId}`,
     entityMeta: {
       status: project.status

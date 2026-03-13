@@ -21,11 +21,20 @@ import {
   meResponseSchema,
   notificationSchema,
   projectAssetSchema,
+  projectBudgetCategoryListSchema,
+  projectBudgetCategorySchema,
   projectDetailSchema,
   projectExpenseSchema,
+  projectPhaseChecklistItemSchema,
+  projectPhaseDetailSchema,
+  projectPhaseListSchema,
+  projectPhaseSupplyListSchema,
+  projectPhaseSupplySchema,
   projectSchema,
+  reorderProjectPhasesSchema,
   projectSummarySchema,
   projectTaskSchema,
+  projectTaskChecklistItemSchema,
   searchResponseSchema,
   serviceProviderSchema,
   threadedCommentSchema,
@@ -40,9 +49,14 @@ import {
   type CreateConditionAssessmentInput,
   type CreateInvitationInput,
   type CreateProjectAssetInput,
+  type CreateProjectBudgetCategoryInput,
   type CreateProjectExpenseInput,
+  type CreateProjectPhaseChecklistItemInput,
+  type CreateProjectPhaseInput,
+  type CreateProjectPhaseSupplyInput,
   type CreateProjectInventoryItemInput,
   type CreateProjectInput,
+  type CreateProjectTaskChecklistItemInput,
   type CreateProjectTaskInput,
   type CreatePresetProfileInput,
   type CreateServiceProviderInput,
@@ -68,21 +82,33 @@ import {
   type MeResponse,
   type Notification,
   type ProjectAsset,
+  type ProjectBudgetCategory,
+  type ProjectBudgetCategorySummary,
   type Project,
   type ProjectDetail,
   type ProjectExpense,
+  type ProjectPhaseDetail,
+  type ProjectPhaseSupply,
+  type ProjectPhaseSummary,
   type SearchEntityType,
   type SearchResponse,
   type ProjectSummary,
   type ProjectTask,
+  type ProjectTaskChecklistItem,
   type ProjectStatus,
+  type ReorderProjectPhasesInput,
   type ServiceProvider,
   type ThreadedComment,
   type UpdateCommentInput,
+  type UpdateProjectBudgetCategoryInput,
   type UpdateAssetInput,
   type UpdateProjectExpenseInput,
   type UpdateProjectInventoryItemInput,
+  type UpdateProjectPhaseChecklistItemInput,
+  type UpdateProjectPhaseInput,
+  type UpdateProjectPhaseSupplyInput,
   type UpdateProjectInput,
+  type UpdateProjectTaskChecklistItemInput,
   type UpdateProjectTaskInput,
   type UpdateServiceProviderInput,
   type UpdateUsageMetricInput,
@@ -132,8 +158,15 @@ const householdInventoryListSchema = {
 };
 const householdLowStockListSchema = lowStockInventoryItemSchema.array();
 const maintenanceLogListSchema = maintenanceLogSchema.array();
+const projectBudgetCategorySummarySchema = projectBudgetCategoryListSchema.element;
+const projectBudgetCategorySummaryListSchema = projectBudgetCategoryListSchema;
 const projectInventoryListSchema = inventoryProjectLinkDetailSchema.array();
+const projectPhaseChecklistListSchema = projectPhaseChecklistItemSchema.array();
+const projectPhaseSummarySchema = projectPhaseListSchema.element;
+const projectPhaseSummaryListSchema = projectPhaseListSchema;
+const projectPhaseSupplySummaryListSchema = projectPhaseSupplyListSchema;
 const projectSummaryListSchema = projectSummarySchema.array();
+const projectTaskChecklistListSchema = projectTaskChecklistItemSchema.array();
 const serviceProviderListSchema = serviceProviderSchema.array();
 const usageMetricEntryListSchema = usageMetricEntrySchema.array();
 const projectInventoryAllocationSchema = {
@@ -146,6 +179,21 @@ const projectInventoryAllocationSchema = {
 
     return {
       projectInventoryItem: inventoryProjectLinkDetailSchema.parse(record.projectInventoryItem),
+      inventoryItem: inventoryItemSummarySchema.parse(record.inventoryItem),
+      transaction: inventoryTransactionSchema.parse(record.transaction)
+    };
+  }
+};
+const projectPhaseSupplyAllocationSchema = {
+  parse: (value: unknown) => {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Invalid phase supply allocation response.");
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return {
+      supply: projectPhaseSupplySchema.parse(record.supply),
       inventoryItem: inventoryItemSummarySchema.parse(record.inventoryItem),
       transaction: inventoryTransactionSchema.parse(record.transaction)
     };
@@ -422,6 +470,40 @@ export const getProjectDetail = async (householdId: string, projectId: string): 
   schema: projectDetailSchema
 });
 
+export const getProjectPhases = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectPhaseSummary[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases`,
+  schema: projectPhaseSummaryListSchema
+});
+
+export const getProjectPhaseDetail = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string
+): Promise<ProjectPhaseDetail> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}`,
+  schema: projectPhaseDetailSchema
+});
+
+export const getProjectBudgetCategories = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectBudgetCategorySummary[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/budget-categories`,
+  schema: projectBudgetCategorySummaryListSchema
+});
+
+export const getProjectPhaseSupplies = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string
+): Promise<ProjectPhaseSupply[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies`,
+  schema: projectPhaseSupplySummaryListSchema
+});
+
 export const getProjectInventory = async (
   householdId: string,
   projectId: string
@@ -598,6 +680,215 @@ export const deleteProject = async (householdId: string, projectId: string): Pro
     method: "DELETE"
   });
 };
+
+export const createProjectPhase = async (
+  householdId: string,
+  projectId: string,
+  input: CreateProjectPhaseInput
+): Promise<ProjectPhaseSummary> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases`,
+  method: "POST",
+  body: input,
+  schema: projectPhaseSummarySchema
+});
+
+export const updateProjectPhase = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  input: UpdateProjectPhaseInput
+): Promise<ProjectPhaseSummary> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectPhaseSummarySchema
+});
+
+export const deleteProjectPhase = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}`,
+    method: "DELETE"
+  });
+};
+
+export const reorderProjectPhases = async (
+  householdId: string,
+  projectId: string,
+  phaseIds: ReorderProjectPhasesInput["phaseIds"]
+): Promise<ReorderProjectPhasesInput> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/reorder`,
+  method: "PATCH",
+  body: { phaseIds },
+  schema: {
+    parse: (value: unknown) => reorderProjectPhasesSchema.parse(value)
+  }
+});
+
+export const createPhaseChecklistItem = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  input: CreateProjectPhaseChecklistItemInput
+): Promise<ReturnType<typeof projectPhaseChecklistItemSchema.parse>> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/checklist`,
+  method: "POST",
+  body: input,
+  schema: projectPhaseChecklistItemSchema
+});
+
+export const updatePhaseChecklistItem = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  checklistItemId: string,
+  input: UpdateProjectPhaseChecklistItemInput
+): Promise<ReturnType<typeof projectPhaseChecklistItemSchema.parse>> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/checklist/${checklistItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectPhaseChecklistItemSchema
+});
+
+export const deletePhaseChecklistItem = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  checklistItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/checklist/${checklistItemId}`,
+    method: "DELETE"
+  });
+};
+
+export const createTaskChecklistItem = async (
+  householdId: string,
+  projectId: string,
+  taskId: string,
+  input: CreateProjectTaskChecklistItemInput
+): Promise<ProjectTaskChecklistItem> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/tasks/${taskId}/checklist`,
+  method: "POST",
+  body: input,
+  schema: projectTaskChecklistItemSchema
+});
+
+export const updateTaskChecklistItem = async (
+  householdId: string,
+  projectId: string,
+  taskId: string,
+  checklistItemId: string,
+  input: UpdateProjectTaskChecklistItemInput
+): Promise<ProjectTaskChecklistItem> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/tasks/${taskId}/checklist/${checklistItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectTaskChecklistItemSchema
+});
+
+export const deleteTaskChecklistItem = async (
+  householdId: string,
+  projectId: string,
+  taskId: string,
+  checklistItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/tasks/${taskId}/checklist/${checklistItemId}`,
+    method: "DELETE"
+  });
+};
+
+export const createProjectBudgetCategory = async (
+  householdId: string,
+  projectId: string,
+  input: CreateProjectBudgetCategoryInput
+): Promise<ProjectBudgetCategorySummary> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/budget-categories`,
+  method: "POST",
+  body: input,
+  schema: projectBudgetCategorySummarySchema
+});
+
+export const updateProjectBudgetCategory = async (
+  householdId: string,
+  projectId: string,
+  categoryId: string,
+  input: UpdateProjectBudgetCategoryInput
+): Promise<ProjectBudgetCategorySummary> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/budget-categories/${categoryId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectBudgetCategorySummarySchema
+});
+
+export const deleteProjectBudgetCategory = async (
+  householdId: string,
+  projectId: string,
+  categoryId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/budget-categories/${categoryId}`,
+    method: "DELETE"
+  });
+};
+
+export const createProjectPhaseSupply = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  input: CreateProjectPhaseSupplyInput
+): Promise<ProjectPhaseSupply> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies`,
+  method: "POST",
+  body: input,
+  schema: projectPhaseSupplySchema
+});
+
+export const updateProjectPhaseSupply = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  supplyId: string,
+  input: UpdateProjectPhaseSupplyInput
+): Promise<ProjectPhaseSupply> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies/${supplyId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectPhaseSupplySchema
+});
+
+export const deleteProjectPhaseSupply = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  supplyId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies/${supplyId}`,
+    method: "DELETE"
+  });
+};
+
+export const allocateSupplyFromInventory = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  supplyId: string,
+  input: AllocateProjectInventoryInput
+): Promise<{
+  supply: ProjectPhaseSupply;
+  inventoryItem: InventoryItemSummary;
+  transaction: Awaited<ReturnType<typeof projectPhaseSupplyAllocationSchema.parse>>["transaction"];
+}> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies/${supplyId}/allocate-from-inventory`,
+  method: "POST",
+  body: input,
+  schema: projectPhaseSupplyAllocationSchema
+});
 
 export const updateProjectStatus = async (
   householdId: string,

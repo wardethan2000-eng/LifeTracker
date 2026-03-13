@@ -2,23 +2,28 @@ import Link from "next/link";
 import type { JSX } from "react";
 import {
   addProjectAssetAction,
-  allocateProjectInventoryItemAction,
-  createProjectInventoryItemAction,
+  createProjectPhaseAction,
   createProjectExpenseAction,
   createProjectTaskAction,
   deleteProjectAction,
   deleteProjectExpenseAction,
-  deleteProjectInventoryItemAction,
   deleteProjectTaskAction,
   removeProjectAssetAction,
   updateProjectAction,
   updateProjectExpenseAction,
-  updateProjectInventoryItemAction,
-  updateProjectStatusAction,
   updateProjectTaskAction
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
+import { ProjectBudgetBreakdown } from "../../../components/project-budget-breakdown";
+import { ProjectChecklist } from "../../../components/project-checklist";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
+import { ProjectPhaseCard } from "../../../components/project-phase-card";
+import { ProjectPhaseDetail } from "../../../components/project-phase-detail";
+import {
+  createTaskChecklistItemAction,
+  deleteTaskChecklistItemAction,
+  updateTaskChecklistItemAction
+} from "../../actions";
 import {
   ApiError,
   getHouseholdAssets,
@@ -27,7 +32,7 @@ import {
   getHouseholdServiceProviders,
   getMe,
   getProjectDetail,
-  getProjectInventory
+  getProjectPhaseDetail
 } from "../../../lib/api";
 import { formatCurrency, formatDate } from "../../../lib/formatters";
 
@@ -44,15 +49,13 @@ const projectStatusLabels: Record<string, string> = {
   cancelled: "Cancelled"
 };
 
-const taskStatusLabels: Record<string, string> = {
+const taskStatusOptions = ["pending", "in_progress", "completed", "skipped"] as const;
+const taskStatusLabels: Record<(typeof taskStatusOptions)[number], string> = {
   pending: "Pending",
   in_progress: "In Progress",
   completed: "Completed",
   skipped: "Skipped"
 };
-
-const taskStatusOptions = ["pending", "in_progress", "completed", "skipped"] as const;
-const projectStatusOptions = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
 
 const toDateInputValue = (value: string | null | undefined): string => value ? value.slice(0, 10) : "";
 
@@ -76,35 +79,53 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, householdAssets, householdMembers, householdInventory, serviceProviders, projectInventory] = await Promise.all([
+    const [project, householdAssets, householdMembers, householdInventory, serviceProviders] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getHouseholdAssets(household.id),
       getHouseholdMembers(household.id),
-      getHouseholdInventory(household.id, { limit: 200 }),
-      getHouseholdServiceProviders(household.id),
-      getProjectInventory(household.id, routeParams.projectId)
+      getHouseholdInventory(household.id, { limit: 100 }),
+      getHouseholdServiceProviders(household.id)
     ]);
 
+    const phaseDetails = await Promise.all(project.phases.map((phase) => getProjectPhaseDetail(household.id, project.id, phase.id)));
+    const phaseDetailsById = new Map(phaseDetails.map((phase) => [phase.id, phase]));
+    const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
+    const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));
+    const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
+    const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
+    const unphasedTasks = project.tasks.filter((task) => task.phaseId === null);
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const completedTaskCount = project.tasks.filter((task) => task.status === "completed").length;
+    const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
+    const phaseCount = project.phases.length;
     const percentComplete = project.tasks.length === 0 ? 0 : Math.round((completedTaskCount / project.tasks.length) * 100);
-    const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
-    const linkedInventoryIds = new Set(projectInventory.map((item) => item.inventoryItemId));
-    const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
-    const availableInventoryItems = householdInventory.items.filter((item) => !linkedInventoryIds.has(item.id));
-    const totalInventoryBudget = projectInventory.reduce(
-      (sum, item) => sum + ((item.budgetedUnitCost ?? 0) * item.quantityNeeded),
-      0
-    );
-    const totalInventoryAllocated = projectInventory.reduce((sum, item) => sum + item.quantityAllocated, 0);
-    const providerLookup = new Map(serviceProviders.map((provider) => [provider.id, provider]));
+    const activePhase = project.phases.find((phase) => phase.status === "in_progress");
+
+    const allSupplies = phaseDetails.flatMap((phase) => phase.supplies);
+    const totalSupplyLines = allSupplies.length;
+    const totalSuppliesProcured = allSupplies.filter((supply) => supply.isProcured).length;
+    const totalSuppliesStaged = allSupplies.filter((supply) => supply.isStaged).length;
+    const estimatedProcurementCost = allSupplies.reduce((sum, supply) => sum + ((supply.estimatedUnitCost ?? 0) * supply.quantityNeeded), 0);
+    const actualProcurementCost = allSupplies.reduce((sum, supply) => {
+      const basis = supply.isProcured ? Math.max(supply.quantityOnHand, supply.quantityNeeded) : supply.quantityOnHand;
+      return sum + ((supply.actualUnitCost ?? 0) * basis);
+    }, 0);
+    const remainingProcurementCost = allSupplies.reduce((sum, supply) => {
+      const quantityRemaining = Math.max(supply.quantityNeeded - supply.quantityOnHand, 0);
+      return sum + ((supply.estimatedUnitCost ?? 0) * quantityRemaining);
+    }, 0);
+    const inventoryLinkedSupplyCount = allSupplies.filter((supply) => supply.inventoryItemId !== null).length;
+    const inventoryCoveredSupplyCount = allSupplies.filter((supply) => (
+      supply.inventoryItemId !== null
+      && (householdInventory.items.find((item) => item.id === supply.inventoryItemId)?.quantityOnHand ?? 0) >= Math.max(supply.quantityNeeded - supply.quantityOnHand, 0)
+    )).length;
 
     return (
       <AppShell activePath="/projects">
         <header className="page-header">
           <div>
             <h1>{project.name}</h1>
-            <p style={{ marginTop: 6 }}>{project.description ?? "Manage project scope, ownership, linked assets, task progress, and costs from one place."}</p>
+            <p style={{ marginTop: 6 }}>{project.description ?? "Organize the work by phase, track structured budgets, and stage supplies before execution starts."}</p>
           </div>
           <div className="page-header__actions">
             <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">Back to Projects</Link>
@@ -121,17 +142,118 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             <div className="stat-card">
               <span className="stat-card__label">Task Progress</span>
               <strong className="stat-card__value">{percentComplete}%</strong>
-              <span className="stat-card__sub">{completedTaskCount} of {project.tasks.length} completed</span>
+              <span className="stat-card__sub">{completedTaskCount} of {project.tasks.length} tasks completed</span>
             </div>
             <div className="stat-card stat-card--warning">
-              <span className="stat-card__label">Budget</span>
-              <strong className="stat-card__value">{formatCurrency(project.budgetAmount, "Unbudgeted")}</strong>
-              <span className="stat-card__sub">Target end {formatDate(project.targetEndDate, "not set")}</span>
+              <span className="stat-card__label">Phases</span>
+              <strong className="stat-card__value">{completedPhaseCount} / {phaseCount}</strong>
+              <span className="stat-card__sub">{activePhase ? `Active: ${activePhase.name}` : "No active phase."}</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-card__label">Supplies</span>
+              <strong className="stat-card__value">{totalSuppliesProcured} / {totalSupplyLines}</strong>
+              <span className="stat-card__sub">{formatCurrency(remainingProcurementCost, "$0.00")} estimated remaining procurement cost</span>
             </div>
             <div className="stat-card stat-card--danger">
-              <span className="stat-card__label">Spent</span>
+              <span className="stat-card__label">Supplies Overview</span>
+              <strong className="stat-card__value">{formatCurrency(estimatedProcurementCost, "$0.00")}</strong>
+              <span className="stat-card__sub">{inventoryLinkedSupplyCount} linked to inventory, {inventoryCoveredSupplyCount} fully coverable from stock</span>
+            </div>
+          </section>
+
+          <section className="panel detail-tile">
+            <div className="panel__header">
+              <div>
+                <h2>Phase Timeline</h2>
+                <p className="data-table__secondary">Sequence the work, then expand a phase to manage its checklist, tasks, supplies, spend, and execution notes in one place.</p>
+              </div>
+            </div>
+            <div className="panel__body--padded">
+              <div className="project-portfolio-grid">
+                {project.phases.map((phase) => {
+                  const phaseDetail = phaseDetailsById.get(phase.id);
+
+                  if (!phaseDetail) {
+                    return null;
+                  }
+
+                  return (
+                    <details key={phase.id} className="project-phase-details" style={{ width: "100%" }}>
+                      <summary style={{ listStyle: "none", cursor: "pointer" }}>
+                        <ProjectPhaseCard phase={phase} />
+                      </summary>
+                      <ProjectPhaseDetail
+                        householdId={household.id}
+                        projectId={project.id}
+                        phase={phaseDetail}
+                        householdMembers={householdMembers}
+                        serviceProviders={serviceProviders}
+                        budgetCategories={project.budgetCategories}
+                        inventoryItems={householdInventory.items}
+                      />
+                    </details>
+                  );
+                })}
+              </div>
+              <div className="panel__body--padded" style={{ marginTop: 20, borderTop: "1px solid var(--border)" }}>
+                <form action={createProjectPhaseAction}>
+                  <input type="hidden" name="householdId" value={household.id} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <div className="form-grid">
+                    <label className="field field--full">
+                      <span>New Phase Name</span>
+                      <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
+                    </label>
+                    <label className="field field--full">
+                      <span>Description</span>
+                      <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
+                    </label>
+                    <label className="field">
+                      <span>Status</span>
+                      <select name="status" defaultValue="pending">
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="skipped">Skipped</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Budget Amount</span>
+                      <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                    </label>
+                    <label className="field">
+                      <span>Target End Date</span>
+                      <input name="targetEndDate" type="date" />
+                    </label>
+                  </div>
+                  <div className="inline-actions" style={{ marginTop: 16 }}>
+                    <button type="submit" className="button">Add Phase</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <section className="stats-row" style={{ marginTop: 8 }}>
+            <div className="stat-card">
+              <span className="stat-card__label">Supply Line Items</span>
+              <strong className="stat-card__value">{totalSupplyLines}</strong>
+              <span className="stat-card__sub">{totalSuppliesProcured} procured · {totalSuppliesStaged} staged</span>
+            </div>
+            <div className="stat-card stat-card--warning">
+              <span className="stat-card__label">Estimated Procurement</span>
+              <strong className="stat-card__value">{formatCurrency(estimatedProcurementCost, "$0.00")}</strong>
+              <span className="stat-card__sub">{formatCurrency(actualProcurementCost, "$0.00")} actual captured so far</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-card__label">Inventory-Linked Supplies</span>
+              <strong className="stat-card__value">{inventoryLinkedSupplyCount}</strong>
+              <span className="stat-card__sub">{inventoryCoveredSupplyCount} lines fully covered by household stock</span>
+            </div>
+            <div className="stat-card stat-card--danger">
+              <span className="stat-card__label">Spend</span>
               <strong className="stat-card__value">{formatCurrency(totalSpent, "$0.00")}</strong>
-              <span className="stat-card__sub">{project.expenses.length} tracked expenses</span>
+              <span className="stat-card__sub">{project.expenses.length} total expenses logged</span>
             </div>
           </section>
 
@@ -141,7 +263,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 <div className="panel__header">
                   <div>
                     <h2>Project Settings</h2>
-                    <p className="data-table__secondary">Use the same structured setup view as project creation, including optional template re-application.</p>
+                    <p className="data-table__secondary">Update the core project scope, timing, and execution notes without leaving the workbench.</p>
                   </div>
                 </div>
                 <div className="panel__body--padded">
@@ -150,6 +272,11 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     <div className="inline-actions" style={{ marginTop: 20 }}>
                       <button type="submit" className="button">Save Project</button>
                     </div>
+                  </form>
+                  <form action={deleteProjectAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <button type="submit" className="button button--danger">Delete Project</button>
                   </form>
                 </div>
               </section>
@@ -163,529 +290,252 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     <input type="hidden" name="householdId" value={household.id} />
                     <input type="hidden" name="projectId" value={project.id} />
                     <div className="form-grid">
-                      <div className="field">
-                        <label htmlFor="new-project-asset">Asset</label>
-                        <select id="new-project-asset" name="assetId" required defaultValue="">
+                      <label className="field field--full">
+                        <span>Asset</span>
+                        <select name="assetId" required defaultValue="">
                           <option value="" disabled>Select an asset</option>
                           {availableAssets.map((asset) => (
                             <option key={asset.id} value={asset.id}>{asset.name} · {asset.category}</option>
                           ))}
                         </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-project-asset-role">Role</label>
-                        <input id="new-project-asset-role" name="role" placeholder="Primary asset, affected system, workspace" />
-                      </div>
-                      <div className="field field--full">
-                        <label htmlFor="new-project-asset-notes">Notes</label>
-                        <textarea id="new-project-asset-notes" name="notes" rows={2} placeholder="Why this asset is part of the project" />
-                      </div>
+                      </label>
+                      <label className="field">
+                        <span>Role</span>
+                        <input name="role" placeholder="Primary asset, affected system, workspace" />
+                      </label>
+                      <label className="field field--full">
+                        <span>Notes</span>
+                        <textarea name="notes" rows={2} placeholder="Why this asset is part of the project" />
+                      </label>
                     </div>
-                    <div className="inline-actions" style={{ marginTop: 20 }}>
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
                       <button type="submit" className="button" disabled={availableAssets.length === 0}>Link Asset</button>
                     </div>
                   </form>
                 </div>
                 <div className="panel__body">
-                  {project.assets.length === 0 ? (
-                    <p className="panel__empty">No assets are linked to this project.</p>
-                  ) : (
-                    <div className="schedule-stack">
-                      {project.assets.map((asset) => (
-                        <div key={asset.id} className="schedule-card">
-                          <div className="schedule-card__summary">
-                            <div>
-                              <div className="data-table__primary">
-                                {asset.asset ? <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link> : "Unknown asset"}
-                              </div>
-                              <div className="data-table__secondary">{asset.asset?.category ?? "Unknown"} · {asset.role ?? "No role set"}</div>
-                              {asset.notes ? <div className="data-table__secondary">{asset.notes}</div> : null}
+                  {project.assets.length === 0 ? <p className="panel__empty">No assets are linked to this project.</p> : null}
+                  <div className="schedule-stack">
+                    {project.assets.map((asset) => (
+                      <div key={asset.id} className="schedule-card">
+                        <div className="schedule-card__summary">
+                          <div>
+                            <div className="data-table__primary">
+                              {asset.asset ? <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link> : "Unknown asset"}
                             </div>
-                            <form action={removeProjectAssetAction}>
-                              <input type="hidden" name="householdId" value={household.id} />
-                              <input type="hidden" name="projectId" value={project.id} />
-                              <input type="hidden" name="projectAssetId" value={asset.id} />
-                              <button type="submit" className="button button--ghost">Remove</button>
-                            </form>
+                            <div className="data-table__secondary">{asset.asset?.category ?? "Unknown"} · {asset.role ?? "No role set"}</div>
+                            {asset.notes ? <div className="data-table__secondary">{asset.notes}</div> : null}
                           </div>
+                          <form action={removeProjectAssetAction}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="projectAssetId" value={asset.id} />
+                            <button type="submit" className="button button--ghost">Remove</button>
+                          </form>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </section>
 
               <section className="panel detail-tile">
                 <div className="panel__header">
                   <div>
-                    <h2>Project Inventory ({projectInventory.length})</h2>
-                    <p className="data-table__secondary">Plan required parts, reserve stock, and track budgeted material spend.</p>
+                    <h2>Unphased Tasks ({unphasedTasks.length})</h2>
+                    <p className="data-table__secondary">Tasks not assigned to any phase stay here until you drag them into a stage of work.</p>
                   </div>
-                </div>
-                <div className="panel__body--padded">
-                  <div className="stats-row" style={{ marginBottom: 20 }}>
-                    <div className="stat-card">
-                      <span className="stat-card__label">Material Budget</span>
-                      <strong className="stat-card__value">{formatCurrency(totalInventoryBudget, "$0.00")}</strong>
-                      <span className="stat-card__sub">Budgeted unit cost x required quantity</span>
-                    </div>
-                    <div className="stat-card stat-card--warning">
-                      <span className="stat-card__label">Units Allocated</span>
-                      <strong className="stat-card__value">{totalInventoryAllocated}</strong>
-                      <span className="stat-card__sub">Reserved from household stock</span>
-                    </div>
-                  </div>
-
-                  <form action={createProjectInventoryItemAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <div className="field field--full">
-                        <label htmlFor="new-project-inventory-item">Inventory Item</label>
-                        <select id="new-project-inventory-item" name="inventoryItemId" required defaultValue="">
-                          <option value="" disabled>Select an inventory item</option>
-                          {availableInventoryItems.map((item) => (
-                            <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit} on hand</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-project-inventory-needed">Quantity Needed</label>
-                        <input id="new-project-inventory-needed" name="quantityNeeded" type="number" min="0.01" step="0.01" placeholder="1" required />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-project-inventory-budget">Budgeted Unit Cost</label>
-                        <input id="new-project-inventory-budget" name="budgetedUnitCost" type="number" min="0" step="0.01" placeholder="0.00" />
-                      </div>
-                      <div className="field field--full">
-                        <label htmlFor="new-project-inventory-notes">Notes</label>
-                        <textarea id="new-project-inventory-notes" name="notes" rows={2} placeholder="Part choice, source, staging notes" />
-                      </div>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 20 }}>
-                      <button type="submit" className="button" disabled={availableInventoryItems.length === 0}>Add Inventory Item</button>
-                      {availableInventoryItems.length === 0 ? (
-                        <Link href={`/inventory?householdId=${household.id}`} className="button button--ghost">Review Inventory</Link>
-                      ) : null}
-                    </div>
-                  </form>
-                </div>
-                <div className="panel__body">
-                  {projectInventory.length === 0 ? (
-                    <p className="panel__empty">No inventory requirements are linked to this project yet.</p>
-                  ) : (
-                    <div className="schedule-stack">
-                      {projectInventory.map((item) => (
-                        <div key={item.inventoryItemId} className="schedule-card">
-                          <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
-                            <div>
-                              <div className="data-table__primary">{item.inventoryItem.name}</div>
-                              <div className="data-table__secondary">
-                                {item.quantityNeeded} {item.inventoryItem.unit} needed · {item.quantityAllocated} allocated · {item.quantityRemaining} remaining
-                              </div>
-                              <div className="data-table__secondary">
-                                {item.inventoryItem.quantityOnHand} {item.inventoryItem.unit} on hand · {formatCurrency(item.inventoryItem.unitCost, "No unit cost")}
-                              </div>
-                            </div>
-                            <span className="pill">{formatCurrency(item.budgetedUnitCost, "Unbudgeted")}</span>
-                          </div>
-
-                          <form action={updateProjectInventoryItemAction}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="inventoryItemId" value={item.inventoryItemId} />
-                            <div className="form-grid">
-                              <div className="field">
-                                <label htmlFor={`project-inventory-needed-${item.inventoryItemId}`}>Quantity Needed</label>
-                                <input
-                                  id={`project-inventory-needed-${item.inventoryItemId}`}
-                                  name="quantityNeeded"
-                                  type="number"
-                                  min="0.01"
-                                  step="0.01"
-                                  defaultValue={item.quantityNeeded}
-                                  required
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`project-inventory-budget-${item.inventoryItemId}`}>Budgeted Unit Cost</label>
-                                <input
-                                  id={`project-inventory-budget-${item.inventoryItemId}`}
-                                  name="budgetedUnitCost"
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  defaultValue={item.budgetedUnitCost ?? ""}
-                                />
-                              </div>
-                              <div className="field field--full">
-                                <label htmlFor={`project-inventory-notes-${item.inventoryItemId}`}>Notes</label>
-                                <textarea
-                                  id={`project-inventory-notes-${item.inventoryItemId}`}
-                                  name="notes"
-                                  rows={2}
-                                  defaultValue={item.notes ?? ""}
-                                />
-                              </div>
-                            </div>
-                            <div className="inline-actions" style={{ marginTop: 16 }}>
-                              <button type="submit" className="button button--ghost">Save Inventory Plan</button>
-                            </div>
-                          </form>
-
-                          <form action={allocateProjectInventoryItemAction} style={{ marginTop: 16 }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="inventoryItemId" value={item.inventoryItemId} />
-                            <div className="form-grid">
-                              <div className="field">
-                                <label htmlFor={`project-inventory-allocate-${item.inventoryItemId}`}>Allocate Quantity</label>
-                                <input
-                                  id={`project-inventory-allocate-${item.inventoryItemId}`}
-                                  name="quantity"
-                                  type="number"
-                                  min="0.01"
-                                  step="0.01"
-                                  max={Math.min(item.quantityRemaining, item.inventoryItem.quantityOnHand)}
-                                  placeholder="0"
-                                  required
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`project-inventory-unit-cost-${item.inventoryItemId}`}>Actual Unit Cost</label>
-                                <input
-                                  id={`project-inventory-unit-cost-${item.inventoryItemId}`}
-                                  name="unitCost"
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder="Optional"
-                                />
-                              </div>
-                              <div className="field field--full">
-                                <label htmlFor={`project-inventory-allocation-notes-${item.inventoryItemId}`}>Allocation Notes</label>
-                                <textarea
-                                  id={`project-inventory-allocation-notes-${item.inventoryItemId}`}
-                                  name="notes"
-                                  rows={2}
-                                  placeholder="Reserved for install, consumed during prep, etc."
-                                />
-                              </div>
-                            </div>
-                            <div className="inline-actions" style={{ marginTop: 16 }}>
-                              <button
-                                type="submit"
-                                className="button"
-                                disabled={item.quantityRemaining <= 0 || item.inventoryItem.quantityOnHand <= 0}
-                              >
-                                Allocate From Stock
-                              </button>
-                            </div>
-                          </form>
-
-                          <form action={deleteProjectInventoryItemAction} className="inline-actions inline-actions--end" style={{ marginTop: 16 }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="inventoryItemId" value={item.inventoryItemId} />
-                            <button type="submit" className="button button--danger">Remove Inventory Item</button>
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <h2>Add Task</h2>
                 </div>
                 <div className="panel__body--padded">
                   <form action={createProjectTaskAction}>
                     <input type="hidden" name="householdId" value={household.id} />
                     <input type="hidden" name="projectId" value={project.id} />
                     <div className="form-grid">
-                      <div className="field field--full">
-                        <label htmlFor="new-task-title">Task Title</label>
-                        <input id="new-task-title" name="title" placeholder="Order parts, prep site, review contractor bid" required />
-                      </div>
-                      <div className="field field--full">
-                        <label htmlFor="new-task-description">Description</label>
-                        <textarea id="new-task-description" name="description" rows={2} placeholder="What needs to happen for this task to be done" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-task-status">Status</label>
-                        <select id="new-task-status" name="status" defaultValue="pending">
+                      <label className="field field--full">
+                        <span>Task Title</span>
+                        <input name="title" placeholder="General task not assigned to a phase yet" required />
+                      </label>
+                      <label className="field field--full">
+                        <span>Description</span>
+                        <textarea name="description" rows={2} placeholder="Why this is still unphased, or what needs to be decided before slotting it into the timeline." />
+                      </label>
+                      <label className="field">
+                        <span>Status</span>
+                        <select name="status" defaultValue="pending">
                           {taskStatusOptions.map((status) => (
-                            <option key={status} value={status}>{taskStatusLabels[status] ?? status}</option>
+                            <option key={status} value={status}>{taskStatusLabels[status]}</option>
                           ))}
                         </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-task-assignee">Assignee</label>
-                        <select id="new-task-assignee" name="assignedToId" defaultValue="">
+                      </label>
+                      <label className="field">
+                        <span>Assignee</span>
+                        <select name="assignedToId" defaultValue="">
                           <option value="">Unassigned</option>
                           {householdMembers.map((member) => (
                             <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
                           ))}
                         </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-task-due-date">Due Date</label>
-                        <input id="new-task-due-date" name="dueDate" type="date" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-task-sort-order">Sort Order</label>
-                        <input id="new-task-sort-order" name="sortOrder" type="number" step="1" placeholder="0" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-task-estimated-cost">Estimated Cost</label>
-                        <input id="new-task-estimated-cost" name="estimatedCost" type="number" min="0" step="0.01" placeholder="0.00" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-task-actual-cost">Actual Cost</label>
-                        <input id="new-task-actual-cost" name="actualCost" type="number" min="0" step="0.01" placeholder="0.00" />
-                      </div>
+                      </label>
                     </div>
-                    <div className="inline-actions" style={{ marginTop: 20 }}>
-                      <button type="submit" className="button">Add Task</button>
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
+                      <button type="submit" className="button">Add Unphased Task</button>
                     </div>
                   </form>
                 </div>
+                <div className="panel__body">
+                  {unphasedTasks.length === 0 ? <p className="panel__empty">Every task is currently assigned to a phase.</p> : null}
+                  <div className="schedule-stack">
+                    {unphasedTasks.map((task) => (
+                      <UnphasedTaskCard
+                        key={task.id}
+                        householdId={household.id}
+                        projectId={project.id}
+                        task={task}
+                        householdMembers={householdMembers}
+                      />
+                    ))}
+                  </div>
+                </div>
               </section>
 
               <section className="panel detail-tile">
                 <div className="panel__header">
-                  <h2>Tasks ({project.tasks.length})</h2>
+                  <div>
+                    <h2>All Expenses ({project.expenses.length})</h2>
+                    <p className="data-table__secondary">See the full spend stream with phase and budget category context preserved on each row.</p>
+                  </div>
                 </div>
                 <div className="panel__body">
-                  {project.tasks.length === 0 ? (
-                    <p className="panel__empty">No tasks are attached to this project yet.</p>
-                  ) : (
-                    <div className="schedule-stack">
-                      {project.tasks.map((task) => (
-                        <div key={task.id} className="schedule-card">
-                          <form action={updateProjectTaskAction}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="taskId" value={task.id} />
-                            <div className="form-grid">
-                              <div className="field field--full">
-                                <label htmlFor={`task-title-${task.id}`}>Task Title</label>
-                                <input id={`task-title-${task.id}`} name="title" defaultValue={task.title} required />
-                              </div>
-                              <div className="field field--full">
-                                <label htmlFor={`task-description-${task.id}`}>Description</label>
-                                <textarea id={`task-description-${task.id}`} name="description" rows={2} defaultValue={task.description ?? ""} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`task-status-${task.id}`}>Status</label>
-                                <select id={`task-status-${task.id}`} name="status" defaultValue={task.status}>
-                                  {taskStatusOptions.map((status) => (
-                                    <option key={status} value={status}>{taskStatusLabels[status] ?? status}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`task-assignee-${task.id}`}>Assignee</label>
-                                <select id={`task-assignee-${task.id}`} name="assignedToId" defaultValue={task.assignedToId ?? ""}>
-                                  <option value="">Unassigned</option>
-                                  {householdMembers.map((member) => (
-                                    <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`task-due-date-${task.id}`}>Due Date</label>
-                                <input id={`task-due-date-${task.id}`} name="dueDate" type="date" defaultValue={toDateInputValue(task.dueDate)} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`task-sort-order-${task.id}`}>Sort Order</label>
-                                <input id={`task-sort-order-${task.id}`} name="sortOrder" type="number" step="1" defaultValue={task.sortOrder ?? ""} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`task-estimated-cost-${task.id}`}>Estimated Cost</label>
-                                <input id={`task-estimated-cost-${task.id}`} name="estimatedCost" type="number" min="0" step="0.01" defaultValue={task.estimatedCost ?? ""} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`task-actual-cost-${task.id}`}>Actual Cost</label>
-                                <input id={`task-actual-cost-${task.id}`} name="actualCost" type="number" min="0" step="0.01" defaultValue={task.actualCost ?? ""} />
+                  {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
+                  <div className="schedule-stack">
+                    {project.expenses.map((expense) => (
+                      <div key={expense.id} className="schedule-card">
+                        <form action={updateProjectExpenseAction}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="expenseId" value={expense.id} />
+                          <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
+                            <div>
+                              <div className="data-table__primary">{expense.description}</div>
+                              <div className="data-table__secondary">
+                                Phase: {expense.phaseId ? (phaseNameLookup.get(expense.phaseId) ?? "Unknown phase") : "Unphased"}
+                                {" · "}
+                                Budget category: {expense.budgetCategoryId ? (budgetCategoryLookup.get(expense.budgetCategoryId) ?? "Unknown category") : "Uncategorized"}
                               </div>
                             </div>
-                            <div className="inline-actions" style={{ marginTop: 16 }}>
-                              <button type="submit" className="button button--ghost">Save Task</button>
-                            </div>
-                          </form>
-                          <div className="inline-actions">
-                            <span className="pill">{taskStatusLabels[task.status] ?? task.status}</span>
-                            <span className="data-table__secondary">Due {formatDate(task.dueDate, "not set")}</span>
-                            <span className="data-table__secondary">Assignee {task.assignee?.displayName ?? "Unassigned"}</span>
-                            {task.scheduleId ? <span className="data-table__secondary">Linked schedule {task.scheduleId}</span> : null}
-                          </div>
-                          <form action={deleteProjectTaskAction} className="inline-actions inline-actions--end">
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="taskId" value={task.id} />
-                            <button type="submit" className="button button--danger">Delete Task</button>
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <h2>Add Expense</h2>
-                </div>
-                <div className="panel__body--padded">
-                  <form action={createProjectExpenseAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <div className="field field--full">
-                        <label htmlFor="new-expense-description">Description</label>
-                        <input id="new-expense-description" name="description" placeholder="Materials, contractor invoice, rental, permit" required />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-expense-amount">Amount</label>
-                        <input id="new-expense-amount" name="amount" type="number" min="0" step="0.01" placeholder="0.00" required />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-expense-category">Category</label>
-                        <input id="new-expense-category" name="category" placeholder="Materials, labor, permit" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-expense-date">Date</label>
-                        <input id="new-expense-date" name="date" type="date" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-expense-task">Related Task</label>
-                        <select id="new-expense-task" name="taskId" defaultValue="">
-                          <option value="">Not tied to a task</option>
-                          {project.tasks.map((task) => (
-                            <option key={task.id} value={task.id}>{task.title}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="new-expense-provider">Service Provider</label>
-                        <select id="new-expense-provider" name="serviceProviderId" defaultValue="">
-                          <option value="">No provider</option>
-                          {serviceProviders.map((provider) => (
-                            <option key={provider.id} value={provider.id}>{provider.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field field--full">
-                        <label htmlFor="new-expense-notes">Notes</label>
-                        <textarea id="new-expense-notes" name="notes" rows={2} placeholder="Receipt details, reimbursement notes, vendor context" />
-                      </div>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 20 }}>
-                      <button type="submit" className="button">Add Expense</button>
-                      <Link href={`/service-providers?householdId=${household.id}`} className="button button--ghost">Manage Providers</Link>
-                    </div>
-                  </form>
-                </div>
-              </section>
-
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <h2>Expenses ({project.expenses.length})</h2>
-                </div>
-                <div className="panel__body">
-                  {project.expenses.length === 0 ? (
-                    <p className="panel__empty">No expenses recorded yet.</p>
-                  ) : (
-                    <div className="schedule-stack">
-                      {project.expenses.map((expense) => (
-                        <div key={expense.id} className="schedule-card">
-                          <form action={updateProjectExpenseAction}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="expenseId" value={expense.id} />
-                            <div className="form-grid">
-                              <div className="field field--full">
-                                <label htmlFor={`expense-description-${expense.id}`}>Description</label>
-                                <input id={`expense-description-${expense.id}`} name="description" defaultValue={expense.description} required />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`expense-amount-${expense.id}`}>Amount</label>
-                                <input id={`expense-amount-${expense.id}`} name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`expense-category-${expense.id}`}>Category</label>
-                                <input id={`expense-category-${expense.id}`} name="category" defaultValue={expense.category ?? ""} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`expense-date-${expense.id}`}>Date</label>
-                                <input id={`expense-date-${expense.id}`} name="date" type="date" defaultValue={toDateInputValue(expense.date)} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`expense-task-${expense.id}`}>Related Task</label>
-                                <select id={`expense-task-${expense.id}`} name="taskId" defaultValue={expense.taskId ?? ""}>
-                                  <option value="">Not tied to a task</option>
-                                  {project.tasks.map((task) => (
-                                    <option key={task.id} value={task.id}>{task.title}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`expense-provider-${expense.id}`}>Service Provider</label>
-                                <select id={`expense-provider-${expense.id}`} name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
-                                  <option value="">No provider</option>
-                                  {serviceProviders.map((provider) => (
-                                    <option key={provider.id} value={provider.id}>{provider.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="field field--full">
-                                <label htmlFor={`expense-notes-${expense.id}`}>Notes</label>
-                                <textarea id={`expense-notes-${expense.id}`} name="notes" rows={2} defaultValue={expense.notes ?? ""} />
-                              </div>
-                            </div>
-                            <div className="inline-actions" style={{ marginTop: 16 }}>
-                              <button type="submit" className="button button--ghost">Save Expense</button>
-                            </div>
-                          </form>
-                          <div className="inline-actions">
                             <span className="pill">{formatCurrency(expense.amount, "$0.00")}</span>
-                            <span className="data-table__secondary">{expense.category ?? "Uncategorized"}</span>
-                            <span className="data-table__secondary">{formatDate(expense.date, "No date")}</span>
-                            {expense.serviceProviderId ? (
-                              <span className="data-table__secondary">
-                                Provider {providerLookup.get(expense.serviceProviderId)?.name ?? expense.serviceProviderId}
-                              </span>
-                            ) : null}
                           </div>
-                          <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end">
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="expenseId" value={expense.id} />
-                            <button type="submit" className="button button--danger">Delete Expense</button>
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                          <div className="form-grid">
+                            <label className="field field--full">
+                              <span>Description</span>
+                              <input name="description" defaultValue={expense.description} required />
+                            </label>
+                            <label className="field">
+                              <span>Amount</span>
+                              <input name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required />
+                            </label>
+                            <label className="field">
+                              <span>Freeform Category</span>
+                              <input name="category" defaultValue={expense.category ?? ""} />
+                            </label>
+                            <label className="field">
+                              <span>Phase</span>
+                              <select name="phaseId" defaultValue={expense.phaseId ?? ""}>
+                                <option value="">Unphased</option>
+                                {project.phases.map((phase) => (
+                                  <option key={phase.id} value={phase.id}>{phase.name}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="field">
+                              <span>Budget Category</span>
+                              <select name="budgetCategoryId" defaultValue={expense.budgetCategoryId ?? ""}>
+                                <option value="">None</option>
+                                {project.budgetCategories.map((category) => (
+                                  <option key={category.id} value={category.id}>{category.name}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="field">
+                              <span>Service Provider</span>
+                              <select name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
+                                <option value="">None</option>
+                                {serviceProviders.map((provider) => (
+                                  <option key={provider.id} value={provider.id}>{provider.name}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="field">
+                              <span>Date</span>
+                              <input name="date" type="date" defaultValue={toDateInputValue(expense.date)} />
+                            </label>
+                            <label className="field field--full">
+                              <span>Notes</span>
+                              <textarea name="notes" rows={2} defaultValue={expense.notes ?? ""} />
+                            </label>
+                          </div>
+                          <div className="inline-actions" style={{ marginTop: 16 }}>
+                            <button type="submit" className="button button--ghost">Save Expense</button>
+                          </div>
+                        </form>
+                        <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="expenseId" value={expense.id} />
+                          <button type="submit" className="button button--danger">Delete Expense</button>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="panel__body--padded">
+                    <form action={createProjectExpenseAction}>
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <div className="form-grid">
+                        <label className="field field--full">
+                          <span>Description</span>
+                          <input name="description" placeholder="Project-wide expense" required />
+                        </label>
+                        <label className="field">
+                          <span>Amount</span>
+                          <input name="amount" type="number" min="0" step="0.01" required />
+                        </label>
+                        <label className="field">
+                          <span>Phase</span>
+                          <select name="phaseId" defaultValue="">
+                            <option value="">Unphased</option>
+                            {project.phases.map((phase) => (
+                              <option key={phase.id} value={phase.id}>{phase.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Budget Category</span>
+                          <select name="budgetCategoryId" defaultValue="">
+                            <option value="">None</option>
+                            {project.budgetCategories.map((category) => (
+                              <option key={category.id} value={category.id}>{category.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="inline-actions" style={{ marginTop: 16 }}>
+                        <button type="submit" className="button">Add Expense</button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               </section>
 
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <h2>Danger Zone</h2>
-                </div>
-                <div className="panel__body--padded">
-                  <p>This permanently deletes the project and its nested links, tasks, and expenses.</p>
-                  <form action={deleteProjectAction} className="inline-actions" style={{ marginTop: 16 }}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <button type="submit" className="button button--danger">Delete Project</button>
-                  </form>
-                </div>
-              </section>
+              <ProjectBudgetBreakdown
+                householdId={household.id}
+                projectId={project.id}
+                projectBudgetAmount={project.budgetAmount}
+                categories={project.budgetCategories}
+                expenses={project.expenses}
+                phaseDetails={phaseDetails}
+              />
             </div>
           </div>
         </div>
@@ -699,7 +549,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           <div className="page-body">
             <div className="panel">
               <div className="panel__body--padded">
-                <p>Failed to load project: {error.message}</p>
+                <p>Failed to load project detail page: {error.message}</p>
               </div>
             </div>
           </div>
@@ -709,4 +559,87 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
     throw error;
   }
+}
+
+function UnphasedTaskCard({
+  householdId,
+  projectId,
+  task,
+  householdMembers
+}: {
+  householdId: string;
+  projectId: string;
+  task: Awaited<ReturnType<typeof getProjectDetail>>["tasks"][number];
+  householdMembers: Awaited<ReturnType<typeof getHouseholdMembers>>;
+}) {
+  return (
+    <div className="schedule-card">
+      <form action={updateProjectTaskAction}>
+        <input type="hidden" name="householdId" value={householdId} />
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="taskId" value={task.id} />
+        <div className="form-grid">
+          <label className="field field--full">
+            <span>Task Title</span>
+            <input name="title" defaultValue={task.title} required />
+          </label>
+          <label className="field field--full">
+            <span>Description</span>
+            <textarea name="description" rows={2} defaultValue={task.description ?? ""} />
+          </label>
+          <label className="field">
+            <span>Status</span>
+            <select name="status" defaultValue={task.status}>
+              {taskStatusOptions.map((status) => (
+                <option key={status} value={status}>{taskStatusLabels[status]}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Assignee</span>
+            <select name="assignedToId" defaultValue={task.assignedToId ?? ""}>
+              <option value="">Unassigned</option>
+              {householdMembers.map((member) => (
+                <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Due Date</span>
+            <input name="dueDate" type="date" defaultValue={toDateInputValue(task.dueDate)} />
+          </label>
+          <label className="field">
+            <span>Sort Order</span>
+            <input name="sortOrder" type="number" step="1" defaultValue={task.sortOrder ?? ""} />
+          </label>
+        </div>
+        <div className="inline-actions" style={{ marginTop: 16 }}>
+          <button type="submit" className="button button--ghost">Save Task</button>
+        </div>
+      </form>
+
+      <div style={{ marginTop: 16 }}>
+        <div className="data-table__secondary" style={{ marginBottom: 12 }}>Task checklist</div>
+        <ProjectChecklist
+          items={task.checklistItems}
+          householdId={householdId}
+          projectId={projectId}
+          parentFieldName="taskId"
+          parentId={task.id}
+          addAction={createTaskChecklistItemAction}
+          toggleAction={updateTaskChecklistItemAction}
+          deleteAction={deleteTaskChecklistItemAction}
+          addPlaceholder="Add step to this task"
+          emptyMessage="No sub-steps yet. Break this task into a quick install or verification checklist if needed."
+        />
+      </div>
+
+      <form action={deleteProjectTaskAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+        <input type="hidden" name="householdId" value={householdId} />
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="taskId" value={task.id} />
+        <button type="submit" className="button button--danger">Delete Task</button>
+      </form>
+    </div>
+  );
 }

@@ -10,6 +10,7 @@ const householdId = "clkeeperhouse000000000001";
 const assetId = "clkeeperasset0000000000001";
 const personalAssetId = "clkeeperasset0000000000002";
 const childAssetId = "clkeeperasset0000000000003";
+const homeAssetId = "clkeeperasset0000000000004";
 const usageMetricId = "clkeepermetric000000000001";
 const maintenanceScheduleId = "clkeeperschedule000000001";
 const overdueScheduleId = "clkeeperschedule000000002";
@@ -17,6 +18,7 @@ const maintenanceLogId = "clkeeperlog00000000000001";
 const maintenanceLogFollowUpId = "clkeeperlog00000000000002";
 const presetProfileId = "clkeeperpreset000000000001";
 const serviceProviderId = "clkeeperprovider0000000001";
+const renovationProviderId = "clkeeperprovider0000000002";
 const projectId = "clkeeperproject0000000001";
 const invitationId = "clkeeperinvite00000000001";
 const acceptedInvitationId = "clkeeperinvite00000000002";
@@ -25,6 +27,17 @@ const inventoryItemOilId = "clkeeperinventory000000002";
 const inventoryItemCabinFilterId = "clkeeperinventory000000003";
 const inventoryItemWheelWeightId = "clkeeperinventory000000004";
 const inventoryItemShopTowelId = "clkeeperinventory000000005";
+const inventoryItemRosinPaperId = "clkeeperinventory000000006";
+const inventoryItemPainterTapeId = "clkeeperinventory000000007";
+const phasePlanningId = "clkeeperphase000000000001";
+const phaseDemolitionId = "clkeeperphase000000000002";
+const phaseInstallationId = "clkeeperphase000000000003";
+const budgetDesignId = "clkeeperbudget00000000001";
+const budgetCabinetryId = "clkeeperbudget00000000002";
+const budgetElectricalId = "clkeeperbudget00000000003";
+const supplyProtectionId = "clkeepersupply00000000001";
+const supplyCabinetHardwareId = "clkeepersupply00000000002";
+const supplyPendantLightsId = "clkeepersupply00000000003";
 
 async function main(): Promise<void> {
   await prisma.user.upsert({
@@ -238,6 +251,53 @@ async function main(): Promise<void> {
       model: "AGM-48",
       customFields: {
         coldCrankingAmps: 760
+      }
+    }
+  });
+
+  await prisma.asset.upsert({
+    where: { id: homeAssetId },
+    update: {
+      assetTag: "LK-00000004",
+      householdId,
+      createdById: ownerUserId,
+      ownerId: ownerUserId,
+      name: "Main Floor Kitchen",
+      category: "home",
+      visibility: "shared",
+      description: "Seeded shared home asset used for project planning and phased renovation demos",
+      manufacturer: "Builder Grade",
+      model: "2012 Layout",
+      locationDetails: {
+        zone: "Main floor",
+        room: "Kitchen",
+        notes: "Open-concept kitchen with peninsula and pantry wall"
+      },
+      customFields: {
+        squareFeet: 210,
+        currentPainPoints: ["poor lighting", "worn laminate counters", "limited drawer storage"]
+      }
+    },
+    create: {
+      id: homeAssetId,
+      assetTag: "LK-00000004",
+      householdId,
+      createdById: ownerUserId,
+      ownerId: ownerUserId,
+      name: "Main Floor Kitchen",
+      category: "home",
+      visibility: "shared",
+      description: "Seeded shared home asset used for project planning and phased renovation demos",
+      manufacturer: "Builder Grade",
+      model: "2012 Layout",
+      locationDetails: {
+        zone: "Main floor",
+        room: "Kitchen",
+        notes: "Open-concept kitchen with peninsula and pantry wall"
+      },
+      customFields: {
+        squareFeet: 210,
+        currentPainPoints: ["poor lighting", "worn laminate counters", "limited drawer storage"]
       }
     }
   });
@@ -567,6 +627,26 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.serviceProvider.upsert({
+    where: { id: renovationProviderId },
+    update: {
+      name: "Northline Home Studio",
+      specialty: "kitchen renovation",
+      phone: "555-0144",
+      rating: 5
+    },
+    create: {
+      id: renovationProviderId,
+      householdId,
+      name: "Northline Home Studio",
+      specialty: "kitchen renovation",
+      phone: "555-0144",
+      email: "hello@northline.example",
+      rating: 5,
+      notes: "Handles cabinet design, electrical coordination, and final punch review"
+    }
+  });
+
   await prisma.maintenanceLog.updateMany({
     where: { id: { in: [maintenanceLogId, maintenanceLogFollowUpId] } },
     data: { serviceProviderId }
@@ -653,6 +733,38 @@ async function main(): Promise<void> {
       unitCost: 4.25,
       storageLocation: "Workshop wall rack",
       notes: "Standalone household supply"
+    },
+    {
+      id: inventoryItemRosinPaperId,
+      name: "Rosin Paper Floor Protection",
+      partNumber: "RP-36IN",
+      category: "renovation-protection",
+      manufacturer: "Trimaco",
+      quantityOnHand: 2,
+      unit: "rolls",
+      reorderThreshold: 1,
+      reorderQuantity: 2,
+      preferredSupplier: "Home Depot",
+      supplierUrl: "https://example.com/rosin-paper",
+      unitCost: 18.5,
+      storageLocation: "Basement project rack",
+      notes: "Used to protect hardwood floors during kitchen demolition and install"
+    },
+    {
+      id: inventoryItemPainterTapeId,
+      name: "Painter's Tape Multipack",
+      partNumber: "PT-3PK",
+      category: "renovation-consumables",
+      manufacturer: "3M",
+      quantityOnHand: 4,
+      unit: "rolls",
+      reorderThreshold: 2,
+      reorderQuantity: 4,
+      preferredSupplier: "Lowe's",
+      supplierUrl: "https://example.com/painters-tape",
+      unitCost: 7.25,
+      storageLocation: "Basement project rack",
+      notes: "Used for layout marks, dust-control seams, and finish protection"
     }
   ] as const;
 
@@ -699,7 +811,7 @@ async function main(): Promise<void> {
 
   await prisma.assetInventoryItem.deleteMany({
     where: {
-      assetId: { in: [assetId, childAssetId] }
+      assetId: { in: [assetId, childAssetId, homeAssetId] }
     }
   });
 
@@ -715,7 +827,9 @@ async function main(): Promise<void> {
           inventoryItemOilId,
           inventoryItemCabinFilterId,
           inventoryItemWheelWeightId,
-          inventoryItemShopTowelId
+          inventoryItemShopTowelId,
+          inventoryItemRosinPaperId,
+          inventoryItemPainterTapeId
         ]
       }
     }
@@ -758,49 +872,65 @@ async function main(): Promise<void> {
   });
 
   // ── Tier 2: Project ───────────────────────────────────────────────────────
+  await prisma.projectPhaseSupply.deleteMany({
+    where: {
+      phase: {
+        projectId
+      }
+    }
+  });
+
+  await prisma.projectPhaseChecklistItem.deleteMany({
+    where: {
+      phase: {
+        projectId
+      }
+    }
+  });
+
+  await prisma.projectTaskChecklistItem.deleteMany({
+    where: {
+      task: {
+        projectId
+      }
+    }
+  });
+
+  await prisma.projectExpense.deleteMany({
+    where: { projectId }
+  });
+
+  await prisma.projectTask.deleteMany({
+    where: { projectId }
+  });
+
+  await prisma.projectBudgetCategory.deleteMany({
+    where: { projectId }
+  });
+
+  await prisma.projectPhase.deleteMany({
+    where: { projectId }
+  });
+
   await prisma.project.upsert({
     where: { id: projectId },
     update: {
-      name: "Spring Vehicle Maintenance",
-      status: "active"
+      name: "Kitchen Refresh 2026",
+      description: "A phased kitchen refresh with design planning, demolition prep, cabinet installation, and lighting upgrades.",
+      status: "active",
+      budgetAmount: 14250,
+      startDate: new Date("2026-03-01T00:00:00.000Z"),
+      targetEndDate: new Date("2026-05-15T00:00:00.000Z")
     },
     create: {
       id: projectId,
       householdId,
-      name: "Spring Vehicle Maintenance",
-      description: "Complete set of spring maintenance tasks for 2026",
+      name: "Kitchen Refresh 2026",
+      description: "A phased kitchen refresh with design planning, demolition prep, cabinet installation, and lighting upgrades.",
       status: "active",
-      budgetAmount: 800,
+      budgetAmount: 14250,
       startDate: new Date("2026-03-01T00:00:00.000Z"),
-      targetEndDate: new Date("2026-04-30T00:00:00.000Z")
-    }
-  });
-
-  // Link the primary vehicle asset to the project
-  await prisma.projectAsset.upsert({
-    where: {
-      projectId_assetId: { projectId, assetId }
-    },
-    update: {},
-    create: {
-      projectId,
-      assetId
-    }
-  });
-
-  await prisma.projectAsset.upsert({
-    where: {
-      projectId_assetId: { projectId, assetId: childAssetId }
-    },
-    update: {
-      role: "affected subsystem",
-      notes: "Battery health check during seasonal prep"
-    },
-    create: {
-      projectId,
-      assetId: childAssetId,
-      role: "affected subsystem",
-      notes: "Battery health check during seasonal prep"
+      targetEndDate: new Date("2026-05-15T00:00:00.000Z")
     }
   });
 
@@ -823,31 +953,65 @@ async function main(): Promise<void> {
         inventoryItemId: inventoryItemCabinFilterId,
         notes: "Seasonal air-quality replacement item",
         recommendedQuantity: 1
+      },
+      {
+        assetId: homeAssetId,
+        inventoryItemId: inventoryItemRosinPaperId,
+        notes: "Reusable kitchen floor protection stock for remodels and appliance swaps",
+        recommendedQuantity: 2
+      },
+      {
+        assetId: homeAssetId,
+        inventoryItemId: inventoryItemPainterTapeId,
+        notes: "Consumable stock for finish protection and layout work",
+        recommendedQuantity: 4
+      },
+      {
+        assetId: homeAssetId,
+        inventoryItemId: inventoryItemShopTowelId,
+        notes: "Cleanup and dust-control consumable for renovation work",
+        recommendedQuantity: 4
       }
     ],
     skipDuplicates: true
+  });
+
+  await prisma.projectAsset.create({
+    data: {
+      projectId,
+      assetId: homeAssetId,
+      role: "work area",
+      notes: "Primary kitchen space undergoing phased layout and finish updates"
+    }
   });
 
   await prisma.projectInventoryItem.createMany({
     data: [
       {
         projectId,
-        inventoryItemId: inventoryItemOilFilterId,
+        inventoryItemId: inventoryItemRosinPaperId,
         quantityNeeded: 2,
         quantityAllocated: 1,
-        budgetedUnitCost: 9.25,
-        notes: "One filter allocated for spring service; keep one spare"
+        budgetedUnitCost: 18.5,
+        notes: "Protect hardwood paths during demolition and install"
       },
       {
         projectId,
-        inventoryItemId: inventoryItemCabinFilterId,
-        quantityNeeded: 1,
+        inventoryItemId: inventoryItemPainterTapeId,
+        quantityNeeded: 4,
         quantityAllocated: 0,
-        budgetedUnitCost: 13.5,
-        notes: "Planned during seasonal cleanup"
+        budgetedUnitCost: 7.25,
+        notes: "Layout marking and finish masking stock"
+      },
+      {
+        projectId,
+        inventoryItemId: inventoryItemShopTowelId,
+        quantityNeeded: 4,
+        quantityAllocated: 0,
+        budgetedUnitCost: 4.25,
+        notes: "Cleanup consumables for punch list and staging"
       }
-    ],
-    skipDuplicates: true
+    ]
   });
 
   const inventoryTransactions = [
@@ -922,10 +1086,10 @@ async function main(): Promise<void> {
       type: "consume",
       quantity: -1,
       quantityAfter: 1,
-      referenceType: "project",
-      referenceId: projectId,
+      referenceType: "maintenance_log",
+      referenceId: maintenanceLogId,
       unitCost: 12.99,
-      notes: "Reserved against spring vehicle maintenance project",
+      notes: "Seeded historical cabin filter replacement",
       userId: ownerUserId,
       createdAt: new Date("2026-03-01T14:00:00.000Z")
     },
@@ -967,6 +1131,45 @@ async function main(): Promise<void> {
       notes: "Initial counted stock",
       userId: ownerUserId,
       createdAt: new Date("2026-02-10T08:30:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000010",
+      inventoryItemId: inventoryItemRosinPaperId,
+      type: "purchase",
+      quantity: 3,
+      quantityAfter: 3,
+      referenceType: "manual",
+      referenceId: inventoryItemRosinPaperId,
+      unitCost: 18.5,
+      notes: "Picked up floor protection ahead of the kitchen refresh",
+      userId: ownerUserId,
+      createdAt: new Date("2026-03-01T17:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000011",
+      inventoryItemId: inventoryItemRosinPaperId,
+      type: "project_supply_allocation",
+      quantity: -1,
+      quantityAfter: 2,
+      referenceType: "project_phase_supply",
+      referenceId: supplyProtectionId,
+      unitCost: 18.5,
+      notes: "Allocated one roll to the demolition and protection phase",
+      userId: ownerUserId,
+      createdAt: new Date("2026-03-05T08:15:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000012",
+      inventoryItemId: inventoryItemPainterTapeId,
+      type: "purchase",
+      quantity: 6,
+      quantityAfter: 6,
+      referenceType: "manual",
+      referenceId: inventoryItemPainterTapeId,
+      unitCost: 7.25,
+      notes: "Consumable stock for layout, masking, and finish protection",
+      userId: ownerUserId,
+      createdAt: new Date("2026-03-03T11:45:00.000Z")
     }
   ] as const;
 
@@ -978,66 +1181,326 @@ async function main(): Promise<void> {
     });
   }
 
-  // Project tasks
+  await prisma.projectBudgetCategory.createMany({
+    data: [
+      {
+        id: budgetDesignId,
+        projectId,
+        name: "Design + Planning",
+        budgetAmount: 1450,
+        sortOrder: 1,
+        notes: "Measurements, drawings, permits, and contingency for prework"
+      },
+      {
+        id: budgetCabinetryId,
+        projectId,
+        name: "Cabinetry + Finish Materials",
+        budgetAmount: 9600,
+        sortOrder: 2,
+        notes: "Cabinet order, hardware, trim, backsplash, and paint"
+      },
+      {
+        id: budgetElectricalId,
+        projectId,
+        name: "Electrical + Lighting",
+        budgetAmount: 3200,
+        sortOrder: 3,
+        notes: "New fixtures, outlets, dimmers, and electrician support"
+      }
+    ]
+  });
+
+  await prisma.projectPhase.createMany({
+    data: [
+      {
+        id: phasePlanningId,
+        projectId,
+        name: "Planning and Measurements",
+        description: "Finalize scope, verify cabinet lead times, and lock electrical changes before teardown.",
+        status: "completed",
+        sortOrder: 1,
+        startDate: new Date("2026-03-01T00:00:00.000Z"),
+        targetEndDate: new Date("2026-03-07T00:00:00.000Z"),
+        actualEndDate: new Date("2026-03-06T00:00:00.000Z"),
+        budgetAmount: 1500,
+        notes: "Measurements complete and permit-free scope confirmed"
+      },
+      {
+        id: phaseDemolitionId,
+        projectId,
+        name: "Demolition and Prep",
+        description: "Protect adjacent floors, remove worn finishes, and prep utilities for cabinet delivery.",
+        status: "in_progress",
+        sortOrder: 2,
+        startDate: new Date("2026-03-08T00:00:00.000Z"),
+        targetEndDate: new Date("2026-03-20T00:00:00.000Z"),
+        budgetAmount: 2450,
+        notes: "Floor protection is staged; old backsplash removal is underway"
+      },
+      {
+        id: phaseInstallationId,
+        projectId,
+        name: "Cabinet Install and Lighting",
+        description: "Install the new cabinet run, hang pendant lights, and close out finish carpentry.",
+        status: "pending",
+        sortOrder: 3,
+        startDate: new Date("2026-03-21T00:00:00.000Z"),
+        targetEndDate: new Date("2026-05-15T00:00:00.000Z"),
+        budgetAmount: 10300,
+        notes: "Waiting on cabinet hardware and pendant lead times"
+      }
+    ]
+  });
+
+  await prisma.projectPhaseChecklistItem.createMany({
+    data: [
+      {
+        id: "clkeeperphasecheck000000001",
+        phaseId: phasePlanningId,
+        title: "Capture final measurements for every wall run",
+        isCompleted: true,
+        completedAt: new Date("2026-03-02T09:30:00.000Z"),
+        sortOrder: 1
+      },
+      {
+        id: "clkeeperphasecheck000000002",
+        phaseId: phasePlanningId,
+        title: "Confirm appliance specs and outlet locations",
+        isCompleted: true,
+        completedAt: new Date("2026-03-04T18:10:00.000Z"),
+        sortOrder: 2
+      },
+      {
+        id: "clkeeperphasecheck000000003",
+        phaseId: phaseDemolitionId,
+        title: "Protect hardwood path from entry to kitchen",
+        isCompleted: true,
+        completedAt: new Date("2026-03-08T08:20:00.000Z"),
+        sortOrder: 1
+      },
+      {
+        id: "clkeeperphasecheck000000004",
+        phaseId: phaseDemolitionId,
+        title: "Shut off disposal circuit and label temporary outlets",
+        isCompleted: false,
+        sortOrder: 2
+      },
+      {
+        id: "clkeeperphasecheck000000005",
+        phaseId: phaseInstallationId,
+        title: "Schedule electrician for pendant and under-cabinet rough-in",
+        isCompleted: false,
+        sortOrder: 1
+      }
+    ]
+  });
+
   const taskIds = [
     "clkeepertask00000000000001",
     "clkeepertask00000000000002",
-    "clkeepertask00000000000003"
-  ];
-  const tasks = [
-    { id: taskIds[0], title: "Oil change", description: "Full synthetic 5W-30", status: "completed" as const, assignedToId: memberUserId, completedAt: new Date("2026-03-10T00:00:00.000Z") },
-    { id: taskIds[1], title: "Brake inspection", description: "Check pads and rotors", status: "in_progress" as const, assignedToId: ownerUserId },
-    { id: taskIds[2], title: "Cabin air filter", description: "Replace cabin filter", status: "pending" as const, assignedToId: null }
-  ];
+    "clkeepertask00000000000003",
+    "clkeepertask00000000000004"
+  ] as const;
 
-  for (const task of tasks) {
-    await prisma.projectTask.upsert({
-      where: { id: task.id! },
-      update: {
-        title: task.title,
-        status: task.status,
-        assignedToId: task.assignedToId,
-        completedAt: task.completedAt ?? null
-      },
-      create: {
-        id: task.id!,
+  await prisma.projectTask.createMany({
+    data: [
+      {
+        id: taskIds[0],
         projectId,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        assignedToId: task.assignedToId,
-        completedAt: task.completedAt ?? null
+        phaseId: phasePlanningId,
+        title: "Finalize cabinet layout",
+        description: "Lock filler widths, drawer stack sizes, and appliance clearances with the design packet.",
+        status: "completed",
+        assignedToId: ownerUserId,
+        dueDate: new Date("2026-03-05T00:00:00.000Z"),
+        completedAt: new Date("2026-03-05T16:45:00.000Z"),
+        estimatedCost: 350,
+        actualCost: 275,
+        sortOrder: 1
+      },
+      {
+        id: taskIds[1],
+        projectId,
+        phaseId: phaseDemolitionId,
+        title: "Remove backsplash and inspect drywall",
+        description: "Open the wall behind the sink run and document any repair work before cabinetry arrives.",
+        status: "in_progress",
+        assignedToId: memberUserId,
+        dueDate: new Date("2026-03-14T00:00:00.000Z"),
+        estimatedCost: 420,
+        actualCost: 130,
+        sortOrder: 1
+      },
+      {
+        id: taskIds[2],
+        projectId,
+        phaseId: phaseInstallationId,
+        title: "Install pendant lights over peninsula",
+        description: "Coordinate box placement, dimmer swap, and final fixture hang after paint cures.",
+        status: "pending",
+        assignedToId: ownerUserId,
+        dueDate: new Date("2026-04-18T00:00:00.000Z"),
+        estimatedCost: 780,
+        sortOrder: 1
+      },
+      {
+        id: taskIds[3],
+        projectId,
+        title: "Collect finish samples and sign-off photos",
+        description: "Store backsplash, paint, and hardware references for closeout and future repairs.",
+        status: "pending",
+        assignedToId: null,
+        dueDate: new Date("2026-05-10T00:00:00.000Z"),
+        estimatedCost: 80,
+        sortOrder: 99
       }
-    });
-  }
+    ]
+  });
 
-  // Project expenses
+  await prisma.projectTaskChecklistItem.createMany({
+    data: [
+      {
+        id: "clkeepertaskcheck000000001",
+        taskId: taskIds[0],
+        title: "Verify refrigerator door swing against panel return",
+        isCompleted: true,
+        completedAt: new Date("2026-03-03T12:15:00.000Z"),
+        sortOrder: 1
+      },
+      {
+        id: "clkeepertaskcheck000000002",
+        taskId: taskIds[0],
+        title: "Confirm sink base width with plumbing offset",
+        isCompleted: true,
+        completedAt: new Date("2026-03-05T15:55:00.000Z"),
+        sortOrder: 2
+      },
+      {
+        id: "clkeepertaskcheck000000003",
+        taskId: taskIds[1],
+        title: "Photograph any hidden electrical before patching",
+        isCompleted: true,
+        completedAt: new Date("2026-03-11T10:20:00.000Z"),
+        sortOrder: 1
+      },
+      {
+        id: "clkeepertaskcheck000000004",
+        taskId: taskIds[1],
+        title: "Patch soft drywall behind removed tile",
+        isCompleted: false,
+        sortOrder: 2
+      },
+      {
+        id: "clkeepertaskcheck000000005",
+        taskId: taskIds[2],
+        title: "Confirm pendants are on-site before electrician visit",
+        isCompleted: false,
+        sortOrder: 1
+      }
+    ]
+  });
+
+  await prisma.projectPhaseSupply.createMany({
+    data: [
+      {
+        id: supplyProtectionId,
+        phaseId: phaseDemolitionId,
+        name: "Floor protection rolls",
+        description: "Rosin paper to protect the hardwood path and adjacent dining area.",
+        quantityNeeded: 2,
+        quantityOnHand: 1,
+        unit: "rolls",
+        estimatedUnitCost: 18.5,
+        actualUnitCost: 18.5,
+        supplier: "Home Depot",
+        supplierUrl: "https://example.com/rosin-paper",
+        isProcured: true,
+        procuredAt: new Date("2026-03-01T17:00:00.000Z"),
+        isStaged: true,
+        stagedAt: new Date("2026-03-08T08:00:00.000Z"),
+        inventoryItemId: inventoryItemRosinPaperId,
+        notes: "One roll allocated from inventory and one more still needed for appliance path coverage",
+        sortOrder: 1
+      },
+      {
+        id: supplyCabinetHardwareId,
+        phaseId: phaseInstallationId,
+        name: "Cabinet pull set",
+        description: "Brushed brass pulls for drawers and doors.",
+        quantityNeeded: 18,
+        quantityOnHand: 0,
+        unit: "pieces",
+        estimatedUnitCost: 12,
+        supplier: "Rejuvenation",
+        supplierUrl: "https://example.com/brass-cabinet-pulls",
+        isProcured: false,
+        isStaged: false,
+        notes: "Awaiting final finish sign-off before ordering",
+        sortOrder: 1
+      },
+      {
+        id: supplyPendantLightsId,
+        phaseId: phaseInstallationId,
+        name: "Pendant light fixtures",
+        description: "Two matte-white pendants for the peninsula.",
+        quantityNeeded: 2,
+        quantityOnHand: 0,
+        unit: "fixtures",
+        estimatedUnitCost: 189,
+        supplier: "Lumens",
+        supplierUrl: "https://example.com/kitchen-pendants",
+        isProcured: false,
+        isStaged: false,
+        notes: "Need finish confirmation after cabinet sample review",
+        sortOrder: 2
+      }
+    ]
+  });
+
   const expenseIds = [
     "clkeeperexpense000000000001",
-    "clkeeperexpense000000000002"
-  ];
-  await prisma.projectExpense.upsert({
-    where: { id: expenseIds[0]! },
-    update: { amount: 65.0 },
-    create: {
-      id: expenseIds[0]!,
-      projectId,
-      description: "Oil change supplies",
-      amount: 65.0,
-      date: new Date("2026-03-10T00:00:00.000Z"),
-      serviceProviderId
-    }
-  });
-  await prisma.projectExpense.upsert({
-    where: { id: expenseIds[1]! },
-    update: { amount: 12.99 },
-    create: {
-      id: expenseIds[1]!,
-      projectId,
-      description: "Cabin air filter",
-      amount: 12.99,
-      date: new Date("2026-03-11T00:00:00.000Z")
-    }
+    "clkeeperexpense000000000002",
+    "clkeeperexpense000000000003"
+  ] as const;
+
+  await prisma.projectExpense.createMany({
+    data: [
+      {
+        id: expenseIds[0],
+        projectId,
+        phaseId: phasePlanningId,
+        budgetCategoryId: budgetDesignId,
+        description: "Cabinet layout consultation",
+        amount: 275,
+        category: "design",
+        date: new Date("2026-03-05T00:00:00.000Z"),
+        serviceProviderId: renovationProviderId,
+        notes: "Two-hour onsite design validation and measurement review"
+      },
+      {
+        id: expenseIds[1],
+        projectId,
+        phaseId: phaseDemolitionId,
+        budgetCategoryId: budgetCabinetryId,
+        description: "Drywall patch materials and dust containment",
+        amount: 186.45,
+        category: "materials",
+        date: new Date("2026-03-12T00:00:00.000Z"),
+        notes: "Joint compound, sanding screens, zipper door, and cleanup consumables"
+      },
+      {
+        id: expenseIds[2],
+        projectId,
+        phaseId: phaseInstallationId,
+        budgetCategoryId: budgetElectricalId,
+        description: "Lighting deposit",
+        amount: 420,
+        category: "fixtures",
+        date: new Date("2026-03-18T00:00:00.000Z"),
+        serviceProviderId: renovationProviderId,
+        notes: "Deposit to reserve electrician and hold two pendant fixtures"
+      }
+    ]
   });
 
   // ── Tier 2: Household Invitation ──────────────────────────────────────────
@@ -1081,7 +1544,11 @@ async function main(): Promise<void> {
   const activityEntries = [
     { action: "asset.created", entityType: "asset", entityId: assetId, userId: ownerUserId, metadata: { name: "Primary Vehicle" } },
     { action: "schedule.created", entityType: "schedule", entityId: maintenanceScheduleId, userId: ownerUserId, metadata: { name: "Engine oil and filter" } },
-    { action: "project.created", entityType: "project", entityId: projectId, userId: ownerUserId, metadata: { name: "Spring Vehicle Maintenance" } },
+    { action: "project.created", entityType: "project", entityId: projectId, userId: ownerUserId, metadata: { name: "Kitchen Refresh 2026" } },
+    { action: "project.phase.created", entityType: "project_phase", entityId: phasePlanningId, userId: ownerUserId, metadata: { projectId, name: "Planning and Measurements" } },
+    { action: "project.phase.status_updated", entityType: "project_phase", entityId: phasePlanningId, userId: ownerUserId, metadata: { projectId, status: "completed" } },
+    { action: "project.budget_category.created", entityType: "project_budget_category", entityId: budgetCabinetryId, userId: ownerUserId, metadata: { projectId, name: "Cabinetry + Finish Materials" } },
+    { action: "project.supply.created", entityType: "project_phase_supply", entityId: supplyProtectionId, userId: ownerUserId, metadata: { projectId, phaseId: phaseDemolitionId, name: "Floor protection rolls" } },
     { action: "member.invited", entityType: "household", entityId: householdId, userId: ownerUserId, metadata: { email: "invited@lifekeeper.app" } }
   ];
   for (const entry of activityEntries) {
@@ -1129,8 +1596,10 @@ async function main(): Promise<void> {
     householdId,
     sharedAssetId: assetId,
     personalAssetId,
+    homeAssetId,
     overdueScheduleId,
     serviceProviderId,
+    renovationProviderId,
     inventoryItemOilFilterId,
     inventoryItemCabinFilterId,
     projectId,

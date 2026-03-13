@@ -20,7 +20,7 @@ export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
-export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", "return", "transfer"] as const;
+export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", "return", "transfer", "project_supply_allocation"] as const;
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
 export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
@@ -1031,6 +1031,8 @@ export const projectStatusSchema = z.enum(projectStatusValues);
 
 export const projectTaskStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
 export const projectTaskStatusSchema = z.enum(projectTaskStatusValues);
+export const projectPhaseStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
+export const projectPhaseStatusSchema = z.enum(projectPhaseStatusValues);
 
 export const projectSchema = z.object({
   id: z.string().cuid(),
@@ -1082,9 +1084,180 @@ export const createProjectAssetSchema = z.object({
   notes: z.string().max(2000).optional()
 });
 
+export const projectPhaseChecklistItemSchema = z.object({
+  id: z.string().cuid(),
+  phaseId: z.string().cuid(),
+  title: z.string(),
+  isCompleted: z.boolean(),
+  completedAt: z.string().datetime().nullable(),
+  sortOrder: z.number().int().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectPhaseChecklistItemSchema = z.object({
+  title: z.string().min(1).max(500),
+  sortOrder: z.number().int().optional()
+});
+
+export const updateProjectPhaseChecklistItemSchema = createProjectPhaseChecklistItemSchema.partial().extend({
+  title: z.string().min(1).max(500).optional(),
+  isCompleted: z.boolean().optional(),
+  sortOrder: z.number().int().nullable().optional()
+});
+
+export const projectTaskChecklistItemSchema = z.object({
+  id: z.string().cuid(),
+  taskId: z.string().cuid(),
+  title: z.string(),
+  isCompleted: z.boolean(),
+  completedAt: z.string().datetime().nullable(),
+  sortOrder: z.number().int().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectTaskChecklistItemSchema = z.object({
+  title: z.string().min(1).max(500),
+  sortOrder: z.number().int().optional()
+});
+
+export const updateProjectTaskChecklistItemSchema = createProjectTaskChecklistItemSchema.partial().extend({
+  title: z.string().min(1).max(500).optional(),
+  isCompleted: z.boolean().optional(),
+  sortOrder: z.number().int().nullable().optional()
+});
+
+export const projectBudgetCategorySchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  name: z.string(),
+  budgetAmount: z.number().nullable(),
+  sortOrder: z.number().int().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectBudgetCategorySchema = z.object({
+  name: z.string().min(1).max(200),
+  budgetAmount: z.number().min(0).optional(),
+  sortOrder: z.number().int().optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const updateProjectBudgetCategorySchema = createProjectBudgetCategorySchema.partial().extend({
+  budgetAmount: z.number().min(0).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional()
+});
+
+export const projectPhaseSupplyInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  quantityOnHand: z.number(),
+  unit: z.string(),
+  unitCost: z.number().nullable()
+});
+
+export const projectPhaseSupplySchema = z.object({
+  id: z.string().cuid(),
+  phaseId: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  quantityNeeded: z.number(),
+  quantityOnHand: z.number(),
+  unit: z.string(),
+  estimatedUnitCost: z.number().nullable(),
+  actualUnitCost: z.number().nullable(),
+  supplier: z.string().nullable(),
+  supplierUrl: z.string().nullable(),
+  isProcured: z.boolean(),
+  procuredAt: z.string().datetime().nullable(),
+  isStaged: z.boolean(),
+  stagedAt: z.string().datetime().nullable(),
+  inventoryItemId: z.string().cuid().nullable(),
+  inventoryItem: projectPhaseSupplyInventoryItemSchema.nullable().default(null),
+  notes: z.string().nullable(),
+  sortOrder: z.number().int().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectPhaseSupplySchema = z.object({
+  name: z.string().min(1).max(300),
+  description: z.string().max(2000).optional(),
+  quantityNeeded: z.number().min(0),
+  quantityOnHand: z.number().min(0).default(0),
+  unit: z.string().max(50).default("each"),
+  estimatedUnitCost: z.number().min(0).optional(),
+  actualUnitCost: z.number().min(0).optional(),
+  supplier: z.string().max(200).optional(),
+  supplierUrl: z.string().url().max(2000).optional(),
+  isProcured: z.boolean().default(false),
+  isStaged: z.boolean().default(false),
+  inventoryItemId: z.string().cuid().optional(),
+  notes: z.string().max(2000).optional(),
+  sortOrder: z.number().int().optional()
+});
+
+export const updateProjectPhaseSupplySchema = createProjectPhaseSupplySchema.partial().extend({
+  description: z.string().max(2000).nullable().optional(),
+  quantityOnHand: z.number().min(0).nullable().optional(),
+  estimatedUnitCost: z.number().min(0).nullable().optional(),
+  actualUnitCost: z.number().min(0).nullable().optional(),
+  supplier: z.string().max(200).nullable().optional(),
+  supplierUrl: z.string().url().max(2000).nullable().optional(),
+  inventoryItemId: z.string().cuid().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  sortOrder: z.number().int().nullable().optional(),
+  procuredAt: z.string().datetime().nullable().optional(),
+  stagedAt: z.string().datetime().nullable().optional()
+});
+
+export const projectPhaseSchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: projectPhaseStatusSchema,
+  sortOrder: z.number().int().nullable(),
+  startDate: z.string().datetime().nullable(),
+  targetEndDate: z.string().datetime().nullable(),
+  actualEndDate: z.string().datetime().nullable(),
+  budgetAmount: z.number().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectPhaseSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  status: projectPhaseStatusSchema.default("pending"),
+  sortOrder: z.number().int().optional(),
+  startDate: z.string().datetime().optional(),
+  targetEndDate: z.string().datetime().optional(),
+  budgetAmount: z.number().min(0).optional(),
+  notes: z.string().max(5000).optional()
+});
+
+export const updateProjectPhaseSchema = createProjectPhaseSchema.partial().extend({
+  description: z.string().max(2000).nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  targetEndDate: z.string().datetime().nullable().optional(),
+  budgetAmount: z.number().min(0).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
+  actualEndDate: z.string().datetime().nullable().optional()
+});
+
+export const reorderProjectPhasesSchema = z.object({
+  phaseIds: z.array(z.string().cuid()).min(1)
+});
+
 export const projectTaskSchema = z.object({
   id: z.string().cuid(),
   projectId: z.string().cuid(),
+  phaseId: z.string().cuid().nullable(),
   title: z.string(),
   description: z.string().nullable(),
   status: z.string(),
@@ -1096,6 +1269,7 @@ export const projectTaskSchema = z.object({
   actualCost: z.number().nullable(),
   sortOrder: z.number().int().nullable(),
   scheduleId: z.string().cuid().nullable(),
+  checklistItems: z.array(projectTaskChecklistItemSchema).default([]),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 });
@@ -1104,6 +1278,7 @@ export const createProjectTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   status: projectTaskStatusSchema.default("pending"),
+  phaseId: z.string().cuid().optional(),
   assignedToId: z.string().cuid().optional(),
   dueDate: z.string().datetime().optional(),
   estimatedCost: z.number().min(0).optional(),
@@ -1114,6 +1289,7 @@ export const createProjectTaskSchema = z.object({
 
 export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend({
   description: z.string().max(2000).nullable().optional(),
+  phaseId: z.string().cuid().nullable().optional(),
   assignedToId: z.string().cuid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   estimatedCost: z.number().min(0).nullable().optional(),
@@ -1126,6 +1302,8 @@ export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend(
 export const projectExpenseSchema = z.object({
   id: z.string().cuid(),
   projectId: z.string().cuid(),
+  phaseId: z.string().cuid().nullable(),
+  budgetCategoryId: z.string().cuid().nullable(),
   description: z.string(),
   amount: z.number(),
   category: z.string().nullable(),
@@ -1142,6 +1320,8 @@ export const createProjectExpenseSchema = z.object({
   amount: z.number().min(0),
   category: z.string().max(120).optional(),
   date: z.string().datetime().optional(),
+  phaseId: z.string().cuid().optional(),
+  budgetCategoryId: z.string().cuid().optional(),
   taskId: z.string().cuid().optional(),
   serviceProviderId: z.string().cuid().optional(),
   notes: z.string().max(2000).optional()
@@ -1150,9 +1330,33 @@ export const createProjectExpenseSchema = z.object({
 export const updateProjectExpenseSchema = createProjectExpenseSchema.partial().extend({
   category: z.string().max(120).nullable().optional(),
   date: z.string().datetime().nullable().optional(),
+  phaseId: z.string().cuid().nullable().optional(),
+  budgetCategoryId: z.string().cuid().nullable().optional(),
   taskId: z.string().cuid().nullable().optional(),
   serviceProviderId: z.string().cuid().nullable().optional(),
   notes: z.string().max(2000).nullable().optional()
+});
+
+export const projectPhaseSummarySchema = projectPhaseSchema.extend({
+  taskCount: z.number().int(),
+  completedTaskCount: z.number().int(),
+  checklistItemCount: z.number().int(),
+  completedChecklistItemCount: z.number().int(),
+  supplyCount: z.number().int(),
+  procuredSupplyCount: z.number().int(),
+  expenseTotal: z.number()
+});
+
+export const projectBudgetCategorySummarySchema = projectBudgetCategorySchema.extend({
+  expenseCount: z.number().int(),
+  actualSpend: z.number()
+});
+
+export const projectPhaseDetailSchema = projectPhaseSummarySchema.extend({
+  tasks: z.array(projectTaskSchema),
+  checklistItems: z.array(projectPhaseChecklistItemSchema),
+  supplies: z.array(projectPhaseSupplySchema),
+  expenses: z.array(projectExpenseSchema)
 });
 
 export const projectSummarySchema = projectSchema.extend({
@@ -1160,14 +1364,24 @@ export const projectSummarySchema = projectSchema.extend({
   totalSpent: z.number(),
   taskCount: z.number().int(),
   completedTaskCount: z.number().int(),
+  phaseCount: z.number().int(),
+  completedPhaseCount: z.number().int(),
   percentComplete: z.number()
 });
 
 export const projectDetailSchema = projectSchema.extend({
   assets: z.array(projectAssetSchema),
   tasks: z.array(projectTaskSchema),
-  expenses: z.array(projectExpenseSchema)
+  expenses: z.array(projectExpenseSchema),
+  phases: z.array(projectPhaseSummarySchema),
+  budgetCategories: z.array(projectBudgetCategorySummarySchema)
 });
+
+export const projectPhaseListSchema = z.array(projectPhaseSummarySchema);
+export const projectPhaseChecklistItemListSchema = z.array(projectPhaseChecklistItemSchema);
+export const projectTaskChecklistItemListSchema = z.array(projectTaskChecklistItemSchema);
+export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySummarySchema);
+export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 
 // ── Activity Log Schemas ─────────────────────────────────────────────
 
@@ -1447,17 +1661,38 @@ export type LowStockInventoryItem = z.infer<typeof lowStockInventoryItemSchema>;
 export type ShallowUser = z.infer<typeof shallowUserSchema>;
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 export type ProjectTaskStatus = z.infer<typeof projectTaskStatusSchema>;
+export type ProjectPhaseStatus = z.infer<typeof projectPhaseStatusSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ProjectAsset = z.infer<typeof projectAssetSchema>;
 export type CreateProjectAssetInput = z.infer<typeof createProjectAssetSchema>;
+export type ProjectPhaseChecklistItem = z.infer<typeof projectPhaseChecklistItemSchema>;
+export type CreateProjectPhaseChecklistItemInput = z.infer<typeof createProjectPhaseChecklistItemSchema>;
+export type UpdateProjectPhaseChecklistItemInput = z.infer<typeof updateProjectPhaseChecklistItemSchema>;
+export type ProjectTaskChecklistItem = z.infer<typeof projectTaskChecklistItemSchema>;
+export type CreateProjectTaskChecklistItemInput = z.infer<typeof createProjectTaskChecklistItemSchema>;
+export type UpdateProjectTaskChecklistItemInput = z.infer<typeof updateProjectTaskChecklistItemSchema>;
+export type ProjectBudgetCategory = z.infer<typeof projectBudgetCategorySchema>;
+export type CreateProjectBudgetCategoryInput = z.infer<typeof createProjectBudgetCategorySchema>;
+export type UpdateProjectBudgetCategoryInput = z.infer<typeof updateProjectBudgetCategorySchema>;
+export type ProjectPhaseSupplyInventoryItem = z.infer<typeof projectPhaseSupplyInventoryItemSchema>;
+export type ProjectPhaseSupply = z.infer<typeof projectPhaseSupplySchema>;
+export type CreateProjectPhaseSupplyInput = z.infer<typeof createProjectPhaseSupplySchema>;
+export type UpdateProjectPhaseSupplyInput = z.infer<typeof updateProjectPhaseSupplySchema>;
+export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
+export type ProjectPhaseSummary = z.infer<typeof projectPhaseSummarySchema>;
+export type ProjectPhaseDetail = z.infer<typeof projectPhaseDetailSchema>;
+export type CreateProjectPhaseInput = z.infer<typeof createProjectPhaseSchema>;
+export type UpdateProjectPhaseInput = z.infer<typeof updateProjectPhaseSchema>;
+export type ReorderProjectPhasesInput = z.infer<typeof reorderProjectPhasesSchema>;
 export type ProjectTask = z.infer<typeof projectTaskSchema>;
 export type CreateProjectTaskInput = z.infer<typeof createProjectTaskSchema>;
 export type UpdateProjectTaskInput = z.infer<typeof updateProjectTaskSchema>;
 export type ProjectExpense = z.infer<typeof projectExpenseSchema>;
 export type CreateProjectExpenseInput = z.infer<typeof createProjectExpenseSchema>;
 export type UpdateProjectExpenseInput = z.infer<typeof updateProjectExpenseSchema>;
+export type ProjectBudgetCategorySummary = z.infer<typeof projectBudgetCategorySummarySchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
 export type ActivityLog = z.infer<typeof activityLogSchema>;
