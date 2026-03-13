@@ -136,8 +136,8 @@ p { margin: 0; color: var(--ink-light); }
   padding: 16px 14px 6px;
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+
+
   color: #64748b;
 }
 
@@ -244,8 +244,8 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+
+
 }
 
 .page-header {
@@ -334,8 +334,8 @@ p { margin: 0; color: var(--ink-light); }
   padding: 6px 10px;
   font-size: 0.78rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+
+
   cursor: pointer;
 }
 
@@ -357,8 +357,8 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
   font-size: 0.76rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+
+
 }
 
 .search-palette__results {
@@ -499,8 +499,8 @@ p { margin: 0; color: var(--ink-light); }
 .stat-card__label {
   font-size: 0.8rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+
+
   color: var(--ink-muted);
 }
 
@@ -621,8 +621,8 @@ p { margin: 0; color: var(--ink-light); }
   padding: 10px 16px;
   font-size: 0.78rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+
+
   color: var(--ink-muted);
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
@@ -1070,8 +1070,8 @@ textarea { resize: vertical; }
 .detail-hero__meta-item dt {
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+
+
   color: var(--ink-muted);
   margin: 0;
 }
@@ -1156,8 +1156,8 @@ textarea { resize: vertical; }
 .detail-tiles--dense .panel__header h2 {
   font-size: 0.82rem;
   font-family: var(--font-mono, monospace);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+
+
 }
 
 .detail-tiles--dense .panel__body,
@@ -1608,10 +1608,10 @@ textarea { resize: vertical; }
 }
 
 .asset-studio--industrial .panel-header h2 {
-  font-family: Consolas, "SFMono-Regular", "Cascadia Mono", monospace;
+
   font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+
+
   color: var(--ink-muted);
 }
 
@@ -1625,10 +1625,10 @@ textarea { resize: vertical; }
 }
 
 .asset-studio--industrial .field span {
-  font-family: Consolas, "SFMono-Regular", "Cascadia Mono", monospace;
+
   font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+
+
   color: var(--ink-muted);
   margin-bottom: 0;
 }
@@ -1695,7 +1695,7 @@ textarea { resize: vertical; }
 }
 
 .asset-studio--industrial .asset-studio__detail-card-header h4 {
-  font-family: Consolas, "SFMono-Regular", "Cascadia Mono", monospace;
+
   font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
@@ -1730,10 +1730,10 @@ textarea { resize: vertical; }
 }
 
 .asset-studio--industrial .asset-studio__detail-group-header h3 {
-  font-family: Consolas, "SFMono-Regular", "Cascadia Mono", monospace;
+
   font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+
+
   color: var(--ink-muted);
 }
 
@@ -1828,8 +1828,8 @@ textarea { resize: vertical; }
 .log-card__meta dt {
   font-size: 0.78rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+
+
   color: var(--ink-muted);
   margin: 0 0 4px;
 }
@@ -1975,7 +1975,7 @@ textarea { resize: vertical; }
 .preset-meta dt {
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
+
   color: var(--ink-muted);
   margin: 0;
 }
@@ -2026,8 +2026,8 @@ textarea { resize: vertical; }
 .eyebrow {
   margin: 0 0 4px;
   font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+
+
   color: var(--ink-muted);
   font-weight: 600;
 }
@@ -2445,7 +2445,7 @@ textarea { resize: vertical; }
   font-family: var(--font-display);
   font-size: 1.6rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+
   color: var(--ink);
 }
 
@@ -2519,7 +2519,7 @@ textarea { resize: vertical; }
   font-size: 0.12in;
   line-height: 1.1;
   font-weight: 700;
-  letter-spacing: 0.04em;
+
   color: inherit;
 }
 
