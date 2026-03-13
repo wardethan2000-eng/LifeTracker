@@ -2139,3 +2139,171 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
   gap: 4px;
 }
+
+/* ── Asset Labels ── */
+
+.asset-label-panel__body {
+  display: grid;
+  gap: 20px;
+}
+
+.asset-label-preview {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.asset-label-preview__image {
+  width: 100%;
+  max-width: 180px;
+  height: auto;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.asset-label-preview__meta {
+  display: grid;
+  gap: 6px;
+}
+
+.asset-label-preview__tag {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.asset-label-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.print-label-page {
+  min-height: 100vh;
+  padding: 32px;
+  display: grid;
+  gap: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(13, 148, 136, 0.1), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef6f5 100%);
+}
+
+.print-label-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+}
+
+.print-label-sheet {
+  display: grid;
+  justify-content: start;
+}
+
+.print-label-sheet--grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.print-label-card {
+  width: 2.625in;
+  min-height: 1in;
+  padding: 0.08in 0.1in;
+  display: grid;
+  grid-template-columns: 0.82in minmax(0, 1fr);
+  gap: 0.08in;
+  align-items: center;
+  border: 1px solid #111827;
+  background: #fff;
+  color: #111827;
+  box-shadow: var(--shadow-sm);
+}
+
+.print-label-card__qr {
+  width: 0.78in;
+  height: 0.78in;
+}
+
+.print-label-card__body {
+  display: grid;
+  gap: 0.03in;
+}
+
+.print-label-card__name {
+  margin: 0;
+  font-size: 0.14in;
+  line-height: 1.1;
+  font-weight: 700;
+  color: inherit;
+}
+
+.print-label-card__tag {
+  margin: 0;
+  font-size: 0.12in;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: inherit;
+}
+
+.print-label-card__meta {
+  margin: 0;
+  font-size: 0.1in;
+  line-height: 1.05;
+  color: #334155;
+}
+
+@media (max-width: 720px) {
+  .asset-label-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .print-label-page {
+    padding: 20px;
+  }
+
+  .print-label-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 0.25in;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .print-hidden {
+    display: none !important;
+  }
+
+  .print-label-page {
+    padding: 0;
+    background: #fff;
+  }
+
+  .print-label-sheet {
+    gap: 0.12in;
+  }
+
+  .print-label-sheet--grid {
+    grid-template-columns: repeat(3, 2.625in);
+    gap: 0.12in;
+  }
+
+  .print-label-card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}

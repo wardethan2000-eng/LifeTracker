@@ -1,11 +1,13 @@
-import type { Asset, MaintenanceLogPart, Notification, Prisma, ServiceProvider, UsageMetric, UsageMetricEntry, User } from "@prisma/client";
+import type { Asset, AssetTransfer, MaintenanceLogPart, Notification, Prisma, ServiceProvider, UsageMetric, UsageMetricEntry, User } from "@prisma/client";
 import {
+  assetTransferSchema,
   assetFieldDefinitionsSchema,
   assetSchema,
   maintenanceLogPartSchema,
   notificationPreferencesSchema,
   notificationSchema,
   serviceProviderSchema,
+  shallowUserSchema,
   usageMetricEntrySchema,
   usageMetricResponseSchema,
   userProfileSchema
@@ -21,13 +23,14 @@ export const toUserProfileResponse = (user: Pick<User, "id" | "clerkUserId" | "e
 });
 
 export const toAssetResponse = (
-  asset: Pick<Asset, "id" | "householdId" | "createdById" | "parentAssetId" | "name" | "category" | "visibility" | "description" | "manufacturer" | "model" | "serialNumber" | "purchaseDate" | "purchaseDetails" | "warrantyDetails" | "locationDetails" | "insuranceDetails" | "dispositionDetails" | "conditionScore" | "conditionHistory" | "assetTypeKey" | "assetTypeLabel" | "assetTypeDescription" | "assetTypeSource" | "assetTypeVersion" | "fieldDefinitions" | "customFields" | "isArchived" | "deletedAt" | "createdAt" | "updatedAt">,
+  asset: Pick<Asset, "id" | "householdId" | "createdById" | "ownerId" | "parentAssetId" | "assetTag" | "name" | "category" | "visibility" | "description" | "manufacturer" | "model" | "serialNumber" | "purchaseDate" | "purchaseDetails" | "warrantyDetails" | "locationDetails" | "insuranceDetails" | "dispositionDetails" | "conditionScore" | "conditionHistory" | "assetTypeKey" | "assetTypeLabel" | "assetTypeDescription" | "assetTypeSource" | "assetTypeVersion" | "fieldDefinitions" | "customFields" | "isArchived" | "deletedAt" | "createdAt" | "updatedAt">,
   relations?: {
     parentAsset?: { id: string; name: string; category: string } | null;
     childAssets?: { id: string; name: string; category: string }[];
   }
 ) => assetSchema.parse({
   ...asset,
+  assetTag: asset.assetTag ?? `LK-${asset.id.slice(-8).toUpperCase()}`,
   purchaseDate: asset.purchaseDate?.toISOString() ?? null,
   deletedAt: asset.deletedAt?.toISOString() ?? null,
   fieldDefinitions: assetFieldDefinitionsSchema.parse(asset.fieldDefinitions ?? []),
@@ -79,4 +82,28 @@ export const toMaintenanceLogPartResponse = (part: Pick<MaintenanceLogPart, "id"
   inventoryItemId: part.inventoryItemId ?? null,
   createdAt: part.createdAt.toISOString(),
   updatedAt: part.updatedAt.toISOString()
+});
+
+const toShallowUserResponse = (user: Pick<User, "id" | "displayName">) => shallowUserSchema.parse({
+  id: user.id,
+  displayName: user.displayName ?? null
+});
+
+export const toAssetTransferResponse = (
+  transfer: Pick<AssetTransfer, "id" | "assetId" | "transferType" | "fromHouseholdId" | "toHouseholdId" | "fromUserId" | "toUserId" | "initiatedById" | "reason" | "notes" | "transferredAt" | "createdAt">,
+  relations: {
+    fromUser: Pick<User, "id" | "displayName">;
+    toUser: Pick<User, "id" | "displayName">;
+    initiatedBy: Pick<User, "id" | "displayName">;
+  }
+) => assetTransferSchema.parse({
+  ...transfer,
+  toHouseholdId: transfer.toHouseholdId ?? null,
+  reason: transfer.reason ?? null,
+  notes: transfer.notes ?? null,
+  transferredAt: transfer.transferredAt.toISOString(),
+  createdAt: transfer.createdAt.toISOString(),
+  fromUser: toShallowUserResponse(relations.fromUser),
+  toUser: toShallowUserResponse(relations.toUser),
+  initiatedBy: toShallowUserResponse(relations.initiatedBy)
 });

@@ -15,11 +15,12 @@ LifeKeeper is a universal maintenance tracking platform for assets across vehicl
 
 1. Install dependencies with `pnpm install`.
 2. Copy `apps/api/.env.example` to `apps/api/.env` and provide PostgreSQL, Redis, and Clerk values.
-3. Generate the Prisma client with `pnpm db:generate`.
-4. Run migrations with `pnpm db:migrate`.
-5. Seed development data with `pnpm db:seed`.
-6. Start the API with `pnpm --filter @lifekeeper/api dev`.
-7. Start the web dashboard with `pnpm --filter @lifekeeper/web dev`.
+3. Set `APP_BASE_URL` in `apps/api/.env` to the public web origin you want encoded into QR labels.
+4. Generate the Prisma client with `pnpm db:generate`.
+5. Run migrations with `pnpm db:migrate`.
+6. Seed development data with `pnpm db:seed`.
+7. Start the API with `pnpm --filter @lifekeeper/api dev`.
+8. Start the web dashboard with `pnpm --filter @lifekeeper/web dev`.
 
 If you use Docker locally, you can start PostgreSQL and Redis with:
 

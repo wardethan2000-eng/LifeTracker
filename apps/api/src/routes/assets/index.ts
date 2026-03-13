@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import {
+  assetLabelDataSchema,
+  assetLookupQuerySchema,
   assetSchema,
   createAssetSchema,
   createConditionAssessmentSchema,
@@ -12,11 +14,17 @@ import {
   updateAssetSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
+import QRCode from "qrcode";
 import { z } from "zod";
 import {
   assertMembership,
-  getAccessibleAsset
+  getAccessibleAsset,
+  personalAssetAccessWhere
 } from "../../lib/asset-access.js";
+import {
+  buildAssetLabelUrl,
+  ensureAssetTag
+} from "../../lib/asset-tags.js";
 import { toAssetResponse } from "../../lib/presenters.js";
 import { logActivity } from "../../lib/activity-log.js";
 
@@ -28,6 +36,11 @@ const listAssetsQuerySchema = z.object({
   householdId: z.string().cuid(),
   includeArchived: z.coerce.boolean().default(false),
   includeDeleted: z.coerce.boolean().default(false)
+});
+
+const assetLabelQuerySchema = z.object({
+  format: z.enum(["png", "svg"]).default("png"),
+  size: z.coerce.number().int().min(100).max(1000).default(300)
 });
 
 const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
@@ -44,10 +57,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
 
     const where: Prisma.AssetWhereInput = {
       householdId: query.householdId,
-      OR: [
-        { visibility: "shared" },
-        { createdById: request.auth.userId }
-      ],
+      ...personalAssetAccessWhere(request.auth.userId),
       ...(query.includeArchived ? {} : { isArchived: false }),
       ...(query.includeDeleted ? {} : { deletedAt: null })
     };
@@ -60,6 +70,24 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return assets.map(a => toAssetResponse(a));
+  });
+
+  app.get("/v1/assets/lookup", async (request, reply) => {
+    const query = assetLookupQuerySchema.parse(request.query);
+
+    const asset = await app.prisma.asset.findFirst({
+      where: {
+        assetTag: query.tag,
+        household: { members: { some: { userId: request.auth.userId } } },
+        OR: [{ visibility: "shared" }, { createdById: request.auth.userId }]
+      }
+    });
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    return toAssetResponse(asset);
   });
 
   app.post("/v1/assets", async (request, reply) => {
@@ -86,6 +114,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const data: Prisma.AssetUncheckedCreateInput = {
       householdId: input.householdId,
       createdById: request.auth.userId,
+      ownerId: request.auth.userId,
       name: input.name,
       category: input.category,
       visibility: input.visibility,
@@ -111,7 +140,12 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     if (input.dispositionDetails !== undefined) data.dispositionDetails = toInputJsonValue(input.dispositionDetails);
     if (input.conditionScore !== undefined) data.conditionScore = input.conditionScore;
 
-    const asset = await app.prisma.asset.create({ data });
+    const createdAsset = await app.prisma.asset.create({ data });
+    const assetTag = await ensureAssetTag(app.prisma, createdAsset.id);
+    const asset = {
+      ...createdAsset,
+      assetTag
+    };
 
     await logActivity(app.prisma, {
       householdId: input.householdId,
@@ -119,10 +153,66 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       action: "asset.created",
       entityType: "asset",
       entityId: asset.id,
-      metadata: { name: asset.name, category: asset.category }
+      metadata: { name: asset.name, category: asset.category, assetTag }
     });
 
     return reply.code(201).send(toAssetResponse(asset));
+  });
+
+  app.get("/v1/assets/:assetId/label", async (request, reply) => {
+    const params = assetIdParamsSchema.parse(request.params);
+    const query = assetLabelQuerySchema.parse(request.query);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const payloadUrl = buildAssetLabelUrl(asset.id);
+
+    if (query.format === "svg") {
+      const svg = await QRCode.toString(payloadUrl, {
+        type: "svg",
+        width: query.size,
+        margin: 1
+      });
+
+      return reply
+        .header("content-type", "image/svg+xml; charset=utf-8")
+        .send(svg);
+    }
+
+    const png = await QRCode.toBuffer(payloadUrl, {
+      type: "png",
+      width: query.size,
+      margin: 1
+    });
+
+    return reply
+      .header("content-type", "image/png")
+      .send(png);
+  });
+
+  app.get("/v1/assets/:assetId/label/data", async (request, reply) => {
+    const params = assetIdParamsSchema.parse(request.params);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const assetTag = asset.assetTag ?? await ensureAssetTag(app.prisma, asset.id);
+
+    return assetLabelDataSchema.parse({
+      assetId: asset.id,
+      assetTag,
+      name: asset.name,
+      serialNumber: asset.serialNumber ?? null,
+      category: asset.category,
+      manufacturer: asset.manufacturer ?? null,
+      model: asset.model ?? null,
+      qrPayloadUrl: buildAssetLabelUrl(asset.id)
+    });
   });
 
   app.get("/v1/assets/:assetId", async (request, reply) => {
@@ -132,7 +222,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       where: {
         id: params.assetId,
         household: { members: { some: { userId: request.auth.userId } } },
-        OR: [{ visibility: "shared" }, { createdById: request.auth.userId }]
+        ...personalAssetAccessWhere(request.auth.userId)
       },
       include: {
         parentAsset: { select: { id: true, name: true, category: true } },

@@ -24,6 +24,7 @@ import {
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
+import { AssetLabelActions } from "../../../components/asset-label-actions";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
 import { ScheduleCardActions } from "../../../components/schedule-card-actions";
 import { ScheduleForm } from "../../../components/schedule-form";
@@ -182,6 +183,33 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         </section>
 
         <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+          <section className="panel asset-label-panel">
+            <div className="panel__header">
+              <h2>Label &amp; QR</h2>
+              <span className="pill">Ready to print</span>
+            </div>
+            <div className="panel__body--padded asset-label-panel__body">
+              <div className="asset-label-preview">
+                <img
+                  src={`/api/assets/${detail.asset.id}/label?format=svg&size=260`}
+                  alt={`QR code for ${detail.asset.name}`}
+                  className="asset-label-preview__image"
+                />
+                <div className="asset-label-preview__meta">
+                  <p className="eyebrow">Asset Tag</p>
+                  <p className="asset-label-preview__tag">{detail.asset.assetTag}</p>
+                  <p>{detail.asset.name}</p>
+                  <p>{formatCategoryLabel(detail.asset.category)}{detail.asset.serialNumber ? ` · S/N ${detail.asset.serialNumber}` : ""}</p>
+                </div>
+              </div>
+              <AssetLabelActions
+                assetId={detail.asset.id}
+                assetName={detail.asset.name}
+                assetTag={detail.asset.assetTag}
+              />
+            </div>
+          </section>
+
           <section className="panel">
             <div className="panel__header">
               <h2>Hierarchy</h2>

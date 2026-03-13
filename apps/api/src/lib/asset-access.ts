@@ -11,6 +11,19 @@ export const membershipWhere = (householdId: string, userId: string) => ({
   userId
 });
 
+export const personalAssetAccessWhere = (userId: string): Prisma.AssetWhereInput => ({
+  OR: [
+    { visibility: "shared" },
+    { ownerId: userId },
+    {
+      AND: [
+        { ownerId: null },
+        { createdById: userId }
+      ]
+    }
+  ]
+});
+
 export const accessibleAssetWhere = (assetId: string, userId: string): Prisma.AssetWhereInput => ({
   id: assetId,
   household: {
@@ -20,10 +33,7 @@ export const accessibleAssetWhere = (assetId: string, userId: string): Prisma.As
       }
     }
   },
-  OR: [
-    { visibility: "shared" },
-    { createdById: userId }
-  ]
+  ...personalAssetAccessWhere(userId)
 });
 
 export const assertMembership = async (

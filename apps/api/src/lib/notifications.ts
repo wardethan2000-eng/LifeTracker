@@ -37,6 +37,7 @@ interface ScheduleCandidate {
     id: string;
     name: string;
     visibility: "shared" | "personal";
+    ownerId: string | null;
     createdById: string;
     householdId: string;
     household: {
@@ -46,6 +47,7 @@ interface ScheduleCandidate {
       }>;
     };
     createdBy: Pick<User, "id" | "notificationPreferences">;
+    owner: Pick<User, "id" | "notificationPreferences"> | null;
   };
   assignedTo: Pick<User, "id" | "notificationPreferences"> | null;
   metric: {
@@ -304,9 +306,11 @@ const getRecipients = (schedule: ScheduleCandidate): Recipient[] => {
   }
 
   if (schedule.asset.visibility === "personal") {
+    const recipient = schedule.asset.owner ?? schedule.asset.createdBy;
+
     return [{
-      userId: schedule.asset.createdBy.id,
-      preferences: parsePreferences(schedule.asset.createdBy.notificationPreferences)
+      userId: recipient.id,
+      preferences: parsePreferences(recipient.notificationPreferences)
     }];
   }
 
@@ -392,8 +396,15 @@ export const scanAndCreateNotifications = async (
           id: true,
           name: true,
           visibility: true,
+          ownerId: true,
           createdById: true,
           householdId: true,
+          owner: {
+            select: {
+              id: true,
+              notificationPreferences: true
+            }
+          },
           createdBy: {
             select: {
               id: true,

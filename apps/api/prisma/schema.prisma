@@ -29,6 +29,11 @@ enum AssetVisibility {
   personal
 }
 
+enum AssetTransferType {
+  reassignment
+  household_transfer
+}
+
 enum TriggerType {
   interval
   usage
@@ -84,12 +89,16 @@ model User {
   householdMemberships    HouseholdMember[]
   householdsCreated       Household[]           @relation("HouseholdCreator")
   createdAssets           Asset[]               @relation("AssetCreator")
+  ownedAssets             Asset[]               @relation("AssetOwner")
   createdPresetProfiles   PresetProfile[]       @relation("PresetProfileCreator")
   maintenanceLogs         MaintenanceLog[]      @relation("MaintenanceLogUser")
   notifications           Notification[]
   assignedSchedules       MaintenanceSchedule[] @relation("ScheduleAssignee")
   assignedProjectTasks    ProjectTask[]         @relation("ProjectTaskAssignee")
   activityLogs            ActivityLog[]
+  initiatedAssetTransfers AssetTransfer[]       @relation("AssetTransferInitiator")
+  outgoingAssetTransfers  AssetTransfer[]       @relation("AssetTransferFromUser")
+  incomingAssetTransfers  AssetTransfer[]       @relation("AssetTransferToUser")
   inventoryTransactions   InventoryTransaction[]
   sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
@@ -111,6 +120,8 @@ model Household {
   projects         Project[]
   inventoryItems   InventoryItem[]
   activityLogs     ActivityLog[]
+  outgoingAssetTransfers AssetTransfer[]        @relation("AssetTransferFromHousehold")
+  incomingAssetTransfers AssetTransfer[]        @relation("AssetTransferToHousehold")
   invitations      HouseholdInvitation[]
 
   @@index([createdById])
@@ -135,7 +146,9 @@ model Asset {
   id                   String                @id @default(cuid())
   householdId          String
   createdById          String
+  ownerId              String?
   parentAssetId        String?
+  assetTag             String?               @unique
   name                 String
   category             AssetCategory
   visibility           AssetVisibility       @default(shared)
@@ -164,6 +177,7 @@ model Asset {
   updatedAt            DateTime              @updatedAt
   household            Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
   createdBy            User                  @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  owner                User?                 @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   parentAsset          Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id], onDelete: SetNull)
   childAssets          Asset[]               @relation("AssetHierarchy")
   usageMetrics         UsageMetric[]
@@ -173,11 +187,38 @@ model Asset {
   notifications        Notification[]
   projectAssets        ProjectAsset[]
   comments             Comment[]
+  transfers            AssetTransfer[]
 
   @@index([householdId, isArchived])
   @@index([createdById])
+  @@index([ownerId])
   @@index([category])
   @@index([parentAssetId])
+}
+
+model AssetTransfer {
+  id              String            @id @default(cuid())
+  assetId         String
+  transferType    AssetTransferType
+  fromHouseholdId String
+  toHouseholdId   String?
+  fromUserId      String
+  toUserId        String
+  initiatedById   String
+  reason          String?
+  notes           String?
+  transferredAt   DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fromHousehold   Household         @relation("AssetTransferFromHousehold", fields: [fromHouseholdId], references: [id], onDelete: Cascade)
+  toHousehold     Household?        @relation("AssetTransferToHousehold", fields: [toHouseholdId], references: [id], onDelete: SetNull)
+  fromUser        User              @relation("AssetTransferFromUser", fields: [fromUserId], references: [id], onDelete: Restrict)
+  toUser          User              @relation("AssetTransferToUser", fields: [toUserId], references: [id], onDelete: Restrict)
+  initiatedBy     User              @relation("AssetTransferInitiator", fields: [initiatedById], references: [id], onDelete: Restrict)
+
+  @@index([assetId, transferredAt])
+  @@index([fromHouseholdId, transferredAt])
+  @@index([toHouseholdId, transferredAt])
 }
 
 model UsageMetric {

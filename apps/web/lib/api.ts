@@ -2,6 +2,8 @@ import { cache } from "react";
 import {
   activityLogSchema,
   assetDetailResponseSchema,
+  assetTransferListSchema,
+  assetLabelDataSchema,
   assetSchema,
   commentSchema,
   customPresetProfileSchema,
@@ -25,7 +27,9 @@ import {
   serviceProviderSchema,
   threadedCommentSchema,
   type Asset,
+  type AssetTransferList,
   type AssetDetailResponse,
+  type AssetLabelData,
   type ActivityLog,
   type AcceptInvitationInput,
   type CompleteMaintenanceScheduleInput,
@@ -39,6 +43,7 @@ import {
   type CreatePresetProfileInput,
   type CreateServiceProviderInput,
   type CreateAssetInput,
+  type CreateAssetTransferInput,
   type CreateHouseholdInput,
   type CreateMaintenanceScheduleInput,
   type CreateMaintenanceLogInput,
@@ -217,6 +222,51 @@ export const getHouseholdDashboard = async (householdId: string): Promise<Househ
 export const getAssetDetail = async (assetId: string): Promise<AssetDetailResponse> => apiRequest({
   path: `/v1/assets/${assetId}/detail`,
   schema: assetDetailResponseSchema
+});
+
+export const getAssetTransferHistory = async (assetId: string): Promise<AssetTransferList> => apiRequest({
+  path: `/v1/assets/${assetId}/transfers`,
+  schema: assetTransferListSchema
+});
+
+export const getHouseholdTransfers = async (
+  householdId: string,
+  options?: {
+    since?: string;
+    transferType?: "reassignment" | "household_transfer";
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<AssetTransferList> => {
+  const query = new URLSearchParams();
+
+  if (options?.since) {
+    query.set("since", options.since);
+  }
+
+  if (options?.transferType) {
+    query.set("transferType", options.transferType);
+  }
+
+  if (options?.limit !== undefined) {
+    query.set("limit", String(options.limit));
+  }
+
+  if (options?.cursor) {
+    query.set("cursor", options.cursor);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/transfers${suffix}`,
+    schema: assetTransferListSchema
+  });
+};
+
+export const getAssetLabelData = async (assetId: string): Promise<AssetLabelData> => apiRequest({
+  path: `/v1/assets/${assetId}/label/data`,
+  schema: assetLabelDataSchema
 });
 
 export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => apiRequest({
@@ -597,6 +647,16 @@ export const updateAsset = async (assetId: string, input: UpdateAssetInput): Pro
   method: "PATCH",
   body: input,
   schema: assetSchema
+});
+
+export const createAssetTransfer = async (
+  assetId: string,
+  input: CreateAssetTransferInput
+) => apiRequest({
+  path: `/v1/assets/${assetId}/transfers`,
+  method: "POST",
+  body: input,
+  schema: assetTransferListSchema.shape.items.element
 });
 
 export const getHouseholdPresets = async (householdId: string): Promise<CustomPresetProfile[]> => apiRequest({

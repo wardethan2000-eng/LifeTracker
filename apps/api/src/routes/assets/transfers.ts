@@ -1,0 +1,379 @@
+import {
+  assetTransferListSchema,
+  createAssetTransferSchema
+} from "@lifekeeper/types";
+import type { Asset, PrismaClient } from "@prisma/client";
+import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
+import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
+import { logActivity } from "../../lib/activity-log.js";
+import { toAssetTransferResponse } from "../../lib/presenters.js";
+
+const assetParamsSchema = z.object({
+  assetId: z.string().cuid()
+});
+
+const householdParamsSchema = z.object({
+  householdId: z.string().cuid()
+});
+
+const householdTransferQuerySchema = z.object({
+  since: z.string().datetime().optional(),
+  transferType: z.enum(["reassignment", "household_transfer"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional()
+});
+
+type TransferableAsset = Pick<Asset, "id" | "householdId" | "createdById" | "ownerId" | "parentAssetId" | "name">;
+
+const getResponsibleUserId = (asset: Pick<Asset, "ownerId" | "createdById">): string => asset.ownerId ?? asset.createdById;
+
+const getTransferAsset = async (
+  prisma: PrismaClient,
+  assetId: string,
+  userId: string
+): Promise<TransferableAsset | null> => {
+  const asset = await prisma.asset.findUnique({
+    where: { id: assetId },
+    select: {
+      id: true,
+      householdId: true,
+      createdById: true,
+      ownerId: true,
+      parentAssetId: true,
+      name: true
+    }
+  });
+
+  if (!asset) {
+    return null;
+  }
+
+  try {
+    await assertMembership(prisma, asset.householdId, userId);
+  } catch {
+    return null;
+  }
+
+  return asset;
+};
+
+const collectTransferScopeAssets = async (
+  tx: PrismaClient,
+  rootAsset: TransferableAsset
+): Promise<TransferableAsset[]> => {
+  const assets = await tx.asset.findMany({
+    where: {
+      householdId: rootAsset.householdId,
+      deletedAt: null
+    },
+    select: {
+      id: true,
+      householdId: true,
+      createdById: true,
+      ownerId: true,
+      parentAssetId: true,
+      name: true
+    }
+  });
+
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const childrenByParentId = new Map<string, TransferableAsset[]>();
+
+  for (const asset of assets) {
+    if (!asset.parentAssetId) {
+      continue;
+    }
+
+    const existing = childrenByParentId.get(asset.parentAssetId) ?? [];
+    existing.push(asset);
+    childrenByParentId.set(asset.parentAssetId, existing);
+  }
+
+  const queue = [rootAsset.id];
+  const seen = new Set<string>();
+  const scope: TransferableAsset[] = [];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId || seen.has(currentId)) {
+      continue;
+    }
+
+    seen.add(currentId);
+
+    const asset = assetsById.get(currentId);
+    if (!asset) {
+      continue;
+    }
+
+    scope.push(asset);
+
+    for (const child of childrenByParentId.get(currentId) ?? []) {
+      queue.push(child.id);
+    }
+  }
+
+  return scope;
+};
+
+export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
+  app.post("/v1/assets/:assetId/transfers", async (request, reply) => {
+    const params = assetParamsSchema.parse(request.params);
+    const input = createAssetTransferSchema.parse(request.body);
+    const asset = await getTransferAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const fromUserId = getResponsibleUserId(asset);
+
+    if (input.transferType === "reassignment") {
+      if (input.toUserId === fromUserId) {
+        return reply.code(400).send({ message: "Asset is already assigned to that user." });
+      }
+
+      const targetMembership = await getMembership(app.prisma, asset.householdId, input.toUserId);
+      if (!targetMembership) {
+        return reply.code(400).send({ message: "Target user must be a member of the current household." });
+      }
+
+      const transfer = await app.prisma.$transaction(async (tx) => {
+        await tx.asset.update({
+          where: { id: asset.id },
+          data: { ownerId: input.toUserId }
+        });
+
+        const created = await tx.assetTransfer.create({
+          data: {
+            assetId: asset.id,
+            transferType: "reassignment",
+            fromHouseholdId: asset.householdId,
+            fromUserId,
+            toUserId: input.toUserId,
+            initiatedById: request.auth.userId,
+            reason: input.reason,
+            notes: input.notes
+          },
+          include: {
+            fromUser: { select: { id: true, displayName: true } },
+            toUser: { select: { id: true, displayName: true } },
+            initiatedBy: { select: { id: true, displayName: true } }
+          }
+        });
+
+        await logActivity(tx, {
+          householdId: asset.householdId,
+          userId: request.auth.userId,
+          action: "asset.reassigned",
+          entityType: "asset",
+          entityId: asset.id,
+          metadata: {
+            assetName: asset.name,
+            fromUserId,
+            toUserId: input.toUserId,
+            reason: input.reason ?? null
+          }
+        });
+
+        return created;
+      });
+
+      return reply.code(201).send(toAssetTransferResponse(transfer, transfer));
+    }
+
+    if (!input.toHouseholdId) {
+      return reply.code(400).send({ message: "toHouseholdId is required for household transfers." });
+    }
+
+    if (input.toHouseholdId === asset.householdId) {
+      return reply.code(400).send({ message: "Use reassignment for transfers within the same household." });
+    }
+
+    try {
+      await assertOwner(app.prisma, asset.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "Only household owners can initiate inter-household transfers." });
+    }
+
+    const targetMembership = await getMembership(app.prisma, input.toHouseholdId, input.toUserId);
+    if (!targetMembership) {
+      return reply.code(400).send({ message: "Target user must be a member of the destination household." });
+    }
+
+    const transfer = await app.prisma.$transaction(async (tx) => {
+      const scopeAssets = await collectTransferScopeAssets(tx as unknown as PrismaClient, asset);
+      const assetIds = scopeAssets.map((entry) => entry.id);
+      const now = new Date();
+
+      await tx.asset.updateMany({
+        where: { id: { in: assetIds } },
+        data: {
+          householdId: input.toHouseholdId,
+          ownerId: input.toUserId
+        }
+      });
+
+      await tx.notification.updateMany({
+        where: {
+          OR: [
+            { assetId: { in: assetIds } },
+            { schedule: { assetId: { in: assetIds } } }
+          ]
+        },
+        data: { householdId: input.toHouseholdId }
+      });
+
+      await tx.assetTransfer.createMany({
+        data: scopeAssets.map((entry) => ({
+          assetId: entry.id,
+          transferType: "household_transfer",
+          fromHouseholdId: entry.householdId,
+          toHouseholdId: input.toHouseholdId,
+          fromUserId: getResponsibleUserId(entry),
+          toUserId: input.toUserId,
+          initiatedById: request.auth.userId,
+          reason: input.reason,
+          notes: input.notes,
+          transferredAt: now,
+          createdAt: now
+        }))
+      });
+
+      const created = await tx.assetTransfer.findFirstOrThrow({
+        where: {
+          assetId: asset.id,
+          transferType: "household_transfer",
+          initiatedById: request.auth.userId,
+          transferredAt: now
+        },
+        include: {
+          fromUser: { select: { id: true, displayName: true } },
+          toUser: { select: { id: true, displayName: true } },
+          initiatedBy: { select: { id: true, displayName: true } }
+        }
+      });
+
+      await logActivity(tx, {
+        householdId: asset.householdId,
+        userId: request.auth.userId,
+        action: "asset.household_transferred_out",
+        entityType: "asset",
+        entityId: asset.id,
+        metadata: {
+          assetName: asset.name,
+          movedAssetIds: assetIds,
+          movedAssetCount: assetIds.length,
+          toHouseholdId: input.toHouseholdId,
+          toUserId: input.toUserId,
+          reason: input.reason ?? null
+        }
+      });
+
+      await logActivity(tx, {
+        householdId: input.toHouseholdId,
+        userId: request.auth.userId,
+        action: "asset.household_transferred_in",
+        entityType: "asset",
+        entityId: asset.id,
+        metadata: {
+          assetName: asset.name,
+          movedAssetIds: assetIds,
+          movedAssetCount: assetIds.length,
+          fromHouseholdId: asset.householdId,
+          toUserId: input.toUserId,
+          reason: input.reason ?? null
+        }
+      });
+
+      return created;
+    });
+
+    return reply.code(201).send(toAssetTransferResponse(transfer, transfer));
+  });
+
+  app.get("/v1/assets/:assetId/transfers", async (request, reply) => {
+    const params = assetParamsSchema.parse(request.params);
+    const asset = await app.prisma.asset.findUnique({
+      where: { id: params.assetId },
+      select: {
+        id: true,
+        householdId: true
+      }
+    });
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    try {
+      await assertMembership(app.prisma, asset.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const transfers = await app.prisma.assetTransfer.findMany({
+      where: { assetId: asset.id },
+      include: {
+        fromUser: { select: { id: true, displayName: true } },
+        toUser: { select: { id: true, displayName: true } },
+        initiatedBy: { select: { id: true, displayName: true } }
+      },
+      orderBy: [
+        { transferredAt: "desc" },
+        { createdAt: "desc" }
+      ]
+    });
+
+    return assetTransferListSchema.parse({
+      items: transfers.map((entry) => toAssetTransferResponse(entry, entry)),
+      nextCursor: null
+    });
+  });
+
+  app.get("/v1/households/:householdId/transfers", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const query = householdTransferQuerySchema.parse(request.query);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const transfers = await app.prisma.assetTransfer.findMany({
+      where: {
+        OR: [
+          { fromHouseholdId: params.householdId },
+          { toHouseholdId: params.householdId }
+        ],
+        ...(query.transferType ? { transferType: query.transferType } : {}),
+        ...(query.since ? { transferredAt: { gte: new Date(query.since) } } : {})
+      },
+      include: {
+        fromUser: { select: { id: true, displayName: true } },
+        toUser: { select: { id: true, displayName: true } },
+        initiatedBy: { select: { id: true, displayName: true } }
+      },
+      take: query.limit + 1,
+      ...(query.cursor ? {
+        cursor: { id: query.cursor },
+        skip: 1
+      } : {}),
+      orderBy: [
+        { transferredAt: "desc" },
+        { id: "desc" }
+      ]
+    });
+
+    const page = transfers.slice(0, query.limit);
+    const nextCursor = transfers.length > query.limit ? transfers[query.limit]?.id ?? null : null;
+
+    return assetTransferListSchema.parse({
+      items: page.map((entry) => toAssetTransferResponse(entry, entry)),
+      nextCursor
+    });
+  });
+};

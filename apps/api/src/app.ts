@@ -4,6 +4,7 @@ import { authPlugin } from "./plugins/auth.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { assetRoutes } from "./routes/assets/index.js";
 import { assetInventoryRoutes } from "./routes/assets/inventory.js";
+import { assetTransferRoutes } from "./routes/assets/transfers.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { healthRoutes } from "./routes/health.js";
 import { householdRoutes } from "./routes/households/index.js";
@@ -42,6 +43,7 @@ export const buildApp = () => {
   app.register(dashboardRoutes);
   app.register(assetRoutes);
   app.register(assetInventoryRoutes);
+  app.register(assetTransferRoutes);
   app.register(usageMetricRoutes);
   app.register(scheduleRoutes);
   app.register(maintenanceLogRoutes);

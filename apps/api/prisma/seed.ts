@@ -124,6 +124,7 @@ async function main(): Promise<void> {
   await prisma.asset.upsert({
     where: { id: assetId },
     update: {
+      assetTag: "LK-00000001",
       name: "Primary Vehicle",
       category: "vehicle",
       visibility: "shared",
@@ -146,8 +147,10 @@ async function main(): Promise<void> {
     },
     create: {
       id: assetId,
+      assetTag: "LK-00000001",
       householdId,
       createdById: ownerUserId,
+      ownerId: ownerUserId,
       name: "Primary Vehicle",
       category: "vehicle",
       visibility: "shared",
@@ -179,6 +182,7 @@ async function main(): Promise<void> {
   await prisma.asset.upsert({
     where: { id: personalAssetId },
     update: {
+      assetTag: "LK-00000002",
       name: "Private Workshop Printer",
       category: "workshop",
       visibility: "personal",
@@ -187,8 +191,10 @@ async function main(): Promise<void> {
     },
     create: {
       id: personalAssetId,
+      assetTag: "LK-00000002",
       householdId,
       createdById: ownerUserId,
+      ownerId: ownerUserId,
       name: "Private Workshop Printer",
       category: "workshop",
       visibility: "personal",
@@ -205,6 +211,7 @@ async function main(): Promise<void> {
   await prisma.asset.upsert({
     where: { id: childAssetId },
     update: {
+      assetTag: "LK-00000003",
       householdId,
       createdById: ownerUserId,
       parentAssetId: assetId,
@@ -217,8 +224,10 @@ async function main(): Promise<void> {
     },
     create: {
       id: childAssetId,
+      assetTag: "LK-00000003",
       householdId,
       createdById: ownerUserId,
+      ownerId: ownerUserId,
       parentAssetId: assetId,
       name: "Primary Vehicle Battery",
       category: "vehicle",

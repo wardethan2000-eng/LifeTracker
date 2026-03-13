@@ -1,6 +1,6 @@
 import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema } from "@lifekeeper/types";
 import type { PrismaClient } from "@prisma/client";
-import { assertMembership, getAccessibleAsset, getMembership } from "./asset-access.js";
+import { assertMembership, getAccessibleAsset, getMembership, personalAssetAccessWhere } from "./asset-access.js";
 import { toMaintenanceLogResponse } from "./maintenance-logs.js";
 import { toAssetResponse, toNotificationResponse, toUsageMetricResponse } from "./presenters.js";
 import { toMaintenanceScheduleResponse } from "./schedule-state.js";
@@ -42,10 +42,7 @@ export const listHouseholdDueWork = async (
       asset: {
         householdId,
         isArchived: false,
-        OR: [
-          { visibility: "shared" },
-          { createdById: userId }
-        ]
+        ...personalAssetAccessWhere(userId)
       }
     },
     include: {
@@ -125,10 +122,7 @@ export const buildHouseholdDashboard = async (
       where: {
         householdId,
         isArchived: false,
-        OR: [
-          { visibility: "shared" },
-          { createdById: userId }
-        ]
+        ...personalAssetAccessWhere(userId)
       },
       include: {
         schedules: {

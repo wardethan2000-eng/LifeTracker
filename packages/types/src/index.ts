@@ -23,6 +23,7 @@ export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", 
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
 export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
+export const assetTransferTypeValues = ["reassignment", "household_transfer"] as const;
 export const assetFieldTypeValues = [
   "string",
   "number",
@@ -48,8 +49,10 @@ export const inventoryTransactionTypeSchema = z.enum(inventoryTransactionTypeVal
 export const scheduleStatusSchema = z.enum(scheduleStatusValues);
 export const presetSourceSchema = z.enum(presetSourceValues);
 export const assetTypeSourceSchema = z.enum(assetTypeSourceValues);
+export const assetTransferTypeSchema = z.enum(assetTransferTypeValues);
 export const assetFieldTypeSchema = z.enum(assetFieldTypeValues);
 export const customFieldTemplateTypeSchema = assetFieldTypeSchema;
+export const assetTagSchema = z.string().trim().toUpperCase().regex(/^LK-[A-Z0-9]{8,}$/);
 
 export const assetFieldValueSchema = z.union([
   z.string(),
@@ -491,11 +494,28 @@ export const shallowAssetSchema = z.object({
   category: assetCategorySchema
 });
 
+export const assetLookupQuerySchema = z.object({
+  tag: assetTagSchema
+});
+
+export const assetLabelDataSchema = z.object({
+  assetId: z.string().cuid(),
+  assetTag: assetTagSchema,
+  name: z.string(),
+  serialNumber: z.string().nullable(),
+  category: assetCategorySchema,
+  manufacturer: z.string().nullable(),
+  model: z.string().nullable(),
+  qrPayloadUrl: z.string().url()
+});
+
 export const assetSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
   createdById: z.string().cuid(),
+  ownerId: z.string().cuid().nullable().default(null),
   parentAssetId: z.string().cuid().nullable().default(null),
+  assetTag: assetTagSchema,
   name: z.string(),
   category: assetCategorySchema,
   visibility: assetVisibilitySchema,
@@ -691,6 +711,45 @@ export const updateMaintenanceScheduleSchema = z.object({
 export const shallowUserSchema = z.object({
   id: z.string().cuid(),
   displayName: z.string().nullable()
+});
+
+export const assetTransferSchema = z.object({
+  id: z.string().cuid(),
+  assetId: z.string().cuid(),
+  transferType: assetTransferTypeSchema,
+  fromHouseholdId: z.string().cuid(),
+  toHouseholdId: z.string().cuid().nullable().default(null),
+  fromUserId: z.string().cuid(),
+  toUserId: z.string().cuid(),
+  initiatedById: z.string().cuid(),
+  reason: z.string().nullable().default(null),
+  notes: z.string().nullable().default(null),
+  transferredAt: z.string().datetime(),
+  createdAt: z.string().datetime(),
+  fromUser: shallowUserSchema,
+  toUser: shallowUserSchema,
+  initiatedBy: shallowUserSchema
+});
+
+export const createAssetTransferSchema = z.object({
+  transferType: assetTransferTypeSchema,
+  toUserId: z.string().cuid(),
+  toHouseholdId: z.string().cuid().optional(),
+  reason: z.string().max(200).optional(),
+  notes: z.string().max(4000).optional()
+}).superRefine((value, context) => {
+  if (value.transferType === "household_transfer" && !value.toHouseholdId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["toHouseholdId"],
+      message: "toHouseholdId is required for household transfers."
+    });
+  }
+});
+
+export const assetTransferListSchema = z.object({
+  items: z.array(assetTransferSchema),
+  nextCursor: z.string().cuid().nullable().default(null)
 });
 
 export const maintenanceScheduleSchema = z.object({
@@ -1179,6 +1238,7 @@ export type InventoryTransactionType = z.infer<typeof inventoryTransactionTypeSc
 export type ScheduleStatus = z.infer<typeof scheduleStatusSchema>;
 export type PresetSource = z.infer<typeof presetSourceSchema>;
 export type AssetTypeSource = z.infer<typeof assetTypeSourceSchema>;
+export type AssetTransferType = z.infer<typeof assetTransferTypeSchema>;
 export type AssetFieldType = z.infer<typeof assetFieldTypeSchema>;
 export type CustomFieldTemplateType = z.infer<typeof customFieldTemplateTypeSchema>;
 export type AssetFieldValue = z.infer<typeof assetFieldValueSchema>;
@@ -1208,6 +1268,12 @@ export type UsageMetric = z.infer<typeof usageMetricResponseSchema>;
 export type CreateAssetInput = z.infer<typeof createAssetSchema>;
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
 export type Asset = z.infer<typeof assetSchema>;
+export type AssetTransfer = z.infer<typeof assetTransferSchema>;
+export type CreateAssetTransferInput = z.infer<typeof createAssetTransferSchema>;
+export type AssetTransferList = z.infer<typeof assetTransferListSchema>;
+export type AssetTag = z.infer<typeof assetTagSchema>;
+export type AssetLookupQuery = z.infer<typeof assetLookupQuerySchema>;
+export type AssetLabelData = z.infer<typeof assetLabelDataSchema>;
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateHouseholdInput = z.infer<typeof createHouseholdSchema>;
