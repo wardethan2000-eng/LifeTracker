@@ -50,6 +50,7 @@ const categoryOptions: Array<{ value: AssetCategory; label: string }> = [
   { value: "vehicle", label: "Vehicle" },
   { value: "home", label: "Home" },
   { value: "marine", label: "Marine" },
+  { value: "aircraft", label: "Aircraft" },
   { value: "yard", label: "Yard & Garden" },
   { value: "workshop", label: "Workshop & Tools" },
   { value: "appliance", label: "Appliance" },
@@ -342,6 +343,7 @@ const categorySuggestedFields: Partial<Record<AssetCategory, AssetFieldDefinitio
       group: "Location & Condition"
     }
   ],
+  aircraft: [],
   yard: [
     {
       key: "power-source",
@@ -595,7 +597,7 @@ const dedupeSuggestedFields = (fields: AssetFieldDefinition[]): AssetFieldDefini
   const byKey = new Map<string, AssetFieldDefinition>();
 
   for (const field of fields) {
-    const normalizedKey = field.key.trim().toLowerCase() || slugify(field.label);
+    const normalizedKey = slugify(field.key) || slugify(field.label);
 
     if (!normalizedKey || byKey.has(normalizedKey)) {
       continue;
@@ -832,6 +834,8 @@ export function AssetProfileWorkbench({
   const [expandedFieldEditors, setExpandedFieldEditors] = useState<number[]>([]);
 
   const selectedBlueprint = blueprintOptions.find((preset) => preset.id === selectedBlueprintId);
+  const categoryLibraryBlueprints = libraryBlueprints.filter((preset) => preset.category === category);
+  const categoryCustomBlueprints = customBlueprints.filter((preset) => preset.category === category);
   const availableParentAssets = householdAssets.filter((asset) => asset.id !== initialAsset?.id);
   const assetTypeSource: AssetTypeSource = selectedBlueprint
     ? selectedBlueprint.source
@@ -900,14 +904,19 @@ export function AssetProfileWorkbench({
   ];
   const dynamicSections = getDistinctGroups(fieldDefinitions);
   const detailSections = Array.from(new Set([...dynamicSections, ...manualSections]));
-  const suggestionPool = dedupeSuggestedFields([
-    ...commonDefaultFields,
-    ...sharedSuggestedFields,
-    ...(categorySuggestedFields[category] ?? []),
-    ...blueprintOptions
-      .filter((preset) => preset.category === category)
-      .flatMap((preset) => preset.fieldDefinitions)
-  ]);
+  const blueprintSuggestionFields = selectedBlueprint ? selectedBlueprint.fieldDefinitions : [];
+  const suggestionPool = dedupeSuggestedFields(category === "aircraft" && selectedBlueprint
+    ? [
+      ...commonDefaultFields,
+      ...sharedSuggestedFields,
+      ...blueprintSuggestionFields
+    ]
+    : [
+      ...commonDefaultFields,
+      ...sharedSuggestedFields,
+      ...(categorySuggestedFields[category] ?? []),
+      ...blueprintSuggestionFields
+    ]);
   const availableSuggestedFields = suggestionPool.filter((suggestion) => !fieldDefinitions.some((field) => field.key === suggestion.key));
   const groupedFieldDefinitions = fieldDefinitions.reduce<Record<string, Array<{ field: AssetFieldDefinition; index: number }>>>((groups, field, index) => {
     const key = field.group?.trim() || "General";
@@ -956,6 +965,14 @@ export function AssetProfileWorkbench({
     const merged = mergeFieldDefinitions(nextBlueprint.fieldDefinitions);
     setFieldDefinitions(merged);
     setFieldValues(buildFieldValueMap(merged));
+  };
+
+  const handleCategoryChange = (nextCategory: AssetCategory): void => {
+    setCategory(nextCategory);
+
+    if (selectedBlueprint && selectedBlueprint.category !== nextCategory) {
+      handleBlueprintChange("");
+    }
   };
 
   const removeSection = (sectionLabel: string): void => {
@@ -1132,6 +1149,11 @@ export function AssetProfileWorkbench({
         .map((field) => [field.key, fieldValues[field.key] ?? buildDefaultFieldValue(field)])
     )
   );
+  const templateLabel = category === "aircraft" ? "Aircraft Subcategory" : "Start from Template";
+  const templateDescription = selectedBlueprint?.description
+    ?? (category === "aircraft"
+      ? "Choose the aircraft family that matches the asset so the details, metrics, and maintenance profile fit the mission and systems on board."
+      : "Templates can pre-fill recommended details for common asset types.");
 
   return (
     <form action={action} className={`asset-studio asset-studio--${layoutMode}`}>
@@ -1178,7 +1200,7 @@ export function AssetProfileWorkbench({
 
           <label className="field">
             <span>Category</span>
-            <select name="category" value={category} onChange={(event) => setCategory(event.target.value as AssetCategory)}>
+            <select name="category" value={category} onChange={(event) => handleCategoryChange(event.target.value as AssetCategory)}>
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -1186,25 +1208,25 @@ export function AssetProfileWorkbench({
           </label>
 
           <label className="field">
-            <span>Start from Template</span>
+            <span>{templateLabel}</span>
             <select value={selectedBlueprintId} onChange={(event) => handleBlueprintChange(event.target.value)}>
               <option value="">None (blank)</option>
-              {libraryBlueprints.length > 0 && (
+              {categoryLibraryBlueprints.length > 0 && (
                 <optgroup label="Built-in Templates">
-                  {libraryBlueprints.map((preset) => (
+                  {categoryLibraryBlueprints.map((preset) => (
                     <option key={preset.id} value={preset.id}>{preset.label}</option>
                   ))}
                 </optgroup>
               )}
-              {customBlueprints.length > 0 && (
+              {categoryCustomBlueprints.length > 0 && (
                 <optgroup label="My Templates">
-                  {customBlueprints.map((preset) => (
+                  {categoryCustomBlueprints.map((preset) => (
                     <option key={preset.id} value={preset.id}>{preset.label}</option>
                   ))}
                 </optgroup>
               )}
             </select>
-            <small>Templates can pre-fill recommended details for common asset types</small>
+            <small>{templateDescription}</small>
           </label>
         </div>
       </section>

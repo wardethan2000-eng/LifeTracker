@@ -4,6 +4,7 @@ export const assetCategoryValues = [
   "vehicle",
   "home",
   "marine",
+  "aircraft",
   "yard",
   "workshop",
   "appliance",

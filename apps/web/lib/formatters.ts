@@ -30,6 +30,7 @@ const categoryLabels: Record<AssetCategory, string> = {
   vehicle: "Vehicle",
   home: "Home",
   marine: "Marine",
+  aircraft: "Aircraft",
   yard: "Yard",
   workshop: "Workshop",
   appliance: "Appliance",

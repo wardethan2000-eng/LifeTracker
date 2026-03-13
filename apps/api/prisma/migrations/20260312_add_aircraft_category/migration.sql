@@ -1,0 +1,1 @@
+ALTER TYPE "AssetCategory" ADD VALUE IF NOT EXISTS 'aircraft';
