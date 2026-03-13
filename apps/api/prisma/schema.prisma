@@ -568,6 +568,25 @@ model ProjectExpense {
   @@index([projectId])
 }
 
+model SearchIndex {
+  id               String                 @id
+  householdId      String
+  entityType       String
+  entityId         String
+  parentEntityId   String?
+  parentEntityName String?
+  title            String
+  subtitle         String?
+  body             String?
+  searchVector     Unsupported("tsvector")
+  entityUrl        String
+  entityMeta       Json?
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([householdId, entityType])
+}
+
 // ── Activity Log ─────────────────────────────────────────────────────
 
 model ActivityLog {

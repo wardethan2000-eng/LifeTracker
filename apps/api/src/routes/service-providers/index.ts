@@ -8,6 +8,7 @@ import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { toServiceProviderResponse } from "../../lib/presenters.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { syncServiceProviderToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -54,6 +55,8 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
       entityId: provider.id,
       metadata: { name: provider.name }
     });
+
+    void syncServiceProviderToSearchIndex(app.prisma, provider.id).catch(console.error);
 
     return reply.code(201).send(toServiceProviderResponse(provider));
   });
@@ -135,6 +138,8 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
+    void syncServiceProviderToSearchIndex(app.prisma, provider.id).catch(console.error);
+
     return toServiceProviderResponse(provider);
   });
 
@@ -157,6 +162,8 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
 
     // Prisma onDelete: SetNull handles clearing serviceProviderId on related logs
     await app.prisma.serviceProvider.delete({ where: { id: existing.id } });
+
+    void removeSearchIndexEntry(app.prisma, "service_provider", existing.id).catch(console.error);
 
     return reply.code(204).send();
   });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { ApiError, getMe } from "../lib/api";
+import { SearchCommandPalette } from "./search-command-palette";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -50,11 +51,13 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
 export async function AppShell({ children, activePath }: AppShellProps): Promise<JSX.Element> {
   let userName = "User";
   let userRole = "Member";
+  let fallbackHouseholdId: string | null = null;
 
   try {
     const me = await getMe();
     userName = me.user.displayName ?? me.user.email ?? "User";
     userRole = me.households[0] ? "Owner" : "Member";
+    fallbackHouseholdId = me.households[0]?.id ?? null;
   } catch {
     // Sidebar still renders even if user fetch fails
   }
@@ -107,6 +110,9 @@ export async function AppShell({ children, activePath }: AppShellProps): Promise
       </nav>
 
       <div className="main-content">
+        <div className="shell-toolbar">
+          <SearchCommandPalette fallbackHouseholdId={fallbackHouseholdId} />
+        </div>
         {children}
       </div>
     </div>

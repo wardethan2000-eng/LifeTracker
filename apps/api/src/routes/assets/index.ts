@@ -27,6 +27,7 @@ import {
 } from "../../lib/asset-tags.js";
 import { toAssetResponse } from "../../lib/presenters.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { syncAssetFamilyToSearchIndex } from "../../lib/search-index.js";
 
 const assetIdParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -155,6 +156,8 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       entityId: asset.id,
       metadata: { name: asset.name, category: asset.category, assetTag }
     });
+
+    void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
 
     return reply.code(201).send(toAssetResponse(asset));
   });
@@ -305,6 +308,8 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: asset.name }
     });
 
+    void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+
     return toAssetResponse(asset);
   });
 
@@ -333,6 +338,8 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: existing.name }
     });
 
+    void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+
     return toAssetResponse(asset);
   });
 
@@ -345,6 +352,9 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id },
       data: { isArchived: false }
     });
+
+    void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+
     return toAssetResponse(asset);
   });
 
@@ -357,6 +367,9 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id },
       data: { deletedAt: new Date() }
     });
+
+    void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+
     return toAssetResponse(asset);
   });
 
@@ -369,6 +382,9 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id },
       data: { deletedAt: null }
     });
+
+    void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+
     return toAssetResponse(asset);
   });
 

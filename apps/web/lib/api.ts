@@ -24,6 +24,7 @@ import {
   projectSchema,
   projectSummarySchema,
   projectTaskSchema,
+  searchResponseSchema,
   serviceProviderSchema,
   threadedCommentSchema,
   type Asset,
@@ -66,6 +67,8 @@ import {
   type Project,
   type ProjectDetail,
   type ProjectExpense,
+  type SearchEntityType,
+  type SearchResponse,
   type ProjectSummary,
   type ProjectTask,
   type ProjectStatus,
@@ -278,6 +281,30 @@ export const getHouseholdProjects = async (householdId: string): Promise<Project
   path: `/v1/households/${householdId}/projects`,
   schema: projectSummaryListSchema
 });
+
+export const searchHousehold = async (
+  householdId: string,
+  query: string,
+  options?: {
+    limit?: number;
+    types?: SearchEntityType[];
+  }
+): Promise<SearchResponse> => {
+  const params = new URLSearchParams({ q: query });
+
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  if (options?.types && options.types.length > 0) {
+    params.set("types", options.types.join(","));
+  }
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/search?${params.toString()}`,
+    schema: searchResponseSchema
+  });
+};
 
 export const getHouseholdActivity = async (householdId: string): Promise<ActivityLog[]> => apiRequest({
   path: `/v1/households/${householdId}/activity`,

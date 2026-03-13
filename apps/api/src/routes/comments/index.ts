@@ -6,6 +6,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { syncCommentToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -132,6 +133,8 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
+
     return reply.code(201).send(toCommentResponse(comment));
   });
 
@@ -168,6 +171,8 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
         author: { select: { id: true, displayName: true } }
       }
     });
+
+    void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
 
     return toCommentResponse(comment);
   });
@@ -218,6 +223,8 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
         bodyPreview: existing.body.slice(0, 100)
       }
     });
+
+    void removeSearchIndexEntry(app.prisma, "comment", existing.id).catch(console.error);
 
     return reply.code(204).send();
   });

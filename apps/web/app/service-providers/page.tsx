@@ -15,6 +15,7 @@ type ServiceProvidersPageProps = {
 export default async function ServiceProvidersPage({ searchParams }: ServiceProvidersPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
+  const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
 
   try {
     const me = await getMe();
@@ -77,7 +78,7 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
               ) : (
                 <div className="schedule-stack">
                   {providers.map((provider) => (
-                    <div key={provider.id} className="schedule-card">
+                    <div key={provider.id} className={`schedule-card${provider.id === highlightId ? " schedule-card--highlight" : ""}`}>
                       <form action={updateServiceProviderAction}>
                         <input type="hidden" name="householdId" value={household.id} />
                         <input type="hidden" name="providerId" value={provider.id} />

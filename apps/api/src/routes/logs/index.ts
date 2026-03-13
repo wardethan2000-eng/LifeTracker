@@ -16,6 +16,7 @@ import {
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { syncLogToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -205,6 +206,11 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 
+    void Promise.all([
+      syncLogToSearchIndex(app.prisma, log.id),
+      ...(log.scheduleId ? [syncScheduleToSearchIndex(app.prisma, log.scheduleId)] : [])
+    ]).catch(console.error);
+
     return reply.code(201).send({
       ...toMaintenanceLogResponse(log, log.parts),
       inventoryWarnings
@@ -323,6 +329,11 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 
+    void Promise.all([
+      syncLogToSearchIndex(app.prisma, log.id),
+      ...(log.scheduleId ? [syncScheduleToSearchIndex(app.prisma, log.scheduleId)] : [])
+    ]).catch(console.error);
+
     return toMaintenanceLogResponse(log, log.parts);
   });
 
@@ -354,6 +365,11 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await enqueueNotificationScan({ householdId: asset.householdId });
+
+    void Promise.all([
+      removeSearchIndexEntry(app.prisma, "log", existing.id),
+      ...(existing.scheduleId ? [syncScheduleToSearchIndex(app.prisma, existing.scheduleId)] : [])
+    ]).catch(console.error);
 
     return reply.code(204).send();
   });

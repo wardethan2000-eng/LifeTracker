@@ -17,6 +17,7 @@ import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
+import { syncLogToSearchIndex, syncProjectToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -258,6 +259,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: project.name }
     });
 
+    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+
     return reply.code(201).send(toProjectResponse(project));
   });
 
@@ -344,6 +347,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: project.name }
     });
 
+    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+
     return toProjectResponse(project);
   });
 
@@ -365,6 +370,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.project.delete({ where: { id: existing.id } });
+
+    void removeSearchIndexEntry(app.prisma, "project", existing.id).catch(console.error);
 
     return reply.code(204).send();
   });
@@ -408,6 +415,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       entityId: project.id,
       metadata: { name: project.name, oldStatus: existing.status, newStatus: status }
     });
+
+    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
 
     return toProjectResponse(project);
   });
@@ -660,6 +669,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         data.completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
 
         // If linked to a maintenance schedule, optionally trigger schedule completion
+        let createdScheduleLogId: string | null = null;
+
         if (effectiveScheduleId) {
           const schedule = await app.prisma.maintenanceSchedule.findUnique({
             where: { id: effectiveScheduleId },
@@ -676,9 +687,15 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
                 completedAt: new Date()
               };
 
-              await tx.maintenanceLog.create({ data: logData });
+              const createdLog = await tx.maintenanceLog.create({ data: logData });
+              createdScheduleLogId = createdLog.id;
               await syncScheduleCompletionFromLogs(tx, schedule.id);
             });
+
+            void Promise.all([
+              syncScheduleToSearchIndex(app.prisma, schedule.id),
+              ...(createdScheduleLogId ? [syncLogToSearchIndex(app.prisma, createdScheduleLogId)] : [])
+            ]).catch(console.error);
           }
         }
 

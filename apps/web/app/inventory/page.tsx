@@ -61,6 +61,7 @@ const formatRestockPlan = (value: number | null, unit: string): string => {
 export default async function InventoryPage({ searchParams }: InventoryPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
+  const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
 
   try {
     const me = await getMe();
@@ -168,7 +169,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                   </thead>
                   <tbody>
                     {lowStockItems.map((item) => (
-                      <tr key={item.id} className="row--due">
+                      <tr key={item.id} className={["row--due", item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ")}>
                         <td>
                           <div className="data-table__primary">{item.name}</div>
                           <div className="data-table__secondary">
@@ -218,7 +219,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                       </thead>
                       <tbody>
                         {categoryItems.map((item) => (
-                          <tr key={item.id} className={item.lowStock ? "row--due" : undefined}>
+                          <tr key={item.id} className={[item.lowStock ? "row--due" : null, item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ") || undefined}>
                             <td>
                               <div className="data-table__primary">{item.name}</div>
                               <div className="data-table__secondary">

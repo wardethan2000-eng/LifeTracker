@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
+import { rebuildSearchIndex } from "../src/lib/search-index.js";
 
 const prisma = new PrismaClient();
 
@@ -1119,6 +1120,8 @@ async function main(): Promise<void> {
       body: "I noticed that too. It might just be the sensor, but let's check the level after the next oil change."
     }
   });
+
+  await rebuildSearchIndex(prisma, householdId);
 
   console.log(JSON.stringify({
     ownerUserId,

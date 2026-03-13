@@ -14,6 +14,7 @@ import {
   toLowStockInventoryItemResponse
 } from "../../lib/inventory.js";
 import { calculateInventoryDeficit, isInventoryLowStock } from "@lifekeeper/utils";
+import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -93,6 +94,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
 
       return created;
     });
+
+    void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
 
     return reply.code(201).send(toInventoryItemSummaryResponse(item));
   });
@@ -268,6 +271,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       return result.item;
     });
 
+    void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
+
     return toInventoryItemSummaryResponse(item);
   });
 
@@ -287,6 +292,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     await app.prisma.inventoryItem.delete({
       where: { id: existing.id }
     });
+
+    void removeSearchIndexEntry(app.prisma, "inventory_item", existing.id).catch(console.error);
 
     return reply.code(204).send();
   });

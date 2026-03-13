@@ -1226,6 +1226,90 @@ export const updateCommentSchema = z.object({
   body: z.string().min(1).max(5000)
 });
 
+// ── Search Schemas ───────────────────────────────────────────────────
+
+export const searchEntityTypeValues = [
+  "asset",
+  "schedule",
+  "log",
+  "project",
+  "service_provider",
+  "inventory_item",
+  "comment"
+] as const;
+
+export const searchEntityTypeSchema = z.enum(searchEntityTypeValues);
+
+export const searchResultSchema = z.object({
+  entityType: searchEntityTypeSchema,
+  entityId: z.string().min(1),
+  title: z.string().min(1),
+  subtitle: z.string().nullable(),
+  entityUrl: z.string().min(1),
+  parentEntityName: z.string().nullable(),
+  entityMeta: z.record(z.string(), z.unknown()).nullable()
+});
+
+export const searchResultGroupSchema = z.object({
+  entityType: searchEntityTypeSchema,
+  label: z.string().min(1),
+  results: z.array(searchResultSchema)
+});
+
+const searchTypesInputSchema = z.union([
+  z.string(),
+  z.array(z.string())
+]).optional();
+
+export const searchQuerySchema = z.object({
+  q: z.string().trim().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  types: searchTypesInputSchema.transform((value, context) => {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const rawValues = Array.isArray(value)
+      ? value.flatMap((entry) => entry.split(","))
+      : value.split(",");
+
+    const normalized = rawValues
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (normalized.length === 0) {
+      return undefined;
+    }
+
+    const parsed: Array<(typeof searchEntityTypeValues)[number]> = [];
+
+    for (const entry of normalized) {
+      const result = searchEntityTypeSchema.safeParse(entry);
+
+      if (!result.success) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["types"],
+          message: `Unsupported search type: ${entry}`
+        });
+
+        return z.NEVER;
+      }
+
+      if (!parsed.includes(result.data)) {
+        parsed.push(result.data);
+      }
+    }
+
+    return parsed;
+  })
+});
+
+export const searchResponseSchema = z.object({
+  query: z.string(),
+  groups: z.array(searchResultGroupSchema)
+});
+
 export type AssetCategory = z.infer<typeof assetCategorySchema>;
 export type AssetVisibility = z.infer<typeof assetVisibilitySchema>;
 export type HouseholdRole = z.infer<typeof householdRoleSchema>;
@@ -1283,6 +1367,11 @@ export type AddHouseholdMemberInput = z.infer<typeof addHouseholdMemberSchema>;
 export type UpdateHouseholdMemberInput = z.infer<typeof updateHouseholdMemberSchema>;
 export type HouseholdMember = z.infer<typeof householdMemberSchema>;
 export type MeResponse = z.infer<typeof meResponseSchema>;
+export type SearchEntityType = z.infer<typeof searchEntityTypeSchema>;
+export type SearchResult = z.infer<typeof searchResultSchema>;
+export type SearchResultGroup = z.infer<typeof searchResultGroupSchema>;
+export type SearchQuery = z.infer<typeof searchQuerySchema>;
+export type SearchResponse = z.infer<typeof searchResponseSchema>;
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
 export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesSchema>;
