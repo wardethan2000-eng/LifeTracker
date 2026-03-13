@@ -11,7 +11,9 @@ import {
   maintenanceScheduleSchema,
   householdDashboardSchema,
   householdSummarySchema,
+  inventoryItemSummarySchema,
   libraryPresetSchema,
+  lowStockInventoryItemSchema,
   meResponseSchema,
   notificationSchema,
   projectAssetSchema,
@@ -47,7 +49,10 @@ import {
   type HouseholdInvitation,
   type HouseholdMember,
   type HouseholdSummary,
+  type CreateInventoryItemInput,
+  type InventoryItemSummary,
   type LibraryPreset,
+  type LowStockInventoryItem,
   type MaintenanceLog,
   type MaintenanceSchedule,
   type MeResponse,
@@ -96,6 +101,22 @@ const commentWithRepliesSchema = commentSchema.extend({
 const threadedCommentListSchema = threadedCommentSchema.array();
 const householdInvitationListSchema = householdInvitationSchema.array();
 const householdMemberListSchema = householdMemberSchema.array();
+const inventoryItemSummaryListSchema = inventoryItemSummarySchema.array();
+const householdInventoryListSchema = {
+  parse: (value: unknown) => {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Invalid inventory response.");
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return {
+      items: inventoryItemSummaryListSchema.parse(record.items ?? []),
+      nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null
+    };
+  }
+};
+const householdLowStockListSchema = lowStockInventoryItemSchema.array();
 const maintenanceLogListSchema = maintenanceLogSchema.array();
 const projectSummaryListSchema = projectSummarySchema.array();
 const serviceProviderListSchema = serviceProviderSchema.array();
@@ -300,6 +321,61 @@ export const getHouseholdMembers = async (householdId: string): Promise<Househol
 export const getHouseholdServiceProviders = async (householdId: string): Promise<ServiceProvider[]> => apiRequest({
   path: `/v1/households/${householdId}/service-providers`,
   schema: serviceProviderListSchema
+});
+
+export const getHouseholdInventory = async (
+  householdId: string,
+  options?: {
+    lowStock?: boolean;
+    category?: string;
+    search?: string;
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<{ items: InventoryItemSummary[]; nextCursor: string | null }> => {
+  const query = new URLSearchParams();
+
+  if (options?.lowStock !== undefined) {
+    query.set("lowStock", String(options.lowStock));
+  }
+
+  if (options?.category) {
+    query.set("category", options.category);
+  }
+
+  if (options?.search) {
+    query.set("search", options.search);
+  }
+
+  if (options?.limit !== undefined) {
+    query.set("limit", String(options.limit));
+  }
+
+  if (options?.cursor) {
+    query.set("cursor", options.cursor);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/inventory${suffix}`,
+    schema: householdInventoryListSchema
+  });
+};
+
+export const getHouseholdLowStockInventory = async (householdId: string): Promise<LowStockInventoryItem[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/low-stock`,
+  schema: householdLowStockListSchema
+});
+
+export const createInventoryItem = async (
+  householdId: string,
+  input: CreateInventoryItemInput
+): Promise<InventoryItemSummary> => apiRequest({
+  path: `/v1/households/${householdId}/inventory`,
+  method: "POST",
+  body: input,
+  schema: inventoryItemSummarySchema
 });
 
 export const createServiceProvider = async (

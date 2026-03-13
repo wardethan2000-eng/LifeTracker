@@ -1,18 +1,20 @@
 import type { Prisma } from "@prisma/client";
 import {
   createMaintenanceLogSchema,
-  createMaintenanceLogPartSchema,
   updateMaintenanceLogSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import {
+  createMaintenanceLogPartWithInventory,
+  InventoryError
+} from "../../lib/inventory.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
 import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
-import { toMaintenanceLogPartResponse } from "../../lib/presenters.js";
 import { logActivity } from "../../lib/activity-log.js";
 
 const assetParamsSchema = z.object({
@@ -138,22 +140,48 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       data.cost = input.cost;
     }
 
-    // Create log and parts in a single transaction
+    if (input.laborHours !== undefined) {
+      data.laborHours = input.laborHours;
+    }
+
+    if (input.laborRate !== undefined) {
+      data.laborRate = input.laborRate;
+    }
+
+    if (input.difficultyRating !== undefined) {
+      data.difficultyRating = input.difficultyRating;
+    }
+
+    if (input.performedBy !== undefined) {
+      data.performedBy = input.performedBy;
+    }
+
+    let inventoryWarnings: string[] = [];
+
     const log = await app.prisma.$transaction(async (tx) => {
       const createdLog = await tx.maintenanceLog.create({ data });
 
       if (input.parts && input.parts.length > 0) {
-        await tx.maintenanceLogPart.createMany({
-          data: input.parts.map(part => ({
-            logId: createdLog.id,
-            name: part.name,
-            partNumber: part.partNumber ?? null,
-            quantity: part.quantity ?? 1,
-            unitCost: part.unitCost ?? null,
-            supplier: part.supplier ?? null,
-            notes: part.notes ?? null
-          }))
-        });
+        for (const part of input.parts) {
+          try {
+            const result = await createMaintenanceLogPartWithInventory(tx, {
+              householdId: asset.householdId,
+              logId: createdLog.id,
+              userId: request.auth.userId,
+              input: part
+            });
+
+            if (result.warning) {
+              inventoryWarnings.push(`${part.name}: ${result.warning}`);
+            }
+          } catch (error) {
+            if (error instanceof InventoryError && error.code === "INVENTORY_ITEM_NOT_FOUND") {
+              throw new Error(error.message);
+            }
+
+            throw error;
+          }
+        }
       }
 
       return tx.maintenanceLog.findUniqueOrThrow({
@@ -177,7 +205,10 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     await enqueueNotificationScan({ householdId: asset.householdId });
 
-    return reply.code(201).send(toMaintenanceLogResponse(log, log.parts));
+    return reply.code(201).send({
+      ...toMaintenanceLogResponse(log, log.parts),
+      inventoryWarnings
+    });
   });
 
   app.get("/v1/assets/:assetId/logs/:logId", async (request, reply) => {
@@ -225,6 +256,21 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     const data: Prisma.MaintenanceLogUncheckedUpdateInput = {};
 
+    if (input.serviceProviderId !== undefined) {
+      if (input.serviceProviderId) {
+        const provider = await app.prisma.serviceProvider.findFirst({
+          where: { id: input.serviceProviderId, householdId: asset.householdId },
+          select: { id: true }
+        });
+
+        if (!provider) {
+          return reply.code(400).send({ message: "Service provider not found or belongs to a different household." });
+        }
+      }
+
+      data.serviceProviderId = input.serviceProviderId;
+    }
+
     if (input.title !== undefined) {
       data.title = input.title;
     }
@@ -243,6 +289,22 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.cost !== undefined) {
       data.cost = input.cost;
+    }
+
+    if (input.laborHours !== undefined) {
+      data.laborHours = input.laborHours;
+    }
+
+    if (input.laborRate !== undefined) {
+      data.laborRate = input.laborRate;
+    }
+
+    if (input.difficultyRating !== undefined) {
+      data.difficultyRating = input.difficultyRating;
+    }
+
+    if (input.performedBy !== undefined) {
+      data.performedBy = input.performedBy;
     }
 
     if (input.metadata !== undefined) {
@@ -292,100 +354,6 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await enqueueNotificationScan({ householdId: asset.householdId });
-
-    return reply.code(204).send();
-  });
-
-  // ── Log Parts CRUD ─────────────────────────────────────────────────
-
-  const partParamsSchema = logParamsSchema.extend({
-    partId: z.string().cuid()
-  });
-
-  app.post("/v1/assets/:assetId/logs/:logId/parts", async (request, reply) => {
-    const params = logParamsSchema.parse(request.params);
-    const input = createMaintenanceLogPartSchema.parse(request.body);
-    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-
-    if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
-    }
-
-    const log = await app.prisma.maintenanceLog.findFirst({
-      where: { id: params.logId, assetId: asset.id },
-      select: { id: true }
-    });
-
-    if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
-    }
-
-    const part = await app.prisma.maintenanceLogPart.create({
-      data: {
-        logId: log.id,
-        name: input.name,
-        partNumber: input.partNumber ?? null,
-        quantity: input.quantity ?? 1,
-        unitCost: input.unitCost ?? null,
-        supplier: input.supplier ?? null,
-        notes: input.notes ?? null
-      }
-    });
-
-    return reply.code(201).send(toMaintenanceLogPartResponse(part));
-  });
-
-  app.get("/v1/assets/:assetId/logs/:logId/parts", async (request, reply) => {
-    const params = logParamsSchema.parse(request.params);
-    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-
-    if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
-    }
-
-    const log = await app.prisma.maintenanceLog.findFirst({
-      where: { id: params.logId, assetId: asset.id },
-      select: { id: true }
-    });
-
-    if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
-    }
-
-    const parts = await app.prisma.maintenanceLogPart.findMany({
-      where: { logId: log.id },
-      orderBy: { createdAt: "asc" }
-    });
-
-    return parts.map(toMaintenanceLogPartResponse);
-  });
-
-  app.delete("/v1/assets/:assetId/logs/:logId/parts/:partId", async (request, reply) => {
-    const params = partParamsSchema.parse(request.params);
-    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-
-    if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
-    }
-
-    const log = await app.prisma.maintenanceLog.findFirst({
-      where: { id: params.logId, assetId: asset.id },
-      select: { id: true }
-    });
-
-    if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
-    }
-
-    const part = await app.prisma.maintenanceLogPart.findFirst({
-      where: { id: params.partId, logId: log.id }
-    });
-
-    if (!part) {
-      return reply.code(404).send({ message: "Part not found." });
-    }
-
-    await app.prisma.maintenanceLogPart.delete({ where: { id: part.id } });
 
     return reply.code(204).send();
   });

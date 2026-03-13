@@ -342,6 +342,43 @@ p { margin: 0; color: var(--ink-light); }
   font-size: 0.9rem;
 }
 
+.inventory-create-panel {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0.04), transparent 70%);
+}
+
+.inventory-groups {
+  display: grid;
+  gap: 0;
+}
+
+.inventory-group {
+  border-top: 1px solid var(--border);
+}
+
+.inventory-group:first-child {
+  border-top: 0;
+}
+
+.inventory-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 12px;
+}
+
+.inventory-group__header h3 {
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+
+.inventory-group__header p {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
 /* ── Tables ── */
 
 .data-table {

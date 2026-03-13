@@ -19,6 +19,11 @@ const serviceProviderId = "clkeeperprovider0000000001";
 const projectId = "clkeeperproject0000000001";
 const invitationId = "clkeeperinvite00000000001";
 const acceptedInvitationId = "clkeeperinvite00000000002";
+const inventoryItemOilFilterId = "clkeeperinventory000000001";
+const inventoryItemOilId = "clkeeperinventory000000002";
+const inventoryItemCabinFilterId = "clkeeperinventory000000003";
+const inventoryItemWheelWeightId = "clkeeperinventory000000004";
+const inventoryItemShopTowelId = "clkeeperinventory000000005";
 
 async function main(): Promise<void> {
   await prisma.user.upsert({
@@ -469,6 +474,11 @@ async function main(): Promise<void> {
       title: "Engine oil and filter",
       completedAt: new Date("2026-03-09T00:00:00.000Z"),
       usageValue: 42500,
+      cost: 72.5,
+      laborHours: 1.25,
+      laborRate: 0,
+      difficultyRating: 2,
+      performedBy: "self",
       metadata: {
         source: "seed"
       }
@@ -481,6 +491,11 @@ async function main(): Promise<void> {
       title: "Engine oil and filter",
       completedAt: new Date("2026-03-09T00:00:00.000Z"),
       usageValue: 42500,
+      cost: 72.5,
+      laborHours: 1.25,
+      laborRate: 0,
+      difficultyRating: 2,
+      performedBy: "self",
       metadata: {
         source: "seed"
       }
@@ -493,6 +508,10 @@ async function main(): Promise<void> {
       title: "Tire rotation and balance",
       completedAt: new Date("2026-02-18T00:00:00.000Z"),
       cost: 49.99,
+      laborHours: 0.75,
+      laborRate: 65,
+      difficultyRating: 3,
+      performedBy: "Quick Lube Express",
       metadata: {
         source: "seed",
         visitType: "shop-service"
@@ -506,6 +525,10 @@ async function main(): Promise<void> {
       title: "Tire rotation and balance",
       completedAt: new Date("2026-02-18T00:00:00.000Z"),
       cost: 49.99,
+      laborHours: 0.75,
+      laborRate: 65,
+      difficultyRating: 3,
+      performedBy: "Quick Lube Express",
       metadata: {
         source: "seed",
         visitType: "shop-service"
@@ -539,6 +562,155 @@ async function main(): Promise<void> {
     data: { serviceProviderId }
   });
 
+  // ── Inventory ─────────────────────────────────────────────────────────────
+  const inventoryItems = [
+    {
+      id: inventoryItemOilFilterId,
+      name: "Motorcraft FL-500S Oil Filter",
+      partNumber: "FL-500S",
+      category: "filters",
+      manufacturer: "Motorcraft",
+      quantityOnHand: 2,
+      unit: "each",
+      reorderThreshold: 2,
+      reorderQuantity: 4,
+      preferredSupplier: "AutoZone",
+      supplierUrl: "https://example.com/motorcraft-fl-500s",
+      unitCost: 8.97,
+      storageLocation: "Garage shelf 2",
+      notes: "Fits the seeded F-150 oil-change schedule"
+    },
+    {
+      id: inventoryItemOilId,
+      name: "Full Synthetic 5W-30 Oil",
+      partNumber: "SYN-5W30",
+      category: "lubricants",
+      manufacturer: "Mobil 1",
+      quantityOnHand: 8,
+      unit: "quarts",
+      reorderThreshold: 6,
+      reorderQuantity: 6,
+      preferredSupplier: "AutoZone",
+      supplierUrl: "https://example.com/full-synthetic-5w30",
+      unitCost: 6.49,
+      storageLocation: "Garage cabinet",
+      notes: "Shared stock for both scheduled and ad-hoc oil changes"
+    },
+    {
+      id: inventoryItemCabinFilterId,
+      name: "Cabin Air Filter",
+      partNumber: "CAF-1138",
+      category: "filters",
+      manufacturer: "WIX",
+      quantityOnHand: 1,
+      unit: "each",
+      reorderThreshold: 2,
+      reorderQuantity: 2,
+      preferredSupplier: "RockAuto",
+      supplierUrl: "https://example.com/cabin-air-filter",
+      unitCost: 12.99,
+      storageLocation: "Garage shelf 1",
+      notes: "Low-stock example for reorder shopping list"
+    },
+    {
+      id: inventoryItemWheelWeightId,
+      name: "Wheel Weights",
+      partNumber: "WW-025",
+      category: "tire-service",
+      manufacturer: null,
+      quantityOnHand: 0,
+      unit: "packs",
+      reorderThreshold: 1,
+      reorderQuantity: 2,
+      preferredSupplier: "Quick Lube Express",
+      supplierUrl: null,
+      unitCost: 3.5,
+      storageLocation: "Workshop bin A",
+      notes: "Consumed during balancing work"
+    },
+    {
+      id: inventoryItemShopTowelId,
+      name: "Shop Towels",
+      partNumber: "TWL-ROLL",
+      category: "consumables",
+      manufacturer: "Scott",
+      quantityOnHand: 3,
+      unit: "rolls",
+      reorderThreshold: 2,
+      reorderQuantity: 4,
+      preferredSupplier: "Home Depot",
+      supplierUrl: "https://example.com/shop-towels",
+      unitCost: 4.25,
+      storageLocation: "Workshop wall rack",
+      notes: "Standalone household supply"
+    }
+  ] as const;
+
+  for (const item of inventoryItems) {
+    await prisma.inventoryItem.upsert({
+      where: { id: item.id },
+      update: {
+        householdId,
+        name: item.name,
+        partNumber: item.partNumber,
+        description: item.notes,
+        category: item.category,
+        manufacturer: item.manufacturer,
+        quantityOnHand: item.quantityOnHand,
+        unit: item.unit,
+        reorderThreshold: item.reorderThreshold,
+        reorderQuantity: item.reorderQuantity,
+        preferredSupplier: item.preferredSupplier,
+        supplierUrl: item.supplierUrl,
+        unitCost: item.unitCost,
+        storageLocation: item.storageLocation,
+        notes: item.notes
+      },
+      create: {
+        id: item.id,
+        householdId,
+        name: item.name,
+        partNumber: item.partNumber,
+        description: item.notes,
+        category: item.category,
+        manufacturer: item.manufacturer,
+        quantityOnHand: item.quantityOnHand,
+        unit: item.unit,
+        reorderThreshold: item.reorderThreshold,
+        reorderQuantity: item.reorderQuantity,
+        preferredSupplier: item.preferredSupplier,
+        supplierUrl: item.supplierUrl,
+        unitCost: item.unitCost,
+        storageLocation: item.storageLocation,
+        notes: item.notes
+      }
+    });
+  }
+
+  await prisma.assetInventoryItem.deleteMany({
+    where: {
+      assetId: { in: [assetId, childAssetId] }
+    }
+  });
+
+  await prisma.projectInventoryItem.deleteMany({
+    where: { projectId }
+  });
+
+  await prisma.inventoryTransaction.deleteMany({
+    where: {
+      inventoryItemId: {
+        in: [
+          inventoryItemOilFilterId,
+          inventoryItemOilId,
+          inventoryItemCabinFilterId,
+          inventoryItemWheelWeightId,
+          inventoryItemShopTowelId
+        ]
+      }
+    }
+  });
+
   // ── Tier 2: Maintenance Log Part ──────────────────────────────────────────
   await prisma.maintenanceLogPart.deleteMany({
     where: { logId: { in: [maintenanceLogId, maintenanceLogFollowUpId] } }
@@ -547,6 +719,7 @@ async function main(): Promise<void> {
     data: [
       {
         logId: maintenanceLogId,
+        inventoryItemId: inventoryItemOilFilterId,
         name: "Motorcraft FL-500S Oil Filter",
         partNumber: "FL-500S",
         quantity: 1,
@@ -555,6 +728,7 @@ async function main(): Promise<void> {
       },
       {
         logId: maintenanceLogId,
+        inventoryItemId: inventoryItemOilId,
         name: "Full Synthetic 5W-30 Oil",
         partNumber: "SYN-5W30",
         quantity: 6,
@@ -563,6 +737,7 @@ async function main(): Promise<void> {
       },
       {
         logId: maintenanceLogFollowUpId,
+        inventoryItemId: inventoryItemWheelWeightId,
         name: "Wheel Weights",
         partNumber: "WW-025",
         quantity: 1,
@@ -618,6 +793,180 @@ async function main(): Promise<void> {
       notes: "Battery health check during seasonal prep"
     }
   });
+
+  await prisma.assetInventoryItem.createMany({
+    data: [
+      {
+        assetId,
+        inventoryItemId: inventoryItemOilFilterId,
+        notes: "OEM recommended filter",
+        recommendedQuantity: 2
+      },
+      {
+        assetId,
+        inventoryItemId: inventoryItemOilId,
+        notes: "Keep enough oil for a full change plus top-offs",
+        recommendedQuantity: 6
+      },
+      {
+        assetId,
+        inventoryItemId: inventoryItemCabinFilterId,
+        notes: "Seasonal air-quality replacement item",
+        recommendedQuantity: 1
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  await prisma.projectInventoryItem.createMany({
+    data: [
+      {
+        projectId,
+        inventoryItemId: inventoryItemOilFilterId,
+        quantityNeeded: 2,
+        quantityAllocated: 1,
+        budgetedUnitCost: 9.25,
+        notes: "One filter allocated for spring service; keep one spare"
+      },
+      {
+        projectId,
+        inventoryItemId: inventoryItemCabinFilterId,
+        quantityNeeded: 1,
+        quantityAllocated: 0,
+        budgetedUnitCost: 13.5,
+        notes: "Planned during seasonal cleanup"
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  const inventoryTransactions = [
+    {
+      id: "clkeeperinvtxn0000000001",
+      inventoryItemId: inventoryItemOilFilterId,
+      type: "purchase",
+      quantity: 6,
+      quantityAfter: 6,
+      referenceType: "manual",
+      referenceId: inventoryItemOilFilterId,
+      unitCost: 8.97,
+      notes: "Bought filters during spring sale",
+      userId: ownerUserId,
+      createdAt: new Date("2026-02-15T09:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000002",
+      inventoryItemId: inventoryItemOilFilterId,
+      type: "consume",
+      quantity: -4,
+      quantityAfter: 2,
+      referenceType: "maintenance_log",
+      referenceId: maintenanceLogId,
+      unitCost: 8.97,
+      notes: "Seeded historical consumption rollup",
+      userId: ownerUserId,
+      createdAt: new Date("2026-03-09T10:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000003",
+      inventoryItemId: inventoryItemOilId,
+      type: "purchase",
+      quantity: 12,
+      quantityAfter: 12,
+      referenceType: "manual",
+      referenceId: inventoryItemOilId,
+      unitCost: 6.49,
+      notes: "Case of oil for home service",
+      userId: ownerUserId,
+      createdAt: new Date("2026-02-15T09:05:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000004",
+      inventoryItemId: inventoryItemOilId,
+      type: "consume",
+      quantity: -4,
+      quantityAfter: 8,
+      referenceType: "maintenance_log",
+      referenceId: maintenanceLogId,
+      unitCost: 6.49,
+      notes: "Oil used across recent service events",
+      userId: ownerUserId,
+      createdAt: new Date("2026-03-09T10:02:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000005",
+      inventoryItemId: inventoryItemCabinFilterId,
+      type: "purchase",
+      quantity: 2,
+      quantityAfter: 2,
+      referenceType: "manual",
+      referenceId: inventoryItemCabinFilterId,
+      unitCost: 12.99,
+      notes: "Picked up two cabin filters",
+      userId: ownerUserId,
+      createdAt: new Date("2026-02-20T12:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000006",
+      inventoryItemId: inventoryItemCabinFilterId,
+      type: "consume",
+      quantity: -1,
+      quantityAfter: 1,
+      referenceType: "project",
+      referenceId: projectId,
+      unitCost: 12.99,
+      notes: "Reserved against spring vehicle maintenance project",
+      userId: ownerUserId,
+      createdAt: new Date("2026-03-01T14:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000007",
+      inventoryItemId: inventoryItemWheelWeightId,
+      type: "purchase",
+      quantity: 1,
+      quantityAfter: 1,
+      referenceType: "manual",
+      referenceId: inventoryItemWheelWeightId,
+      unitCost: 3.5,
+      notes: "Emergency tire-balance stock",
+      userId: ownerUserId,
+      createdAt: new Date("2026-02-17T08:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000008",
+      inventoryItemId: inventoryItemWheelWeightId,
+      type: "consume",
+      quantity: -1,
+      quantityAfter: 0,
+      referenceType: "maintenance_log",
+      referenceId: maintenanceLogFollowUpId,
+      unitCost: 3.5,
+      notes: "Wheel balancing service used the last pack",
+      userId: ownerUserId,
+      createdAt: new Date("2026-02-18T09:00:00.000Z")
+    },
+    {
+      id: "clkeeperinvtxn0000000009",
+      inventoryItemId: inventoryItemShopTowelId,
+      type: "adjust",
+      quantity: 3,
+      quantityAfter: 3,
+      referenceType: "manual",
+      referenceId: inventoryItemShopTowelId,
+      unitCost: 4.25,
+      notes: "Initial counted stock",
+      userId: ownerUserId,
+      createdAt: new Date("2026-02-10T08:30:00.000Z")
+    }
+  ] as const;
+
+  for (const transaction of inventoryTransactions) {
+    await prisma.inventoryTransaction.upsert({
+      where: { id: transaction.id },
+      update: transaction,
+      create: transaction
+    });
+  }
 
   // Project tasks
   const taskIds = [
@@ -770,6 +1119,8 @@ async function main(): Promise<void> {
     personalAssetId,
     overdueScheduleId,
     serviceProviderId,
+    inventoryItemOilFilterId,
+    inventoryItemCabinFilterId,
     projectId,
     invitationId
   }, null, 2));

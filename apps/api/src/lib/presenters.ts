@@ -74,8 +74,9 @@ export const toServiceProviderResponse = (provider: Pick<ServiceProvider, "id" |
   updatedAt: provider.updatedAt.toISOString()
 });
 
-export const toMaintenanceLogPartResponse = (part: Pick<MaintenanceLogPart, "id" | "logId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">) => maintenanceLogPartSchema.parse({
+export const toMaintenanceLogPartResponse = (part: Pick<MaintenanceLogPart, "id" | "logId" | "inventoryItemId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">) => maintenanceLogPartSchema.parse({
   ...part,
+  inventoryItemId: part.inventoryItemId ?? null,
   createdAt: part.createdAt.toISOString(),
   updatedAt: part.updatedAt.toISOString()
 });

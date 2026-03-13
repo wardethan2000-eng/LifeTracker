@@ -19,6 +19,7 @@ export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
+export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", "return", "transfer"] as const;
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
 export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
@@ -43,6 +44,7 @@ export const notificationTypeSchema = z.enum(notificationTypeValues);
 export const triggerTypeSchema = z.enum(triggerTypeValues);
 export const notificationChannelSchema = z.enum(notificationChannelValues);
 export const notificationStatusSchema = z.enum(notificationStatusValues);
+export const inventoryTransactionTypeSchema = z.enum(inventoryTransactionTypeValues);
 export const scheduleStatusSchema = z.enum(scheduleStatusValues);
 export const presetSourceSchema = z.enum(presetSourceValues);
 export const assetTypeSourceSchema = z.enum(assetTypeSourceValues);
@@ -432,6 +434,7 @@ export const updateServiceProviderSchema = createServiceProviderSchema.partial()
 export const maintenanceLogPartSchema = z.object({
   id: z.string().cuid(),
   logId: z.string().cuid(),
+  inventoryItemId: z.string().cuid().nullable().default(null),
   name: z.string(),
   partNumber: z.string().nullable(),
   quantity: z.number(),
@@ -444,12 +447,15 @@ export const maintenanceLogPartSchema = z.object({
 
 export const createMaintenanceLogPartSchema = z.object({
   name: z.string().min(1).max(200),
+  inventoryItemId: z.string().cuid().optional(),
   partNumber: z.string().max(120).optional(),
   quantity: z.number().min(0).default(1),
   unitCost: z.number().min(0).optional(),
   supplier: z.string().max(200).optional(),
   notes: z.string().max(2000).optional()
 });
+
+export const updateMaintenanceLogPartSchema = createMaintenanceLogPartSchema.partial();
 
 export const createAssetSchema = z.object({
   householdId: z.string().cuid(),
@@ -718,6 +724,10 @@ export const createMaintenanceLogSchema = z.object({
   completedAt: z.string().datetime().optional(),
   usageValue: z.number().min(0).optional(),
   cost: z.number().min(0).optional(),
+  laborHours: z.number().min(0).optional(),
+  laborRate: z.number().min(0).optional(),
+  difficultyRating: z.number().int().min(1).max(5).optional(),
+  performedBy: z.string().min(1).max(200).optional(),
   metadata: maintenanceLogMetadataSchema.default({}),
   parts: z.array(createMaintenanceLogPartSchema).optional()
 });
@@ -728,6 +738,11 @@ export const updateMaintenanceLogSchema = z.object({
   completedAt: z.string().datetime().optional(),
   usageValue: z.number().min(0).optional(),
   cost: z.number().min(0).optional(),
+  serviceProviderId: z.string().cuid().nullable().optional(),
+  laborHours: z.number().min(0).optional(),
+  laborRate: z.number().min(0).optional(),
+  difficultyRating: z.number().int().min(1).max(5).optional(),
+  performedBy: z.string().min(1).max(200).nullable().optional(),
   metadata: maintenanceLogMetadataSchema.optional()
 });
 
@@ -751,11 +766,193 @@ export const maintenanceLogSchema = z.object({
   completedAt: z.string().datetime(),
   usageValue: z.number().nullable(),
   cost: z.number().nullable(),
+  laborHours: z.number().nullable().default(null),
+  laborRate: z.number().nullable().default(null),
+  difficultyRating: z.number().int().min(1).max(5).nullable().default(null),
+  performedBy: z.string().nullable().default(null),
   metadata: maintenanceLogMetadataSchema,
   parts: z.array(maintenanceLogPartSchema).default([]),
   totalPartsCost: z.number().default(0),
+  totalLaborCost: z.number().nullable().default(null),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
+});
+
+// ── Inventory Schemas ───────────────────────────────────────────────
+
+export const inventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string(),
+  partNumber: z.string().nullable(),
+  description: z.string().nullable(),
+  category: z.string().nullable(),
+  manufacturer: z.string().nullable(),
+  quantityOnHand: z.number(),
+  unit: z.string(),
+  reorderThreshold: z.number().nullable(),
+  reorderQuantity: z.number().nullable(),
+  preferredSupplier: z.string().nullable(),
+  supplierUrl: z.string().nullable(),
+  unitCost: z.number().nullable(),
+  storageLocation: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createInventoryItemSchema = z.object({
+  name: z.string().min(1).max(200),
+  partNumber: z.string().max(120).optional(),
+  description: z.string().max(2000).optional(),
+  category: z.string().max(120).optional(),
+  manufacturer: z.string().max(120).optional(),
+  quantityOnHand: z.number().default(0),
+  unit: z.string().min(1).max(60).default("each"),
+  reorderThreshold: z.number().min(0).optional(),
+  reorderQuantity: z.number().min(0).optional(),
+  preferredSupplier: z.string().max(200).optional(),
+  supplierUrl: z.string().url().max(1000).optional(),
+  unitCost: z.number().min(0).optional(),
+  storageLocation: z.string().max(200).optional(),
+  notes: z.string().max(4000).optional()
+});
+
+export const updateInventoryItemSchema = createInventoryItemSchema.partial();
+
+export const inventoryItemSummarySchema = inventoryItemSchema.extend({
+  totalValue: z.number().nullable(),
+  lowStock: z.boolean()
+});
+
+export const inventoryTransactionSchema = z.object({
+  id: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  type: inventoryTransactionTypeSchema,
+  quantity: z.number(),
+  quantityAfter: z.number(),
+  referenceType: z.string().nullable(),
+  referenceId: z.string().nullable(),
+  unitCost: z.number().nullable(),
+  notes: z.string().nullable(),
+  userId: z.string().cuid(),
+  createdAt: z.string().datetime()
+});
+
+export const createInventoryTransactionSchema = z.object({
+  type: inventoryTransactionTypeSchema,
+  quantity: z.number(),
+  unitCost: z.number().min(0).optional(),
+  referenceType: z.string().max(80).optional(),
+  referenceId: z.string().max(120).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const assetInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  assetId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  notes: z.string().nullable(),
+  recommendedQuantity: z.number().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createAssetInventoryItemSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  notes: z.string().max(2000).optional(),
+  recommendedQuantity: z.number().min(0).optional()
+});
+
+export const projectInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  quantityNeeded: z.number(),
+  quantityAllocated: z.number(),
+  budgetedUnitCost: z.number().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectInventoryItemSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  quantityNeeded: z.number().positive(),
+  budgetedUnitCost: z.number().min(0).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const updateProjectInventoryItemSchema = z.object({
+  quantityNeeded: z.number().positive().optional(),
+  quantityAllocated: z.number().min(0).optional(),
+  budgetedUnitCost: z.number().min(0).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional()
+});
+
+export const allocateProjectInventorySchema = z.object({
+  quantity: z.number().positive(),
+  unitCost: z.number().min(0).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const inventoryAssetLinkDetailSchema = assetInventoryItemSchema.extend({
+  inventoryItem: inventoryItemSummarySchema,
+  asset: shallowAssetSchema.optional()
+});
+
+export const inventoryProjectLinkDetailSchema = projectInventoryItemSchema.extend({
+  inventoryItem: inventoryItemSummarySchema,
+  project: z.object({
+    id: z.string().cuid(),
+    name: z.string()
+  }).optional(),
+  quantityRemaining: z.number()
+});
+
+export const inventoryItemDetailSchema = inventoryItemSummarySchema.extend({
+  transactions: z.array(inventoryTransactionSchema),
+  assets: z.array(z.object({
+    id: z.string().cuid(),
+    assetId: z.string().cuid(),
+    inventoryItemId: z.string().cuid(),
+    notes: z.string().nullable(),
+    recommendedQuantity: z.number().nullable(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    asset: shallowAssetSchema
+  })),
+  projects: z.array(z.object({
+    id: z.string().cuid(),
+    projectId: z.string().cuid(),
+    inventoryItemId: z.string().cuid(),
+    quantityNeeded: z.number(),
+    quantityAllocated: z.number(),
+    budgetedUnitCost: z.number().nullable(),
+    notes: z.string().nullable(),
+    quantityRemaining: z.number(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    project: z.object({
+      id: z.string().cuid(),
+      name: z.string()
+    })
+  }))
+});
+
+export const lowStockInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string(),
+  partNumber: z.string().nullable(),
+  quantityOnHand: z.number(),
+  reorderThreshold: z.number().nullable(),
+  reorderQuantity: z.number().nullable(),
+  preferredSupplier: z.string().nullable(),
+  supplierUrl: z.string().nullable(),
+  unitCost: z.number().nullable(),
+  unit: z.string(),
+  deficit: z.number()
 });
 
 export const assetDetailResponseSchema = z.object({
@@ -978,6 +1175,7 @@ export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type TriggerType = z.infer<typeof triggerTypeSchema>;
 export type NotificationChannel = z.infer<typeof notificationChannelSchema>;
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>;
+export type InventoryTransactionType = z.infer<typeof inventoryTransactionTypeSchema>;
 export type ScheduleStatus = z.infer<typeof scheduleStatusSchema>;
 export type PresetSource = z.infer<typeof presetSourceSchema>;
 export type AssetTypeSource = z.infer<typeof assetTypeSourceSchema>;
@@ -1051,8 +1249,25 @@ export type CreateServiceProviderInput = z.infer<typeof createServiceProviderSch
 export type UpdateServiceProviderInput = z.infer<typeof updateServiceProviderSchema>;
 export type MaintenanceLogPart = z.infer<typeof maintenanceLogPartSchema>;
 export type CreateMaintenanceLogPartInput = z.infer<typeof createMaintenanceLogPartSchema>;
+export type UpdateMaintenanceLogPartInput = z.infer<typeof updateMaintenanceLogPartSchema>;
 export type PurchaseCondition = z.infer<typeof purchaseConditionSchema>;
 export type DisposalMethod = z.infer<typeof disposalMethodSchema>;
+export type InventoryItem = z.infer<typeof inventoryItemSchema>;
+export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
+export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
+export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
+export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
+export type CreateInventoryTransactionInput = z.infer<typeof createInventoryTransactionSchema>;
+export type AssetInventoryItem = z.infer<typeof assetInventoryItemSchema>;
+export type CreateAssetInventoryItemInput = z.infer<typeof createAssetInventoryItemSchema>;
+export type ProjectInventoryItem = z.infer<typeof projectInventoryItemSchema>;
+export type CreateProjectInventoryItemInput = z.infer<typeof createProjectInventoryItemSchema>;
+export type UpdateProjectInventoryItemInput = z.infer<typeof updateProjectInventoryItemSchema>;
+export type AllocateProjectInventoryInput = z.infer<typeof allocateProjectInventorySchema>;
+export type InventoryAssetLinkDetail = z.infer<typeof inventoryAssetLinkDetailSchema>;
+export type InventoryProjectLinkDetail = z.infer<typeof inventoryProjectLinkDetailSchema>;
+export type InventoryItemDetail = z.infer<typeof inventoryItemDetailSchema>;
+export type LowStockInventoryItem = z.infer<typeof lowStockInventoryItemSchema>;
 
 export type ShallowUser = z.infer<typeof shallowUserSchema>;
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;

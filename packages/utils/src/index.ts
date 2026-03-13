@@ -244,6 +244,56 @@ export const projectNextDueValue = (
   return projected;
 };
 
+/**
+ * Calculates the current extended value of an inventory item when a unit cost is known.
+ */
+export const calculateInventoryTotalValue = (
+  quantityOnHand: number,
+  unitCost?: number | null
+): number | null => {
+  if (unitCost === null || unitCost === undefined) {
+    return null;
+  }
+
+  return quantityOnHand * unitCost;
+};
+
+/**
+ * Returns true when an item's on-hand quantity is at or below its reorder threshold.
+ */
+export const isInventoryLowStock = (
+  quantityOnHand: number,
+  reorderThreshold?: number | null
+): boolean => {
+  if (reorderThreshold === null || reorderThreshold === undefined) {
+    return false;
+  }
+
+  return quantityOnHand <= reorderThreshold;
+};
+
+/**
+ * Calculates how far below the reorder threshold an item currently is.
+ */
+export const calculateInventoryDeficit = (
+  quantityOnHand: number,
+  reorderThreshold?: number | null
+): number => {
+  if (reorderThreshold === null || reorderThreshold === undefined) {
+    return 0;
+  }
+
+  return Math.max(reorderThreshold - quantityOnHand, 0);
+};
+
+/**
+ * Applies a stock delta while preventing the resulting quantity from dropping below zero.
+ */
+export const applyInventoryDelta = (
+  quantityOnHand: number,
+  delta: number
+): number => Math.max(quantityOnHand + delta, 0);
+
 export const calculateScheduleStatus = (
   trigger: MaintenanceTrigger,
   due: DueDateResult,

@@ -6,14 +6,17 @@ import { toMaintenanceLogPartResponse } from "./presenters.js";
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 export const toMaintenanceLogResponse = (
-  log: Pick<MaintenanceLog, "id" | "assetId" | "scheduleId" | "completedById" | "serviceProviderId" | "title" | "notes" | "completedAt" | "usageValue" | "cost" | "metadata" | "createdAt" | "updatedAt">,
-  parts: Pick<MaintenanceLogPart, "id" | "logId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">[] = []
+  log: Pick<MaintenanceLog, "id" | "assetId" | "scheduleId" | "completedById" | "serviceProviderId" | "title" | "notes" | "completedAt" | "usageValue" | "cost" | "laborHours" | "laborRate" | "difficultyRating" | "performedBy" | "metadata" | "createdAt" | "updatedAt">,
+  parts: Pick<MaintenanceLogPart, "id" | "logId" | "inventoryItemId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">[] = []
 ) => {
   const partResponses = parts.map(toMaintenanceLogPartResponse);
   const totalPartsCost = parts.reduce(
     (sum, p) => sum + (p.quantity ?? 1) * (p.unitCost ?? 0),
     0
   );
+  const totalLaborCost = typeof log.laborHours === "number" && typeof log.laborRate === "number"
+    ? log.laborHours * log.laborRate
+    : null;
 
   return maintenanceLogSchema.parse({
     id: log.id,
@@ -26,9 +29,14 @@ export const toMaintenanceLogResponse = (
     completedAt: log.completedAt.toISOString(),
     usageValue: log.usageValue,
     cost: log.cost,
+    laborHours: log.laborHours,
+    laborRate: log.laborRate,
+    difficultyRating: log.difficultyRating,
+    performedBy: log.performedBy,
     metadata: log.metadata,
     parts: partResponses,
     totalPartsCost,
+    totalLaborCost,
     createdAt: log.createdAt.toISOString(),
     updatedAt: log.updatedAt.toISOString()
   });

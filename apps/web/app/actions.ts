@@ -11,6 +11,7 @@ import type {
   CreateCommentInput,
   CreateConditionAssessmentInput,
   CreateInvitationInput,
+  CreateInventoryItemInput,
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
   CreateProjectAssetInput,
@@ -56,6 +57,7 @@ import {
   createMetric,
   createAsset,
   createHousehold,
+  createInventoryItem,
   createMaintenanceLog,
   createPresetProfile,
   createSchedule,
@@ -449,6 +451,12 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
   }
 };
 
+const revalidateInventoryPaths = (householdId: string): void => {
+  revalidatePath("/");
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory?householdId=${householdId}`);
+};
+
 export async function createHouseholdAction(formData: FormData): Promise<void> {
   const household = await createHousehold({
     name: getRequiredString(formData, "name")
@@ -456,6 +464,70 @@ export async function createHouseholdAction(formData: FormData): Promise<void> {
 
   revalidatePath("/");
   redirect(`/?householdId=${household.id}`);
+}
+
+export async function createInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const input: CreateInventoryItemInput = {
+    name: getRequiredString(formData, "name"),
+    quantityOnHand: getOptionalNumber(formData, "quantityOnHand") ?? 0,
+    unit: getOptionalString(formData, "unit") ?? "each"
+  };
+
+  const partNumber = getOptionalString(formData, "partNumber");
+  const category = getOptionalString(formData, "category");
+  const manufacturer = getOptionalString(formData, "manufacturer");
+  const reorderThreshold = getOptionalNumber(formData, "reorderThreshold");
+  const reorderQuantity = getOptionalNumber(formData, "reorderQuantity");
+  const preferredSupplier = getOptionalString(formData, "preferredSupplier");
+  const supplierUrl = getOptionalString(formData, "supplierUrl");
+  const unitCost = getOptionalNumber(formData, "unitCost");
+  const storageLocation = getOptionalString(formData, "storageLocation");
+  const notes = getOptionalString(formData, "notes");
+
+  if (partNumber) {
+    input.partNumber = partNumber;
+  }
+
+  if (category) {
+    input.category = category;
+  }
+
+  if (manufacturer) {
+    input.manufacturer = manufacturer;
+  }
+
+  if (reorderThreshold !== undefined) {
+    input.reorderThreshold = reorderThreshold;
+  }
+
+  if (reorderQuantity !== undefined) {
+    input.reorderQuantity = reorderQuantity;
+  }
+
+  if (preferredSupplier) {
+    input.preferredSupplier = preferredSupplier;
+  }
+
+  if (supplierUrl) {
+    input.supplierUrl = supplierUrl;
+  }
+
+  if (unitCost !== undefined) {
+    input.unitCost = unitCost;
+  }
+
+  if (storageLocation) {
+    input.storageLocation = storageLocation;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await createInventoryItem(householdId, input);
+  revalidateInventoryPaths(householdId);
+  redirect(`/inventory?householdId=${householdId}`);
 }
 
 export async function createAssetAction(formData: FormData): Promise<void> {

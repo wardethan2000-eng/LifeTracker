@@ -90,6 +90,7 @@ model User {
   assignedSchedules       MaintenanceSchedule[] @relation("ScheduleAssignee")
   assignedProjectTasks    ProjectTask[]         @relation("ProjectTaskAssignee")
   activityLogs            ActivityLog[]
+  inventoryTransactions   InventoryTransaction[]
   sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
   authoredComments        Comment[]             @relation("CommentAuthor")
@@ -108,6 +109,7 @@ model Household {
   notifications    Notification[]
   serviceProviders ServiceProvider[]
   projects         Project[]
+  inventoryItems   InventoryItem[]
   activityLogs     ActivityLog[]
   invitations      HouseholdInvitation[]
 
@@ -167,6 +169,7 @@ model Asset {
   usageMetrics         UsageMetric[]
   schedules            MaintenanceSchedule[]
   logs                 MaintenanceLog[]
+  inventoryLinks       AssetInventoryItem[]
   notifications        Notification[]
   projectAssets        ProjectAsset[]
   comments             Comment[]
@@ -290,6 +293,10 @@ model MaintenanceLog {
   completedAt       DateTime
   usageValue        Float?
   cost              Float?
+  laborHours        Float?
+  laborRate         Float?
+  difficultyRating  Int?
+  performedBy       String?
   metadata          Json                 @default("{}")
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
@@ -308,6 +315,7 @@ model MaintenanceLog {
 model MaintenanceLogPart {
   id         String         @id @default(cuid())
   logId      String
+  inventoryItemId String?
   name       String
   partNumber String?
   quantity   Float          @default(1)
@@ -317,8 +325,10 @@ model MaintenanceLogPart {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   log        MaintenanceLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
 
   @@index([logId])
+  @@index([inventoryItemId])
 }
 
 model Notification {
@@ -369,10 +379,95 @@ model Project {
   updatedAt     DateTime         @updatedAt
   household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
   assets        ProjectAsset[]
+  inventoryItems ProjectInventoryItem[]
   tasks         ProjectTask[]
   expenses      ProjectExpense[]
 
   @@index([householdId, status])
+}
+
+model InventoryItem {
+  id                 String                  @id @default(cuid())
+  householdId        String
+  name               String
+  partNumber         String?
+  description        String?
+  category           String?
+  manufacturer       String?
+  quantityOnHand     Float                   @default(0)
+  unit               String                  @default("each")
+  reorderThreshold   Float?
+  reorderQuantity    Float?
+  preferredSupplier  String?
+  supplierUrl        String?
+  unitCost           Float?
+  storageLocation    String?
+  notes              String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  household          Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assetLinks         AssetInventoryItem[]
+  projectLinks       ProjectInventoryItem[]
+  transactions       InventoryTransaction[]
+  maintenanceLogParts MaintenanceLogPart[]
+
+  @@index([householdId])
+  @@index([householdId, category])
+  @@index([householdId, partNumber])
+}
+
+model AssetInventoryItem {
+  id                String        @id @default(cuid())
+  assetId           String
+  inventoryItemId   String
+  notes             String?
+  recommendedQuantity Float?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  asset             Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, inventoryItemId])
+  @@index([assetId])
+  @@index([inventoryItemId])
+}
+
+model ProjectInventoryItem {
+  id                String        @id @default(cuid())
+  projectId         String
+  inventoryItemId   String
+  quantityNeeded    Float
+  quantityAllocated Float         @default(0)
+  budgetedUnitCost  Float?
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  project           Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, inventoryItemId])
+  @@index([projectId])
+  @@index([inventoryItemId])
+}
+
+model InventoryTransaction {
+  id              String        @id @default(cuid())
+  inventoryItemId String
+  type            String
+  quantity        Float
+  quantityAfter   Float
+  referenceType   String?
+  referenceId     String?
+  unitCost        Float?
+  notes           String?
+  userId          String
+  createdAt       DateTime      @default(now())
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([userId])
 }
 
 model ProjectAsset {
