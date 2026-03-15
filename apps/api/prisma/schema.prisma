@@ -72,6 +72,14 @@ enum ProjectStatus {
   cancelled
 }
 
+enum NoteCategory {
+  research
+  reference
+  decision
+  measurement
+  general
+}
+
 enum InvitationStatus {
   pending
   accepted
@@ -104,6 +112,7 @@ model User {
   sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
   authoredComments        Comment[]             @relation("CommentAuthor")
+  projectNotes            ProjectNote[]         @relation("ProjectNoteAuthor")
 }
 
 model Household {
@@ -430,6 +439,7 @@ model Project {
   budgetCategories ProjectBudgetCategory[]
   tasks           ProjectTask[]
   expenses        ProjectExpense[]
+  noteEntries     ProjectNote[]
 
   @@index([householdId, status])
   @@index([parentProjectId])
@@ -563,6 +573,30 @@ model ProjectTask {
   @@index([assignedToId])
 }
 
+model ProjectNote {
+  id             String        @id @default(cuid())
+  projectId      String
+  phaseId        String?
+  title          String
+  body           String        @default("")
+  url            String?
+  category       NoteCategory  @default(general)
+  attachmentUrl  String?
+  attachmentName String?
+  isPinned       Boolean       @default(false)
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase          ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  createdBy      User          @relation("ProjectNoteAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, category])
+  @@index([projectId, isPinned])
+  @@index([phaseId])
+  @@index([createdById])
+}
+
 model ProjectExpense {
   id                String           @id @default(cuid())
   projectId         String
@@ -606,6 +640,7 @@ model ProjectPhase {
   checklistItems ProjectPhaseChecklistItem[]
   expenses       ProjectExpense[]
   supplies       ProjectPhaseSupply[]
+  noteEntries    ProjectNote[]
 
   @@index([projectId, sortOrder])
   @@index([projectId, status])

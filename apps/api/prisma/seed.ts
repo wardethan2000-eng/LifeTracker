@@ -1536,6 +1536,51 @@ async function main(): Promise<void> {
     ]
   });
 
+  // ── Project Notes ─────────────────────────────────────────────────────────
+  const noteIds = [
+    "clkeepernote00000000000001",
+    "clkeepernote00000000000002",
+    "clkeepernote00000000000003"
+  ] as const;
+
+  await prisma.projectNote.deleteMany({ where: { projectId } });
+
+  await prisma.projectNote.createMany({
+    data: [
+      {
+        id: noteIds[0],
+        projectId,
+        phaseId: phasePlanningId,
+        title: "Cabinet hardware finish comparison",
+        body: "## Finish Comparison\n\n**Brushed Brass**\n- Price: ~$12/pull\n- Lead time: 2–3 weeks\n- ✅ Recommended\n\n**Matte Black**\n- Price: ~$9/pull\n- Lead time: 1 week\n\n**Satin Nickel**\n- Price: ~$8/pull\n- Lead time: 1 week\n\nRecommendation: Brushed brass best matches the warm wood tones planned for the new cabinetry.",
+        url: "https://example.com/hardware-comparison",
+        category: "research",
+        isPinned: true,
+        createdById: ownerUserId
+      },
+      {
+        id: noteIds[1],
+        projectId,
+        phaseId: null,
+        title: "Decided against open shelving on the peninsula wall",
+        body: "After discussing with the household, open shelving on the peninsula wall was ruled out. Primary concerns: visible clutter with young children, dust accumulation on rarely-used items, and the cost difference did not justify the aesthetic. Will proceed with full upper cabinet run on that wall.",
+        category: "decision",
+        isPinned: false,
+        createdById: ownerUserId
+      },
+      {
+        id: noteIds[2],
+        projectId,
+        phaseId: phaseDemolitionId,
+        title: "Wall measurements after demo",
+        body: "## Post-Demo Measurements\n\n- North wall run: 142.5 in\n- East wall (sink): 76 in\n- Peninsula wall: 98 in\n- Ceiling height: 108 in\n- Electrical box center (north): 34 in from floor\n- Pendant drop target: 66 in from floor",
+        category: "measurement",
+        isPinned: false,
+        createdById: ownerUserId
+      }
+    ]
+  });
+
   // ── Tier 2: Household Invitation ──────────────────────────────────────────
   await prisma.householdInvitation.upsert({
     where: { id: invitationId },

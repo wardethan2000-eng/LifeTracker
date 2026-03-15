@@ -19,6 +19,7 @@ import type {
   CreateProjectAssetInput,
   CreateProjectBudgetCategoryInput,
   CreateProjectExpenseInput,
+  CreateProjectNoteInput,
   CreateProjectPhaseChecklistItemInput,
   CreateProjectPhaseInput,
   CreateProjectPhaseSupplyInput,
@@ -38,6 +39,7 @@ import type {
   UpdateCommentInput,
   UpdateProjectBudgetCategoryInput,
   UpdateProjectInventoryItemInput,
+  UpdateProjectNoteInput,
   UpdateProjectPhaseChecklistItemInput,
   UpdateProjectPhaseInput,
   UpdateProjectPhaseSupplyInput,
@@ -71,6 +73,7 @@ import {
   createProject,
   createProjectBudgetCategory,
   createProjectExpense,
+  createProjectNote,
   createProjectPhase,
   createPhaseChecklistItem,
   createProjectPhaseSupply,
@@ -90,6 +93,7 @@ import {
   deleteProject,
   deleteProjectBudgetCategory,
   deleteProjectExpense,
+  deleteProjectNote,
   deleteProjectPhase,
   deleteProjectInventoryItem,
   deletePhaseChecklistItem,
@@ -112,6 +116,7 @@ import {
   updateProject,
   updateProjectBudgetCategory,
   updateProjectExpense,
+  updateProjectNote,
   updateProjectInventoryItem,
   updateProjectPhase,
   updatePhaseChecklistItem,
@@ -1565,6 +1570,61 @@ export async function deleteProjectExpenseAction(formData: FormData): Promise<vo
   const expenseId = getRequiredString(formData, "expenseId");
 
   await deleteProjectExpense(householdId, projectId, expenseId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectNoteAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const title = getRequiredString(formData, "title");
+  const body = getOptionalString(formData, "body") ?? "";
+  const rawCategory = getOptionalString(formData, "category") ?? "general";
+  const category = rawCategory as CreateProjectNoteInput["category"];
+  const url = getOptionalString(formData, "url");
+  const phaseId = getOptionalString(formData, "phaseId");
+  const isPinnedRaw = getOptionalString(formData, "isPinned");
+  const isPinned = isPinnedRaw === "true";
+
+  const input: CreateProjectNoteInput = { title, body, category, isPinned };
+  if (url) input.url = url;
+  if (phaseId) input.phaseId = phaseId;
+
+  await createProjectNote(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectNoteAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const noteId = getRequiredString(formData, "noteId");
+  const input: UpdateProjectNoteInput = {
+    title: getRequiredString(formData, "title"),
+    body: getNullableString(formData, "body") ?? "",
+    category: getRequiredString(formData, "category") as UpdateProjectNoteInput["category"],
+    url: getNullableString(formData, "url"),
+    phaseId: getNullableString(formData, "phaseId")
+  };
+
+  await updateProjectNote(householdId, projectId, noteId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteProjectNoteAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const noteId = getRequiredString(formData, "noteId");
+
+  await deleteProjectNote(householdId, projectId, noteId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function toggleProjectNotePinAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const noteId = getRequiredString(formData, "noteId");
+  const isPinned = getRequiredString(formData, "isPinned") === "true";
+
+  await updateProjectNote(householdId, projectId, noteId, { isPinned });
   revalidateProjectPaths(householdId, projectId);
 }
 

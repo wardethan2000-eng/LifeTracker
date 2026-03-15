@@ -2,13 +2,16 @@ import Link from "next/link";
 import type { JSX } from "react";
 import {
   addProjectAssetAction,
+  createProjectNoteAction,
   createProjectPhaseAction,
   createProjectExpenseAction,
   createProjectTaskAction,
   deleteProjectAction,
   deleteProjectExpenseAction,
+  deleteProjectNoteAction,
   deleteProjectTaskAction,
   removeProjectAssetAction,
+  toggleProjectNotePinAction,
   updateProjectAction,
   updateProjectExpenseAction,
   updateProjectTaskAction
@@ -38,6 +41,7 @@ import {
   getHouseholdServiceProviders,
   getMe,
   getProjectDetail,
+  getProjectNotes,
   getProjectPhaseDetail
 } from "../../../lib/api";
 import { formatCurrency, formatDate } from "../../../lib/formatters";
@@ -85,12 +89,13 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, householdAssets, householdMembers, householdInventory, serviceProviders] = await Promise.all([
+    const [project, householdAssets, householdMembers, householdInventory, serviceProviders, projectNotes] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getHouseholdAssets(household.id),
       getHouseholdMembers(household.id),
       getHouseholdInventory(household.id, { limit: 100 }),
-      getHouseholdServiceProviders(household.id)
+      getHouseholdServiceProviders(household.id),
+      getProjectNotes(household.id, routeParams.projectId)
     ]);
 
     const phaseDetails = await Promise.all(project.phases.map((phase) => getProjectPhaseDetail(household.id, project.id, phase.id)));
@@ -380,6 +385,110 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       task={task}
                       householdMembers={householdMembers}
                     />
+                  ))}
+                </div>
+              </ExpandableCard>
+
+              <ExpandableCard
+                title="Research & Notes"
+                modalTitle="Research & Notes"
+                previewContent={
+                  <span className="data-table__secondary">
+                    {projectNotes.length} note{projectNotes.length !== 1 ? "s" : ""}
+                    {projectNotes.filter((n) => n.isPinned).length > 0 ? ` · ${projectNotes.filter((n) => n.isPinned).length} pinned` : ""}
+                  </span>
+                }
+              >
+                <details style={{ marginBottom: 16 }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
+                  <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <div className="workbench-grid" style={{ marginBottom: 12 }}>
+                      <label className="field">
+                        <span className="field__label">Title *</span>
+                        <input type="text" name="title" required maxLength={300} placeholder="Note title" />
+                      </label>
+                      <label className="field">
+                        <span className="field__label">Category</span>
+                        <select name="category" defaultValue="general">
+                          <option value="research">Research</option>
+                          <option value="reference">Reference</option>
+                          <option value="decision">Decision</option>
+                          <option value="measurement">Measurement</option>
+                          <option value="general">General</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span className="field__label">Phase (optional)</span>
+                        <select name="phaseId" defaultValue="">
+                          <option value="">No phase</option>
+                          {project.phases.map((phase) => (
+                            <option key={phase.id} value={phase.id}>{phase.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span className="field__label">URL (optional)</span>
+                        <input type="url" name="url" placeholder="https://…" />
+                      </label>
+                    </div>
+                    <label className="field" style={{ display: "block", marginBottom: 12 }}>
+                      <span className="field__label">Body</span>
+                      <textarea name="body" rows={5} placeholder="Markdown supported…" style={{ width: "100%", resize: "vertical" }} />
+                    </label>
+                    <div className="inline-actions">
+                      <button type="submit" className="button">Save Note</button>
+                    </div>
+                  </form>
+                </details>
+                {projectNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
+                <div className="schedule-stack">
+                  {projectNotes.map((note) => (
+                    <div
+                      key={note.id}
+                      className="schedule-card"
+                      style={note.isPinned ? { background: "var(--surface-accent)", borderLeft: "3px solid var(--accent)" } : undefined}
+                    >
+                      <div className="schedule-card__summary">
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                          <span className="pill">{({ research: "Research", reference: "Reference", decision: "Decision", measurement: "Measurement", general: "General" } as Record<string, string>)[note.category] ?? note.category}</span>
+                          {note.phaseName ? <span className="pill pill--muted">{note.phaseName}</span> : null}
+                          {note.isPinned ? <span className="pill pill--accent">PINNED</span> : null}
+                        </div>
+                        <div className="data-table__primary">{note.title}</div>
+                        {note.body ? (
+                          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: "8px 0 0", fontFamily: "inherit", fontSize: "0.875rem" }}>
+                            {note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body}
+                          </pre>
+                        ) : null}
+                        {note.url ? (
+                          <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ display: "block", marginTop: 6, fontSize: "0.8125rem" }}>
+                            {(() => { try { return new URL(note.url).hostname; } catch { return note.url; } })()}
+                          </a>
+                        ) : null}
+                        <div className="data-table__secondary" style={{ marginTop: 8 }}>
+                          {note.createdBy?.displayName ?? "Unknown"} · {formatDate(note.createdAt)}
+                        </div>
+                      </div>
+                      <div className="inline-actions" style={{ marginTop: 8 }}>
+                        <form action={toggleProjectNotePinAction} style={{ display: "inline" }}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="noteId" value={note.id} />
+                          <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
+                          <button type="submit" className="button button--ghost button--small">
+                            {note.isPinned ? "Unpin" : "Pin"}
+                          </button>
+                        </form>
+                        <form action={deleteProjectNoteAction} style={{ display: "inline" }}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="noteId" value={note.id} />
+                          <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                        </form>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </ExpandableCard>

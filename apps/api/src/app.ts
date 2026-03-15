@@ -23,6 +23,7 @@ import { commentRoutes } from "./routes/comments/index.js";
 import { invitationRoutes } from "./routes/invitations/index.js";
 import { projectRoutes } from "./routes/projects/index.js";
 import { projectInventoryRoutes } from "./routes/projects/inventory.js";
+import { projectNoteRoutes } from "./routes/projects/notes.js";
 import { projectPhaseRoutes } from "./routes/projects/phases.js";
 import { searchRoutes } from "./routes/search/index.js";
 
@@ -58,6 +59,7 @@ export const buildApp = () => {
   app.register(projectRoutes);
   app.register(projectInventoryRoutes);
   app.register(projectPhaseRoutes);
+  app.register(projectNoteRoutes);
   app.register(searchRoutes);
 
   return app;

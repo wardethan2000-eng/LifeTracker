@@ -1029,6 +1029,9 @@ export const assetDetailResponseSchema = z.object({
 export const projectStatusValues = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
 export const projectStatusSchema = z.enum(projectStatusValues);
 
+export const noteCategoryValues = ["research", "reference", "decision", "measurement", "general"] as const;
+export const noteCategorySchema = z.enum(noteCategoryValues);
+
 export const projectTaskStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
 export const projectTaskStatusSchema = z.enum(projectTaskStatusValues);
 export const projectPhaseStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
@@ -1419,6 +1422,46 @@ export const projectTaskChecklistItemListSchema = z.array(projectTaskChecklistIt
 export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySummarySchema);
 export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 
+export const projectNoteSchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  phaseId: z.string().cuid().nullable(),
+  title: z.string(),
+  body: z.string(),
+  url: z.string().nullable(),
+  category: noteCategorySchema,
+  attachmentUrl: z.string().nullable(),
+  attachmentName: z.string().nullable(),
+  isPinned: z.boolean(),
+  createdById: z.string().cuid(),
+  createdBy: z.object({ id: z.string().cuid(), displayName: z.string().nullable() }).nullable().default(null),
+  phaseName: z.string().nullable().default(null),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const projectNoteListSchema = z.array(projectNoteSchema);
+
+export const createProjectNoteSchema = z.object({
+  title: z.string().min(1).max(300),
+  body: z.string().default(""),
+  category: noteCategorySchema.default("general"),
+  url: z.string().url().max(2000).optional(),
+  phaseId: z.string().cuid().optional(),
+  attachmentUrl: z.string().max(2000).optional(),
+  attachmentName: z.string().max(500).optional(),
+  isPinned: z.boolean().default(false)
+});
+
+export const updateProjectNoteSchema = createProjectNoteSchema.partial().extend({
+  title: z.string().min(1).max(300).optional(),
+  body: z.string().nullable().optional(),
+  url: z.string().url().max(2000).nullable().optional(),
+  phaseId: z.string().cuid().nullable().optional(),
+  attachmentUrl: z.string().max(2000).nullable().optional(),
+  attachmentName: z.string().max(500).nullable().optional()
+});
+
 // ── Activity Log Schemas ─────────────────────────────────────────────
 
 export const activityLogSchema = z.object({
@@ -1698,6 +1741,10 @@ export type ShallowUser = z.infer<typeof shallowUserSchema>;
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 export type ProjectTaskStatus = z.infer<typeof projectTaskStatusSchema>;
 export type ProjectPhaseStatus = z.infer<typeof projectPhaseStatusSchema>;
+export type NoteCategory = z.infer<typeof noteCategorySchema>;
+export type ProjectNote = z.infer<typeof projectNoteSchema>;
+export type CreateProjectNoteInput = z.infer<typeof createProjectNoteSchema>;
+export type UpdateProjectNoteInput = z.infer<typeof updateProjectNoteSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;

@@ -28,6 +28,8 @@ import {
   projectChildSummarySchema,
   projectTreeStatsSchema,
   projectExpenseSchema,
+  projectNoteSchema,
+  projectNoteListSchema,
   projectPhaseChecklistItemSchema,
   projectPhaseDetailSchema,
   projectPhaseListSchema,
@@ -51,6 +53,9 @@ import {
   type CreateCommentInput,
   type CreateConditionAssessmentInput,
   type CreateInvitationInput,
+  type CreateProjectNoteInput,
+  type UpdateProjectNoteInput,
+  type ProjectNote,
   type CreateProjectAssetInput,
   type CreateProjectBudgetCategoryInput,
   type CreateProjectExpenseInput,
@@ -1115,6 +1120,71 @@ export const applyPreset = async (
       skipExistingMetrics: true,
       skipExistingSchedules: true
     }
+  });
+};
+
+export const getProjectNotes = async (
+  householdId: string,
+  projectId: string,
+  options?: {
+    category?: string;
+    phaseId?: string;
+    pinned?: boolean;
+  }
+): Promise<ProjectNote[]> => {
+  const query = new URLSearchParams();
+
+  if (options?.category) {
+    query.set("category", options.category);
+  }
+
+  if (options?.phaseId) {
+    query.set("phaseId", options.phaseId);
+  }
+
+  if (options?.pinned !== undefined) {
+    query.set("pinned", String(options.pinned));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/notes${suffix}`,
+    schema: projectNoteListSchema
+  });
+};
+
+export const createProjectNote = async (
+  householdId: string,
+  projectId: string,
+  input: CreateProjectNoteInput
+): Promise<ProjectNote> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/notes`,
+  method: "POST",
+  body: input,
+  schema: projectNoteSchema
+});
+
+export const updateProjectNote = async (
+  householdId: string,
+  projectId: string,
+  noteId: string,
+  input: UpdateProjectNoteInput
+): Promise<ProjectNote> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/notes/${noteId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectNoteSchema
+});
+
+export const deleteProjectNote = async (
+  householdId: string,
+  projectId: string,
+  noteId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/notes/${noteId}`,
+    method: "DELETE"
   });
 };
 
