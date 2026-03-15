@@ -553,6 +553,8 @@ model ProjectTask {
   title         String
   description   String?
   status        String               @default("pending")
+  taskType      String               @default("full")
+  isCompleted   Boolean              @default(false)
   assignedToId  String?
   dueDate       DateTime?
   completedAt   DateTime?
@@ -569,6 +571,7 @@ model ProjectTask {
   checklistItems ProjectTaskChecklistItem[]
 
   @@index([projectId, status])
+  @@index([projectId, taskType])
   @@index([phaseId, sortOrder])
   @@index([assignedToId])
 }

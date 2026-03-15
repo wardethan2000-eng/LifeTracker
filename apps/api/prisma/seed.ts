@@ -1344,6 +1344,8 @@ async function main(): Promise<void> {
         title: "Finalize cabinet layout",
         description: "Lock filler widths, drawer stack sizes, and appliance clearances with the design packet.",
         status: "completed",
+        taskType: "full",
+        isCompleted: false,
         assignedToId: ownerUserId,
         dueDate: new Date("2026-03-05T00:00:00.000Z"),
         completedAt: new Date("2026-03-05T16:45:00.000Z"),
@@ -1358,6 +1360,8 @@ async function main(): Promise<void> {
         title: "Remove backsplash and inspect drywall",
         description: "Open the wall behind the sink run and document any repair work before cabinetry arrives.",
         status: "in_progress",
+        taskType: "full",
+        isCompleted: false,
         assignedToId: memberUserId,
         dueDate: new Date("2026-03-14T00:00:00.000Z"),
         estimatedCost: 420,
@@ -1371,6 +1375,8 @@ async function main(): Promise<void> {
         title: "Install pendant lights over peninsula",
         description: "Coordinate box placement, dimmer swap, and final fixture hang after paint cures.",
         status: "pending",
+        taskType: "full",
+        isCompleted: false,
         assignedToId: ownerUserId,
         dueDate: new Date("2026-04-18T00:00:00.000Z"),
         estimatedCost: 780,
@@ -1382,6 +1388,8 @@ async function main(): Promise<void> {
         title: "Collect finish samples and sign-off photos",
         description: "Store backsplash, paint, and hardware references for closeout and future repairs.",
         status: "pending",
+        taskType: "full",
+        isCompleted: false,
         assignedToId: null,
         dueDate: new Date("2026-05-10T00:00:00.000Z"),
         estimatedCost: 80,
@@ -1429,6 +1437,52 @@ async function main(): Promise<void> {
         title: "Confirm pendants are on-site before electrician visit",
         isCompleted: false,
         sortOrder: 1
+      }
+    ]
+  });
+
+  // Quick to-dos for Kitchen Refresh 2026
+  await prisma.projectTask.createMany({
+    data: [
+      {
+        id: "clkeeperquicktodo0000001",
+        projectId,
+        phaseId: phasePlanningId,
+        title: "Pick up cabinet hardware samples from Rejuvenation",
+        status: "pending",
+        taskType: "quick",
+        isCompleted: false,
+        sortOrder: 1
+      },
+      {
+        id: "clkeeperquicktodo0000002",
+        projectId,
+        phaseId: phaseInstallationId,
+        title: "Confirm pendant light lead time with Lumens",
+        status: "pending",
+        taskType: "quick",
+        isCompleted: false,
+        sortOrder: 2
+      },
+      {
+        id: "clkeeperquicktodo0000003",
+        projectId,
+        phaseId: phaseDemolitionId,
+        title: "Return unused drywall compound to Home Depot",
+        status: "completed",
+        taskType: "quick",
+        isCompleted: true,
+        completedAt: new Date("2026-03-12T14:00:00.000Z"),
+        sortOrder: 3
+      },
+      {
+        id: "clkeeperquicktodo0000004",
+        projectId,
+        title: "Ask electrician about adding an outlet behind the fridge",
+        status: "pending",
+        taskType: "quick",
+        isCompleted: false,
+        sortOrder: 4
       }
     ]
   });

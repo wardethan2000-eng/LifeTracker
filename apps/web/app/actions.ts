@@ -27,6 +27,7 @@ import type {
   CreateProjectInput,
   CreateProjectTaskChecklistItemInput,
   CreateProjectTaskInput,
+  CreateQuickTodoInput,
   CreatePresetProfileInput,
   CreateServiceProviderInput,
   CreateUsageMetricEntryInput,
@@ -78,6 +79,7 @@ import {
   createPhaseChecklistItem,
   createProjectPhaseSupply,
   createProjectTask,
+  createQuickTodo,
   createTaskChecklistItem,
   createMetric,
   createAsset,
@@ -124,6 +126,7 @@ import {
   updateProjectStatus,
   updateProjectTask,
   updateTaskChecklistItem,
+  promoteTask,
   updateSchedule,
   updateServiceProvider,
   updateMetric
@@ -1497,6 +1500,39 @@ export async function deleteProjectTaskAction(formData: FormData): Promise<void>
   const taskId = getRequiredString(formData, "taskId");
 
   await deleteProjectTask(householdId, projectId, taskId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createQuickTodoAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateQuickTodoInput = {
+    title: getRequiredString(formData, "title")
+  };
+
+  const phaseId = getOptionalString(formData, "phaseId");
+  if (phaseId) { input.phaseId = phaseId; }
+
+  await createQuickTodo(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function toggleQuickTodoAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+  const isCompleted = getRequiredString(formData, "isCompleted") === "true";
+
+  await updateProjectTask(householdId, projectId, taskId, { isCompleted });
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function promoteTaskAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const taskId = getRequiredString(formData, "taskId");
+
+  await promoteTask(householdId, projectId, taskId);
   revalidateProjectPaths(householdId, projectId);
 }
 

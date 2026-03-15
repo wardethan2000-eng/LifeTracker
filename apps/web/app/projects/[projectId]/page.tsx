@@ -6,12 +6,15 @@ import {
   createProjectPhaseAction,
   createProjectExpenseAction,
   createProjectTaskAction,
+  createQuickTodoAction,
   deleteProjectAction,
   deleteProjectExpenseAction,
   deleteProjectNoteAction,
   deleteProjectTaskAction,
+  promoteTaskAction,
   removeProjectAssetAction,
   toggleProjectNotePinAction,
+  toggleQuickTodoAction,
   updateProjectAction,
   updateProjectExpenseAction,
   updateProjectTaskAction
@@ -104,12 +107,17 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));
     const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
     const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
-    const unphasedTasks = project.tasks.filter((task) => task.phaseId === null);
+    const quickTodos = project.tasks.filter((task) => task.taskType === "quick");
+    const fullTasks = project.tasks.filter((task) => task.taskType !== "quick");
+    const unphasedTasks = fullTasks.filter((task) => task.phaseId === null);
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const completedTaskCount = project.tasks.filter((task) => task.status === "completed").length;
+    const completedQuickTodoCount = quickTodos.filter((task) => task.isCompleted).length;
+    const completedFullTaskCount = fullTasks.filter((task) => task.status === "completed").length;
+    const completedTaskCount = completedQuickTodoCount + completedFullTaskCount;
     const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
     const phaseCount = project.phases.length;
-    const percentComplete = project.tasks.length === 0 ? 0 : Math.round((completedTaskCount / project.tasks.length) * 100);
+    const totalTaskCount = project.tasks.length;
+    const percentComplete = totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
     const activePhase = project.phases.find((phase) => phase.status === "in_progress");
 
     const allSupplies = phaseDetails.flatMap((phase) => phase.supplies);
@@ -178,7 +186,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             <div className="stat-card">
               <span className="stat-card__label">Task Progress</span>
               <strong className="stat-card__value">{percentComplete}%</strong>
-              <span className="stat-card__sub">{completedTaskCount} of {project.tasks.length} tasks completed</span>
+              <span className="stat-card__sub">{completedTaskCount} of {totalTaskCount} tasks completed</span>
             </div>
             <div className="stat-card stat-card--warning">
               <span className="stat-card__label">Phases</span>
@@ -335,9 +343,114 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               </ExpandableCard>
 
               <ExpandableCard
+                title={`Quick To-dos (${quickTodos.length})`}
+                modalTitle="Quick To-dos"
+                previewContent={
+                  <span className="data-table__secondary">
+                    {completedQuickTodoCount} of {quickTodos.length} done
+                  </span>
+                }
+              >
+                <form action={createQuickTodoAction} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: 16 }}>
+                  <input type="hidden" name="householdId" value={household.id} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <input
+                    name="title"
+                    placeholder="Add a to-do…"
+                    required
+                    style={{ flex: 1, height: "36px", padding: "0 10px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--surface)", color: "var(--ink)", fontSize: "0.875rem" }}
+                  />
+                  {project.phases.length > 0 && (
+                    <select name="phaseId" defaultValue="" style={{ height: "36px", padding: "0 8px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--surface)", color: "var(--ink)", fontSize: "0.875rem" }}>
+                      <option value="">No phase</option>
+                      {project.phases.map((phase) => (
+                        <option key={phase.id} value={phase.id}>{phase.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <button type="submit" className="button button--sm">Add</button>
+                </form>
+                {quickTodos.length === 0 ? (
+                  <p className="panel__empty">No quick to-dos yet. Use the field above to add lightweight checkbox items.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    {quickTodos.map((todo) => (
+                      <div
+                        key={todo.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "8px 0",
+                          borderBottom: "1px solid var(--border)",
+                          minHeight: "36px"
+                        }}
+                      >
+                        <form action={toggleQuickTodoAction} style={{ display: "contents" }}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="taskId" value={todo.id} />
+                          <input type="hidden" name="isCompleted" value={todo.isCompleted ? "false" : "true"} />
+                          <button
+                            type="submit"
+                            style={{
+                              width: "18px",
+                              height: "18px",
+                              flexShrink: 0,
+                              border: "2px solid var(--border)",
+                              borderRadius: "3px",
+                              background: todo.isCompleted ? "var(--accent)" : "var(--surface)",
+                              cursor: "pointer",
+                              padding: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "white",
+                              fontSize: "11px",
+                              lineHeight: 1
+                            }}
+                            title={todo.isCompleted ? "Mark incomplete" : "Mark complete"}
+                          >
+                            {todo.isCompleted ? "✓" : ""}
+                          </button>
+                        </form>
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: "0.875rem",
+                            color: todo.isCompleted ? "var(--ink-muted)" : "var(--ink)",
+                            textDecoration: todo.isCompleted ? "line-through" : "none"
+                          }}
+                        >
+                          {todo.title}
+                        </span>
+                        {todo.phaseId ? (
+                          <span className="pill pill--muted" style={{ fontSize: "0.75rem" }}>
+                            {phaseNameLookup.get(todo.phaseId) ?? ""}
+                          </span>
+                        ) : null}
+                        <form action={promoteTaskAction} style={{ display: "inline" }}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="taskId" value={todo.id} />
+                          <button type="submit" className="button button--ghost button--small" title="Promote to full task">→ Full task</button>
+                        </form>
+                        <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="taskId" value={todo.id} />
+                          <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ExpandableCard>
+
+              <ExpandableCard
                 title="Tasks"
                 modalTitle="Tasks"
-                previewContent={<CompactTaskPreview tasks={project.tasks} />}
+                previewContent={<CompactTaskPreview tasks={fullTasks} />}
               >
                 <div style={{ marginBottom: 20 }}>
                   <form action={createProjectTaskAction}>
@@ -375,7 +488,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     </div>
                   </form>
                 </div>
-                {unphasedTasks.length === 0 ? <p className="panel__empty">Every task is assigned to a phase.</p> : null}
+                {unphasedTasks.length === 0 ? <p className="panel__empty">Every full task is assigned to a phase.</p> : null}
                 <div className="schedule-stack">
                   {unphasedTasks.map((task) => (
                     <UnphasedTaskCard
@@ -664,7 +777,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               <Card title="Project Status">
                 <dl className="schedule-meta">
                   <div><dt>Status</dt><dd><span className="pill">{projectStatusLabels[project.status] ?? project.status}</span></dd></div>
-                  <div><dt>Task progress</dt><dd>{percentComplete}% — {completedTaskCount}/{project.tasks.length} tasks</dd></div>
+                  <div><dt>Task progress</dt><dd>{percentComplete}% — {completedTaskCount}/{totalTaskCount} tasks</dd></div>
                   <div><dt>Phases</dt><dd>{completedPhaseCount} of {phaseCount} complete</dd></div>
                   {activePhase ? <div><dt>Active phase</dt><dd>{activePhase.name}</dd></div> : null}
                   <div><dt>Start date</dt><dd>{formatDate(project.startDate, "Not set")}</dd></div>

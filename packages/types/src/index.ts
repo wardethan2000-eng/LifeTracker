@@ -1297,6 +1297,8 @@ export const projectTaskSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   status: projectTaskStatusSchema,
+  taskType: z.string().default("full"),
+  isCompleted: z.boolean().default(false),
   assignedToId: z.string().cuid().nullable(),
   assignee: shallowUserSchema.nullable().default(null),
   dueDate: z.string().datetime().nullable(),
@@ -1314,6 +1316,8 @@ export const createProjectTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   status: projectTaskStatusSchema.default("pending"),
+  taskType: z.enum(["quick", "full"]).default("full").optional(),
+  isCompleted: z.boolean().default(false).optional(),
   phaseId: z.string().cuid().optional(),
   assignedToId: z.string().cuid().optional(),
   dueDate: z.string().datetime().optional(),
@@ -1325,6 +1329,8 @@ export const createProjectTaskSchema = z.object({
 
 export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend({
   description: z.string().max(2000).nullable().optional(),
+  taskType: z.enum(["quick", "full"]).optional(),
+  isCompleted: z.boolean().optional(),
   phaseId: z.string().cuid().nullable().optional(),
   assignedToId: z.string().cuid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
@@ -1333,6 +1339,19 @@ export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend(
   sortOrder: z.number().int().nullable().optional(),
   scheduleId: z.string().cuid().nullable().optional(),
   completedAt: z.string().datetime().nullable().optional()
+});
+
+export const createQuickTodoSchema = z.object({
+  title: z.string().min(1).max(200),
+  phaseId: z.string().cuid().optional(),
+  sortOrder: z.number().int().optional()
+});
+
+export const promoteTaskSchema = z.object({
+  status: projectTaskStatusSchema.optional(),
+  assignedToId: z.string().cuid().optional(),
+  dueDate: z.string().datetime().optional(),
+  estimatedCost: z.number().min(0).optional()
 });
 
 export const projectExpenseSchema = z.object({
@@ -1775,6 +1794,8 @@ export type ReorderProjectPhasesInput = z.infer<typeof reorderProjectPhasesSchem
 export type ProjectTask = z.infer<typeof projectTaskSchema>;
 export type CreateProjectTaskInput = z.infer<typeof createProjectTaskSchema>;
 export type UpdateProjectTaskInput = z.infer<typeof updateProjectTaskSchema>;
+export type CreateQuickTodoInput = z.infer<typeof createQuickTodoSchema>;
+export type PromoteTaskInput = z.infer<typeof promoteTaskSchema>;
 export type ProjectExpense = z.infer<typeof projectExpenseSchema>;
 export type CreateProjectExpenseInput = z.infer<typeof createProjectExpenseSchema>;
 export type UpdateProjectExpenseInput = z.infer<typeof updateProjectExpenseSchema>;

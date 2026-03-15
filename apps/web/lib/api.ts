@@ -66,6 +66,8 @@ import {
   type CreateProjectInput,
   type CreateProjectTaskChecklistItemInput,
   type CreateProjectTaskInput,
+  type CreateQuickTodoInput,
+  type PromoteTaskInput,
   type CreatePresetProfileInput,
   type CreateServiceProviderInput,
   type CreateAssetInput,
@@ -972,6 +974,29 @@ export const deleteProjectTask = async (
     method: "DELETE"
   });
 };
+
+export const createQuickTodo = async (
+  householdId: string,
+  projectId: string,
+  input: CreateQuickTodoInput
+): Promise<ProjectTask> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/quick-todos`,
+  method: "POST",
+  body: input,
+  schema: projectTaskSchema
+});
+
+export const promoteTask = async (
+  householdId: string,
+  projectId: string,
+  taskId: string,
+  input?: PromoteTaskInput
+): Promise<ProjectTask> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/tasks/${taskId}/promote`,
+  method: "POST",
+  body: input ?? {},
+  schema: projectTaskSchema
+});
 
 export const createProjectExpense = async (
   householdId: string,

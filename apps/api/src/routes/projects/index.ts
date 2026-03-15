@@ -5,6 +5,8 @@ import {
   createProjectAssetSchema,
   createProjectTaskSchema,
   updateProjectTaskSchema,
+  createQuickTodoSchema,
+  promoteTaskSchema,
   createProjectExpenseSchema,
   updateProjectExpenseSchema,
   projectStatusSchema
@@ -62,13 +64,15 @@ const toProjectSummary = (
     updatedAt: Date;
     expenses: { amount: number }[];
     _count: { tasks: number };
-    tasks: { status: string }[];
+    tasks: { status: string; taskType: string; isCompleted: boolean }[];
     phases: { status: string }[];
   }
 ) => {
   const totalSpent = project.expenses.reduce((sum, e) => sum + e.amount, 0);
   const taskCount = project._count.tasks;
-  const completedTaskCount = project.tasks.filter((t) => t.status === "completed").length;
+  const completedTaskCount = project.tasks.filter(
+    (t) => t.status === "completed" || (t.taskType === "quick" && t.isCompleted)
+  ).length;
   const phaseCount = project.phases.length;
   const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
   const percentComplete = taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0;
@@ -241,6 +245,8 @@ const toProjectTaskResponse = (task: {
   title: string;
   description: string | null;
   status: string;
+  taskType: string;
+  isCompleted: boolean;
   assignedToId: string | null;
   dueDate: Date | null;
   completedAt: Date | null;
@@ -268,6 +274,8 @@ const toProjectTaskResponse = (task: {
   title: task.title,
   description: task.description,
   status: task.status,
+  taskType: task.taskType,
+  isCompleted: task.isCompleted,
   assignedToId: task.assignedToId,
   assignee: task.assignedTo ? { id: task.assignedTo.id, displayName: task.assignedTo.displayName } : null,
   dueDate: task.dueDate?.toISOString() ?? null,
@@ -411,7 +419,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       where,
       include: {
         expenses: { select: { amount: true } },
-        tasks: { select: { status: true } },
+        tasks: { select: { status: true, taskType: true, isCompleted: true } },
         phases: { select: { status: true } },
         _count: { select: { tasks: true } }
       },
@@ -529,7 +537,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const childProjects = await app.prisma.project.findMany({
       where: { parentProjectId: project.id, householdId: params.householdId },
       include: {
-        tasks: { select: { status: true } },
+        tasks: { select: { status: true, taskType: true, isCompleted: true } },
         expenses: { select: { amount: true } },
         _count: { select: { childProjects: true } }
       },
@@ -538,7 +546,9 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const childSummaries = childProjects.map((child) => {
       const taskCount = child.tasks.length;
-      const completedTaskCount = child.tasks.filter((t) => t.status === "completed").length;
+      const completedTaskCount = child.tasks.filter(
+        (t) => t.status === "completed" || (t.taskType === "quick" && t.isCompleted)
+      ).length;
       return {
         id: child.id,
         name: child.name,
@@ -887,19 +897,24 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    const taskType = input.taskType ?? "full";
+    const isQuick = taskType === "quick";
+
     const task = await app.prisma.projectTask.create({
       data: {
         projectId: project.id,
         phaseId: input.phaseId ?? null,
         title: input.title,
-        description: input.description ?? null,
-        status: input.status,
-        assignedToId: input.assignedToId ?? null,
-        dueDate: input.dueDate ? new Date(input.dueDate) : null,
-        estimatedCost: input.estimatedCost ?? null,
-        actualCost: input.actualCost ?? null,
+        description: isQuick ? null : (input.description ?? null),
+        status: input.status ?? "pending",
+        taskType,
+        isCompleted: input.isCompleted ?? false,
+        assignedToId: isQuick ? null : (input.assignedToId ?? null),
+        dueDate: isQuick ? null : (input.dueDate ? new Date(input.dueDate) : null),
+        estimatedCost: isQuick ? null : (input.estimatedCost ?? null),
+        actualCost: isQuick ? null : (input.actualCost ?? null),
         sortOrder: input.sortOrder ?? null,
-        scheduleId: input.scheduleId ?? null
+        scheduleId: isQuick ? null : (input.scheduleId ?? null)
       },
       include: {
         assignedTo: { select: { id: true, displayName: true } },
@@ -990,6 +1005,19 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.actualCost !== undefined) data.actualCost = input.actualCost ?? null;
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder ?? null;
     if (input.scheduleId !== undefined) data.scheduleId = input.scheduleId ?? null;
+    if (input.taskType !== undefined) data.taskType = input.taskType;
+
+    // Handle isCompleted toggle (quick to-dos) — sync status and completedAt
+    if (input.isCompleted !== undefined) {
+      data.isCompleted = input.isCompleted;
+      if (input.isCompleted) {
+        data.status = "completed";
+        data.completedAt = new Date();
+      } else {
+        data.status = "pending";
+        data.completedAt = null;
+      }
+    }
 
     const effectiveScheduleId = input.scheduleId !== undefined ? input.scheduleId : existing.scheduleId;
 
@@ -1099,6 +1127,127 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     await app.prisma.projectTask.delete({ where: { id: existing.id } });
 
     return reply.code(204).send();
+  });
+
+  // ── Quick To-dos ──────────────────────────────────────────────────
+
+  app.post("/v1/households/:householdId/projects/:projectId/quick-todos", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+    const input = createQuickTodoSchema.parse(request.body);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId },
+      select: { id: true }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    if (input.phaseId) {
+      const phase = await app.prisma.projectPhase.findFirst({
+        where: { id: input.phaseId, projectId: project.id },
+        select: { id: true }
+      });
+
+      if (!phase) {
+        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+      }
+    }
+
+    const task = await app.prisma.projectTask.create({
+      data: {
+        projectId: project.id,
+        phaseId: input.phaseId ?? null,
+        title: input.title,
+        description: null,
+        status: "pending",
+        taskType: "quick",
+        isCompleted: false,
+        sortOrder: input.sortOrder ?? null
+      },
+      include: {
+        assignedTo: { select: { id: true, displayName: true } },
+        checklistItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
+      }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.quicktodo.created",
+      entityType: "project_task",
+      entityId: task.id,
+      metadata: { taskTitle: task.title }
+    });
+
+    return reply.code(201).send(toProjectTaskResponse(task));
+  });
+
+  app.post("/v1/households/:householdId/projects/:projectId/tasks/:taskId/promote", async (request, reply) => {
+    const params = taskParamsSchema.parse(request.params);
+    const input = promoteTaskSchema.parse(request.body);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.projectTask.findFirst({
+      where: {
+        id: params.taskId,
+        project: { id: params.projectId, householdId: params.householdId }
+      }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Project task not found." });
+    }
+
+    if (existing.taskType === "full") {
+      return reply.code(400).send({ message: "Task is already a full task." });
+    }
+
+    const promotedStatus = input.status ?? (existing.isCompleted ? "completed" : "pending");
+    const promotedCompletedAt = promotedStatus === "completed" && !existing.completedAt ? new Date() : existing.completedAt;
+
+    const task = await app.prisma.projectTask.update({
+      where: { id: existing.id },
+      data: {
+        taskType: "full",
+        status: promotedStatus,
+        completedAt: promotedCompletedAt,
+        assignedToId: input.assignedToId ?? null,
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        estimatedCost: input.estimatedCost ?? null
+      },
+      include: {
+        assignedTo: { select: { id: true, displayName: true } },
+        checklistItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
+      }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.task.promoted",
+      entityType: "project_task",
+      entityId: existing.id,
+      metadata: { taskTitle: existing.title }
+    });
+
+    return toProjectTaskResponse(task);
   });
 
   // ── Project Expenses ─────────────────────────────────────────────
