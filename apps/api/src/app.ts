@@ -10,6 +10,7 @@ import { healthRoutes } from "./routes/health.js";
 import { householdRoutes } from "./routes/households/index.js";
 import { householdInventoryItemRoutes } from "./routes/households/inventory-items.js";
 import { householdInventoryTransactionRoutes } from "./routes/households/inventory-transactions.js";
+import { householdLinkPreviewRoutes } from "./routes/households/link-preview.js";
 import { maintenanceLogRoutes } from "./routes/logs/index.js";
 import { maintenanceLogPartRoutes } from "./routes/logs/parts.js";
 import { meRoutes } from "./routes/me.js";
@@ -42,6 +43,7 @@ export const buildApp = () => {
   app.register(householdRoutes);
   app.register(householdInventoryItemRoutes);
   app.register(householdInventoryTransactionRoutes);
+  app.register(householdLinkPreviewRoutes);
   app.register(notificationRoutes);
   app.register(dashboardRoutes);
   app.register(assetRoutes);

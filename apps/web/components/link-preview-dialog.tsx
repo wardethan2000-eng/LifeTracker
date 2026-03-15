@@ -1,0 +1,220 @@
+"use client";
+
+import { useState } from "react";
+import type { JSX } from "react";
+import type { LinkPreviewField, LinkPreviewResponse } from "@lifekeeper/types";
+import { fetchLinkPreview } from "../lib/api";
+
+type LinkPreviewConfirmData = {
+  fields: Record<string, string>;
+  imageUrl: string | null;
+  sourceUrl: string;
+  retailer: string | null;
+};
+
+type LinkPreviewDialogProps = {
+  householdId: string;
+  onConfirm: (data: LinkPreviewConfirmData) => void;
+  onCancel: () => void;
+  triggerLabel?: string;
+};
+
+type DialogState =
+  | { phase: "closed" }
+  | { phase: "input" }
+  | { phase: "loading" }
+  | { phase: "review"; data: LinkPreviewResponse; editedValues: Record<string, string> };
+
+export function LinkPreviewDialog({
+  householdId,
+  onConfirm,
+  onCancel,
+  triggerLabel = "Add from Link",
+}: LinkPreviewDialogProps): JSX.Element {
+  const [state, setState] = useState<DialogState>({ phase: "closed" });
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const open = () => {
+    setUrl("");
+    setError(null);
+    setState({ phase: "input" });
+  };
+
+  const close = () => {
+    setState({ phase: "closed" });
+    setUrl("");
+    setError(null);
+    onCancel();
+  };
+
+  const handleFetch = async () => {
+    if (!url.trim()) return;
+    setError(null);
+    setState({ phase: "loading" });
+
+    try {
+      const data = await fetchLinkPreview(householdId, url.trim());
+      const initialValues: Record<string, string> = {};
+      for (const field of data.fields) {
+        if (field.value) {
+          initialValues[field.key] = field.value;
+        }
+      }
+      setState({ phase: "review", data, editedValues: initialValues });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch link preview.";
+      setError(message);
+      setState({ phase: "input" });
+    }
+  };
+
+  const handleFieldChange = (key: string, value: string) => {
+    if (state.phase !== "review") return;
+    setState({
+      ...state,
+      editedValues: { ...state.editedValues, [key]: value },
+    });
+  };
+
+  const handleConfirm = () => {
+    if (state.phase !== "review") return;
+    const { data, editedValues } = state;
+
+    // Filter out empty values
+    const fields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(editedValues)) {
+      if (value.trim()) {
+        fields[key] = value.trim();
+      }
+    }
+
+    onConfirm({
+      fields,
+      imageUrl: data.imageUrls[0] ?? null,
+      sourceUrl: data.url,
+      retailer: data.retailer,
+    });
+
+    setState({ phase: "closed" });
+    setUrl("");
+  };
+
+  if (state.phase === "closed") {
+    return (
+      <button type="button" className="button" onClick={open}>
+        {triggerLabel}
+      </button>
+    );
+  }
+
+  const confidenceClass = (c: LinkPreviewField["confidence"]): string =>
+    `link-preview--confidence link-preview--confidence-${c}`;
+
+  return (
+    <div className="link-preview--overlay" role="dialog" aria-modal="true" onMouseDown={(e) => {
+      if (e.target === e.currentTarget) close();
+    }}>
+      <div className="link-preview--panel">
+        <div className="link-preview--header">
+          <h2>Add from Product Link</h2>
+          <button type="button" className="button button--ghost" onClick={close} aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        {(state.phase === "input" || state.phase === "loading") && (
+          <>
+            <div className="link-preview--url-row">
+              <input
+                type="url"
+                className="input"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Paste a product URL (Home Depot, Amazon, Lowes, etc.)"
+                disabled={state.phase === "loading"}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleFetch(); } }}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={handleFetch}
+                disabled={state.phase === "loading" || !url.trim()}
+              >
+                {state.phase === "loading" ? "Fetching…" : "Fetch"}
+              </button>
+            </div>
+            {error && <p className="link-preview--error">{error}</p>}
+            {state.phase === "loading" && (
+              <div className="link-preview--loading">
+                <span className="search-palette__spinner" aria-hidden="true" />
+                <span>Extracting product information…</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {state.phase === "review" && (
+          <>
+            <div className="link-preview--review">
+              <div className="link-preview--image-col">
+                {state.data.imageUrls[0] ? (
+                  <img
+                    className="link-preview--thumb"
+                    src={state.data.imageUrls[0]}
+                    alt="Product preview"
+                  />
+                ) : (
+                  <div className="link-preview--thumb" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-muted)", fontSize: "0.82rem" }}>
+                    No image
+                  </div>
+                )}
+                {state.data.retailer && (
+                  <div className="link-preview--retailer">{state.data.retailer}</div>
+                )}
+                <a
+                  className="link-preview--source-url"
+                  href={state.data.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {new URL(state.data.url).hostname}
+                </a>
+              </div>
+              <div className="link-preview--fields-col">
+                {state.data.fields.map((field) => (
+                  <div key={field.key} className="link-preview--field-row">
+                    <span className="link-preview--field-label">
+                      <span className={confidenceClass(field.confidence)} title={`${field.confidence} confidence (${field.source})`} />
+                      {field.label}
+                    </span>
+                    <input
+                      type="text"
+                      className="input"
+                      value={state.editedValues[field.key] ?? ""}
+                      onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                    />
+                  </div>
+                ))}
+                {state.data.fields.length === 0 && (
+                  <p style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>
+                    No product metadata could be extracted from this page.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="link-preview--actions">
+              <button type="button" className="button button--ghost" onClick={close}>
+                Cancel
+              </button>
+              <button type="button" className="button button--primary" onClick={handleConfirm}>
+                Use This Information
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

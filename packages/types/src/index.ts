@@ -1862,3 +1862,29 @@ export type ProjectShoppingListItem = z.infer<typeof projectShoppingListItemSche
 export type ProjectShoppingListSupplierGroup = z.infer<typeof projectShoppingListSupplierGroupSchema>;
 export type ProjectShoppingList = z.infer<typeof projectShoppingListSchema>;
 
+export const linkPreviewFieldSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  value: z.string().nullable(),
+  confidence: z.enum(["high", "medium", "low"]),
+  source: z.enum(["json-ld", "og", "meta", "html", "inferred"])
+});
+
+export const linkPreviewResponseSchema = z.object({
+  url: z.string().url(),
+  canonicalUrl: z.string().url().nullable(),
+  retailer: z.string().nullable(),
+  fields: z.array(linkPreviewFieldSchema),
+  imageUrls: z.array(z.string().url()),
+  rawTitle: z.string().nullable(),
+  fetchedAt: z.string().datetime()
+});
+
+export const linkPreviewRequestSchema = z.object({
+  url: z.string().url()
+});
+
+export type LinkPreviewField = z.infer<typeof linkPreviewFieldSchema>;
+export type LinkPreviewResponse = z.infer<typeof linkPreviewResponseSchema>;
+export type LinkPreviewRequest = z.infer<typeof linkPreviewRequestSchema>;
+

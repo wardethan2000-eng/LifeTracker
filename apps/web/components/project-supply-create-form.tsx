@@ -1,0 +1,103 @@
+"use client";
+
+import { useState } from "react";
+import type { JSX } from "react";
+import type { InventoryItemSummary } from "@lifekeeper/types";
+import { createProjectPhaseSupplyAction } from "../app/actions";
+import { LinkPreviewDialog } from "./link-preview-dialog";
+
+type Props = {
+  householdId: string;
+  projectId: string;
+  phaseId: string;
+  inventoryItems: InventoryItemSummary[];
+};
+
+type SupplyPrefill = {
+  name: string;
+  description: string;
+  estimatedUnitCost: string;
+  supplier: string;
+  supplierUrl: string;
+};
+
+const emptyPrefill: SupplyPrefill = { name: "", description: "", estimatedUnitCost: "", supplier: "", supplierUrl: "" };
+
+export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inventoryItems }: Props): JSX.Element {
+  const [prefill, setPrefill] = useState<SupplyPrefill>(emptyPrefill);
+  const [prefillKey, setPrefillKey] = useState(0);
+  const [showLinkPreview, setShowLinkPreview] = useState(false);
+
+  return (
+    <div className="panel__body--padded">
+      {showLinkPreview && (
+        <LinkPreviewDialog
+          householdId={householdId}
+          onConfirm={(data) => {
+            const priceRaw = data.fields.price?.replace(/[^\d.]/g, "") ?? "";
+            setPrefill({
+              name: data.fields.name ?? "",
+              description: data.fields.description ?? "",
+              estimatedUnitCost: priceRaw,
+              supplier: data.retailer ?? "",
+              supplierUrl: data.sourceUrl ?? "",
+            });
+            setPrefillKey((k) => k + 1);
+            setShowLinkPreview(false);
+          }}
+          onCancel={() => setShowLinkPreview(false)}
+        />
+      )}
+      <form action={createProjectPhaseSupplyAction} key={prefillKey}>
+        <input type="hidden" name="householdId" value={householdId} />
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="phaseId" value={phaseId} />
+        <div className="form-grid">
+          <label className="field field--full">
+            <span>Supply Name</span>
+            <input name="name" placeholder="1/2 in. drywall sheets" required defaultValue={prefill.name ?? ""} />
+          </label>
+          <label className="field field--full">
+            <span>Description</span>
+            <textarea name="description" rows={2} placeholder="Sizing, brand preference, finish, or substitution notes" defaultValue={prefill.description ?? ""} />
+          </label>
+          <label className="field">
+            <span>Quantity Needed</span>
+            <input name="quantityNeeded" type="number" min="0" step="0.01" required />
+          </label>
+          <label className="field">
+            <span>Unit</span>
+            <input name="unit" defaultValue="each" />
+          </label>
+          <label className="field">
+            <span>Estimated Unit Cost</span>
+            <input name="estimatedUnitCost" type="number" min="0" step="0.01" defaultValue={prefill.estimatedUnitCost ?? ""} />
+          </label>
+          <label className="field">
+            <span>Supplier</span>
+            <input name="supplier" defaultValue={prefill.supplier ?? ""} />
+          </label>
+          <label className="field">
+            <span>Supplier URL</span>
+            <input name="supplierUrl" type="url" defaultValue={prefill.supplierUrl ?? ""} />
+          </label>
+          <label className="field">
+            <span>Linked Inventory Item</span>
+            <select name="inventoryItemId" defaultValue="">
+              <option value="">None</option>
+              {inventoryItems.map((item) => (
+                <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit} on hand</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="inline-actions" style={{ marginTop: 16 }}>
+          <button type="button" className="button" onClick={() => setShowLinkPreview(true)}>
+            Add from Link
+          </button>
+          <button type="submit" className="button">Add Supply</button>
+        </div>
+      </form>
+    </div>
+  );
+}

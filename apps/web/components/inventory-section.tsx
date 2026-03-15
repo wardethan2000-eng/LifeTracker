@@ -3,6 +3,16 @@
 import type { JSX, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { createInventoryItemAction } from "../app/actions";
+import { LinkPreviewDialog } from "./link-preview-dialog";
+
+type InventoryPrefill = {
+  name?: string;
+  partNumber?: string;
+  manufacturer?: string;
+  unitCost?: string;
+  preferredSupplier?: string;
+  supplierUrl?: string;
+};
 
 type InventorySectionProps = {
   householdId: string;
@@ -32,6 +42,9 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
   const [showForm, setShowForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [customCategory, setCustomCategory] = useState("");
+  const [prefill, setPrefill] = useState<InventoryPrefill>({});
+  const [prefillKey, setPrefillKey] = useState(0);
+  const [showLinkPreview, setShowLinkPreview] = useState(false);
 
   const mergedCategoryOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -70,6 +83,13 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
         <div className="panel__header-actions">
           <button
             type="button"
+            className="button button--sm"
+            onClick={() => setShowLinkPreview(true)}
+          >
+            Add from Link
+          </button>
+          <button
+            type="button"
             className={`button button--primary button--sm${showForm ? " button--active" : ""}`}
             onClick={() => setShowForm((current) => !current)}
           >
@@ -78,19 +98,40 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
         </div>
       </div>
 
+      {showLinkPreview && (
+        <LinkPreviewDialog
+          householdId={householdId}
+          onConfirm={(data) => {
+            const priceRaw = data.fields.price?.replace(/[^\d.]/g, "") ?? "";
+            setPrefill({
+              name: data.fields.name ?? "",
+              partNumber: data.fields.partNumber ?? data.fields.sku ?? "",
+              manufacturer: data.fields.brand ?? "",
+              unitCost: priceRaw || undefined,
+              preferredSupplier: data.retailer ?? "",
+              supplierUrl: data.sourceUrl ?? "",
+            });
+            setPrefillKey((k) => k + 1);
+            setShowLinkPreview(false);
+            setShowForm(true);
+          }}
+          onCancel={() => setShowLinkPreview(false)}
+        />
+      )}
+
       {showForm && (
         <div className="panel__body--padded inventory-create-panel">
-          <form action={createInventoryItemAction}>
+          <form action={createInventoryItemAction} key={prefillKey}>
             <input type="hidden" name="householdId" value={householdId} />
             <input type="hidden" name="category" value={resolvedCategory} />
             <div className="form-grid">
               <label className="field">
                 <span>Name</span>
-                <input type="text" name="name" placeholder="Oil filter" required />
+                <input type="text" name="name" placeholder="Oil filter" required defaultValue={prefill.name ?? ""} />
               </label>
               <label className="field">
                 <span>Part Number</span>
-                <input type="text" name="partNumber" placeholder="FL-500S" />
+                <input type="text" name="partNumber" placeholder="FL-500S" defaultValue={prefill.partNumber ?? ""} />
               </label>
               <label className="field">
                 <span>Category</span>
@@ -108,7 +149,7 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
               </label>
               <label className="field">
                 <span>Manufacturer</span>
-                <input type="text" name="manufacturer" placeholder="Motorcraft" />
+                <input type="text" name="manufacturer" placeholder="Motorcraft" defaultValue={prefill.manufacturer ?? ""} />
               </label>
               {showCustomCategoryField && (
                 <label className="field field--full">
@@ -140,15 +181,15 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
               </label>
               <label className="field">
                 <span>Last Price</span>
-                <input type="number" name="unitCost" min="0" step="0.01" placeholder="8.97" />
+                <input type="number" name="unitCost" min="0" step="0.01" placeholder="8.97" defaultValue={prefill.unitCost ?? ""} />
               </label>
               <label className="field">
                 <span>Supplier</span>
-                <input type="text" name="preferredSupplier" placeholder="AutoZone" />
+                <input type="text" name="preferredSupplier" placeholder="AutoZone" defaultValue={prefill.preferredSupplier ?? ""} />
               </label>
               <label className="field field--full">
                 <span>Supplier Link</span>
-                <input type="url" name="supplierUrl" placeholder="https://..." />
+                <input type="url" name="supplierUrl" placeholder="https://..." defaultValue={prefill.supplierUrl ?? ""} />
               </label>
               <label className="field field--full">
                 <span>Storage Location</span>

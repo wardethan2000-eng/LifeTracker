@@ -88,6 +88,7 @@ import {
   type InventoryItemSummary,
   type InventoryProjectLinkDetail,
   type LibraryPreset,
+  type LinkPreviewResponse,
   type LowStockInventoryItem,
   type MaintenanceLog,
   type MaintenanceSchedule,
@@ -1358,3 +1359,10 @@ export const enqueueNotificationScan = async (householdId: string): Promise<void
     body: { householdId }
   });
 };
+
+export const fetchLinkPreview = async (householdId: string, url: string): Promise<LinkPreviewResponse> => apiRequest({
+  path: `/v1/households/${householdId}/link-preview`,
+  method: "POST",
+  body: { url },
+  schema: linkPreviewResponseSchema
+});

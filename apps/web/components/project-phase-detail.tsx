@@ -27,6 +27,7 @@ import {
 import { formatCurrency } from "../lib/formatters";
 import { ProjectChecklist } from "./project-checklist";
 import { ProjectSupplyCard } from "./project-supply-card";
+import { ProjectSupplyCreateForm } from "./project-supply-create-form";
 
 const taskStatusOptions = ["pending", "in_progress", "completed", "skipped"] as const;
 const taskStatusLabels: Record<(typeof taskStatusOptions)[number], string> = {
@@ -237,47 +238,12 @@ export function ProjectPhaseDetail({
             ))}
           </div>
 
-          <div className="panel__body--padded">
-            <form action={createProjectPhaseSupplyAction}>
-              <input type="hidden" name="householdId" value={householdId} />
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name="phaseId" value={phase.id} />
-              <div className="form-grid">
-                <label className="field field--full">
-                  <span>Supply Name</span>
-                  <input name="name" placeholder="1/2 in. drywall sheets" required />
-                </label>
-                <label className="field field--full">
-                  <span>Description</span>
-                  <textarea name="description" rows={2} placeholder="Sizing, brand preference, finish, or substitution notes" />
-                </label>
-                <label className="field">
-                  <span>Quantity Needed</span>
-                  <input name="quantityNeeded" type="number" min="0" step="0.01" required />
-                </label>
-                <label className="field">
-                  <span>Unit</span>
-                  <input name="unit" defaultValue="each" />
-                </label>
-                <label className="field">
-                  <span>Estimated Unit Cost</span>
-                  <input name="estimatedUnitCost" type="number" min="0" step="0.01" />
-                </label>
-                <label className="field">
-                  <span>Linked Inventory Item</span>
-                  <select name="inventoryItemId" defaultValue="">
-                    <option value="">None</option>
-                    {inventoryItems.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit} on hand</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="inline-actions" style={{ marginTop: 16 }}>
-                <button type="submit" className="button">Add Supply</button>
-              </div>
-            </form>
-          </div>
+          <ProjectSupplyCreateForm
+            householdId={householdId}
+            projectId={projectId}
+            phaseId={phase.id}
+            inventoryItems={inventoryItems}
+          />
         </div>
       </section>
 
