@@ -1,9 +1,15 @@
 import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema } from "@lifekeeper/types";
 import type { PrismaClient } from "@prisma/client";
-import { assertMembership, getAccessibleAsset, getMembership, personalAssetAccessWhere } from "./asset-access.js";
+import { getAccessibleAsset, getMembership, personalAssetAccessWhere } from "./asset-access.js";
 import { toMaintenanceLogResponse } from "./maintenance-logs.js";
 import { toAssetResponse, toNotificationResponse, toUsageMetricResponse } from "./serializers/index.js";
 import { toMaintenanceScheduleResponse } from "./schedule-state.js";
+
+export class DashboardNotFoundError extends Error {
+  constructor(message = "Household not found.") {
+    super(message);
+  }
+}
 
 const formatDueSummary = (schedule: ReturnType<typeof toMaintenanceScheduleResponse>, currentMetricValue: number | null, metricUnit: string | null): string => {
   if (schedule.status === "overdue") {
@@ -34,8 +40,6 @@ export const listHouseholdDueWork = async (
     status?: "all" | "due" | "overdue";
   } = {}
 ) => {
-  await assertMembership(prisma, householdId, userId);
-
   const schedules = await prisma.maintenanceSchedule.findMany({
     where: {
       isActive: true,
@@ -102,7 +106,7 @@ export const buildHouseholdDashboard = async (
   const membership = await getMembership(prisma, householdId, userId);
 
   if (!membership) {
-    throw new Error("FORBIDDEN");
+    throw new Error("Dashboard membership context is unavailable.");
   }
 
   const [household, dueWork, assets, notifications] = await Promise.all([
@@ -152,7 +156,7 @@ export const buildHouseholdDashboard = async (
   ]);
 
   if (!household) {
-    throw new Error("NOT_FOUND");
+    throw new DashboardNotFoundError();
   }
 
   const assetOverviews = assets.map((asset) => {

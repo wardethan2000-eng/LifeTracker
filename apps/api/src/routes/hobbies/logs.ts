@@ -3,7 +3,7 @@ import {
   updateHobbyLogInputSchema,
   hobbyLogTypeSchema
 } from "@lifekeeper/types";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { toLogResponse } from "../../lib/serializers/index.js";
@@ -26,6 +26,15 @@ const listLogsQuerySchema = z.object({
   cursor: z.string().optional()
 });
 
+const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
+  try {
+    await assertMembership(app.prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/logs";
 
@@ -35,7 +44,9 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const query = listLogsQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const limit = query.limit ?? 50;
 
@@ -73,13 +84,15 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyLogInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const log = await app.prisma.hobbyLog.create({
@@ -102,13 +115,15 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyLogInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyLog.findFirst({
       where: { id: logId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Log entry not found" });
+      return reply.code(404).send({ message: "Log entry not found" });
     }
 
     const log = await app.prisma.hobbyLog.update({
@@ -130,13 +145,15 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, logId } = logParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyLog.findFirst({
       where: { id: logId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Log entry not found" });
+      return reply.code(404).send({ message: "Log entry not found" });
     }
 
     await app.prisma.hobbyLog.delete({ where: { id: logId } });

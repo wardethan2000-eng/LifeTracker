@@ -7,7 +7,7 @@ import {
   createHobbyRecipeStepInputSchema,
   updateHobbyRecipeStepInputSchema
 } from "@lifekeeper/types";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
@@ -43,6 +43,15 @@ const reorderStepsBodySchema = z.object({
   stepIds: z.array(z.string().cuid())
 });
 
+const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
+  try {
+    await assertMembership(app.prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/recipes";
 
@@ -52,7 +61,9 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const query = listRecipesQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const where: Prisma.HobbyRecipeWhereInput = {
       hobbyId,
@@ -85,13 +96,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyRecipeInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const result = await app.prisma.$transaction(async (tx) => {
@@ -170,7 +183,9 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
       where: { id: recipeId, hobbyId, hobby: { householdId } },
@@ -187,7 +202,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!recipe) {
-      return reply.code(404).send({ error: "Recipe not found" });
+      return reply.code(404).send({ message: "Recipe not found" });
     }
 
     return reply.send({
@@ -207,13 +222,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyRecipeInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyRecipe.findFirst({
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Recipe not found" });
+      return reply.code(404).send({ message: "Recipe not found" });
     }
 
     const recipe = await app.prisma.hobbyRecipe.update({
@@ -240,13 +257,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyRecipe.findFirst({
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Recipe not found" });
+      return reply.code(404).send({ message: "Recipe not found" });
     }
 
     await app.prisma.hobbyRecipe.delete({ where: { id: recipeId } });
@@ -269,13 +288,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyRecipeIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!recipe) {
-      return reply.code(404).send({ error: "Recipe not found" });
+      return reply.code(404).send({ message: "Recipe not found" });
     }
 
     const maxSort = await app.prisma.hobbyRecipeIngredient.aggregate({
@@ -305,13 +326,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyRecipeIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyRecipeIngredient.findFirst({
       where: { id: ingredientId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Ingredient not found" });
+      return reply.code(404).send({ message: "Ingredient not found" });
     }
 
     const ingredient = await app.prisma.hobbyRecipeIngredient.update({
@@ -335,13 +358,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId, ingredientId } = ingredientParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyRecipeIngredient.findFirst({
       where: { id: ingredientId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Ingredient not found" });
+      return reply.code(404).send({ message: "Ingredient not found" });
     }
 
     await app.prisma.hobbyRecipeIngredient.delete({ where: { id: ingredientId } });
@@ -355,13 +380,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyRecipeStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!recipe) {
-      return reply.code(404).send({ error: "Recipe not found" });
+      return reply.code(404).send({ message: "Recipe not found" });
     }
 
     const maxSort = await app.prisma.hobbyRecipeStep.aggregate({
@@ -389,13 +416,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyRecipeStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyRecipeStep.findFirst({
       where: { id: stepId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Step not found" });
+      return reply.code(404).send({ message: "Step not found" });
     }
 
     const step = await app.prisma.hobbyRecipeStep.update({
@@ -417,13 +446,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId, stepId } = stepParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyRecipeStep.findFirst({
       where: { id: stepId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Step not found" });
+      return reply.code(404).send({ message: "Step not found" });
     }
 
     await app.prisma.hobbyRecipeStep.delete({ where: { id: stepId } });
@@ -437,13 +468,15 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { stepIds } = reorderStepsBodySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!recipe) {
-      return reply.code(404).send({ error: "Recipe not found" });
+      return reply.code(404).send({ message: "Recipe not found" });
     }
 
     await app.prisma.$transaction(

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { buildAssetDetail, buildHouseholdDashboard, listHouseholdDueWork } from "../lib/dashboard.js";
+import { assertMembership } from "../lib/asset-access.js";
+import { buildAssetDetail, buildHouseholdDashboard, DashboardNotFoundError, listHouseholdDueWork } from "../lib/dashboard.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -30,10 +31,12 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     const query = dueWorkQuerySchema.parse(request.query);
 
     try {
-      return await listHouseholdDueWork(app.prisma, params.householdId, request.auth.userId, query);
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
+
+    return await listHouseholdDueWork(app.prisma, params.householdId, request.auth.userId, query);
   });
 
   app.get("/v1/households/:householdId/dashboard", async (request, reply) => {
@@ -41,13 +44,19 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     const query = dashboardQuerySchema.parse(request.query);
 
     try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    try {
       return await buildHouseholdDashboard(app.prisma, params.householdId, request.auth.userId, query);
     } catch (error) {
-      if (error instanceof Error && error.message === "NOT_FOUND") {
+      if (error instanceof DashboardNotFoundError) {
         return reply.code(404).send({ message: "Household not found." });
       }
 
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      throw error;
     }
   });
 

@@ -4,7 +4,7 @@ import {
   updateHobbyInputSchema,
   hobbyStatusSchema
 } from "@lifekeeper/types";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
@@ -27,6 +27,15 @@ const listHobbiesQuerySchema = z.object({
   cursor: z.string().optional()
 });
 
+const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
+  try {
+    await assertMembership(app.prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/hobbies
   app.get("/v1/households/:householdId/hobbies", async (request, reply) => {
@@ -34,7 +43,9 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const query = listHobbiesQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const where: Prisma.HobbyWhereInput = {
       householdId,
@@ -80,7 +91,9 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.create({
       data: {
@@ -123,7 +136,9 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId },
@@ -166,7 +181,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     return reply.send({
@@ -247,14 +262,16 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
 
     if (!existing) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const hobby = await app.prisma.hobby.update({
@@ -289,14 +306,16 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
 
     if (!existing) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     await app.prisma.hobby.delete({ where: { id: hobbyId } });

@@ -4,7 +4,7 @@ import {
   createHobbyProjectInputSchema,
   createHobbyInventoryCategoryInputSchema
 } from "@lifekeeper/types";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 
@@ -29,6 +29,15 @@ const categoryParamsSchema = hobbyParamsSchema.extend({
   categoryId: z.string().cuid()
 });
 
+const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
+  try {
+    await assertMembership(app.prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/links";
 
@@ -39,7 +48,9 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const links = await app.prisma.hobbyAsset.findMany({
       where: { hobbyId, hobby: { householdId } },
@@ -66,13 +77,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyAssetInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const link = await app.prisma.hobbyAsset.create({
@@ -104,13 +117,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, hobbyAssetId } = hobbyAssetParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyAsset.findFirst({
       where: { id: hobbyAssetId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Asset link not found" });
+      return reply.code(404).send({ message: "Asset link not found" });
     }
 
     await app.prisma.hobbyAsset.delete({ where: { id: hobbyAssetId } });
@@ -125,7 +140,9 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const links = await app.prisma.hobbyInventoryItem.findMany({
       where: { hobbyId, hobby: { householdId } },
@@ -151,13 +168,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyInventoryItemInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const link = await app.prisma.hobbyInventoryItem.create({
@@ -187,13 +206,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, hobbyInventoryItemId } = hobbyInventoryItemParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyInventoryItem.findFirst({
       where: { id: hobbyInventoryItemId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Inventory link not found" });
+      return reply.code(404).send({ message: "Inventory link not found" });
     }
 
     await app.prisma.hobbyInventoryItem.delete({ where: { id: hobbyInventoryItemId } });
@@ -208,7 +229,9 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const links = await app.prisma.hobbyProject.findMany({
       where: { hobbyId, hobby: { householdId } },
@@ -234,13 +257,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyProjectInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const link = await app.prisma.hobbyProject.create({
@@ -270,13 +295,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, hobbyProjectId } = hobbyProjectParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyProject.findFirst({
       where: { id: hobbyProjectId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Project link not found" });
+      return reply.code(404).send({ message: "Project link not found" });
     }
 
     await app.prisma.hobbyProject.delete({ where: { id: hobbyProjectId } });
@@ -291,7 +318,9 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const categories = await app.prisma.hobbyInventoryCategory.findMany({
       where: { hobbyId, hobby: { householdId } },
@@ -314,13 +343,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyInventoryCategoryInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const category = await app.prisma.hobbyInventoryCategory.create({
@@ -346,13 +377,15 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, categoryId } = categoryParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbyInventoryCategory.findFirst({
       where: { id: categoryId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Category not found" });
+      return reply.code(404).send({ message: "Category not found" });
     }
 
     await app.prisma.hobbyInventoryCategory.delete({ where: { id: categoryId } });

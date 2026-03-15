@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { authPlugin } from "./plugins/auth.js";
+import { errorHandlerPlugin } from "./plugins/error-handler.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { storagePlugin } from "./plugins/storage.js";
 import { assetRoutes } from "./routes/assets/index.js";
@@ -49,6 +50,7 @@ export const buildApp = () => {
   app.register(prismaPlugin);
   app.register(authPlugin);
   app.register(storagePlugin);
+  app.register(errorHandlerPlugin);
   app.register(healthRoutes);
   app.register(meRoutes);
   app.register(householdRoutes);

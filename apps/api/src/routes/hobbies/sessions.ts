@@ -7,7 +7,7 @@ import {
   createHobbySessionStepInputSchema,
   updateHobbySessionStepInputSchema
 } from "@lifekeeper/types";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
@@ -47,6 +47,15 @@ const reorderStepsBodySchema = z.object({
   stepIds: z.array(z.string().cuid())
 });
 
+const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
+  try {
+    await assertMembership(app.prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/sessions";
 
@@ -56,7 +65,9 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const query = listSessionsQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const where: Prisma.HobbySessionWhereInput = {
       hobbyId,
@@ -102,7 +113,9 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbySessionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId },
@@ -111,7 +124,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       }
     });
     if (!hobby) {
-      return reply.code(404).send({ error: "Hobby not found" });
+      return reply.code(404).send({ message: "Hobby not found" });
     }
 
     const session = await app.prisma.$transaction(async (tx) => {
@@ -215,7 +228,9 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const session = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId, hobby: { householdId } },
@@ -239,7 +254,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!session) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     return reply.send({
@@ -281,13 +296,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbySessionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     const data: Prisma.HobbySessionUpdateInput = {};
@@ -310,7 +327,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       if (hobby?.lifecycleMode === "pipeline") {
         const step = hobby.statusPipeline.find((s) => s.label === input.status);
         if (!step) {
-          return reply.code(400).send({ error: "Invalid pipeline status" });
+          return reply.code(400).send({ message: "Invalid pipeline status" });
         }
         data.status = input.status;
         data.pipelineStepId = step.id;
@@ -346,7 +363,9 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId },
@@ -354,19 +373,19 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby || hobby.lifecycleMode !== "pipeline") {
-      return reply.code(400).send({ error: "Hobby is not in pipeline mode" });
+      return reply.code(400).send({ message: "Hobby is not in pipeline mode" });
     }
 
     const session = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId }
     });
     if (!session) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     const currentIndex = hobby.statusPipeline.findIndex((s) => s.id === session.pipelineStepId);
     if (currentIndex === -1 || currentIndex >= hobby.statusPipeline.length - 1) {
-      return reply.code(400).send({ error: "Session is already at the final step" });
+      return reply.code(400).send({ message: "Session is already at the final step" });
     }
 
     const nextStep = hobby.statusPipeline[currentIndex + 1]!;
@@ -397,13 +416,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     await app.prisma.hobbySession.delete({ where: { id: sessionId } });
@@ -426,13 +447,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbySessionIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const session = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId, hobby: { householdId } }
     });
     if (!session) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     const ingredient = await app.prisma.$transaction(async (tx) => {
@@ -477,13 +500,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbySessionIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbySessionIngredient.findFirst({
       where: { id: ingredientId, sessionId, session: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Ingredient not found" });
+      return reply.code(404).send({ message: "Ingredient not found" });
     }
 
     const ingredient = await app.prisma.$transaction(async (tx) => {
@@ -529,13 +554,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId, ingredientId } = sessionIngredientParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbySessionIngredient.findFirst({
       where: { id: ingredientId, sessionId, session: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Ingredient not found" });
+      return reply.code(404).send({ message: "Ingredient not found" });
     }
 
     await app.prisma.$transaction(async (tx) => {
@@ -567,13 +594,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbySessionStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const session = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId, hobby: { householdId } }
     });
     if (!session) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     const maxSort = await app.prisma.hobbySessionStep.aggregate({
@@ -602,13 +631,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbySessionStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const existing = await app.prisma.hobbySessionStep.findFirst({
       where: { id: stepId, sessionId, session: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ error: "Step not found" });
+      return reply.code(404).send({ message: "Step not found" });
     }
 
     const data: Prisma.HobbySessionStepUpdateInput = {};
@@ -641,13 +672,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { stepIds } = reorderStepsBodySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    await assertMembership(app.prisma, householdId, userId);
+    if (!await ensureMembership(app, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
 
     const session = await app.prisma.hobbySession.findFirst({
       where: { id: sessionId, hobbyId, hobby: { householdId } }
     });
     if (!session) {
-      return reply.code(404).send({ error: "Session not found" });
+      return reply.code(404).send({ message: "Session not found" });
     }
 
     await app.prisma.$transaction(

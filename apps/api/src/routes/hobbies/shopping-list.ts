@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 
@@ -8,6 +8,15 @@ const recipeParamsSchema = z.object({
   recipeId: z.string().cuid()
 });
 
+const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
+  try {
+    await assertMembership(app.prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
   // GET .../recipes/:recipeId/shopping-list
   app.get(
@@ -16,7 +25,9 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
       const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
       const userId = request.auth.userId;
 
-      await assertMembership(app.prisma, householdId, userId);
+      if (!await ensureMembership(app, householdId, userId)) {
+        return reply.code(403).send({ message: "You do not have access to this household." });
+      }
 
       const recipe = await app.prisma.hobbyRecipe.findFirst({
         where: { id: recipeId, hobbyId, hobby: { householdId } },
@@ -33,7 +44,7 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!recipe) {
-        return reply.code(404).send({ error: "Recipe not found" });
+        return reply.code(404).send({ message: "Recipe not found" });
       }
 
       const items = recipe.ingredients.map((ing) => {
