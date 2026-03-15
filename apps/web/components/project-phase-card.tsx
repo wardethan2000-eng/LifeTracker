@@ -1,5 +1,6 @@
 import type { ProjectPhaseSummary } from "@lifekeeper/types";
 import { formatCurrency, formatDate } from "../lib/formatters";
+import { ProjectProgressBar } from "./project-progress-bar";
 
 const phaseStatusLabels: Record<ProjectPhaseSummary["status"], string> = {
   pending: "Pending",
@@ -15,9 +16,6 @@ type ProjectPhaseCardProps = {
 export function ProjectPhaseCard({ phase }: ProjectPhaseCardProps) {
   const completionDenominator = phase.taskCount + phase.checklistItemCount;
   const completionNumerator = phase.completedTaskCount + phase.completedChecklistItemCount;
-  const completionPercent = completionDenominator > 0
-    ? Math.round((completionNumerator / completionDenominator) * 100)
-    : 0;
 
   return (
     <div className="project-portfolio-card project-portfolio-card--neutral" style={{ minWidth: 280 }}>
@@ -39,9 +37,17 @@ export function ProjectPhaseCard({ phase }: ProjectPhaseCardProps) {
             <span>Tasks + checklist</span>
             <strong>{completionNumerator} / {completionDenominator || 0}</strong>
           </div>
-          <div className="project-meter__track">
-            <span className="project-meter__fill" style={{ width: `${Math.min(completionPercent, 100)}%` }} />
-          </div>
+          <ProjectProgressBar
+            phases={[{
+              name: phase.name,
+              status: phase.status,
+              taskCount: phase.taskCount,
+              completedTaskCount: phase.completedTaskCount
+            }]}
+            totalTaskCount={phase.taskCount}
+            completedTaskCount={phase.completedTaskCount}
+            variant="compact"
+          />
         </div>
       </div>
 

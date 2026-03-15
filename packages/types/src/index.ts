@@ -1413,6 +1413,13 @@ export const projectPhaseSummarySchema = projectPhaseSchema.extend({
   expenseTotal: z.number()
 });
 
+export const projectPhaseProgressSchema = z.object({
+  name: z.string(),
+  status: z.string(),
+  taskCount: z.number().int(),
+  completedTaskCount: z.number().int()
+});
+
 export const projectBudgetCategorySummarySchema = projectBudgetCategorySchema.extend({
   expenseCount: z.number().int(),
   actualSpend: z.number()
@@ -1432,7 +1439,8 @@ export const projectSummarySchema = projectSchema.extend({
   completedTaskCount: z.number().int(),
   phaseCount: z.number().int(),
   completedPhaseCount: z.number().int(),
-  percentComplete: z.number()
+  percentComplete: z.number(),
+  phaseProgress: z.array(projectPhaseProgressSchema).default([])
 });
 
 export const projectDetailSchema = projectSchema.extend({
@@ -1835,6 +1843,7 @@ export type CreateProjectPhaseSupplyInput = z.infer<typeof createProjectPhaseSup
 export type UpdateProjectPhaseSupplyInput = z.infer<typeof updateProjectPhaseSupplySchema>;
 export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
 export type ProjectPhaseSummary = z.infer<typeof projectPhaseSummarySchema>;
+export type ProjectPhaseProgress = z.infer<typeof projectPhaseProgressSchema>;
 export type ProjectPhaseDetail = z.infer<typeof projectPhaseDetailSchema>;
 export type CreateProjectPhaseInput = z.infer<typeof createProjectPhaseSchema>;
 export type UpdateProjectPhaseInput = z.infer<typeof updateProjectPhaseSchema>;
@@ -1911,4 +1920,75 @@ export const barcodeLookupResultSchema = z.object({
 
 export type BarcodeLookupRequest = z.infer<typeof barcodeLookupRequestSchema>;
 export type BarcodeLookupResult = z.infer<typeof barcodeLookupResultSchema>;
+
+// ── Attachment Schemas ───────────────────────────────────────────────
+
+export const attachmentEntityTypeValues = [
+  "maintenance_log",
+  "asset",
+  "project_note",
+  "project_expense",
+  "project_phase",
+  "project_task",
+  "inventory_item",
+] as const;
+
+export const attachmentEntityTypeSchema = z.enum(attachmentEntityTypeValues);
+
+export const attachmentStatusValues = ["pending", "active", "deleted"] as const;
+export const attachmentStatusSchema = z.enum(attachmentStatusValues);
+
+export const attachmentSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  uploadedById: z.string(),
+  uploadedBy: shallowUserSchema.nullable().default(null),
+  entityType: attachmentEntityTypeSchema,
+  entityId: z.string(),
+  storageKey: z.string(),
+  originalFilename: z.string(),
+  mimeType: z.string(),
+  fileSize: z.number().int(),
+  thumbnailKey: z.string().nullable(),
+  ocrResult: z.record(z.string(), z.unknown()).nullable(),
+  caption: z.string().nullable(),
+  sortOrder: z.number().int().nullable(),
+  status: attachmentStatusSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const createAttachmentUploadSchema = z.object({
+  entityType: attachmentEntityTypeSchema,
+  entityId: z.string().min(1),
+  filename: z.string().min(1).max(500),
+  mimeType: z.string().min(1).max(255),
+  fileSize: z.number().int().min(1).max(52_428_800),
+  caption: z.string().max(1000).optional(),
+});
+
+export const confirmAttachmentUploadSchema = z.object({});
+
+export const updateAttachmentSchema = z.object({
+  caption: z.string().max(1000).nullable().optional(),
+  sortOrder: z.number().int().nullable().optional(),
+});
+
+export const attachmentUploadResponseSchema = z.object({
+  attachment: attachmentSchema,
+  uploadUrl: z.string(),
+});
+
+export const attachmentListQuerySchema = z.object({
+  entityType: attachmentEntityTypeSchema.optional(),
+  entityId: z.string().optional(),
+});
+
+export type AttachmentEntityType = z.infer<typeof attachmentEntityTypeSchema>;
+export type AttachmentStatus = z.infer<typeof attachmentStatusSchema>;
+export type Attachment = z.infer<typeof attachmentSchema>;
+export type CreateAttachmentUploadInput = z.infer<typeof createAttachmentUploadSchema>;
+export type ConfirmAttachmentUploadInput = z.infer<typeof confirmAttachmentUploadSchema>;
+export type UpdateAttachmentInput = z.infer<typeof updateAttachmentSchema>;
+export type AttachmentUploadResponse = z.infer<typeof attachmentUploadResponseSchema>;
 

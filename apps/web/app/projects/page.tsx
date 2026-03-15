@@ -2,6 +2,7 @@ import type { ProjectStatus, ProjectSummary } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
+import { ProjectProgressBar } from "../../components/project-progress-bar";
 import { ApiError, getHouseholdProjects, getMe, getProjectInventory } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/formatters";
 
@@ -484,13 +485,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                               </td>
                               <td><span className={`status-chip status-chip--${tone === 'neutral' ? 'default' : tone}`}>{projectStatusLabels[project.status]}</span></td>
                               <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <strong>{project.percentComplete}%</strong>
-                                  <small className="data-table__secondary">{project.completedTaskCount}/{project.taskCount}</small>
-                                </div>
-                                <div className="project-meter__track" style={{ height: 4, width: 80, marginTop: 4, marginBottom: 4 }}>
-                                  <span className="project-meter__fill" style={{ width: `${Math.min(project.percentComplete, 100)}%` }} />
-                                </div>
+                                <ProjectProgressBar
+                                  phases={project.phaseProgress ?? []}
+                                  totalTaskCount={project.taskCount}
+                                  completedTaskCount={project.completedTaskCount}
+                                  showLabel={true}
+                                />
                               </td>
                               <td>
                                 <strong>{getTargetLabel(project)}</strong>

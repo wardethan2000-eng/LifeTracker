@@ -47,6 +47,12 @@ const listProjectsQuerySchema = z.object({
   parentProjectId: z.string().optional()
 });
 
+const isProjectSummaryTaskCompleted = (task: {
+  status: string;
+  taskType: string;
+  isCompleted: boolean;
+}): boolean => task.status === "completed" || (task.taskType === "quick" && task.isCompleted);
+
 const toProjectSummary = (
   project: {
     id: string;
@@ -65,18 +71,36 @@ const toProjectSummary = (
     updatedAt: Date;
     expenses: { amount: number }[];
     _count: { tasks: number };
-    tasks: { status: string; taskType: string; isCompleted: boolean }[];
-    phases: { status: string }[];
+    tasks: { status: string; taskType: string; isCompleted: boolean; phaseId: string | null }[];
+    phases: {
+      name: string;
+      status: string;
+      tasks: { status: string; taskType: string; isCompleted: boolean }[];
+    }[];
   }
 ) => {
   const totalSpent = project.expenses.reduce((sum, e) => sum + e.amount, 0);
   const taskCount = project._count.tasks;
-  const completedTaskCount = project.tasks.filter(
-    (t) => t.status === "completed" || (t.taskType === "quick" && t.isCompleted)
-  ).length;
+  const completedTaskCount = project.tasks.filter(isProjectSummaryTaskCompleted).length;
   const phaseCount = project.phases.length;
   const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
   const percentComplete = taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0;
+  const phaseProgress = project.phases.map((phase) => ({
+    name: phase.name,
+    status: phase.status,
+    taskCount: phase.tasks.length,
+    completedTaskCount: phase.tasks.filter(isProjectSummaryTaskCompleted).length
+  }));
+  const unphasedTasks = project.tasks.filter((task) => task.phaseId === null);
+
+  if (unphasedTasks.length > 0) {
+    phaseProgress.push({
+      name: "Unphased",
+      status: "active",
+      taskCount: unphasedTasks.length,
+      completedTaskCount: unphasedTasks.filter(isProjectSummaryTaskCompleted).length
+    });
+  }
 
   return {
     id: project.id,
@@ -99,7 +123,8 @@ const toProjectSummary = (
     completedTaskCount,
     phaseCount,
     completedPhaseCount,
-    percentComplete
+    percentComplete,
+    phaseProgress
   };
 };
 
@@ -422,8 +447,13 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       where,
       include: {
         expenses: { select: { amount: true } },
-        tasks: { select: { status: true, taskType: true, isCompleted: true } },
-        phases: { select: { status: true } },
+        tasks: { select: { status: true, taskType: true, isCompleted: true, phaseId: true } },
+        phases: {
+          include: {
+            tasks: { select: { status: true, taskType: true, isCompleted: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
         _count: { select: { tasks: true } }
       },
       orderBy: { createdAt: "desc" }

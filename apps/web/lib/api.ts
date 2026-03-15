@@ -139,7 +139,14 @@ import {
   usageProjectionSchema,
   usageMetricResponseSchema,
   barcodeLookupResultSchema,
-  type BarcodeLookupResult
+  type BarcodeLookupResult,
+  attachmentSchema,
+  attachmentUploadResponseSchema,
+  type Attachment,
+  type AttachmentUploadResponse,
+  type AttachmentEntityType,
+  type CreateAttachmentUploadInput,
+  type UpdateAttachmentInput
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -1388,3 +1395,66 @@ export const lookupBarcode = async (barcode: string, barcodeFormat?: string): Pr
   body: { barcode, ...(barcodeFormat ? { barcodeFormat } : {}) },
   schema: barcodeLookupResultSchema
 });
+
+// ── Attachments ──────────────────────────────────────────────────────
+
+export const requestAttachmentUpload = async (
+  householdId: string,
+  input: CreateAttachmentUploadInput
+): Promise<AttachmentUploadResponse> => apiRequest({
+  path: `/v1/households/${householdId}/attachments/upload`,
+  method: "POST",
+  body: input,
+  schema: attachmentUploadResponseSchema,
+});
+
+export const confirmAttachmentUpload = async (
+  householdId: string,
+  attachmentId: string
+): Promise<Attachment> => apiRequest({
+  path: `/v1/households/${householdId}/attachments/${attachmentId}/confirm`,
+  method: "POST",
+  body: {},
+  schema: attachmentSchema,
+});
+
+export const fetchAttachments = async (
+  householdId: string,
+  entityType?: AttachmentEntityType,
+  entityId?: string
+): Promise<Attachment[]> => {
+  const params = new URLSearchParams();
+  if (entityType) params.set("entityType", entityType);
+  if (entityId) params.set("entityId", entityId);
+  const query = params.toString();
+  const path = `/v1/households/${householdId}/attachments${query ? `?${query}` : ""}`;
+  return apiRequest({ path, schema: attachmentSchema.array() });
+};
+
+export const getAttachmentDownloadUrl = async (
+  householdId: string,
+  attachmentId: string
+): Promise<{ url: string }> => apiRequest({
+  path: `/v1/households/${householdId}/attachments/${attachmentId}/download`,
+});
+
+export const updateAttachment = async (
+  householdId: string,
+  attachmentId: string,
+  input: UpdateAttachmentInput
+): Promise<Attachment> => apiRequest({
+  path: `/v1/households/${householdId}/attachments/${attachmentId}`,
+  method: "PATCH",
+  body: input,
+  schema: attachmentSchema,
+});
+
+export const deleteAttachment = async (
+  householdId: string,
+  attachmentId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/attachments/${attachmentId}`,
+    method: "DELETE",
+  });
+};

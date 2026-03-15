@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { authPlugin } from "./plugins/auth.js";
 import { prismaPlugin } from "./plugins/prisma.js";
+import { storagePlugin } from "./plugins/storage.js";
 import { assetRoutes } from "./routes/assets/index.js";
 import { assetInventoryRoutes } from "./routes/assets/inventory.js";
 import { assetTransferRoutes } from "./routes/assets/transfers.js";
@@ -27,6 +28,7 @@ import { projectInventoryRoutes } from "./routes/projects/inventory.js";
 import { projectNoteRoutes } from "./routes/projects/notes.js";
 import { projectPhaseRoutes } from "./routes/projects/phases.js";
 import { searchRoutes } from "./routes/search/index.js";
+import { attachmentRoutes } from "./routes/attachments/index.js";
 import { barcodeRoutes } from "./routes/barcode.js";
 
 export const buildApp = () => {
@@ -39,6 +41,7 @@ export const buildApp = () => {
   });
   app.register(prismaPlugin);
   app.register(authPlugin);
+  app.register(storagePlugin);
   app.register(healthRoutes);
   app.register(meRoutes);
   app.register(householdRoutes);
@@ -65,6 +68,7 @@ export const buildApp = () => {
   app.register(projectNoteRoutes);
   app.register(searchRoutes);
   app.register(barcodeRoutes);
+  app.register(attachmentRoutes);
 
   return app;
 };

@@ -28,6 +28,7 @@ import { formatCurrency } from "../lib/formatters";
 import { ProjectChecklist } from "./project-checklist";
 import { ProjectSupplyCard } from "./project-supply-card";
 import { ProjectSupplyCreateForm } from "./project-supply-create-form";
+import { AttachmentSection } from "./attachment-section";
 
 const taskStatusOptions = ["pending", "in_progress", "completed", "skipped"] as const;
 const taskStatusLabels: Record<(typeof taskStatusOptions)[number], string> = {
@@ -318,6 +319,20 @@ export function ProjectPhaseDetail({
           </div>
         </div>
       </section>
+
+      <section className="panel detail-tile">
+        <div className="panel__header">
+          <h2>Progress Photos</h2>
+        </div>
+        <div className="panel__body--padded">
+          <AttachmentSection
+            householdId={householdId}
+            entityType="project_phase"
+            entityId={phase.id}
+            label=""
+          />
+        </div>
+      </section>
     </div>
   );
 }
@@ -413,6 +428,14 @@ function TaskCard({
         <input type="hidden" name="taskId" value={task.id} />
         <button type="submit" className="button button--danger">Delete Task</button>
       </form>
+
+      <AttachmentSection
+        householdId={householdId}
+        entityType="project_task"
+        entityId={task.id}
+        compact
+        label=""
+      />
     </div>
   );
 }

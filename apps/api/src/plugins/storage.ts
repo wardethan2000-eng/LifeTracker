@@ -1,0 +1,108 @@
+import fp from "fastify-plugin";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  CreateBucketCommand,
+  HeadBucketCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+export interface StorageService {
+  generateUploadUrl(key: string, contentType: string, maxSizeBytes: number): Promise<string>;
+  generateDownloadUrl(key: string, filename: string): Promise<string>;
+  deleteObject(key: string): Promise<void>;
+  headObject(key: string): Promise<{ contentLength: number; contentType: string } | null>;
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    storage: StorageService;
+  }
+}
+
+const parseBoolean = (value: string | undefined): boolean => value === "true";
+
+const getStorageConfig = () => ({
+  endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9000",
+  region: process.env.S3_REGION ?? "us-east-1",
+  accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "minioadmin",
+  secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "minioadmin",
+  bucket: process.env.S3_BUCKET ?? "lifekeeper-attachments",
+  forcePathStyle: parseBoolean(process.env.S3_FORCE_PATH_STYLE ?? "true"),
+  uploadExpiresSec: Number(process.env.S3_PRESIGN_UPLOAD_EXPIRES_SECONDS ?? "300"),
+  downloadExpiresSec: Number(process.env.S3_PRESIGN_DOWNLOAD_EXPIRES_SECONDS ?? "3600"),
+});
+
+export const storagePlugin = fp(async (app) => {
+  const config = getStorageConfig();
+
+  const client = new S3Client({
+    endpoint: config.endpoint,
+    region: config.region,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+    forcePathStyle: config.forcePathStyle,
+  });
+
+  // Ensure the bucket exists on startup (helpful for MinIO local dev).
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: config.bucket }));
+  } catch {
+    app.log.info(`Bucket "${config.bucket}" not found — creating it.`);
+    try {
+      await client.send(new CreateBucketCommand({ Bucket: config.bucket }));
+      app.log.info(`Bucket "${config.bucket}" created.`);
+    } catch (createErr) {
+      app.log.warn({ err: createErr }, `Could not create bucket "${config.bucket}". Storage operations will fail if it does not exist.`);
+    }
+  }
+
+  const storage: StorageService = {
+    async generateUploadUrl(key, contentType, _maxSizeBytes) {
+      const command = new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        ContentType: contentType,
+      });
+      return getSignedUrl(client, command, { expiresIn: config.uploadExpiresSec });
+    },
+
+    async generateDownloadUrl(key, filename) {
+      const command = new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        ResponseContentDisposition: `inline; filename="${filename}"`,
+      });
+      return getSignedUrl(client, command, { expiresIn: config.downloadExpiresSec });
+    },
+
+    async deleteObject(key) {
+      await client.send(new DeleteObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+      }));
+    },
+
+    async headObject(key) {
+      try {
+        const result = await client.send(new HeadObjectCommand({
+          Bucket: config.bucket,
+          Key: key,
+        }));
+        return {
+          contentLength: result.ContentLength ?? 0,
+          contentType: result.ContentType ?? "application/octet-stream",
+        };
+      } catch {
+        return null;
+      }
+    },
+  };
+
+  app.decorate("storage", storage);
+});

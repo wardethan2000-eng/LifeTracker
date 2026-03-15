@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type {
   InventoryItemSummary,
+  ProjectPhaseProgress,
   ProjectPhaseSummary,
   ProjectPhaseSupply
 } from "@lifekeeper/types";
@@ -35,11 +36,13 @@ import { CompactTaskPreview } from "../../../components/compact-task-preview";
 import { ExpandableCard } from "../../../components/expandable-card";
 import { ProjectBudgetBreakdown } from "../../../components/project-budget-breakdown";
 import { ProjectChecklist } from "../../../components/project-checklist";
+import { ProjectProgressBar } from "../../../components/project-progress-bar";
 import { ProjectShoppingListItemActions } from "../../../components/project-shopping-list-item-actions";
 import { ProjectSupplyRollupActions } from "../../../components/project-supply-rollup-actions";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
 import { ProjectPhaseCard } from "../../../components/project-phase-card";
 import { ProjectPhaseDetail } from "../../../components/project-phase-detail";
+import { AttachmentSection } from "../../../components/attachment-section";
 import {
   createTaskChecklistItemAction,
   deleteTaskChecklistItemAction,
@@ -146,6 +149,21 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     const totalTaskCount = project.tasks.length;
     const percentComplete = totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
     const activePhase = project.phases.find((phase) => phase.status === "in_progress");
+    const phaseProgress: ProjectPhaseProgress[] = project.phases.map((phase) => ({
+      name: phase.name,
+      status: phase.status,
+      taskCount: phase.taskCount,
+      completedTaskCount: phase.completedTaskCount
+    }));
+
+    if (unphasedTasks.length > 0) {
+      phaseProgress.push({
+        name: "Unphased",
+        status: "in_progress",
+        taskCount: unphasedTasks.length,
+        completedTaskCount: unphasedTasks.filter((task) => task.status === "completed").length
+      });
+    }
 
     const allSupplies = phaseDetails.flatMap((phase) => phase.supplies);
     const totalSupplyLines = allSupplies.length;
@@ -212,8 +230,11 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             </div>
             <div className="stat-card">
               <span className="stat-card__label">Task Progress</span>
-              <strong className="stat-card__value">{percentComplete}%</strong>
-              <span className="stat-card__sub">{completedTaskCount} of {totalTaskCount} tasks completed</span>
+              <ProjectProgressBar
+                phases={phaseProgress}
+                totalTaskCount={totalTaskCount}
+                completedTaskCount={completedTaskCount}
+              />
             </div>
             <div className="stat-card stat-card--warning">
               <span className="stat-card__label">Phases</span>
@@ -634,6 +655,13 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                           <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
                         </form>
                       </div>
+                      <AttachmentSection
+                        householdId={household.id}
+                        entityType="project_note"
+                        entityId={note.id}
+                        compact
+                        label=""
+                      />
                     </div>
                   ))}
                 </div>
@@ -717,6 +745,13 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                           <input type="hidden" name="expenseId" value={expense.id} />
                           <button type="submit" className="button button--danger">Delete Expense</button>
                         </form>
+                        <AttachmentSection
+                          householdId={household.id}
+                          entityType="project_expense"
+                          entityId={expense.id}
+                          compact
+                          label="Receipts"
+                        />
                       </div>
                     ))}
                   </div>

@@ -27,6 +27,7 @@ import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
 import { AssetLabelActions } from "../../../components/asset-label-actions";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
+import { AttachmentSection } from "../../../components/attachment-section";
 import { Card } from "../../../components/card";
 import { CompactMaintenanceSchedulePreview } from "../../../components/compact-maintenance-schedule-preview";
 import { ExpandableCard } from "../../../components/expandable-card";
@@ -272,6 +273,20 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
           <section className="panel">
             <div className="panel__header">
+              <h2>Photos &amp; Documents</h2>
+            </div>
+            <div className="panel__body--padded">
+              <AttachmentSection
+                householdId={detail.asset.householdId}
+                entityType="asset"
+                entityId={detail.asset.id}
+                label=""
+              />
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
               <h2>Due Work</h2>
             </div>
             <div className="panel__body">
@@ -309,7 +324,18 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                 <p className="panel__empty">No maintenance logs recorded yet.</p>
               ) : (
                 <div className="log-list">
-                  {detail.recentLogs.slice(0, 3).map(renderLogSummary)}
+                  {detail.recentLogs.slice(0, 3).map((log) => (
+                    <div key={log.id}>
+                      {renderLogSummary(log)}
+                      <AttachmentSection
+                        householdId={detail.asset.householdId}
+                        entityType="maintenance_log"
+                        entityId={log.id}
+                        compact
+                        label=""
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -733,7 +759,18 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                 <p className="panel__empty">No maintenance history logged yet.</p>
               ) : (
                 <div className="log-list">
-                  {detail.recentLogs.map(renderLogSummary)}
+                  {detail.recentLogs.map((log) => (
+                    <div key={log.id}>
+                      {renderLogSummary(log)}
+                      <AttachmentSection
+                        householdId={detail.asset.householdId}
+                        entityType="maintenance_log"
+                        entityId={log.id}
+                        compact
+                        label=""
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>

@@ -94,6 +94,16 @@ enum ProjectAssetRelationship {
   supports
 }
 
+enum AttachmentEntityType {
+  maintenance_log
+  asset
+  project_note
+  project_expense
+  project_phase
+  project_task
+  inventory_item
+}
+
 model User {
   id                      String                @id @default(cuid())
   clerkUserId             String                @unique
@@ -120,6 +130,7 @@ model User {
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
   authoredComments        Comment[]             @relation("CommentAuthor")
   projectNotes            ProjectNote[]         @relation("ProjectNoteAuthor")
+  attachments             Attachment[]          @relation("AttachmentUploader")
 }
 
 model Household {
@@ -140,6 +151,7 @@ model Household {
   outgoingAssetTransfers AssetTransfer[]        @relation("AssetTransferFromHousehold")
   incomingAssetTransfers AssetTransfer[]        @relation("AssetTransferToHousehold")
   invitations      HouseholdInvitation[]
+  attachments      Attachment[]
 
   @@index([createdById])
 }
@@ -829,4 +841,33 @@ model BarcodeLookup {
 
   @@index([barcode])
   @@index([createdAt])
+}
+
+// ── File Attachments ─────────────────────────────────────────────────
+
+model Attachment {
+  id               String               @id @default(cuid())
+  householdId      String
+  uploadedById     String
+  entityType       AttachmentEntityType
+  entityId         String
+  storageKey       String               @unique
+  originalFilename String
+  mimeType         String
+  fileSize         Int
+  thumbnailKey     String?
+  ocrResult        Json?
+  caption          String?
+  sortOrder        Int?
+  status           String               @default("pending")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  household        Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  uploadedBy       User                 @relation("AttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([entityType, entityId])
+  @@index([uploadedById])
+  @@index([storageKey])
+  @@index([status])
 }
