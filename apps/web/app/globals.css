@@ -3332,7 +3332,7 @@ textarea { resize: vertical; }
   overflow: hidden;
 }
 
-.card--expandable .card__collapse-inner > :first-child {
+.card--expandable .card__collapse-content {
   padding: 16px;
 }
 
@@ -3368,7 +3368,7 @@ html[data-ui-density="relaxed"] .card__body {
   padding: 20px;
 }
 
-html[data-ui-density="relaxed"] .card--expandable .card__collapse-inner > :first-child {
+html[data-ui-density="relaxed"] .card--expandable .card__collapse-content {
   padding: 20px;
 }
 
@@ -3384,7 +3384,7 @@ html[data-ui-density="compact"] .card__body {
   padding: 12px;
 }
 
-html[data-ui-density="compact"] .card--expandable .card__collapse-inner > :first-child {
+html[data-ui-density="compact"] .card--expandable .card__collapse-content {
   padding: 12px;
 }
 

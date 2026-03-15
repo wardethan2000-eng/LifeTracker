@@ -49,7 +49,9 @@ export function ExpandableCard({
       </div>
       <div className="card__body">{previewContent}</div>
       <div className="card__collapse-region">
-        <div className="card__collapse-inner">{children}</div>
+        <div className="card__collapse-inner">
+          <div className="card__collapse-content">{children}</div>
+        </div>
       </div>
     </div>
   );

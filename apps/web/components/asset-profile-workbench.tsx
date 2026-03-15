@@ -703,6 +703,108 @@ const createFieldDefinition = (): AssetFieldDefinition => ({
 
 const mergeFieldDefinitions = (templateFields: AssetFieldDefinition[]): AssetFieldDefinition[] => cloneFieldDefinitions(templateFields);
 
+const buildUniqueTemplateKey = (
+  preferred: string,
+  existingKeys: string[],
+  fallbackPrefix: string
+): string => {
+  const normalizedExistingKeys = new Set(existingKeys.map((value) => slugify(value)).filter(Boolean));
+  const baseKey = slugify(preferred) || fallbackPrefix;
+
+  if (!normalizedExistingKeys.has(baseKey)) {
+    return baseKey;
+  }
+
+  let suffix = 2;
+  let candidate = `${baseKey}-${suffix}`;
+
+  while (normalizedExistingKeys.has(candidate)) {
+    suffix += 1;
+    candidate = `${baseKey}-${suffix}`;
+  }
+
+  return candidate;
+};
+
+const createMetricDraft = (existingKeys: string[]): MetricTemplateDraft => ({
+  key: buildUniqueTemplateKey("usage-metric", existingKeys, "metric"),
+  name: "New Metric",
+  unit: "hours",
+  startingValue: 0,
+  allowManualEntry: true,
+  helpText: undefined,
+  enabled: true,
+  currentValue: 0,
+  lastRecordedAt: ""
+});
+
+const createTriggerTemplate = (
+  type: PresetScheduleTemplate["triggerTemplate"]["type"],
+  fallbackMetricKey?: string
+): PresetScheduleTemplate["triggerTemplate"] => {
+  switch (type) {
+    case "interval":
+      return {
+        type: "interval",
+        intervalDays: 30,
+        leadTimeDays: 7
+      };
+    case "usage":
+      return {
+        type: "usage",
+        metricKey: fallbackMetricKey ?? "usage-metric",
+        intervalValue: 100,
+        leadTimeValue: 10
+      };
+    case "seasonal":
+      return {
+        type: "seasonal",
+        month: 3,
+        day: 1,
+        leadTimeDays: 14
+      };
+    case "compound":
+      return {
+        type: "compound",
+        metricKey: fallbackMetricKey ?? "usage-metric",
+        intervalDays: 90,
+        intervalValue: 100,
+        logic: "whichever_first",
+        leadTimeDays: 14,
+        leadTimeValue: 10
+      };
+    case "one_time":
+      return {
+        type: "one_time",
+        dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        leadTimeDays: 7
+      };
+    default:
+      return {
+        type: "interval",
+        intervalDays: 30,
+        leadTimeDays: 7
+      };
+  }
+};
+
+const createScheduleDraft = (existingKeys: string[]): ScheduleTemplateDraft => ({
+  key: buildUniqueTemplateKey("maintenance-schedule", existingKeys, "schedule"),
+  name: "New Schedule",
+  description: undefined,
+  triggerTemplate: createTriggerTemplate("interval"),
+  notificationConfig: {
+    channels: ["push"],
+    sendAtDue: true,
+    digest: false
+  },
+  tags: [],
+  quickLogLabel: undefined,
+  enabled: true,
+  lastCompletedAt: "",
+  usageValue: ""
+});
+
 const toOptionalIsoString = (value: string): string | undefined => {
   if (!value) {
     return undefined;
@@ -1230,12 +1332,31 @@ export function AssetProfileWorkbench({
     )));
   };
 
+  const addMetricDraft = (): void => {
+    setMetricDrafts((current) => [...current, createMetricDraft(current.map((draft) => draft.key))]);
+  };
+
   const updateScheduleDraft = (index: number, update: Partial<ScheduleTemplateDraft>): void => {
     setScheduleDrafts((current) => current.map((draft, draftIndex) => (
       draftIndex === index
         ? { ...draft, ...update }
         : draft
     )));
+  };
+
+  const setScheduleTriggerTemplate = (
+    index: number,
+    triggerTemplate: PresetScheduleTemplate["triggerTemplate"]
+  ): void => {
+    setScheduleDrafts((current) => current.map((draft, draftIndex) => (
+      draftIndex === index
+        ? { ...draft, triggerTemplate }
+        : draft
+    )));
+  };
+
+  const addScheduleDraft = (): void => {
+    setScheduleDrafts((current) => [...current, createScheduleDraft(current.map((draft) => draft.key))]);
   };
 
   const fieldDefinitionJson = JSON.stringify(fieldDefinitions.map((field, index) => ({
@@ -1595,119 +1716,23 @@ export function AssetProfileWorkbench({
             </div>
           </ExpandableCard>
 
-          {/* Card 3: Maintenance Schedules (expandable) */}
-          <ExpandableCard
-            title="Maintenance Schedules"
-            modalTitle="Schedule Templates"
-            previewContent={<CompactSchedulePreview scheduleTemplates={scheduleTemplates} />}
-            actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
-          >
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', marginBottom: '16px' }}>
-              {isCreateMode
-                ? 'Choose which preset schedules to create, rename them if needed, and optionally record when they were last completed.'
-                : 'These template-derived schedules describe the preset profile. Live schedules are managed in the asset Maintenance tab.'}
-            </p>
-            {scheduleDrafts.length === 0 ? (
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No schedule templates â€” select a template in Core Identity to populate these.</p>
-            ) : (
-              <div className="workbench-table-wrap">
-                <table className="workbench-table">
-                  <thead>
-                    <tr>
-                      <th>Use</th>
-                      <th>Name</th>
-                      <th>Trigger</th>
-                      <th>Last Completed</th>
-                      <th>Usage at Completion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scheduleDrafts.map((draft, index) => {
-                      const metricKey = getScheduleMetricKey(draft);
-                      const dependsOnDisabledMetric = metricKey ? !enabledMetricKeys.has(metricKey) : false;
-                      const isEnabled = draft.enabled && !dependsOnDisabledMetric;
-
-                      return (
-                        <tr key={draft.key}>
-                          <td className="workbench-table__checkbox">
-                            <input
-                              type="checkbox"
-                              checked={isEnabled}
-                              disabled={!isCreateMode || dependsOnDisabledMetric}
-                              aria-label={`Use schedule ${draft.name}`}
-                              onChange={(event) => updateScheduleDraft(index, { enabled: event.target.checked })}
-                            />
-                          </td>
-                          <td>
-                            <div className="workbench-table__control">
-                              <input
-                                type="text"
-                                value={draft.name}
-                                disabled={!isCreateMode || !isEnabled}
-                                onChange={(event) => updateScheduleDraft(index, { name: event.target.value })}
-                              />
-                              {metricKey ? (
-                                <small className="workbench-table__hint">
-                                  Depends on usage metric: {metricKey}
-                                  {dependsOnDisabledMetric ? ' — enable that metric to create this schedule.' : ''}
-                                </small>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="workbench-table__control">
-                              <span>{formatPresetTriggerSummary(draft)}</span>
-                              {draft.tags.length > 0 ? (
-                                <small className="workbench-table__hint">{draft.tags.join(', ')}</small>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>
-                            <input
-                              type="datetime-local"
-                              value={draft.lastCompletedAt}
-                              disabled={!isCreateMode || !isEnabled}
-                              onChange={(event) => updateScheduleDraft(index, { lastCompletedAt: event.target.value })}
-                            />
-                          </td>
-                          <td>
-                            {metricKey ? (
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                value={draft.usageValue}
-                                disabled={!isCreateMode || !isEnabled}
-                                placeholder="Optional"
-                                onChange={(event) => updateScheduleDraft(index, { usageValue: event.target.value })}
-                              />
-                            ) : (
-                              <span style={{ color: 'var(--ink-muted)' }}>—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ExpandableCard>
-
-          {/* Card 4: Usage Metrics (expandable) */}
+          {/* Card 3: Usage Metrics (expandable) */}
           <ExpandableCard
             title="Usage Metrics"
             modalTitle="Usage Metric Templates"
             previewContent={<CompactMetricPreview metricTemplates={metricTemplates} />}
             actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
           >
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', marginBottom: '16px' }}>
-              {isCreateMode
-                ? 'Choose which preset metrics to track and set their initial readings before the asset is created.'
-                : 'These template-derived metrics describe the preset profile. Live readings are managed in the asset Usage Metrics tab.'}
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: 0, flex: '1 1 320px' }}>
+                {isCreateMode
+                  ? 'Choose which preset metrics to track and set their initial readings before the asset is created, or add your own metrics manually.'
+                  : 'These template-derived metrics describe the preset profile. Live readings are managed in the asset Usage Metrics tab.'}
+              </p>
+              {isCreateMode ? <button type="button" className="button button--secondary button--sm" onClick={addMetricDraft}>+ Add Metric</button> : null}
+            </div>
             {metricDrafts.length === 0 ? (
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No metric templates â€” select a template in Core Identity to populate these.</p>
+              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No metrics yet â€” select a template in Core Identity to populate these, or add one manually.</p>
             ) : (
               <div className="workbench-table-wrap">
                 <table className="workbench-table">
@@ -1751,6 +1776,15 @@ export function AssetProfileWorkbench({
                               disabled={!isCreateMode || !draft.enabled}
                               onChange={(event) => updateMetricDraft(index, { name: event.target.value })}
                             />
+                            {isCreateMode ? (
+                              <input
+                                type="text"
+                                value={draft.helpText ?? ""}
+                                disabled={!draft.enabled}
+                                placeholder="Optional help text"
+                                onChange={(event) => updateMetricDraft(index, { helpText: event.target.value.trim() || undefined })}
+                              />
+                            ) : null}
                             {draft.helpText ? <small className="workbench-table__hint">{draft.helpText}</small> : null}
                           </div>
                         </td>
@@ -1784,6 +1818,439 @@ export function AssetProfileWorkbench({
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ExpandableCard>
+
+          {/* Card 4: Maintenance Schedules (expandable) */}
+          <ExpandableCard
+            title="Maintenance Schedules"
+            modalTitle="Schedule Templates"
+            previewContent={<CompactSchedulePreview scheduleTemplates={scheduleTemplates} />}
+            actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: 0, flex: '1 1 320px' }}>
+                {isCreateMode
+                  ? 'Choose which preset schedules to create, rename them if needed, optionally record when they were last completed, or add your own schedules manually. Usage-based schedules can reference the metrics configured above.'
+                  : 'These template-derived schedules describe the preset profile. Live schedules are managed in the asset Maintenance tab.'}
+              </p>
+              {isCreateMode ? <button type="button" className="button button--secondary button--sm" onClick={addScheduleDraft}>+ Add Schedule</button> : null}
+            </div>
+            {scheduleDrafts.length === 0 ? (
+              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No schedules yet â€” select a template in Core Identity to populate these, or add one manually.</p>
+            ) : (
+              <div className="workbench-table-wrap">
+                <table className="workbench-table">
+                  <thead>
+                    <tr>
+                      <th>Use</th>
+                      <th>Name</th>
+                      <th>Trigger</th>
+                      <th>Last Completed</th>
+                      <th>Usage at Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheduleDrafts.map((draft, index) => {
+                      const availableMetricOptions = metricDrafts.filter((metricDraft) => metricDraft.enabled);
+                      const metricKey = getScheduleMetricKey(draft);
+                      const dependsOnDisabledMetric = metricKey ? !enabledMetricKeys.has(metricKey) : false;
+                      const isEnabled = draft.enabled && !dependsOnDisabledMetric;
+                      const intervalTrigger = draft.triggerTemplate.type === "interval" ? draft.triggerTemplate : undefined;
+                      const usageTrigger = draft.triggerTemplate.type === "usage" ? draft.triggerTemplate : undefined;
+                      const seasonalTrigger = draft.triggerTemplate.type === "seasonal" ? draft.triggerTemplate : undefined;
+                      const compoundTrigger = draft.triggerTemplate.type === "compound" ? draft.triggerTemplate : undefined;
+                      const oneTimeTrigger = draft.triggerTemplate.type === "one_time" ? draft.triggerTemplate : undefined;
+
+                      return (
+                        <tr key={draft.key}>
+                          <td className="workbench-table__checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isEnabled}
+                              disabled={!isCreateMode || dependsOnDisabledMetric}
+                              aria-label={`Use schedule ${draft.name}`}
+                              onChange={(event) => updateScheduleDraft(index, { enabled: event.target.checked })}
+                            />
+                          </td>
+                          <td>
+                            <div className="workbench-table__control">
+                              <input
+                                type="text"
+                                value={draft.name}
+                                disabled={!isCreateMode || !isEnabled}
+                                onChange={(event) => updateScheduleDraft(index, { name: event.target.value })}
+                              />
+                              {isCreateMode ? (
+                                <input
+                                  type="text"
+                                  value={draft.description ?? ""}
+                                  disabled={!isEnabled}
+                                  placeholder="Optional description"
+                                  onChange={(event) => updateScheduleDraft(index, { description: event.target.value.trim() || undefined })}
+                                />
+                              ) : null}
+                              {metricKey ? (
+                                <small className="workbench-table__hint">
+                                  Depends on usage metric: {metricKey}
+                                  {dependsOnDisabledMetric ? ' — enable that metric to create this schedule.' : ''}
+                                </small>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="workbench-table__control">
+                              <select
+                                value={draft.triggerTemplate.type}
+                                disabled={!isCreateMode || !isEnabled}
+                                onChange={(event) => {
+                                  const nextType = event.target.value as PresetScheduleTemplate["triggerTemplate"]["type"];
+                                  const fallbackMetricKey = availableMetricOptions[0]?.key;
+                                  setScheduleTriggerTemplate(index, createTriggerTemplate(nextType, fallbackMetricKey));
+                                }}
+                              >
+                                <option value="interval">Interval</option>
+                                <option value="usage" disabled={availableMetricOptions.length === 0}>Usage</option>
+                                <option value="seasonal">Seasonal</option>
+                                <option value="compound" disabled={availableMetricOptions.length === 0}>Compound</option>
+                                <option value="one_time">One Time</option>
+                              </select>
+                              {intervalTrigger ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                                  <label className="field">
+                                    <span>Every Days</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={intervalTrigger.intervalDays}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "interval",
+                                        intervalDays: Math.max(1, Number(event.target.value) || 1),
+                                        leadTimeDays: intervalTrigger.leadTimeDays,
+                                        ...(intervalTrigger.anchorDate ? { anchorDate: intervalTrigger.anchorDate } : {})
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Lead Days</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={intervalTrigger.leadTimeDays}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "interval",
+                                        intervalDays: intervalTrigger.intervalDays,
+                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0),
+                                        ...(intervalTrigger.anchorDate ? { anchorDate: intervalTrigger.anchorDate } : {})
+                                      })}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                              {usageTrigger ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
+                                  <label className="field">
+                                    <span>Metric</span>
+                                    <select
+                                      value={usageTrigger.metricKey}
+                                      disabled={!isEnabled || availableMetricOptions.length === 0}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "usage",
+                                        metricKey: event.target.value,
+                                        intervalValue: usageTrigger.intervalValue,
+                                        leadTimeValue: usageTrigger.leadTimeValue
+                                      })}
+                                    >
+                                      {availableMetricOptions.map((metricDraft) => (
+                                        <option key={metricDraft.key} value={metricDraft.key}>{metricDraft.name}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    <span>Interval Value</span>
+                                    <input
+                                      type="number"
+                                      min="0.1"
+                                      step="0.1"
+                                      value={usageTrigger.intervalValue}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "usage",
+                                        metricKey: usageTrigger.metricKey,
+                                        intervalValue: Math.max(0.1, Number(event.target.value) || 0.1),
+                                        leadTimeValue: usageTrigger.leadTimeValue
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Lead Value</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.1"
+                                      value={usageTrigger.leadTimeValue}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "usage",
+                                        metricKey: usageTrigger.metricKey,
+                                        intervalValue: usageTrigger.intervalValue,
+                                        leadTimeValue: Math.max(0, Number(event.target.value) || 0)
+                                      })}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                              {seasonalTrigger ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
+                                  <label className="field">
+                                    <span>Month</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="12"
+                                      step="1"
+                                      value={seasonalTrigger.month}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "seasonal",
+                                        month: Math.min(12, Math.max(1, Number(event.target.value) || 1)),
+                                        day: seasonalTrigger.day,
+                                        leadTimeDays: seasonalTrigger.leadTimeDays
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Day</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="31"
+                                      step="1"
+                                      value={seasonalTrigger.day}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "seasonal",
+                                        month: seasonalTrigger.month,
+                                        day: Math.min(31, Math.max(1, Number(event.target.value) || 1)),
+                                        leadTimeDays: seasonalTrigger.leadTimeDays
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Lead Days</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={seasonalTrigger.leadTimeDays}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "seasonal",
+                                        month: seasonalTrigger.month,
+                                        day: seasonalTrigger.day,
+                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0)
+                                      })}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                              {compoundTrigger ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                                  <label className="field">
+                                    <span>Metric</span>
+                                    <select
+                                      value={compoundTrigger.metricKey}
+                                      disabled={!isEnabled || availableMetricOptions.length === 0}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "compound",
+                                        metricKey: event.target.value,
+                                        intervalDays: compoundTrigger.intervalDays,
+                                        intervalValue: compoundTrigger.intervalValue,
+                                        logic: compoundTrigger.logic,
+                                        leadTimeDays: compoundTrigger.leadTimeDays,
+                                        leadTimeValue: compoundTrigger.leadTimeValue
+                                      })}
+                                    >
+                                      {availableMetricOptions.map((metricDraft) => (
+                                        <option key={metricDraft.key} value={metricDraft.key}>{metricDraft.name}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    <span>Logic</span>
+                                    <select
+                                      value={compoundTrigger.logic}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "compound",
+                                        metricKey: compoundTrigger.metricKey,
+                                        intervalDays: compoundTrigger.intervalDays,
+                                        intervalValue: compoundTrigger.intervalValue,
+                                        logic: event.target.value as "whichever_first" | "whichever_last",
+                                        leadTimeDays: compoundTrigger.leadTimeDays,
+                                        leadTimeValue: compoundTrigger.leadTimeValue
+                                      })}
+                                    >
+                                      <option value="whichever_first">Whichever first</option>
+                                      <option value="whichever_last">Whichever last</option>
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    <span>Every Days</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={compoundTrigger.intervalDays}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "compound",
+                                        metricKey: compoundTrigger.metricKey,
+                                        intervalDays: Math.max(1, Number(event.target.value) || 1),
+                                        intervalValue: compoundTrigger.intervalValue,
+                                        logic: compoundTrigger.logic,
+                                        leadTimeDays: compoundTrigger.leadTimeDays,
+                                        leadTimeValue: compoundTrigger.leadTimeValue
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Usage Interval</span>
+                                    <input
+                                      type="number"
+                                      min="0.1"
+                                      step="0.1"
+                                      value={compoundTrigger.intervalValue}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "compound",
+                                        metricKey: compoundTrigger.metricKey,
+                                        intervalDays: compoundTrigger.intervalDays,
+                                        intervalValue: Math.max(0.1, Number(event.target.value) || 0.1),
+                                        logic: compoundTrigger.logic,
+                                        leadTimeDays: compoundTrigger.leadTimeDays,
+                                        leadTimeValue: compoundTrigger.leadTimeValue
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Lead Days</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={compoundTrigger.leadTimeDays}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "compound",
+                                        metricKey: compoundTrigger.metricKey,
+                                        intervalDays: compoundTrigger.intervalDays,
+                                        intervalValue: compoundTrigger.intervalValue,
+                                        logic: compoundTrigger.logic,
+                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0),
+                                        leadTimeValue: compoundTrigger.leadTimeValue
+                                      })}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Lead Value</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.1"
+                                      value={compoundTrigger.leadTimeValue}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "compound",
+                                        metricKey: compoundTrigger.metricKey,
+                                        intervalDays: compoundTrigger.intervalDays,
+                                        intervalValue: compoundTrigger.intervalValue,
+                                        logic: compoundTrigger.logic,
+                                        leadTimeDays: compoundTrigger.leadTimeDays,
+                                        leadTimeValue: Math.max(0, Number(event.target.value) || 0)
+                                      })}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                              {oneTimeTrigger ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                                  <label className="field">
+                                    <span>Due At</span>
+                                    <input
+                                      type="datetime-local"
+                                      value={toLocalDateTimeValue(oneTimeTrigger.dueAt)}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => {
+                                        const nextDueAt = toOptionalIsoString(event.target.value);
+                                        if (!nextDueAt) {
+                                          return;
+                                        }
+
+                                        setScheduleTriggerTemplate(index, {
+                                          type: "one_time",
+                                          dueAt: nextDueAt,
+                                          leadTimeDays: oneTimeTrigger.leadTimeDays
+                                        });
+                                      }}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span>Lead Days</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={oneTimeTrigger.leadTimeDays}
+                                      disabled={!isEnabled}
+                                      onChange={(event) => setScheduleTriggerTemplate(index, {
+                                        type: "one_time",
+                                        dueAt: oneTimeTrigger.dueAt,
+                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0)
+                                      })}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                              <small className="workbench-table__hint">{formatPresetTriggerSummary(draft)}</small>
+                              {draft.tags.length > 0 ? (
+                                <small className="workbench-table__hint">{draft.tags.join(', ')}</small>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>
+                            <input
+                              type="datetime-local"
+                              value={draft.lastCompletedAt}
+                              disabled={!isCreateMode || !isEnabled}
+                              onChange={(event) => updateScheduleDraft(index, { lastCompletedAt: event.target.value })}
+                            />
+                          </td>
+                          <td>
+                            {metricKey ? (
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={draft.usageValue}
+                                disabled={!isCreateMode || !isEnabled}
+                                placeholder="Optional"
+                                onChange={(event) => updateScheduleDraft(index, { usageValue: event.target.value })}
+                              />
+                            ) : (
+                              <span style={{ color: 'var(--ink-muted)' }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
