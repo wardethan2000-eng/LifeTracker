@@ -1574,6 +1574,15 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
             projectId: true,
             project: { select: { id: true, name: true } }
           }
+        },
+        inventoryItem: {
+          select: {
+            id: true,
+            name: true,
+            quantityOnHand: true,
+            unit: true,
+            unitCost: true
+          }
         }
       },
       orderBy: [
@@ -1598,6 +1607,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         estimatedLineCost,
         supplier: supply.supplier,
         supplierUrl: supply.supplierUrl,
+        inventoryItemId: supply.inventoryItemId,
+        inventoryItem: supply.inventoryItem,
         phaseName: supply.phase.name,
         phaseId: supply.phase.id,
         projectName: supply.phase.project.name,
@@ -1620,12 +1631,16 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const groupedBySupplier = Array.from(groupMap.entries()).map(([key, group]) => ({
-      supplierName: key === "" ? "No supplier specified" : group.items[0].supplier!.trim(),
-      supplierUrl: group.supplierUrl,
-      items: group.items,
-      subtotal: group.items.reduce((sum, item) => sum + (item.estimatedLineCost ?? 0), 0)
-    }));
+    const groupedBySupplier = Array.from(groupMap.entries()).map(([key, group]) => {
+      const firstSupplierName = group.items[0]?.supplier?.trim();
+
+      return {
+        supplierName: key === "" ? "No supplier specified" : (firstSupplierName ?? "Unknown supplier"),
+        supplierUrl: group.supplierUrl,
+        items: group.items,
+        subtotal: group.items.reduce((sum, item) => sum + (item.estimatedLineCost ?? 0), 0)
+      };
+    });
 
     const totalEstimatedCost = items.reduce((sum, item) => sum + (item.estimatedLineCost ?? 0), 0);
     const supplierCount = new Set(items.filter((item) => item.supplier != null).map((item) => item.supplier!.trim().toLowerCase())).size;

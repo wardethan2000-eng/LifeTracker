@@ -1260,6 +1260,47 @@ textarea { resize: vertical; }
   font-size: 0.8rem;
 }
 
+.quick-todo-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.quick-todo-form__title {
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border-color: var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.quick-todo-form__phase {
+  flex: 0 0 clamp(160px, 24%, 220px);
+  width: auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0 30px 0 8px;
+  border-color: var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .quick-todo-form {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .quick-todo-form__title,
+  .quick-todo-form__phase {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
 .detail-tiles--dense .form-grid {
   gap: 6px;
 }

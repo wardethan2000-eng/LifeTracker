@@ -1464,6 +1464,8 @@ export const projectShoppingListItemSchema = z.object({
   estimatedLineCost: z.number().nullable(),
   supplier: z.string().nullable(),
   supplierUrl: z.string().nullable(),
+  inventoryItemId: z.string().cuid().nullable(),
+  inventoryItem: projectPhaseSupplyInventoryItemSchema.nullable().default(null),
   phaseName: z.string(),
   phaseId: z.string().cuid(),
   projectName: z.string(),

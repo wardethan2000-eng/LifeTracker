@@ -1,9 +1,15 @@
 import Link from "next/link";
+import type {
+  InventoryItemSummary,
+  ProjectPhaseSummary,
+  ProjectPhaseSupply
+} from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   addProjectAssetAction,
   createProjectNoteAction,
   createProjectPhaseAction,
+  createProjectPhaseSupplyAction,
   createProjectExpenseAction,
   createProjectTaskAction,
   createQuickTodoAction,
@@ -29,6 +35,8 @@ import { CompactTaskPreview } from "../../../components/compact-task-preview";
 import { ExpandableCard } from "../../../components/expandable-card";
 import { ProjectBudgetBreakdown } from "../../../components/project-budget-breakdown";
 import { ProjectChecklist } from "../../../components/project-checklist";
+import { ProjectShoppingListItemActions } from "../../../components/project-shopping-list-item-actions";
+import { ProjectSupplyRollupActions } from "../../../components/project-supply-rollup-actions";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
 import { ProjectPhaseCard } from "../../../components/project-phase-card";
 import { ProjectPhaseDetail } from "../../../components/project-phase-detail";
@@ -92,6 +100,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
   const routeParams = await params;
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
+  const focusedPhaseId = typeof query.focusPhaseId === "string" ? query.focusPhaseId : undefined;
 
   try {
     const me = await getMe();
@@ -122,6 +131,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     const phaseDetailsById = new Map(phaseDetails.map((phase) => [phase.id, phase]));
     const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
     const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));
+    const inventoryItemLookup = new Map(householdInventory.items.map((item) => [item.id, item]));
     const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
     const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
     const quickTodos = project.tasks.filter((task) => task.taskType === "quick");
@@ -274,7 +284,13 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     const phaseDetail = phaseDetailsById.get(phase.id);
                     if (!phaseDetail) { return null; }
                     return (
-                      <details key={phase.id} className="project-phase-details" style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                      <details
+                        key={phase.id}
+                        id={`phase-${phase.id}`}
+                        className="project-phase-details"
+                        open={focusedPhaseId === phase.id}
+                        style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}
+                      >
                         <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
                           <ProjectPhaseCard phase={phase} />
                         </summary>
@@ -368,17 +384,17 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   </span>
                 }
               >
-                <form action={createQuickTodoAction} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: 16 }}>
+                <form action={createQuickTodoAction} className="quick-todo-form">
                   <input type="hidden" name="householdId" value={household.id} />
                   <input type="hidden" name="projectId" value={project.id} />
                   <input
                     name="title"
                     placeholder="Add a to-do…"
                     required
-                    style={{ flex: 1, height: "36px", padding: "0 10px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--surface)", color: "var(--ink)", fontSize: "0.875rem" }}
+                    className="quick-todo-form__title"
                   />
                   {project.phases.length > 0 && (
-                    <select name="phaseId" defaultValue="" style={{ height: "36px", padding: "0 8px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--surface)", color: "var(--ink)", fontSize: "0.875rem" }}>
+                    <select name="phaseId" defaultValue="" className="quick-todo-form__phase">
                       <option value="">No phase</option>
                       {project.phases.map((phase) => (
                         <option key={phase.id} value={phase.id}>{phase.name}</option>
@@ -743,6 +759,14 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   />
                 }
               >
+                {project.phases.length > 0 ? (
+                  <ProjectSupplyQuickAddForm
+                    householdId={household.id}
+                    projectId={project.id}
+                    phases={project.phases}
+                    inventoryItems={householdInventory.items}
+                  />
+                ) : null}
                 {allSupplies.length === 0 ? (
                   <p className="panel__empty">No supplies added yet. Expand a phase in the Phase Timeline to add supplies per phase.</p>
                 ) : (
@@ -755,6 +779,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                         <th>Est. Cost</th>
                         <th>Procured</th>
                         <th>Staged</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -780,6 +805,15 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                               {supply.isStaged
                                 ? <span className="status-chip status-chip--upcoming">Yes</span>
                                 : <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>No</span>}
+                            </td>
+                            <td>
+                              <ProjectSupplyActions
+                                householdId={household.id}
+                                projectId={project.id}
+                                phaseId={supply.phaseId}
+                                supply={supply}
+                                inventoryItems={householdInventory.items}
+                              />
                             </td>
                           </tr>
                         );
@@ -819,6 +853,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                               <th>Qty Remaining</th>
                               <th>Unit Cost</th>
                               <th>Line Cost</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -831,6 +866,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                                 <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{item.quantityRemaining} {item.unit}</td>
                                 <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{item.estimatedUnitCost != null ? formatCurrency(item.estimatedUnitCost, "$0.00") : "—"}</td>
                                 <td style={{ fontSize: "0.82rem" }}>{item.estimatedLineCost != null ? formatCurrency(item.estimatedLineCost, "$0.00") : "—"}</td>
+                                <td>
+                                  <ProjectShoppingListItemActions householdId={household.id} item={item} />
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -970,6 +1008,97 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
     throw error;
   }
+}
+
+function getPhaseFocusHref(householdId: string, projectId: string, phaseId: string): string {
+  return `/projects/${projectId}?householdId=${householdId}&focusPhaseId=${phaseId}#phase-${phaseId}`;
+}
+
+function ProjectSupplyQuickAddForm({
+  householdId,
+  projectId,
+  phases,
+  inventoryItems
+}: {
+  householdId: string;
+  projectId: string;
+  phases: ProjectPhaseSummary[];
+  inventoryItems: InventoryItemSummary[];
+}): JSX.Element {
+  return (
+    <form action={createProjectPhaseSupplyAction} style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
+      <input type="hidden" name="householdId" value={householdId} />
+      <input type="hidden" name="projectId" value={projectId} />
+      <div className="form-grid">
+        <label className="field">
+          <span>Phase</span>
+          <select name="phaseId" defaultValue="" required>
+            <option value="" disabled>Select phase</option>
+            {phases.map((phase) => (
+              <option key={phase.id} value={phase.id}>{phase.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field field--full">
+          <span>Supply Name</span>
+          <input name="name" placeholder="Drywall sheets, primer, stainless screws" required />
+        </label>
+        <label className="field">
+          <span>Quantity Needed</span>
+          <input name="quantityNeeded" type="number" min="0" step="0.01" required />
+        </label>
+        <label className="field">
+          <span>Unit</span>
+          <input name="unit" defaultValue="each" />
+        </label>
+        <label className="field">
+          <span>Estimated Unit Cost</span>
+          <input name="estimatedUnitCost" type="number" min="0" step="0.01" />
+        </label>
+        <label className="field">
+          <span>Supplier</span>
+          <input name="supplier" placeholder="Lowe's, Ferguson, West Marine" />
+        </label>
+        <label className="field">
+          <span>Linked Inventory Item</span>
+          <select name="inventoryItemId" defaultValue="">
+            <option value="">None</option>
+            {inventoryItems.map((item) => (
+              <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit} on hand</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="inline-actions" style={{ marginTop: 16 }}>
+        <button type="submit" className="button">Add Supply</button>
+      </div>
+    </form>
+  );
+}
+
+function ProjectSupplyActions({
+  householdId,
+  projectId,
+  phaseId,
+  supply,
+  inventoryItems
+}: {
+  householdId: string;
+  projectId: string;
+  phaseId: string;
+  supply: ProjectPhaseSupply;
+  inventoryItems: InventoryItemSummary[];
+}): JSX.Element {
+  return (
+    <ProjectSupplyRollupActions
+      householdId={householdId}
+      projectId={projectId}
+      phaseId={phaseId}
+      supply={supply}
+      inventoryItems={inventoryItems}
+      openPhaseHref={getPhaseFocusHref(householdId, projectId, phaseId)}
+    />
+  );
 }
 
 function UnphasedTaskCard({
