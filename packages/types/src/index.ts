@@ -1452,6 +1452,39 @@ export const projectTaskChecklistItemListSchema = z.array(projectTaskChecklistIt
 export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySummarySchema);
 export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 
+export const projectShoppingListItemSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  quantityNeeded: z.number(),
+  quantityOnHand: z.number(),
+  quantityRemaining: z.number(),
+  unit: z.string(),
+  estimatedUnitCost: z.number().nullable(),
+  estimatedLineCost: z.number().nullable(),
+  supplier: z.string().nullable(),
+  supplierUrl: z.string().nullable(),
+  phaseName: z.string(),
+  phaseId: z.string().cuid(),
+  projectName: z.string(),
+  projectId: z.string().cuid()
+});
+
+export const projectShoppingListSupplierGroupSchema = z.object({
+  supplierName: z.string(),
+  supplierUrl: z.string().nullable(),
+  items: z.array(projectShoppingListItemSchema),
+  subtotal: z.number()
+});
+
+export const projectShoppingListSchema = z.object({
+  items: z.array(projectShoppingListItemSchema),
+  totalEstimatedCost: z.number(),
+  supplierCount: z.number(),
+  lineCount: z.number(),
+  groupedBySupplier: z.array(projectShoppingListSupplierGroupSchema)
+});
+
 export const projectNoteSchema = z.object({
   id: z.string().cuid(),
   projectId: z.string().cuid(),
@@ -1825,4 +1858,7 @@ export type Comment = z.infer<typeof commentSchema>;
 export type ThreadedComment = z.infer<typeof threadedCommentSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type UpdateCommentInput = z.infer<typeof updateCommentSchema>;
+export type ProjectShoppingListItem = z.infer<typeof projectShoppingListItemSchema>;
+export type ProjectShoppingListSupplierGroup = z.infer<typeof projectShoppingListSupplierGroupSchema>;
+export type ProjectShoppingList = z.infer<typeof projectShoppingListSchema>;
 

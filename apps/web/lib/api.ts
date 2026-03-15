@@ -35,6 +35,7 @@ import {
   projectPhaseListSchema,
   projectPhaseSupplyListSchema,
   projectPhaseSupplySchema,
+  projectShoppingListSchema,
   projectSchema,
   reorderProjectPhasesSchema,
   projectSummarySchema,
@@ -101,6 +102,7 @@ import {
   type ProjectPhaseDetail,
   type ProjectPhaseSupply,
   type ProjectPhaseSummary,
+  type ProjectShoppingList,
   type ProjectChildSummary,
   type ProjectBreadcrumb,
   type ProjectTreeStats,
@@ -529,6 +531,14 @@ export const getProjectInventory = async (
 ): Promise<InventoryProjectLinkDetail[]> => apiRequest({
   path: `/v1/households/${householdId}/projects/${projectId}/inventory`,
   schema: projectInventoryListSchema
+});
+
+export const getProjectShoppingList = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectShoppingList> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/shopping-list`,
+  schema: projectShoppingListSchema
 });
 
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => apiRequest({

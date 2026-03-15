@@ -1526,4 +1526,116 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.code(204).send();
   });
+
+  // ── Shopping List (aggregated unprocured supplies across project tree) ──
+
+  app.get("/v1/households/:householdId/projects/:projectId/shopping-list", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId },
+      select: { id: true }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    // Collect all project IDs in the tree rooted at this project
+    const treeRows = await app.prisma.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE project_tree AS (
+        SELECT id FROM "Project" WHERE id = ${params.projectId}
+        UNION ALL
+        SELECT p.id FROM "Project" p
+        JOIN project_tree pt ON p."parentProjectId" = pt.id
+      )
+      SELECT id FROM project_tree
+    `;
+    const treeProjectIds = treeRows.map((row) => row.id);
+
+    const supplies = await app.prisma.projectPhaseSupply.findMany({
+      where: {
+        isProcured: false,
+        phase: {
+          projectId: { in: treeProjectIds }
+        }
+      },
+      include: {
+        phase: {
+          select: {
+            id: true,
+            name: true,
+            projectId: true,
+            project: { select: { id: true, name: true } }
+          }
+        }
+      },
+      orderBy: [
+        { supplier: { sort: "asc", nulls: "last" } },
+        { name: "asc" }
+      ]
+    });
+
+    const items = supplies.map((supply) => {
+      const quantityRemaining = Math.max(0, supply.quantityNeeded - supply.quantityOnHand);
+      const estimatedLineCost = supply.estimatedUnitCost != null ? quantityRemaining * supply.estimatedUnitCost : null;
+
+      return {
+        id: supply.id,
+        name: supply.name,
+        description: supply.description,
+        quantityNeeded: supply.quantityNeeded,
+        quantityOnHand: supply.quantityOnHand,
+        quantityRemaining,
+        unit: supply.unit,
+        estimatedUnitCost: supply.estimatedUnitCost,
+        estimatedLineCost,
+        supplier: supply.supplier,
+        supplierUrl: supply.supplierUrl,
+        phaseName: supply.phase.name,
+        phaseId: supply.phase.id,
+        projectName: supply.phase.project.name,
+        projectId: supply.phase.project.id
+      };
+    });
+
+    // Group by supplier (case-insensitive, trimmed)
+    const groupMap = new Map<string, { supplierUrl: string | null; items: typeof items }>();
+    for (const item of items) {
+      const key = item.supplier ? item.supplier.trim().toLowerCase() : "";
+      const existing = groupMap.get(key);
+      if (existing) {
+        if (!existing.supplierUrl && item.supplierUrl) {
+          existing.supplierUrl = item.supplierUrl;
+        }
+        existing.items.push(item);
+      } else {
+        groupMap.set(key, { supplierUrl: item.supplierUrl, items: [item] });
+      }
+    }
+
+    const groupedBySupplier = Array.from(groupMap.entries()).map(([key, group]) => ({
+      supplierName: key === "" ? "No supplier specified" : group.items[0].supplier!.trim(),
+      supplierUrl: group.supplierUrl,
+      items: group.items,
+      subtotal: group.items.reduce((sum, item) => sum + (item.estimatedLineCost ?? 0), 0)
+    }));
+
+    const totalEstimatedCost = items.reduce((sum, item) => sum + (item.estimatedLineCost ?? 0), 0);
+    const supplierCount = new Set(items.filter((item) => item.supplier != null).map((item) => item.supplier!.trim().toLowerCase())).size;
+
+    return reply.send({
+      items,
+      totalEstimatedCost,
+      supplierCount,
+      lineCount: items.length,
+      groupedBySupplier
+    });
+  });
 };
