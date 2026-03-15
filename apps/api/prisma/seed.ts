@@ -1007,14 +1007,32 @@ async function main(): Promise<void> {
   await prisma.projectAsset.upsert({
     where: { projectId_assetId: { projectId, assetId: homeAssetId } },
     update: {
-      role: "work area",
+      relationship: "target",
+      role: "Primary kitchen space undergoing phased renovation",
       notes: "Primary kitchen space undergoing phased layout and finish updates"
     },
     create: {
       projectId,
       assetId: homeAssetId,
-      role: "work area",
+      relationship: "target",
+      role: "Primary kitchen space undergoing phased renovation",
       notes: "Primary kitchen space undergoing phased layout and finish updates"
+    }
+  });
+
+  await prisma.projectAsset.upsert({
+    where: { projectId_assetId: { projectId, assetId } },
+    update: {
+      relationship: "supports",
+      role: "Used to transport materials and haul demolition debris",
+      notes: "F-150 used for supply runs and debris removal during renovation phases"
+    },
+    create: {
+      projectId,
+      assetId,
+      relationship: "supports",
+      role: "Used to transport materials and haul demolition debris",
+      notes: "F-150 used for supply runs and debris removal during renovation phases"
     }
   });
 

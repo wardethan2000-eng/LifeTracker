@@ -16,6 +16,7 @@ import {
   toggleProjectNotePinAction,
   toggleQuickTodoAction,
   updateProjectAction,
+  updateProjectAssetAction,
   updateProjectExpenseAction,
   updateProjectTaskAction
 } from "../../actions";
@@ -60,6 +61,20 @@ const projectStatusLabels: Record<string, string> = {
   on_hold: "On Hold",
   completed: "Completed",
   cancelled: "Cancelled"
+};
+
+const assetRelationshipLabels: Record<string, string> = {
+  target: "Works on",
+  produces: "Will create",
+  consumes: "Consumes",
+  supports: "Supports"
+};
+
+const assetRelationshipSortOrder: Record<string, number> = {
+  target: 0,
+  produces: 1,
+  supports: 2,
+  consumes: 3
 };
 
 const taskStatusOptions = ["pending", "in_progress", "completed", "skipped"] as const;
@@ -802,34 +817,69 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       </select>
                     </label>
                     <label className="field">
-                      <span>Role</span>
-                      <input name="role" placeholder="Primary, affected system…" />
+                      <span>Relationship</span>
+                      <select name="relationship" defaultValue="target">
+                        <option value="target">This project works on this asset</option>
+                        <option value="produces">This project will create this asset</option>
+                        <option value="consumes">This project uses/consumes this asset</option>
+                        <option value="supports">This asset supports the project</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Role / Description</span>
+                      <input name="role" placeholder="Primary, affected system, haul vehicle…" />
                     </label>
                     <button type="submit" className="button button--sm" disabled={availableAssets.length === 0}>Link Asset</button>
                   </div>
                 </form>
                 {project.assets.length === 0 ? (
                   <p className="panel__empty">No assets linked yet.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {project.assets.map((asset) => (
-                      <div key={asset.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                        <div>
-                          {asset.asset ? (
-                            <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link>
-                          ) : "Unknown asset"}
-                          {asset.role ? <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{asset.role}</div> : null}
-                        </div>
-                        <form action={removeProjectAssetAction}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="projectAssetId" value={asset.id} />
-                          <button type="submit" className="button button--ghost button--sm">Remove</button>
-                        </form>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ) : (() => {
+                  const sorted = [...project.assets].sort((a, b) => {
+                    const aOrder = assetRelationshipSortOrder[a.relationship ?? "target"] ?? 99;
+                    const bOrder = assetRelationshipSortOrder[b.relationship ?? "target"] ?? 99;
+                    return aOrder - bOrder;
+                  });
+                  let lastRelationship: string | null = null;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {sorted.map((asset) => {
+                        const rel = asset.relationship ?? "target";
+                        const showHeader = rel !== lastRelationship;
+                        lastRelationship = rel;
+                        return (
+                          <div key={asset.id}>
+                            {showHeader && (
+                              <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 0 4px", borderTop: lastRelationship !== rel ? "1px solid var(--border)" : undefined }}>
+                                {assetRelationshipLabels[rel] ?? rel}
+                              </div>
+                            )}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                              <div>
+                                {asset.asset ? (
+                                  <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link>
+                                ) : "Unknown asset"}
+                                {rel === "produces" && (
+                                  <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", fontStyle: "italic", marginTop: 2 }}>Asset will be created when this project completes</div>
+                                )}
+                                {asset.role ? <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{asset.role}</div> : null}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                                <span className="status-badge" style={{ fontSize: "0.72rem" }}>{assetRelationshipLabels[rel] ?? rel}</span>
+                                <form action={removeProjectAssetAction}>
+                                  <input type="hidden" name="householdId" value={household.id} />
+                                  <input type="hidden" name="projectId" value={project.id} />
+                                  <input type="hidden" name="projectAssetId" value={asset.id} />
+                                  <button type="submit" className="button button--ghost button--sm">Remove</button>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </Card>
 
               <Card title="Linked Inventory">
