@@ -27,6 +27,9 @@ import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
 import { AssetLabelActions } from "../../../components/asset-label-actions";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
+import { Card } from "../../../components/card";
+import { CompactMaintenanceSchedulePreview } from "../../../components/compact-maintenance-schedule-preview";
+import { ExpandableCard } from "../../../components/expandable-card";
 import { ScheduleCardActions } from "../../../components/schedule-card-actions";
 import { ScheduleForm } from "../../../components/schedule-form";
 import {
@@ -655,135 +658,185 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       </div>
     );
 
-    const renderMaintenanceTab = (): JSX.Element => (
-      <div style={{ display: "grid", gap: "24px" }}>
-        <section className="panel">
-          <div className="panel__header">
-            <h2>Maintenance Schedules</h2>
-            <span className="pill">{detail.schedules.length}</span>
-          </div>
-          <div className="panel__body">
-            {detail.schedules.length === 0 ? (
-              <p className="panel__empty">No maintenance schedules active yet.</p>
-            ) : (
-              <div className="schedule-stack">
-                {detail.schedules.map((schedule) => (
-                  <article key={schedule.id} className={`schedule-card schedule-card--${schedule.status}`}>
-                    <div className="schedule-card__summary">
-                      <div>
-                        <p className="eyebrow">{formatTriggerSummary(schedule.triggerConfig)}</p>
-                        <h3>{schedule.name}</h3>
-                        <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                          {schedule.description ?? "No description."}
-                        </p>
-                      </div>
-                      <div className="schedule-card__badges">
-                        <span className={`status-chip status-chip--${schedule.status}`}>
-                          {formatScheduleStatus(schedule.status)}
-                        </span>
-                        {!schedule.isActive ? <span className="status-chip status-chip--paused">Paused</span> : null}
-                      </div>
-                    </div>
-                    <dl className="schedule-meta">
-                      <div><dt>Next due</dt><dd>{formatDueLabel(schedule.nextDueAt, schedule.nextDueMetricValue, null)}</dd></div>
-                      <div><dt>Last completed</dt><dd>{formatDateTime(schedule.lastCompletedAt, "Never")}</dd></div>
-                      <div><dt>Assignee</dt><dd>{schedule.assignee?.displayName ?? "Unassigned"}</dd></div>
-                      <div><dt>Trigger</dt><dd>{schedule.triggerConfig.type}</dd></div>
-                    </dl>
-                    <ScheduleCardActions
-                      assetId={detail.asset.id}
-                      scheduleId={schedule.id}
-                      scheduleName={schedule.name}
-                      isActive={schedule.isActive}
-                      completeAction={completeScheduleAction}
-                      toggleAction={toggleScheduleActiveAction}
-                      deleteAction={deleteScheduleAction}
-                    />
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+    const renderMaintenanceTab = (): JSX.Element => {
+      const overdueCount = detail.schedules.filter((s) => s.status === "overdue").length;
+      const dueCount = detail.schedules.filter((s) => s.status === "due").length;
+      const upcomingCount = detail.schedules.filter((s) => s.status === "upcoming").length;
+      const nextDue = detail.schedules
+        .filter((s) => s.isActive && s.nextDueAt)
+        .sort((a, b) => (a.nextDueAt! < b.nextDueAt! ? -1 : 1))[0] ?? null;
 
-        <section className="panel">
-          <div className="panel__header">
-            <h2>Add Schedule</h2>
-          </div>
-          <ScheduleForm
-            assetId={detail.asset.id}
-            metrics={detail.metrics.map((metric) => ({ id: metric.id, name: metric.name, unit: metric.unit }))}
-            action={createScheduleAction}
-          />
-        </section>
-
-        <section className="panel">
-          <div className="panel__header">
-            <h2>Maintenance Log</h2>
-          </div>
-          <div className="panel__body">
-            {detail.recentLogs.length === 0 ? (
-              <p className="panel__empty">No maintenance history logged yet.</p>
-            ) : (
-              <div className="log-list">
-                {detail.recentLogs.map(renderLogSummary)}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel__header">
-            <h2>Log Maintenance</h2>
-          </div>
-          <div className="panel__body--padded">
-            <form action={createLogAction} className="form-grid">
-              <input type="hidden" name="assetId" value={detail.asset.id} />
-              <label className="field field--full">
-                <span>Schedule</span>
-                <select name="scheduleId" defaultValue="">
-                  <option value="">No linked schedule</option>
+      return (
+        <div className="resource-layout">
+          <div className="resource-layout__primary">
+            <ExpandableCard
+              title="Maintenance Schedules"
+              modalTitle="Maintenance Schedules"
+              badge={detail.schedules.length > 0 ? { count: detail.schedules.length, variant: overdueCount > 0 ? "danger" : dueCount > 0 ? "warning" : "neutral" } : undefined}
+              previewContent={
+                <CompactMaintenanceSchedulePreview schedules={detail.schedules} />
+              }
+            >
+              {detail.schedules.length === 0 ? (
+                <p className="panel__empty">No maintenance schedules active yet.</p>
+              ) : (
+                <div className="schedule-stack">
                   {detail.schedules.map((schedule) => (
-                    <option key={schedule.id} value={schedule.id}>{schedule.name}</option>
+                    <article key={schedule.id} className={`schedule-card schedule-card--${schedule.status}`}>
+                      <div className="schedule-card__summary">
+                        <div>
+                          <p className="eyebrow">{formatTriggerSummary(schedule.triggerConfig)}</p>
+                          <h3>{schedule.name}</h3>
+                          <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                            {schedule.description ?? "No description."}
+                          </p>
+                        </div>
+                        <div className="schedule-card__badges">
+                          <span className={`status-chip status-chip--${schedule.status}`}>
+                            {formatScheduleStatus(schedule.status)}
+                          </span>
+                          {!schedule.isActive ? <span className="status-chip status-chip--paused">Paused</span> : null}
+                        </div>
+                      </div>
+                      <dl className="schedule-meta">
+                        <div><dt>Next due</dt><dd>{formatDueLabel(schedule.nextDueAt, schedule.nextDueMetricValue, null)}</dd></div>
+                        <div><dt>Last completed</dt><dd>{formatDateTime(schedule.lastCompletedAt, "Never")}</dd></div>
+                        <div><dt>Assignee</dt><dd>{schedule.assignee?.displayName ?? "Unassigned"}</dd></div>
+                        <div><dt>Trigger</dt><dd>{schedule.triggerConfig.type}</dd></div>
+                      </dl>
+                      <ScheduleCardActions
+                        assetId={detail.asset.id}
+                        scheduleId={schedule.id}
+                        scheduleName={schedule.name}
+                        isActive={schedule.isActive}
+                        completeAction={completeScheduleAction}
+                        toggleAction={toggleScheduleActiveAction}
+                        deleteAction={deleteScheduleAction}
+                      />
+                    </article>
                   ))}
-                </select>
-              </label>
-              <label className="field field--full">
-                <span>Title</span>
-                <input type="text" name="title" placeholder="Brake inspection" required />
-              </label>
-              <label className="field">
-                <span>Completed At</span>
-                <input type="datetime-local" name="completedAt" required />
-              </label>
-              <label className="field">
-                <span>Usage Value</span>
-                <input type="number" name="usageValue" min="0" step="0.1" />
-              </label>
-              <label className="field">
-                <span>Cost</span>
-                <input type="number" name="cost" min="0" step="0.01" />
-              </label>
-              <label className="field">
-                <span>Service Provider Id</span>
-                <input type="text" name="serviceProviderId" placeholder="Optional structured provider id" />
-              </label>
-              <label className="field field--full">
-                <span>Notes</span>
-                <textarea name="notes" rows={3} placeholder="Service notes or findings" />
-              </label>
-              <label className="field"><span>Part Name</span><input type="text" name="partName" placeholder="Oil filter" /></label>
-              <label className="field"><span>Part Number</span><input type="text" name="partNumber" placeholder="FL-500S" /></label>
-              <label className="field"><span>Quantity</span><input type="number" name="partQuantity" min="0" step="0.1" placeholder="1" /></label>
-              <label className="field"><span>Unit Cost</span><input type="number" name="partUnitCost" min="0" step="0.01" placeholder="8.97" /></label>
-              <label className="field"><span>Supplier</span><input type="text" name="partSupplier" placeholder="AutoZone" /></label>
-              <label className="field field--full"><span>Part Notes</span><textarea name="partNotes" rows={2} placeholder="Optional part note" /></label>
-              <button type="submit" className="button button--primary">Add Log Entry</button>
-            </form>
+                </div>
+              )}
+            </ExpandableCard>
+
+            <Card title="Add Schedule">
+              <ScheduleForm
+                assetId={detail.asset.id}
+                metrics={detail.metrics.map((metric) => ({ id: metric.id, name: metric.name, unit: metric.unit }))}
+                action={createScheduleAction}
+              />
+            </Card>
+
+            <Card title="Maintenance Log">
+              {detail.recentLogs.length === 0 ? (
+                <p className="panel__empty">No maintenance history logged yet.</p>
+              ) : (
+                <div className="log-list">
+                  {detail.recentLogs.map(renderLogSummary)}
+                </div>
+              )}
+            </Card>
+
+            <Card title="Log Maintenance">
+              <form action={createLogAction} className="form-grid">
+                <input type="hidden" name="assetId" value={detail.asset.id} />
+                <label className="field field--full">
+                  <span>Schedule</span>
+                  <select name="scheduleId" defaultValue="">
+                    <option value="">No linked schedule</option>
+                    {detail.schedules.map((schedule) => (
+                      <option key={schedule.id} value={schedule.id}>{schedule.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field field--full">
+                  <span>Title</span>
+                  <input type="text" name="title" placeholder="Brake inspection" required />
+                </label>
+                <label className="field">
+                  <span>Completed At</span>
+                  <input type="datetime-local" name="completedAt" required />
+                </label>
+                <label className="field">
+                  <span>Usage Value</span>
+                  <input type="number" name="usageValue" min="0" step="0.1" />
+                </label>
+                <label className="field">
+                  <span>Cost</span>
+                  <input type="number" name="cost" min="0" step="0.01" />
+                </label>
+                <label className="field">
+                  <span>Service Provider Id</span>
+                  <input type="text" name="serviceProviderId" placeholder="Optional structured provider id" />
+                </label>
+                <label className="field field--full">
+                  <span>Notes</span>
+                  <textarea name="notes" rows={3} placeholder="Service notes or findings" />
+                </label>
+                <label className="field"><span>Part Name</span><input type="text" name="partName" placeholder="Oil filter" /></label>
+                <label className="field"><span>Part Number</span><input type="text" name="partNumber" placeholder="FL-500S" /></label>
+                <label className="field"><span>Quantity</span><input type="number" name="partQuantity" min="0" step="0.1" placeholder="1" /></label>
+                <label className="field"><span>Unit Cost</span><input type="number" name="partUnitCost" min="0" step="0.01" placeholder="8.97" /></label>
+                <label className="field"><span>Supplier</span><input type="text" name="partSupplier" placeholder="AutoZone" /></label>
+                <label className="field field--full"><span>Part Notes</span><textarea name="partNotes" rows={2} placeholder="Optional part note" /></label>
+                <button type="submit" className="button button--primary">Add Log Entry</button>
+              </form>
+            </Card>
           </div>
-        </section>
-      </div>
-    );
+
+          <div className="resource-layout__aside">
+            <Card title="Schedule Health">
+              <dl className="schedule-meta">
+                <div>
+                  <dt>Total schedules</dt>
+                  <dd>{detail.schedules.length}</dd>
+                </div>
+                <div>
+                  <dt>Overdue</dt>
+                  <dd>
+                    {overdueCount > 0 ? (
+                      <span className="status-chip status-chip--overdue">{overdueCount}</span>
+                    ) : (
+                      <span style={{ color: "var(--ink-muted)" }}>None</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Due now</dt>
+                  <dd>
+                    {dueCount > 0 ? (
+                      <span className="status-chip status-chip--due">{dueCount}</span>
+                    ) : (
+                      <span style={{ color: "var(--ink-muted)" }}>None</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Upcoming</dt>
+                  <dd>{upcomingCount}</dd>
+                </div>
+                <div>
+                  <dt>Next due</dt>
+                  <dd>
+                    {nextDue ? (
+                      <>
+                        <span style={{ fontWeight: 500 }}>{nextDue.name}</span>
+                        <br />
+                        <span style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>
+                          {formatDueLabel(nextDue.nextDueAt, nextDue.nextDueMetricValue, null)}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ color: "var(--ink-muted)" }}>None scheduled</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+          </div>
+        </div>
+      );
+    };
 
     const renderCommentsTab = (): JSX.Element => (
       <div style={{ display: "grid", gap: "24px" }}>
@@ -885,20 +938,41 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
     const renderSettingsTab = (): JSX.Element => (
       <div style={{ display: "grid", gap: "24px" }}>
+        <AssetProfileWorkbench
+          action={updateAssetAction}
+          householdId={detail.asset.householdId}
+          householdAssets={householdAssets}
+          submitLabel="Update Asset"
+          libraryPresets={visiblePresets}
+          customPresets={customPresets}
+          initialAsset={detail.asset}
+        />
+
         <section className="panel">
           <div className="panel__header">
-            <h2>Edit Asset</h2>
+            <h2>Apply a Preset</h2>
           </div>
-          <div className="panel__body--padded">
-            <AssetProfileWorkbench
-              action={updateAssetAction}
-              householdId={detail.asset.householdId}
-              householdAssets={householdAssets}
-              submitLabel="Update Asset"
-              libraryPresets={visiblePresets}
-              customPresets={customPresets}
-              initialAsset={detail.asset}
-            />
+          <div className="preset-grid">
+            {visiblePresets.map((preset) => (
+              <article key={preset.key} className="preset-card">
+                <div>
+                  <p className="eyebrow">{formatCategoryLabel(preset.category)}</p>
+                  <h3>{preset.label}</h3>
+                  <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
+                    {preset.description ?? "No description."}
+                  </p>
+                </div>
+                <div className="preset-card__meta">
+                  <span>{preset.metricTemplates.length} metrics</span>
+                  <span>{preset.scheduleTemplates.length} schedules</span>
+                </div>
+                <form action={applyPresetToAssetAction}>
+                  <input type="hidden" name="assetId" value={detail.asset.id} />
+                  <input type="hidden" name="presetKey" value={preset.key} />
+                  <button type="submit" className="button button--ghost button--sm">Apply</button>
+                </form>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -949,31 +1023,18 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
           </div>
         </section>
 
-        <section className="panel">
+        <section className="panel panel--danger">
           <div className="panel__header">
-            <h2>Apply a Preset</h2>
+            <h2>Danger Zone</h2>
           </div>
-          <div className="preset-grid">
-            {visiblePresets.map((preset) => (
-              <article key={preset.key} className="preset-card">
-                <div>
-                  <p className="eyebrow">{formatCategoryLabel(preset.category)}</p>
-                  <h3>{preset.label}</h3>
-                  <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
-                    {preset.description ?? "No description."}
-                  </p>
-                </div>
-                <div className="preset-card__meta">
-                  <span>{preset.metricTemplates.length} metrics</span>
-                  <span>{preset.scheduleTemplates.length} schedules</span>
-                </div>
-                <form action={applyPresetToAssetAction}>
-                  <input type="hidden" name="assetId" value={detail.asset.id} />
-                  <input type="hidden" name="presetKey" value={preset.key} />
-                  <button type="submit" className="button button--ghost button--sm">Apply</button>
-                </form>
-              </article>
-            ))}
+          <div className="panel__body--padded">
+            <AssetDangerActions
+              assetId={detail.asset.id}
+              isArchived={detail.asset.isArchived}
+              archiveAction={archiveAssetAction}
+              unarchiveAction={unarchiveAssetAction}
+              deleteAction={softDeleteAssetAction}
+            />
           </div>
         </section>
       </div>

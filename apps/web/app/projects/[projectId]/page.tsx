@@ -14,6 +14,12 @@ import {
   updateProjectTaskAction
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
+import { Card } from "../../../components/card";
+import { CompactBudgetPreview } from "../../../components/compact-budget-preview";
+import { CompactPhasePreview } from "../../../components/compact-phase-preview";
+import { CompactSupplyPreview } from "../../../components/compact-supply-preview";
+import { CompactTaskPreview } from "../../../components/compact-task-preview";
+import { ExpandableCard } from "../../../components/expandable-card";
 import { ProjectBudgetBreakdown } from "../../../components/project-budget-breakdown";
 import { ProjectChecklist } from "../../../components/project-checklist";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
@@ -161,195 +167,109 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             </div>
           </section>
 
-          <section className="panel detail-tile">
-            <div className="panel__header">
-              <div>
-                <h2>Phase Timeline</h2>
-                <p className="data-table__secondary">Sequence the work, then expand a phase to manage its checklist, tasks, supplies, spend, and execution notes in one place.</p>
-              </div>
-            </div>
-            <div className="panel__body--padded">
-              <div className="project-phase-stack" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {project.phases.map((phase) => {
-                  const phaseDetail = phaseDetailsById.get(phase.id);
-
-                  if (!phaseDetail) {
-                    return null;
-                  }
-
-                  return (
-                    <details key={phase.id} className="project-phase-details" style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}>
-                      <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
-                        <ProjectPhaseCard phase={phase} />
-                      </summary>
-                      <div className="project-phase-details__content" style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
-                        <ProjectPhaseDetail
-                          householdId={household.id}
-                          projectId={project.id}
-                          phase={phaseDetail}
-                          householdMembers={householdMembers}
-                          serviceProviders={serviceProviders}
-                          budgetCategories={project.budgetCategories}
-                          inventoryItems={householdInventory.items}
-                        />
-                      </div>
-                    </details>
-                  );
-                })}
-              </div>
-              <div className="panel__body--padded" style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingLeft: 0, paddingRight: 0 }}>
-                <form action={createProjectPhaseAction}>
-                  <input type="hidden" name="householdId" value={household.id} />
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <div className="form-grid">
-                    <label className="field field--full">
-                      <span>New Phase Name</span>
-                      <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
-                    </label>
-                    <label className="field field--full">
-                      <span>Description</span>
-                      <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
-                    </label>
-                    <label className="field">
-                      <span>Status</span>
-                      <select name="status" defaultValue="pending">
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="skipped">Skipped</option>
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Budget Amount</span>
-                      <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                    </label>
-                    <label className="field">
-                      <span>Target End Date</span>
-                      <input name="targetEndDate" type="date" />
-                    </label>
-                  </div>
-                  <div className="inline-actions" style={{ marginTop: 16 }}>
-                    <button type="submit" className="button">Add Phase</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </section>
-
-          <section className="stats-row" style={{ marginTop: 8 }}>
-            <div className="stat-card">
-              <span className="stat-card__label">Supply Line Items</span>
-              <strong className="stat-card__value">{totalSupplyLines}</strong>
-              <span className="stat-card__sub">{totalSuppliesProcured} procured · {totalSuppliesStaged} staged</span>
-            </div>
-            <div className="stat-card stat-card--warning">
-              <span className="stat-card__label">Estimated Procurement</span>
-              <strong className="stat-card__value">{formatCurrency(estimatedProcurementCost, "$0.00")}</strong>
-              <span className="stat-card__sub">{formatCurrency(actualProcurementCost, "$0.00")} actual captured so far</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__label">Inventory-Linked Supplies</span>
-              <strong className="stat-card__value">{inventoryLinkedSupplyCount}</strong>
-              <span className="stat-card__sub">{inventoryCoveredSupplyCount} lines fully covered by household stock</span>
-            </div>
-            <div className="stat-card stat-card--danger">
-              <span className="stat-card__label">Spend</span>
-              <strong className="stat-card__value">{formatCurrency(totalSpent, "$0.00")}</strong>
-              <span className="stat-card__sub">{project.expenses.length} total expenses logged</span>
-            </div>
-          </section>
-
-          <div className="detail-tiles">
-            <div className="detail-tiles__grid">
-              <section className="panel detail-tile" data-tile="edit">
-                <div className="panel__header">
-                  <div>
-                    <h2>Project Settings</h2>
-                    <p className="data-table__secondary">Update the core project scope, timing, and execution notes without leaving the workbench.</p>
-                  </div>
+          <div className="resource-layout">
+            <div className="resource-layout__primary">
+              <ExpandableCard
+                title="Phase Timeline"
+                modalTitle="Phase Timeline"
+                previewContent={<CompactPhasePreview phases={project.phases} />}
+              >
+                <div className="project-phase-stack" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {project.phases.map((phase) => {
+                    const phaseDetail = phaseDetailsById.get(phase.id);
+                    if (!phaseDetail) { return null; }
+                    return (
+                      <details key={phase.id} className="project-phase-details" style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                        <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
+                          <ProjectPhaseCard phase={phase} />
+                        </summary>
+                        <div className="project-phase-details__content" style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
+                          <ProjectPhaseDetail
+                            householdId={household.id}
+                            projectId={project.id}
+                            phase={phaseDetail}
+                            householdMembers={householdMembers}
+                            serviceProviders={serviceProviders}
+                            budgetCategories={project.budgetCategories}
+                            inventoryItems={householdInventory.items}
+                          />
+                        </div>
+                      </details>
+                    );
+                  })}
                 </div>
-                <div className="panel__body--padded">
-                  <form action={updateProjectAction} className="workbench-form">
-                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Save Project</button>
-                    </div>
-                  </form>
-                  <form action={deleteProjectAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+                {project.phases.length === 0 ? <p className="panel__empty">No phases defined yet. Add one below to sequence the work.</p> : null}
+                <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                  <form action={createProjectPhaseAction}>
                     <input type="hidden" name="householdId" value={household.id} />
                     <input type="hidden" name="projectId" value={project.id} />
-                    <button type="submit" className="button button--danger">Delete Project</button>
-                  </form>
-                </div>
-              </section>
-
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <h2>Linked Assets ({project.assets.length})</h2>
-                </div>
-                <div className="panel__body--padded">
-                  <form action={addProjectAssetAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                      <label className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
-                        <span>Asset</span>
-                        <select name="assetId" required defaultValue="">
-                          <option value="" disabled>Select an asset</option>
-                          {availableAssets.map((asset) => (
-                            <option key={asset.id} value={asset.id}>{asset.name} · {asset.category}</option>
-                          ))}
+                    <div className="form-grid">
+                      <label className="field field--full">
+                        <span>New Phase Name</span>
+                        <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
+                      </label>
+                      <label className="field field--full">
+                        <span>Description</span>
+                        <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
+                      </label>
+                      <label className="field">
+                        <span>Status</span>
+                        <select name="status" defaultValue="pending">
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="skipped">Skipped</option>
                         </select>
                       </label>
-                      <label className="field" style={{ flex: '1 1 160px', minWidth: 0 }}>
-                        <span>Role</span>
-                        <input name="role" placeholder="Primary, affected system…" />
+                      <label className="field">
+                        <span>Budget Amount</span>
+                        <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
                       </label>
-                      <button type="submit" className="button button--sm" disabled={availableAssets.length === 0} style={{ alignSelf: 'flex-end' }}>Link Asset</button>
+                      <label className="field">
+                        <span>Target End Date</span>
+                        <input name="targetEndDate" type="date" />
+                      </label>
+                    </div>
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
+                      <button type="submit" className="button">Add Phase</button>
                     </div>
                   </form>
                 </div>
-                {project.assets.length === 0 ? (
-                  <p className="panel__empty">No assets are linked to this project.</p>
-                ) : (
-                  <table className="workbench-table">
-                    <thead>
-                      <tr>
-                        <th>Asset</th>
-                        <th>Category</th>
-                        <th>Role</th>
-                        <th style={{ width: '72px' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {project.assets.map((asset) => (
-                        <tr key={asset.id}>
-                          <td>{asset.asset ? <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link> : "Unknown asset"}</td>
-                          <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>{asset.asset?.category ?? "—"}</td>
-                          <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>{asset.role ?? "—"}</td>
-                          <td>
-                            <form action={removeProjectAssetAction}>
-                              <input type="hidden" name="householdId" value={household.id} />
-                              <input type="hidden" name="projectId" value={project.id} />
-                              <input type="hidden" name="projectAssetId" value={asset.id} />
-                              <button type="submit" className="button button--ghost button--sm">Remove</button>
-                            </form>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </section>
+              </ExpandableCard>
 
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <div>
-                    <h2>Unphased Tasks ({unphasedTasks.length})</h2>
-                    <p className="data-table__secondary">Tasks not assigned to any phase stay here until you drag them into a stage of work.</p>
+              <ExpandableCard
+                title="Project Settings"
+                modalTitle="Project Settings"
+                previewContent={
+                  <div className="compact-preview">
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <span className="compact-preview__pill">{projectStatusLabels[project.status] ?? project.status}</span>
+                      {project.startDate ? <span className="compact-preview__pill">Starts {formatDate(project.startDate, "—")}</span> : null}
+                      {project.targetEndDate ? <span className="compact-preview__pill">Target {formatDate(project.targetEndDate, "—")}</span> : null}
+                      {project.budgetAmount ? <span className="compact-preview__pill">{formatCurrency(project.budgetAmount, "$0")} budget</span> : null}
+                    </div>
                   </div>
-                </div>
-                <div className="panel__body--padded">
+                }
+              >
+                <form action={updateProjectAction} className="workbench-form">
+                  <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
+                  <div className="inline-actions" style={{ marginTop: 16 }}>
+                    <button type="submit" className="button">Save Project</button>
+                  </div>
+                </form>
+                <form action={deleteProjectAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+                  <input type="hidden" name="householdId" value={household.id} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <button type="submit" className="button button--danger">Delete Project</button>
+                </form>
+              </ExpandableCard>
+
+              <ExpandableCard
+                title="Tasks"
+                modalTitle="Tasks"
+                previewContent={<CompactTaskPreview tasks={project.tasks} />}
+              >
+                <div style={{ marginBottom: 20 }}>
                   <form action={createProjectTaskAction}>
                     <input type="hidden" name="householdId" value={household.id} />
                     <input type="hidden" name="projectId" value={project.id} />
@@ -381,36 +301,47 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       </label>
                     </div>
                     <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Add Unphased Task</button>
+                      <button type="submit" className="button">Add Task</button>
                     </div>
                   </form>
                 </div>
-                <div className="panel__body">
-                  {unphasedTasks.length === 0 ? <p className="panel__empty">Every task is currently assigned to a phase.</p> : null}
-                  <div className="schedule-stack">
-                    {unphasedTasks.map((task) => (
-                      <UnphasedTaskCard
-                        key={task.id}
-                        householdId={household.id}
-                        projectId={project.id}
-                        task={task}
-                        householdMembers={householdMembers}
-                      />
-                    ))}
-                  </div>
+                {unphasedTasks.length === 0 ? <p className="panel__empty">Every task is assigned to a phase.</p> : null}
+                <div className="schedule-stack">
+                  {unphasedTasks.map((task) => (
+                    <UnphasedTaskCard
+                      key={task.id}
+                      householdId={household.id}
+                      projectId={project.id}
+                      task={task}
+                      householdMembers={householdMembers}
+                    />
+                  ))}
                 </div>
-              </section>
+              </ExpandableCard>
 
-              <section className="panel detail-tile">
-                <div className="panel__header">
-                  <div>
-                    <h2>All Expenses ({project.expenses.length})</h2>
-                    <p className="data-table__secondary">See the full spend stream with phase and budget category context preserved on each row.</p>
-                  </div>
-                </div>
-                <div className="panel__body">
-                  {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
+              <ExpandableCard
+                title="Budget & Expenses"
+                modalTitle="Budget & Expenses"
+                previewContent={
+                  <CompactBudgetPreview
+                    budgetAmount={project.budgetAmount}
+                    totalSpent={totalSpent}
+                    categories={project.budgetCategories}
+                    expenses={project.expenses}
+                  />
+                }
+              >
+                <ProjectBudgetBreakdown
+                  householdId={household.id}
+                  projectId={project.id}
+                  projectBudgetAmount={project.budgetAmount}
+                  categories={project.budgetCategories}
+                  expenses={project.expenses}
+                  phaseDetails={phaseDetails}
+                />
+                <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
                   <div className="schedule-stack">
+                    {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
                     {project.expenses.map((expense) => (
                       <div key={expense.id} className="schedule-card">
                         <form action={updateProjectExpenseAction}>
@@ -429,53 +360,32 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                             <span className="pill">{formatCurrency(expense.amount, "$0.00")}</span>
                           </div>
                           <div className="form-grid">
-                            <label className="field field--full">
-                              <span>Description</span>
-                              <input name="description" defaultValue={expense.description} required />
-                            </label>
-                            <label className="field">
-                              <span>Amount</span>
-                              <input name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required />
-                            </label>
-                            <label className="field">
-                              <span>Freeform Category</span>
-                              <input name="category" defaultValue={expense.category ?? ""} />
-                            </label>
+                            <label className="field field--full"><span>Description</span><input name="description" defaultValue={expense.description} required /></label>
+                            <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required /></label>
+                            <label className="field"><span>Freeform Category</span><input name="category" defaultValue={expense.category ?? ""} /></label>
                             <label className="field">
                               <span>Phase</span>
                               <select name="phaseId" defaultValue={expense.phaseId ?? ""}>
                                 <option value="">Unphased</option>
-                                {project.phases.map((phase) => (
-                                  <option key={phase.id} value={phase.id}>{phase.name}</option>
-                                ))}
+                                {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
                               </select>
                             </label>
                             <label className="field">
                               <span>Budget Category</span>
                               <select name="budgetCategoryId" defaultValue={expense.budgetCategoryId ?? ""}>
                                 <option value="">None</option>
-                                {project.budgetCategories.map((category) => (
-                                  <option key={category.id} value={category.id}>{category.name}</option>
-                                ))}
+                                {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
                               </select>
                             </label>
                             <label className="field">
                               <span>Service Provider</span>
                               <select name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
                                 <option value="">None</option>
-                                {serviceProviders.map((provider) => (
-                                  <option key={provider.id} value={provider.id}>{provider.name}</option>
-                                ))}
+                                {serviceProviders.map((provider) => (<option key={provider.id} value={provider.id}>{provider.name}</option>))}
                               </select>
                             </label>
-                            <label className="field">
-                              <span>Date</span>
-                              <input name="date" type="date" defaultValue={toDateInputValue(expense.date)} />
-                            </label>
-                            <label className="field field--full">
-                              <span>Notes</span>
-                              <textarea name="notes" rows={2} defaultValue={expense.notes ?? ""} />
-                            </label>
+                            <label className="field"><span>Date</span><input name="date" type="date" defaultValue={toDateInputValue(expense.date)} /></label>
+                            <label className="field field--full"><span>Notes</span><textarea name="notes" rows={2} defaultValue={expense.notes ?? ""} /></label>
                           </div>
                           <div className="inline-actions" style={{ marginTop: 16 }}>
                             <button type="submit" className="button button--ghost">Save Expense</button>
@@ -490,55 +400,162 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       </div>
                     ))}
                   </div>
-
-                  <div className="panel__body--padded">
-                    <form action={createProjectExpenseAction}>
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <div className="form-grid">
-                        <label className="field field--full">
-                          <span>Description</span>
-                          <input name="description" placeholder="Project-wide expense" required />
-                        </label>
-                        <label className="field">
-                          <span>Amount</span>
-                          <input name="amount" type="number" min="0" step="0.01" required />
-                        </label>
-                        <label className="field">
-                          <span>Phase</span>
-                          <select name="phaseId" defaultValue="">
-                            <option value="">Unphased</option>
-                            {project.phases.map((phase) => (
-                              <option key={phase.id} value={phase.id}>{phase.name}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>Budget Category</span>
-                          <select name="budgetCategoryId" defaultValue="">
-                            <option value="">None</option>
-                            {project.budgetCategories.map((category) => (
-                              <option key={category.id} value={category.id}>{category.name}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <div className="inline-actions" style={{ marginTop: 16 }}>
-                        <button type="submit" className="button">Add Expense</button>
-                      </div>
-                    </form>
-                  </div>
+                  <form action={createProjectExpenseAction} style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <div className="form-grid">
+                      <label className="field field--full"><span>Description</span><input name="description" placeholder="Project-wide expense" required /></label>
+                      <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" required /></label>
+                      <label className="field">
+                        <span>Phase</span>
+                        <select name="phaseId" defaultValue="">
+                          <option value="">Unphased</option>
+                          {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Budget Category</span>
+                        <select name="budgetCategoryId" defaultValue="">
+                          <option value="">None</option>
+                          {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
+                      <button type="submit" className="button">Add Expense</button>
+                    </div>
+                  </form>
                 </div>
-              </section>
+              </ExpandableCard>
 
-              <ProjectBudgetBreakdown
-                householdId={household.id}
-                projectId={project.id}
-                projectBudgetAmount={project.budgetAmount}
-                categories={project.budgetCategories}
-                expenses={project.expenses}
-                phaseDetails={phaseDetails}
-              />
+              <ExpandableCard
+                title="Supplies"
+                modalTitle="Supplies"
+                previewContent={
+                  <CompactSupplyPreview
+                    supplies={allSupplies}
+                    estimatedCost={estimatedProcurementCost}
+                    remainingCost={remainingProcurementCost}
+                  />
+                }
+              >
+                {allSupplies.length === 0 ? (
+                  <p className="panel__empty">No supplies added yet. Expand a phase in the Phase Timeline to add supplies per phase.</p>
+                ) : (
+                  <table className="workbench-table">
+                    <thead>
+                      <tr>
+                        <th>Supply</th>
+                        <th>Phase</th>
+                        <th>Qty</th>
+                        <th>Est. Cost</th>
+                        <th>Procured</th>
+                        <th>Staged</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allSupplies.map((supply) => {
+                        const phaseName = phaseNameLookup.get(supply.phaseId) ?? "—";
+                        return (
+                          <tr key={supply.id}>
+                            <td>
+                              <div className="data-table__primary">{supply.name}</div>
+                              {supply.supplier ? <div className="data-table__secondary">{supply.supplier}</div> : null}
+                            </td>
+                            <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{phaseName}</td>
+                            <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{supply.quantityOnHand}/{supply.quantityNeeded} {supply.unit}</td>
+                            <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>
+                              {supply.estimatedUnitCost != null ? formatCurrency(supply.estimatedUnitCost * supply.quantityNeeded, "$0.00") : "—"}
+                            </td>
+                            <td>
+                              {supply.isProcured
+                                ? <span className="status-chip status-chip--upcoming">Yes</span>
+                                : <span className="status-chip status-chip--overdue">No</span>}
+                            </td>
+                            <td>
+                              {supply.isStaged
+                                ? <span className="status-chip status-chip--upcoming">Yes</span>
+                                : <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>No</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </ExpandableCard>
+            </div>
+
+            <div className="resource-layout__aside">
+              <Card title="Project Status">
+                <dl className="schedule-meta">
+                  <div><dt>Status</dt><dd><span className="pill">{projectStatusLabels[project.status] ?? project.status}</span></dd></div>
+                  <div><dt>Task progress</dt><dd>{percentComplete}% — {completedTaskCount}/{project.tasks.length} tasks</dd></div>
+                  <div><dt>Phases</dt><dd>{completedPhaseCount} of {phaseCount} complete</dd></div>
+                  {activePhase ? <div><dt>Active phase</dt><dd>{activePhase.name}</dd></div> : null}
+                  <div><dt>Start date</dt><dd>{formatDate(project.startDate, "Not set")}</dd></div>
+                  {project.targetEndDate ? <div><dt>Target end</dt><dd>{formatDate(project.targetEndDate, "—")}</dd></div> : null}
+                  <div><dt>Budget</dt><dd>{project.budgetAmount ? formatCurrency(project.budgetAmount, "$0.00") : "Not set"}</dd></div>
+                  <div><dt>Spent</dt><dd>{formatCurrency(totalSpent, "$0.00")}</dd></div>
+                </dl>
+              </Card>
+
+              <Card title={`Linked Assets (${project.assets.length})`}>
+                <form action={addProjectAssetAction} style={{ marginBottom: 8 }}>
+                  <input type="hidden" name="householdId" value={household.id} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label className="field">
+                      <span>Asset</span>
+                      <select name="assetId" required defaultValue="">
+                        <option value="" disabled>Select an asset</option>
+                        {availableAssets.map((asset) => (
+                          <option key={asset.id} value={asset.id}>{asset.name} · {asset.category}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Role</span>
+                      <input name="role" placeholder="Primary, affected system…" />
+                    </label>
+                    <button type="submit" className="button button--sm" disabled={availableAssets.length === 0}>Link Asset</button>
+                  </div>
+                </form>
+                {project.assets.length === 0 ? (
+                  <p className="panel__empty">No assets linked yet.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {project.assets.map((asset) => (
+                      <div key={asset.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                        <div>
+                          {asset.asset ? (
+                            <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link>
+                          ) : "Unknown asset"}
+                          {asset.role ? <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{asset.role}</div> : null}
+                        </div>
+                        <form action={removeProjectAssetAction}>
+                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="projectAssetId" value={asset.id} />
+                          <button type="submit" className="button button--ghost button--sm">Remove</button>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card title="Linked Inventory">
+                <dl className="schedule-meta">
+                  <div><dt>Supply lines</dt><dd>{totalSupplyLines}</dd></div>
+                  <div><dt>Procured</dt><dd>{totalSuppliesProcured} / {totalSupplyLines}</dd></div>
+                  <div><dt>Staged</dt><dd>{totalSuppliesStaged} / {totalSupplyLines}</dd></div>
+                  <div><dt>Inventory-linked</dt><dd>{inventoryLinkedSupplyCount} lines</dd></div>
+                  <div><dt>Covered from stock</dt><dd>{inventoryCoveredSupplyCount} fully covered</dd></div>
+                  <div><dt>Est. procurement</dt><dd>{formatCurrency(estimatedProcurementCost, "$0.00")}</dd></div>
+                  <div><dt>Remaining cost</dt><dd>{formatCurrency(remainingProcurementCost, "$0.00")}</dd></div>
+                </dl>
+              </Card>
             </div>
           </div>
         </div>
