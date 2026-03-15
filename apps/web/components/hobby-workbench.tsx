@@ -64,7 +64,9 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
   return (
     <form className="workbench-form" onSubmit={handleSubmit}>
       <section className="workbench-section">
-        <h2 className="workbench-section__title">Core Identity</h2>
+        <div className="workbench-section__head">
+          <h3>Core Identity</h3>
+        </div>
 
         <div className="workbench-grid">
           <label className="workbench-field workbench-field--wide">
@@ -117,7 +119,7 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
             </select>
           </label>
 
-          <fieldset className="workbench-field">
+          <fieldset className="workbench-field workbench-fieldset">
             <legend className="workbench-field__label">Session Lifecycle</legend>
             <div className="workbench-radio-group">
               <label className="workbench-radio">
@@ -147,7 +149,9 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
 
       {selectedPreset && (
         <section className="workbench-section">
-          <h2 className="workbench-section__title">What this preset includes</h2>
+          <div className="workbench-section__head">
+            <h3>What this preset includes</h3>
+          </div>
           <div className="workbench-details">
             <div className="kv-grid">
               <span className="kv-grid__label">Lifecycle</span>

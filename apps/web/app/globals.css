@@ -1504,6 +1504,12 @@ textarea { resize: vertical; }
   gap: 8px;
 }
 
+.workbench-section__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .workbench-section__head {
   display: flex;
   align-items: center;
@@ -1534,6 +1540,39 @@ textarea { resize: vertical; }
   align-items: start;
 }
 
+.workbench-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.workbench-field--wide {
+  min-width: 0;
+}
+
+.workbench-fieldset {
+  border: 0;
+  padding: 0;
+}
+
+.workbench-field__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.workbench-field__required {
+  color: var(--danger);
+}
+
+.workbench-field__textarea {
+  min-height: 104px;
+}
+
 .workbench-form .field {
   gap: 2px;
   align-content: start;
@@ -1558,9 +1597,64 @@ textarea { resize: vertical; }
   box-shadow: none;
 }
 
+.workbench-form input[type="radio"],
+.workbench-form input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+.workbench-radio-group {
+  display: grid;
+  gap: 10px;
+}
+
+.workbench-radio {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms, box-shadow 150ms;
+}
+
+.workbench-radio:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-alt);
+}
+
+.workbench-radio:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, 0.12);
+}
+
+.workbench-radio span {
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
 .workbench-form .field small {
   font-size: 0.72rem;
   color: var(--ink-muted);
+}
+
+.workbench-error {
+  padding: 12px 14px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.84rem;
 }
 
 .project-blueprint-layout {

@@ -54,7 +54,8 @@ Run `pnpm db:generate` after every Prisma schema change before writing code that
 - CSS is global in `apps/web/app/globals.css` — no CSS modules, no Tailwind. Use existing CSS custom properties (e.g. `var(--ink)`, `var(--surface)`, `var(--accent)`, `var(--border)`).
 - **Dashboard/home pages** use a card-based layout (`.panel--studio`, `.kv-grid`).
 - **Workbench screens** (asset create/edit, project create/settings) use the flat form paradigm with `.workbench-*` classes: `.workbench-form`, `.workbench-section`, `.workbench-grid`, `.workbench-table`, `.workbench-details`, `.workbench-bar`.
-- Do not introduce card wrappers on workbench surfaces. Cards are for reading; workbenches are for working.
+- ExpandableCard sections (Custom Fields, Maintenance Schedules, Usage Metrics, and similar dense editing sections on workbench surfaces) use inline collapse/expand — clicking the header toggle slides the full editing UI open directly in the page flow, pushing content below it down. They do not use modals. The ExpandModal component exists in the codebase but is not the active pattern for workbench surfaces. When collapsed, these cards show a compact preview summary. When expanded, they render the same workbench-table and workbench-grid content inline.
+- Workbench surfaces use Card, CollapsibleCard, and ExpandableCard components as section containers. These are thin-bordered grouping containers, not decorative boxes. Card is always-open for primary field groups like Core Identity. CollapsibleCard is used in the aside column for secondary metadata (Purchase Details, Warranty, Location, etc.) that defaults to collapsed. ExpandableCard is used for dense editing sections that show a compact preview when collapsed and slide open inline when expanded.
 
 ## Shared types contract
 
