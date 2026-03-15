@@ -300,72 +300,74 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 modalTitle="Phase Timeline"
                 previewContent={<CompactPhasePreview phases={project.phases} />}
               >
-                <div className="project-phase-stack" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  {project.phases.map((phase) => {
-                    const phaseDetail = phaseDetailsById.get(phase.id);
-                    if (!phaseDetail) { return null; }
-                    return (
-                      <details
-                        key={phase.id}
-                        id={`phase-${phase.id}`}
-                        className="project-phase-details"
-                        open={focusedPhaseId === phase.id}
-                        style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}
-                      >
-                        <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
-                          <ProjectPhaseCard phase={phase} />
-                        </summary>
-                        <div className="project-phase-details__content" style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
-                          <ProjectPhaseDetail
-                            householdId={household.id}
-                            projectId={project.id}
-                            phase={phaseDetail}
-                            householdMembers={householdMembers}
-                            serviceProviders={serviceProviders}
-                            budgetCategories={project.budgetCategories}
-                            inventoryItems={householdInventory.items}
-                          />
-                        </div>
-                      </details>
-                    );
-                  })}
-                </div>
-                {project.phases.length === 0 ? <p className="panel__empty">No phases defined yet. Add one below to sequence the work.</p> : null}
-                <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                  <form action={createProjectPhaseAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <label className="field field--full">
-                        <span>New Phase Name</span>
-                        <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
-                      </label>
-                      <label className="field field--full">
-                        <span>Description</span>
-                        <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
-                      </label>
-                      <label className="field">
-                        <span>Status</span>
-                        <select name="status" defaultValue="pending">
-                          <option value="pending">Pending</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                          <option value="skipped">Skipped</option>
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Budget Amount</span>
-                        <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                      </label>
-                      <label className="field">
-                        <span>Target End Date</span>
-                        <input name="targetEndDate" type="date" />
-                      </label>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Add Phase</button>
-                    </div>
-                  </form>
+                <div>
+                  <div className="project-phase-stack" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    {project.phases.map((phase) => {
+                      const phaseDetail = phaseDetailsById.get(phase.id);
+                      if (!phaseDetail) { return null; }
+                      return (
+                        <details
+                          key={phase.id}
+                          id={`phase-${phase.id}`}
+                          className="project-phase-details"
+                          open={focusedPhaseId === phase.id}
+                          style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}
+                        >
+                          <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
+                            <ProjectPhaseCard phase={phase} />
+                          </summary>
+                          <div className="project-phase-details__content" style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
+                            <ProjectPhaseDetail
+                              householdId={household.id}
+                              projectId={project.id}
+                              phase={phaseDetail}
+                              householdMembers={householdMembers}
+                              serviceProviders={serviceProviders}
+                              budgetCategories={project.budgetCategories}
+                              inventoryItems={householdInventory.items}
+                            />
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                  {project.phases.length === 0 ? <p className="panel__empty">No phases defined yet. Add one below to sequence the work.</p> : null}
+                  <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                    <form action={createProjectPhaseAction}>
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <div className="form-grid">
+                        <label className="field field--full">
+                          <span>New Phase Name</span>
+                          <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
+                        </label>
+                        <label className="field field--full">
+                          <span>Description</span>
+                          <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
+                        </label>
+                        <label className="field">
+                          <span>Status</span>
+                          <select name="status" defaultValue="pending">
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="skipped">Skipped</option>
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Budget Amount</span>
+                          <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                        </label>
+                        <label className="field">
+                          <span>Target End Date</span>
+                          <input name="targetEndDate" type="date" />
+                        </label>
+                      </div>
+                      <div className="inline-actions" style={{ marginTop: 16 }}>
+                        <button type="submit" className="button">Add Phase</button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               </ExpandableCard>
 
@@ -383,17 +385,19 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   </div>
                 }
               >
-                <form action={updateProjectAction} className="workbench-form">
-                  <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
-                  <div className="inline-actions" style={{ marginTop: 16 }}>
-                    <button type="submit" className="button">Save Project</button>
-                  </div>
-                </form>
-                <form action={deleteProjectAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-                  <input type="hidden" name="householdId" value={household.id} />
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <button type="submit" className="button button--danger">Delete Project</button>
-                </form>
+                <div>
+                  <form action={updateProjectAction} className="workbench-form">
+                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
+                      <button type="submit" className="button">Save Project</button>
+                    </div>
+                  </form>
+                  <form action={deleteProjectAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <button type="submit" className="button button--danger">Delete Project</button>
+                  </form>
+                </div>
               </ExpandableCard>
 
               <ExpandableCard
@@ -405,100 +409,102 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   </span>
                 }
               >
-                <form action={createQuickTodoAction} className="quick-todo-form">
-                  <input type="hidden" name="householdId" value={household.id} />
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <input
-                    name="title"
-                    placeholder="Add a to-do…"
-                    required
-                    className="quick-todo-form__title"
-                  />
-                  {project.phases.length > 0 && (
-                    <select name="phaseId" defaultValue="" className="quick-todo-form__phase">
-                      <option value="">No phase</option>
-                      {project.phases.map((phase) => (
-                        <option key={phase.id} value={phase.id}>{phase.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  <button type="submit" className="button button--sm">Add</button>
-                </form>
-                {quickTodos.length === 0 ? (
-                  <p className="panel__empty">No quick to-dos yet. Use the field above to add lightweight checkbox items.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {quickTodos.map((todo) => (
-                      <div
-                        key={todo.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "8px 0",
-                          borderBottom: "1px solid var(--border)",
-                          minHeight: "36px"
-                        }}
-                      >
-                        <form action={toggleQuickTodoAction} style={{ display: "contents" }}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="taskId" value={todo.id} />
-                          <input type="hidden" name="isCompleted" value={todo.isCompleted ? "false" : "true"} />
-                          <button
-                            type="submit"
-                            style={{
-                              width: "18px",
-                              height: "18px",
-                              flexShrink: 0,
-                              border: "2px solid var(--border)",
-                              borderRadius: "3px",
-                              background: todo.isCompleted ? "var(--accent)" : "var(--surface)",
-                              cursor: "pointer",
-                              padding: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "white",
-                              fontSize: "11px",
-                              lineHeight: 1
-                            }}
-                            title={todo.isCompleted ? "Mark incomplete" : "Mark complete"}
-                          >
-                            {todo.isCompleted ? "✓" : ""}
-                          </button>
-                        </form>
-                        <span
+                <div>
+                  <form action={createQuickTodoAction} className="quick-todo-form">
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <input
+                      name="title"
+                      placeholder="Add a to-do…"
+                      required
+                      className="quick-todo-form__title"
+                    />
+                    {project.phases.length > 0 && (
+                      <select name="phaseId" defaultValue="" className="quick-todo-form__phase">
+                        <option value="">No phase</option>
+                        {project.phases.map((phase) => (
+                          <option key={phase.id} value={phase.id}>{phase.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <button type="submit" className="button button--sm">Add</button>
+                  </form>
+                  {quickTodos.length === 0 ? (
+                    <p className="panel__empty">No quick to-dos yet. Use the field above to add lightweight checkbox items.</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {quickTodos.map((todo) => (
+                        <div
+                          key={todo.id}
                           style={{
-                            flex: 1,
-                            fontSize: "0.875rem",
-                            color: todo.isCompleted ? "var(--ink-muted)" : "var(--ink)",
-                            textDecoration: todo.isCompleted ? "line-through" : "none"
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "8px 0",
+                            borderBottom: "1px solid var(--border)",
+                            minHeight: "36px"
                           }}
                         >
-                          {todo.title}
-                        </span>
-                        {todo.phaseId ? (
-                          <span className="pill pill--muted" style={{ fontSize: "0.75rem" }}>
-                            {phaseNameLookup.get(todo.phaseId) ?? ""}
+                          <form action={toggleQuickTodoAction} style={{ display: "contents" }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="taskId" value={todo.id} />
+                            <input type="hidden" name="isCompleted" value={todo.isCompleted ? "false" : "true"} />
+                            <button
+                              type="submit"
+                              style={{
+                                width: "18px",
+                                height: "18px",
+                                flexShrink: 0,
+                                border: "2px solid var(--border)",
+                                borderRadius: "3px",
+                                background: todo.isCompleted ? "var(--accent)" : "var(--surface)",
+                                cursor: "pointer",
+                                padding: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "white",
+                                fontSize: "11px",
+                                lineHeight: 1
+                              }}
+                              title={todo.isCompleted ? "Mark incomplete" : "Mark complete"}
+                            >
+                              {todo.isCompleted ? "✓" : ""}
+                            </button>
+                          </form>
+                          <span
+                            style={{
+                              flex: 1,
+                              fontSize: "0.875rem",
+                              color: todo.isCompleted ? "var(--ink-muted)" : "var(--ink)",
+                              textDecoration: todo.isCompleted ? "line-through" : "none"
+                            }}
+                          >
+                            {todo.title}
                           </span>
-                        ) : null}
-                        <form action={promoteTaskAction} style={{ display: "inline" }}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="taskId" value={todo.id} />
-                          <button type="submit" className="button button--ghost button--small" title="Promote to full task">→ Full task</button>
-                        </form>
-                        <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="taskId" value={todo.id} />
-                          <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
-                        </form>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          {todo.phaseId ? (
+                            <span className="pill pill--muted" style={{ fontSize: "0.75rem" }}>
+                              {phaseNameLookup.get(todo.phaseId) ?? ""}
+                            </span>
+                          ) : null}
+                          <form action={promoteTaskAction} style={{ display: "inline" }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="taskId" value={todo.id} />
+                            <button type="submit" className="button button--ghost button--small" title="Promote to full task">→ Full task</button>
+                          </form>
+                          <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="taskId" value={todo.id} />
+                            <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                          </form>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </ExpandableCard>
 
               <ExpandableCard
@@ -506,53 +512,55 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 modalTitle="Tasks"
                 previewContent={<CompactTaskPreview tasks={fullTasks} />}
               >
-                <div style={{ marginBottom: 20 }}>
-                  <form action={createProjectTaskAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <label className="field field--full">
-                        <span>Task Title</span>
-                        <input name="title" placeholder="General task not assigned to a phase yet" required />
-                      </label>
-                      <label className="field field--full">
-                        <span>Description</span>
-                        <textarea name="description" rows={2} placeholder="Why this is still unphased, or what needs to be decided before slotting it into the timeline." />
-                      </label>
-                      <label className="field">
-                        <span>Status</span>
-                        <select name="status" defaultValue="pending">
-                          {taskStatusOptions.map((status) => (
-                            <option key={status} value={status}>{taskStatusLabels[status]}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Assignee</span>
-                        <select name="assignedToId" defaultValue="">
-                          <option value="">Unassigned</option>
-                          {householdMembers.map((member) => (
-                            <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Add Task</button>
-                    </div>
-                  </form>
-                </div>
-                {unphasedTasks.length === 0 ? <p className="panel__empty">Every full task is assigned to a phase.</p> : null}
-                <div className="schedule-stack">
-                  {unphasedTasks.map((task) => (
-                    <UnphasedTaskCard
-                      key={task.id}
-                      householdId={household.id}
-                      projectId={project.id}
-                      task={task}
-                      householdMembers={householdMembers}
-                    />
-                  ))}
+                <div>
+                  <div style={{ marginBottom: 20 }}>
+                    <form action={createProjectTaskAction}>
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <div className="form-grid">
+                        <label className="field field--full">
+                          <span>Task Title</span>
+                          <input name="title" placeholder="General task not assigned to a phase yet" required />
+                        </label>
+                        <label className="field field--full">
+                          <span>Description</span>
+                          <textarea name="description" rows={2} placeholder="Why this is still unphased, or what needs to be decided before slotting it into the timeline." />
+                        </label>
+                        <label className="field">
+                          <span>Status</span>
+                          <select name="status" defaultValue="pending">
+                            {taskStatusOptions.map((status) => (
+                              <option key={status} value={status}>{taskStatusLabels[status]}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Assignee</span>
+                          <select name="assignedToId" defaultValue="">
+                            <option value="">Unassigned</option>
+                            {householdMembers.map((member) => (
+                              <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="inline-actions" style={{ marginTop: 16 }}>
+                        <button type="submit" className="button">Add Task</button>
+                      </div>
+                    </form>
+                  </div>
+                  {unphasedTasks.length === 0 ? <p className="panel__empty">Every full task is assigned to a phase.</p> : null}
+                  <div className="schedule-stack">
+                    {unphasedTasks.map((task) => (
+                      <UnphasedTaskCard
+                        key={task.id}
+                        householdId={household.id}
+                        projectId={project.id}
+                        task={task}
+                        householdMembers={householdMembers}
+                      />
+                    ))}
+                  </div>
                 </div>
               </ExpandableCard>
 
@@ -566,104 +574,106 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   </span>
                 }
               >
-                <details style={{ marginBottom: 16 }}>
-                  <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
-                  <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="workbench-grid" style={{ marginBottom: 12 }}>
-                      <label className="field">
-                        <span className="field__label">Title *</span>
-                        <input type="text" name="title" required maxLength={300} placeholder="Note title" />
-                      </label>
-                      <label className="field">
-                        <span className="field__label">Category</span>
-                        <select name="category" defaultValue="general">
-                          <option value="research">Research</option>
-                          <option value="reference">Reference</option>
-                          <option value="decision">Decision</option>
-                          <option value="measurement">Measurement</option>
-                          <option value="general">General</option>
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span className="field__label">Phase (optional)</span>
-                        <select name="phaseId" defaultValue="">
-                          <option value="">No phase</option>
-                          {project.phases.map((phase) => (
-                            <option key={phase.id} value={phase.id}>{phase.name}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span className="field__label">URL (optional)</span>
-                        <input type="url" name="url" placeholder="https://…" />
-                      </label>
-                    </div>
-                    <label className="field" style={{ display: "block", marginBottom: 12 }}>
-                      <span className="field__label">Body</span>
-                      <textarea name="body" rows={5} placeholder="Markdown supported…" style={{ width: "100%", resize: "vertical" }} />
-                    </label>
-                    <div className="inline-actions">
-                      <button type="submit" className="button">Save Note</button>
-                    </div>
-                  </form>
-                </details>
-                {projectNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
-                <div className="schedule-stack">
-                  {projectNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      className="schedule-card"
-                      style={note.isPinned ? { background: "var(--surface-accent)", borderLeft: "3px solid var(--accent)" } : undefined}
-                    >
-                      <div className="schedule-card__summary">
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 4 }}>
-                          <span className="pill">{({ research: "Research", reference: "Reference", decision: "Decision", measurement: "Measurement", general: "General" } as Record<string, string>)[note.category] ?? note.category}</span>
-                          {note.phaseName ? <span className="pill pill--muted">{note.phaseName}</span> : null}
-                          {note.isPinned ? <span className="pill pill--accent">PINNED</span> : null}
-                        </div>
-                        <div className="data-table__primary">{note.title}</div>
-                        {note.body ? (
-                          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: "8px 0 0", fontFamily: "inherit", fontSize: "0.875rem" }}>
-                            {note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body}
-                          </pre>
-                        ) : null}
-                        {note.url ? (
-                          <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ display: "block", marginTop: 6, fontSize: "0.8125rem" }}>
-                            {(() => { try { return new URL(note.url).hostname; } catch { return note.url; } })()}
-                          </a>
-                        ) : null}
-                        <div className="data-table__secondary" style={{ marginTop: 8 }}>
-                          {note.createdBy?.displayName ?? "Unknown"} · {formatDate(note.createdAt)}
-                        </div>
+                <div>
+                  <details style={{ marginBottom: 16 }}>
+                    <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
+                    <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <div className="workbench-grid" style={{ marginBottom: 12 }}>
+                        <label className="field">
+                          <span className="field__label">Title *</span>
+                          <input type="text" name="title" required maxLength={300} placeholder="Note title" />
+                        </label>
+                        <label className="field">
+                          <span className="field__label">Category</span>
+                          <select name="category" defaultValue="general">
+                            <option value="research">Research</option>
+                            <option value="reference">Reference</option>
+                            <option value="decision">Decision</option>
+                            <option value="measurement">Measurement</option>
+                            <option value="general">General</option>
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span className="field__label">Phase (optional)</span>
+                          <select name="phaseId" defaultValue="">
+                            <option value="">No phase</option>
+                            {project.phases.map((phase) => (
+                              <option key={phase.id} value={phase.id}>{phase.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span className="field__label">URL (optional)</span>
+                          <input type="url" name="url" placeholder="https://…" />
+                        </label>
                       </div>
-                      <div className="inline-actions" style={{ marginTop: 8 }}>
-                        <form action={toggleProjectNotePinAction} style={{ display: "inline" }}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="noteId" value={note.id} />
-                          <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
-                          <button type="submit" className="button button--ghost button--small">
-                            {note.isPinned ? "Unpin" : "Pin"}
-                          </button>
-                        </form>
-                        <form action={deleteProjectNoteAction} style={{ display: "inline" }}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="noteId" value={note.id} />
-                          <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
-                        </form>
+                      <label className="field" style={{ display: "block", marginBottom: 12 }}>
+                        <span className="field__label">Body</span>
+                        <textarea name="body" rows={5} placeholder="Markdown supported…" style={{ width: "100%", resize: "vertical" }} />
+                      </label>
+                      <div className="inline-actions">
+                        <button type="submit" className="button">Save Note</button>
                       </div>
-                      <AttachmentSection
-                        householdId={household.id}
-                        entityType="project_note"
-                        entityId={note.id}
-                        compact
-                        label=""
-                      />
-                    </div>
-                  ))}
+                    </form>
+                  </details>
+                  {projectNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
+                  <div className="schedule-stack">
+                    {projectNotes.map((note) => (
+                      <div
+                        key={note.id}
+                        className="schedule-card"
+                        style={note.isPinned ? { background: "var(--surface-accent)", borderLeft: "3px solid var(--accent)" } : undefined}
+                      >
+                        <div className="schedule-card__summary">
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                            <span className="pill">{({ research: "Research", reference: "Reference", decision: "Decision", measurement: "Measurement", general: "General" } as Record<string, string>)[note.category] ?? note.category}</span>
+                            {note.phaseName ? <span className="pill pill--muted">{note.phaseName}</span> : null}
+                            {note.isPinned ? <span className="pill pill--accent">PINNED</span> : null}
+                          </div>
+                          <div className="data-table__primary">{note.title}</div>
+                          {note.body ? (
+                            <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: "8px 0 0", fontFamily: "inherit", fontSize: "0.875rem" }}>
+                              {note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body}
+                            </pre>
+                          ) : null}
+                          {note.url ? (
+                            <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ display: "block", marginTop: 6, fontSize: "0.8125rem" }}>
+                              {(() => { try { return new URL(note.url).hostname; } catch { return note.url; } })()}
+                            </a>
+                          ) : null}
+                          <div className="data-table__secondary" style={{ marginTop: 8 }}>
+                            {note.createdBy?.displayName ?? "Unknown"} · {formatDate(note.createdAt)}
+                          </div>
+                        </div>
+                        <div className="inline-actions" style={{ marginTop: 8 }}>
+                          <form action={toggleProjectNotePinAction} style={{ display: "inline" }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="noteId" value={note.id} />
+                            <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
+                            <button type="submit" className="button button--ghost button--small">
+                              {note.isPinned ? "Unpin" : "Pin"}
+                            </button>
+                          </form>
+                          <form action={deleteProjectNoteAction} style={{ display: "inline" }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="noteId" value={note.id} />
+                            <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                          </form>
+                        </div>
+                        <AttachmentSection
+                          householdId={household.id}
+                          entityType="project_note"
+                          entityId={note.id}
+                          compact
+                          label=""
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </ExpandableCard>
 
@@ -679,107 +689,109 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   />
                 }
               >
-                <ProjectBudgetBreakdown
-                  householdId={household.id}
-                  projectId={project.id}
-                  projectBudgetAmount={project.budgetAmount}
-                  categories={project.budgetCategories}
-                  expenses={project.expenses}
-                  phaseDetails={phaseDetails}
-                />
-                <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                  <div className="schedule-stack">
-                    {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
-                    {project.expenses.map((expense) => (
-                      <div key={expense.id} className="schedule-card">
-                        <form action={updateProjectExpenseAction}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="expenseId" value={expense.id} />
-                          <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
-                            <div>
-                              <div className="data-table__primary">{expense.description}</div>
-                              <div className="data-table__secondary">
-                                Phase: {expense.phaseId ? (phaseNameLookup.get(expense.phaseId) ?? "Unknown phase") : "Unphased"}
-                                {" · "}
-                                Budget category: {expense.budgetCategoryId ? (budgetCategoryLookup.get(expense.budgetCategoryId) ?? "Unknown category") : "Uncategorized"}
+                <div>
+                  <ProjectBudgetBreakdown
+                    householdId={household.id}
+                    projectId={project.id}
+                    projectBudgetAmount={project.budgetAmount}
+                    categories={project.budgetCategories}
+                    expenses={project.expenses}
+                    phaseDetails={phaseDetails}
+                  />
+                  <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                    <div className="schedule-stack">
+                      {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
+                      {project.expenses.map((expense) => (
+                        <div key={expense.id} className="schedule-card">
+                          <form action={updateProjectExpenseAction}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="expenseId" value={expense.id} />
+                            <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
+                              <div>
+                                <div className="data-table__primary">{expense.description}</div>
+                                <div className="data-table__secondary">
+                                  Phase: {expense.phaseId ? (phaseNameLookup.get(expense.phaseId) ?? "Unknown phase") : "Unphased"}
+                                  {" · "}
+                                  Budget category: {expense.budgetCategoryId ? (budgetCategoryLookup.get(expense.budgetCategoryId) ?? "Unknown category") : "Uncategorized"}
+                                </div>
                               </div>
+                              <span className="pill">{formatCurrency(expense.amount, "$0.00")}</span>
                             </div>
-                            <span className="pill">{formatCurrency(expense.amount, "$0.00")}</span>
-                          </div>
-                          <div className="form-grid">
-                            <label className="field field--full"><span>Description</span><input name="description" defaultValue={expense.description} required /></label>
-                            <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required /></label>
-                            <label className="field"><span>Freeform Category</span><input name="category" defaultValue={expense.category ?? ""} /></label>
-                            <label className="field">
-                              <span>Phase</span>
-                              <select name="phaseId" defaultValue={expense.phaseId ?? ""}>
-                                <option value="">Unphased</option>
-                                {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
-                              </select>
-                            </label>
-                            <label className="field">
-                              <span>Budget Category</span>
-                              <select name="budgetCategoryId" defaultValue={expense.budgetCategoryId ?? ""}>
-                                <option value="">None</option>
-                                {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
-                              </select>
-                            </label>
-                            <label className="field">
-                              <span>Service Provider</span>
-                              <select name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
-                                <option value="">None</option>
-                                {serviceProviders.map((provider) => (<option key={provider.id} value={provider.id}>{provider.name}</option>))}
-                              </select>
-                            </label>
-                            <label className="field"><span>Date</span><input name="date" type="date" defaultValue={toDateInputValue(expense.date)} /></label>
-                            <label className="field field--full"><span>Notes</span><textarea name="notes" rows={2} defaultValue={expense.notes ?? ""} /></label>
-                          </div>
-                          <div className="inline-actions" style={{ marginTop: 16 }}>
-                            <button type="submit" className="button button--ghost">Save Expense</button>
-                          </div>
-                        </form>
-                        <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-                          <input type="hidden" name="householdId" value={household.id} />
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="expenseId" value={expense.id} />
-                          <button type="submit" className="button button--danger">Delete Expense</button>
-                        </form>
-                        <AttachmentSection
-                          householdId={household.id}
-                          entityType="project_expense"
-                          entityId={expense.id}
-                          compact
-                          label="Receipts"
-                        />
+                            <div className="form-grid">
+                              <label className="field field--full"><span>Description</span><input name="description" defaultValue={expense.description} required /></label>
+                              <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required /></label>
+                              <label className="field"><span>Freeform Category</span><input name="category" defaultValue={expense.category ?? ""} /></label>
+                              <label className="field">
+                                <span>Phase</span>
+                                <select name="phaseId" defaultValue={expense.phaseId ?? ""}>
+                                  <option value="">Unphased</option>
+                                  {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
+                                </select>
+                              </label>
+                              <label className="field">
+                                <span>Budget Category</span>
+                                <select name="budgetCategoryId" defaultValue={expense.budgetCategoryId ?? ""}>
+                                  <option value="">None</option>
+                                  {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
+                                </select>
+                              </label>
+                              <label className="field">
+                                <span>Service Provider</span>
+                                <select name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
+                                  <option value="">None</option>
+                                  {serviceProviders.map((provider) => (<option key={provider.id} value={provider.id}>{provider.name}</option>))}
+                                </select>
+                              </label>
+                              <label className="field"><span>Date</span><input name="date" type="date" defaultValue={toDateInputValue(expense.date)} /></label>
+                              <label className="field field--full"><span>Notes</span><textarea name="notes" rows={2} defaultValue={expense.notes ?? ""} /></label>
+                            </div>
+                            <div className="inline-actions" style={{ marginTop: 16 }}>
+                              <button type="submit" className="button button--ghost">Save Expense</button>
+                            </div>
+                          </form>
+                          <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
+                            <input type="hidden" name="householdId" value={household.id} />
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="expenseId" value={expense.id} />
+                            <button type="submit" className="button button--danger">Delete Expense</button>
+                          </form>
+                          <AttachmentSection
+                            householdId={household.id}
+                            entityType="project_expense"
+                            entityId={expense.id}
+                            compact
+                            label="Receipts"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <form action={createProjectExpenseAction} style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <div className="form-grid">
+                        <label className="field field--full"><span>Description</span><input name="description" placeholder="Project-wide expense" required /></label>
+                        <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" required /></label>
+                        <label className="field">
+                          <span>Phase</span>
+                          <select name="phaseId" defaultValue="">
+                            <option value="">Unphased</option>
+                            {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Budget Category</span>
+                          <select name="budgetCategoryId" defaultValue="">
+                            <option value="">None</option>
+                            {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
+                          </select>
+                        </label>
                       </div>
-                    ))}
+                      <div className="inline-actions" style={{ marginTop: 16 }}>
+                        <button type="submit" className="button">Add Expense</button>
+                      </div>
+                    </form>
                   </div>
-                  <form action={createProjectExpenseAction} style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <label className="field field--full"><span>Description</span><input name="description" placeholder="Project-wide expense" required /></label>
-                      <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" required /></label>
-                      <label className="field">
-                        <span>Phase</span>
-                        <select name="phaseId" defaultValue="">
-                          <option value="">Unphased</option>
-                          {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Budget Category</span>
-                        <select name="budgetCategoryId" defaultValue="">
-                          <option value="">None</option>
-                          {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Add Expense</button>
-                    </div>
-                  </form>
                 </div>
               </ExpandableCard>
 
@@ -794,68 +806,70 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   />
                 }
               >
-                {project.phases.length > 0 ? (
-                  <ProjectSupplyQuickAddForm
-                    householdId={household.id}
-                    projectId={project.id}
-                    phases={project.phases}
-                    inventoryItems={householdInventory.items}
-                  />
-                ) : null}
-                {allSupplies.length === 0 ? (
-                  <p className="panel__empty">No supplies added yet. Expand a phase in the Phase Timeline to add supplies per phase.</p>
-                ) : (
-                  <table className="workbench-table">
-                    <thead>
-                      <tr>
-                        <th>Supply</th>
-                        <th>Phase</th>
-                        <th>Qty</th>
-                        <th>Est. Cost</th>
-                        <th>Procured</th>
-                        <th>Staged</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allSupplies.map((supply) => {
-                        const phaseName = phaseNameLookup.get(supply.phaseId) ?? "—";
-                        return (
-                          <tr key={supply.id}>
-                            <td>
-                              <div className="data-table__primary">{supply.name}</div>
-                              {supply.supplier ? <div className="data-table__secondary">{supply.supplier}</div> : null}
-                            </td>
-                            <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{phaseName}</td>
-                            <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{supply.quantityOnHand}/{supply.quantityNeeded} {supply.unit}</td>
-                            <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>
-                              {supply.estimatedUnitCost != null ? formatCurrency(supply.estimatedUnitCost * supply.quantityNeeded, "$0.00") : "—"}
-                            </td>
-                            <td>
-                              {supply.isProcured
-                                ? <span className="status-chip status-chip--upcoming">Yes</span>
-                                : <span className="status-chip status-chip--overdue">No</span>}
-                            </td>
-                            <td>
-                              {supply.isStaged
-                                ? <span className="status-chip status-chip--upcoming">Yes</span>
-                                : <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>No</span>}
-                            </td>
-                            <td>
-                              <ProjectSupplyActions
-                                householdId={household.id}
-                                projectId={project.id}
-                                phaseId={supply.phaseId}
-                                supply={supply}
-                                inventoryItems={householdInventory.items}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
+                <div>
+                  {project.phases.length > 0 ? (
+                    <ProjectSupplyQuickAddForm
+                      householdId={household.id}
+                      projectId={project.id}
+                      phases={project.phases}
+                      inventoryItems={householdInventory.items}
+                    />
+                  ) : null}
+                  {allSupplies.length === 0 ? (
+                    <p className="panel__empty">No supplies added yet. Expand a phase in the Phase Timeline to add supplies per phase.</p>
+                  ) : (
+                    <table className="workbench-table">
+                      <thead>
+                        <tr>
+                          <th>Supply</th>
+                          <th>Phase</th>
+                          <th>Qty</th>
+                          <th>Est. Cost</th>
+                          <th>Procured</th>
+                          <th>Staged</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allSupplies.map((supply) => {
+                          const phaseName = phaseNameLookup.get(supply.phaseId) ?? "—";
+                          return (
+                            <tr key={supply.id}>
+                              <td>
+                                <div className="data-table__primary">{supply.name}</div>
+                                {supply.supplier ? <div className="data-table__secondary">{supply.supplier}</div> : null}
+                              </td>
+                              <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{phaseName}</td>
+                              <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{supply.quantityOnHand}/{supply.quantityNeeded} {supply.unit}</td>
+                              <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>
+                                {supply.estimatedUnitCost != null ? formatCurrency(supply.estimatedUnitCost * supply.quantityNeeded, "$0.00") : "—"}
+                              </td>
+                              <td>
+                                {supply.isProcured
+                                  ? <span className="status-chip status-chip--upcoming">Yes</span>
+                                  : <span className="status-chip status-chip--overdue">No</span>}
+                              </td>
+                              <td>
+                                {supply.isStaged
+                                  ? <span className="status-chip status-chip--upcoming">Yes</span>
+                                  : <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>No</span>}
+                              </td>
+                              <td>
+                                <ProjectSupplyActions
+                                  householdId={household.id}
+                                  projectId={project.id}
+                                  phaseId={supply.phaseId}
+                                  supply={supply}
+                                  inventoryItems={householdInventory.items}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               </ExpandableCard>
 
               <Card title="Shopping List">
