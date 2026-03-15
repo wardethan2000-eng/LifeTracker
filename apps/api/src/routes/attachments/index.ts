@@ -218,7 +218,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
       where: { id: attachmentId },
       data: {
         status: "active",
-        fileSize: headResult.contentLength !== attachment.fileSize ? headResult.contentLength : undefined,
+        ...(headResult.contentLength !== attachment.fileSize ? { fileSize: headResult.contentLength } : {}),
       },
       include: {
         uploadedBy: { select: { id: true, displayName: true } },

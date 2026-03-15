@@ -5,6 +5,7 @@ import type { JSX, ReactNode } from "react";
 import { useCallback, useState } from "react";
 import { ExpandModal } from "./expand-modal";
 import { InventoryItemEditForm } from "./inventory-item-edit-form";
+import { AttachmentSection } from "./attachment-section";
 
 type InventoryEditableRowProps = {
   householdId: string;
@@ -43,6 +44,14 @@ export function InventoryEditableRow({ householdId, item, className, children }:
             onSaved={handleSaved}
             onCancel={() => setEditing(false)}
           />
+          <div style={{ marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+            <AttachmentSection
+              householdId={householdId}
+              entityType="inventory_item"
+              entityId={item.id}
+              compact
+            />
+          </div>
         </ExpandModal>
       )}
     </>

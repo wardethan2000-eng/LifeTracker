@@ -2276,3 +2276,15 @@ export async function deleteProjectInventoryItemAction(formData: FormData): Prom
   await deleteProjectInventoryItem(householdId, projectId, inventoryItemId);
   revalidateProjectPaths(householdId, projectId);
 }
+
+export async function revalidateAttachmentsAction(formData: FormData): Promise<void> {
+  const assetId = getOptionalString(formData, "assetId");
+  if (assetId) {
+    revalidateAssetPaths(assetId);
+  }
+  const projectId = getOptionalString(formData, "projectId");
+  const householdId = getOptionalString(formData, "householdId");
+  if (projectId && householdId) {
+    revalidateProjectPaths(householdId, projectId);
+  }
+}
