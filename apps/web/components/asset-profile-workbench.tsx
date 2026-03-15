@@ -13,7 +13,7 @@ import type {
   PresetUsageMetricTemplate
 } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 
 type AssetProfileWorkbenchProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -44,8 +44,6 @@ type CoreDetailField = {
   render: () => JSX.Element;
 };
 
-type AssetLayoutMode = "cards" | "compact" | "industrial";
-
 const categoryOptions: Array<{ value: AssetCategory; label: string }> = [
   { value: "vehicle", label: "Vehicle" },
   { value: "home", label: "Home" },
@@ -71,10 +69,13 @@ const fieldTypeOptions: Array<{ value: AssetFieldType; label: string }> = [
   { value: "url", label: "Link / URL" }
 ];
 
-const assetLayoutModeOptions: Array<{ value: AssetLayoutMode; label: string }> = [
-  { value: "cards", label: "Cards" },
-  { value: "compact", label: "Compact" },
-  { value: "industrial", label: "Dense" }
+const LIFECYCLE_SECTION_NAMES: readonly string[] = [
+  "Hierarchy & Condition",
+  "Purchase Details",
+  "Warranty",
+  "Location & Property",
+  "Insurance",
+  "Disposition"
 ];
 
 const commonDefaultFields: AssetFieldDefinition[] = [
@@ -826,7 +827,6 @@ export function AssetProfileWorkbench({
   const [metricTemplates, setMetricTemplates] = useState<PresetUsageMetricTemplate[]>(initialBlueprint?.metricTemplates ?? []);
   const [scheduleTemplates, setScheduleTemplates] = useState<PresetScheduleTemplate[]>(initialBlueprint?.scheduleTemplates ?? []);
   const [saveAsPreset, setSaveAsPreset] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<AssetLayoutMode>("cards");
   const [detailPickerValue, setDetailPickerValue] = useState("");
   const [detailTargetSection, setDetailTargetSection] = useState("");
   const [newSectionName, setNewSectionName] = useState("");
@@ -1077,6 +1077,24 @@ export function AssetProfileWorkbench({
     setNewSectionName("");
   };
 
+  const addFieldDefinitionToSection = (sectionName: string): void => {
+    setFieldDefinitions((currentDefinitions) => {
+      const nextKey = buildUniqueFieldKey("custom-detail", currentDefinitions.map((field) => field.key), "detail");
+      const nextField: AssetFieldDefinition = {
+        ...createFieldDefinition(),
+        key: nextKey,
+        group: sectionName,
+        order: currentDefinitions.length
+      };
+      setFieldValues((currentValues) => ({
+        ...currentValues,
+        [nextField.key]: buildDefaultFieldValue(nextField)
+      }));
+      return [...currentDefinitions, nextField];
+    });
+    setExpandedFieldEditors((current) => [...current, fieldDefinitions.length]);
+  };
+
   const fieldDefinitionJson = JSON.stringify(fieldDefinitions.map((field, index) => ({
     ...field,
     order: index,
@@ -1096,8 +1114,64 @@ export function AssetProfileWorkbench({
       ? "Choose the aircraft family that matches the asset so the details, metrics, and maintenance profile fit the mission and systems on board."
       : "Templates can pre-fill recommended details for common asset types.");
 
-﻿  return (
-    <form action={action} className="asset-studio asset-studio--industrial">
+  const renderSectionCustomFields = (sectionName: string): JSX.Element => {
+    const sectionFields = groupedFieldDefinitions[sectionName] ?? [];
+    return (
+      <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+        {sectionFields.length > 0 && (
+          <table className="workbench-table" style={{ marginBottom: '6px' }}>
+            <tbody>
+              {sectionFields.map(({ field, index }) => {
+                const isExpanded = expandedFieldEditors.includes(index);
+                const optionsValue = field.options.map((opt) => opt.value).join(", ");
+                return (
+                  <Fragment key={`lc-${field.key}-${index}`}>
+                    <tr className={isExpanded ? "workbench-table__row--active" : undefined}>
+                      <td style={{ fontWeight: 500 }}>{field.label || <em style={{ color: 'var(--ink-muted)', fontStyle: 'normal' }}>New field</em>}</td>
+                      <td style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>{getFieldTypeLabel(field.type)}</td>
+                      <td>
+                        {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                          setFieldValues((current) => ({ ...current, [field.key]: nextValue }));
+                        })}
+                      </td>
+                      <td>
+                        <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
+                          {isExpanded ? "Done" : "Edit"}
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="workbench-table__edit">
+                        <td colSpan={4}>
+                          <div className="workbench-grid" style={{ padding: '8px 4px' }}>
+                            <label className="field"><span>Label</span><input type="text" value={field.label} onChange={(evt) => handleFieldLabelChange(index, evt.target.value)} /></label>
+                            <label className="field"><span>Format</span><select value={field.type} onChange={(evt) => updateFieldDefinition(index, { type: evt.target.value as AssetFieldType })}>{fieldTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
+                            <label className="field"><span>Unit</span><input type="text" value={field.unit ?? ""} onChange={(evt) => updateFieldDefinition(index, { unit: evt.target.value.trim() || undefined })} /></label>
+                            {(field.type === "select" || field.type === "multiselect") && (
+                              <label className="field field--full"><span>Options (comma separated)</span><input type="text" value={optionsValue} onChange={(evt) => updateFieldDefinition(index, { options: evt.target.value.split(",").map((s) => s.trim()).filter(Boolean).map((o) => ({ label: o, value: o })) })} /></label>
+                            )}
+                            <label className="field field--full"><span>Help text</span><input type="text" value={field.helpText ?? ""} onChange={(evt) => updateFieldDefinition(index, { helpText: evt.target.value.trim() || undefined })} /></label>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between' }}>
+                              <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
+                              <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>Done</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        <button type="button" className="button button--ghost button--sm" onClick={() => addFieldDefinitionToSection(sectionName)}>+ Add field</button>
+      </div>
+    );
+  };
+
+  return (
+    <form action={action} className="workbench-form">
       {initialAsset ? <input type="hidden" name="assetId" value={initialAsset.id} /> : null}
       <input type="hidden" name="householdId" value={householdId} />
       <input type="hidden" name="fieldDefinitionsJson" value={fieldDefinitionJson} />
@@ -1114,15 +1188,12 @@ export function AssetProfileWorkbench({
       <input type="hidden" name="scheduleTemplatesJson" value={JSON.stringify(scheduleTemplates)} />
       <input type="hidden" name="saveAsPreset" value={saveAsPreset ? "true" : "false"} />
 
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <h2>Core Identity</h2>
-          <div className="panel-header__actions">
-            <button type="submit" className="button button--primary">{submitLabel}</button>
-          </div>
+      {/* ── Section 1: Core Identity ── */}
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Core Identity</h3>
         </div>
-
-        <div className="form-grid">
+        <div className="workbench-grid">
           <label className="field field--full">
             <span>Asset Name *</span>
             <input type="text" name="name" defaultValue={initialAsset?.name ?? ""} placeholder="e.g. &quot;Riding Mower&quot;, &quot;Family SUV&quot;" required />
@@ -1137,28 +1208,26 @@ export function AssetProfileWorkbench({
             </select>
           </label>
 
-          <label className="field field--full">
+          <label className="field">
             <span>{templateLabel}</span>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <select style={{ flex: 1, maxWidth: '400px' }} value={selectedBlueprintId} onChange={(event) => handleBlueprintChange(event.target.value)}>
-                <option value="">None (blank)</option>
-                {categoryLibraryBlueprints.length > 0 && (
-                  <optgroup label="Built-in Templates">
-                    {categoryLibraryBlueprints.map((preset) => (
-                      <option key={preset.id} value={preset.id}>{preset.label}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {categoryCustomBlueprints.length > 0 && (
-                  <optgroup label="My Templates">
-                    {categoryCustomBlueprints.map((preset) => (
-                      <option key={preset.id} value={preset.id}>{preset.label}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-              <small style={{ flex: 2, padding: '4px', color: 'var(--ink-muted)' }}>{templateDescription}</small>
-            </div>
+            <select value={selectedBlueprintId} onChange={(event) => handleBlueprintChange(event.target.value)}>
+              <option value="">None (blank)</option>
+              {categoryLibraryBlueprints.length > 0 && (
+                <optgroup label="Built-in Templates">
+                  {categoryLibraryBlueprints.map((preset) => (
+                    <option key={preset.id} value={preset.id}>{preset.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {categoryCustomBlueprints.length > 0 && (
+                <optgroup label="My Templates">
+                  {categoryCustomBlueprints.map((preset) => (
+                    <option key={preset.id} value={preset.id}>{preset.label}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            {selectedBlueprint ? <small>{templateDescription}</small> : null}
           </label>
 
           <label className="field">
@@ -1177,7 +1246,6 @@ export function AssetProfileWorkbench({
             <span>Purchase Date</span>
             <input type="date" name="purchaseDate" defaultValue={initialAsset?.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : ""} />
           </label>
-
           <label className="field">
             <span>Visibility</span>
             <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
@@ -1185,7 +1253,6 @@ export function AssetProfileWorkbench({
               <option value="personal">Personal (only you)</option>
             </select>
           </label>
-
           <label className="field field--full">
             <span>Description & Notes</span>
             <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Anything helpful..." />
@@ -1199,301 +1266,260 @@ export function AssetProfileWorkbench({
         ))}
       </datalist>
 
-      {fieldDefinitions.length > 0 && (
-        <section className="panel panel--studio">
-          <div className="panel-header">
-            <h2>Asset Specifications</h2>
+      {/* ── Section 2: Asset Specifications (table) ── */}
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Asset Specifications</h3>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '4px' }}>
+          <label className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
+            <span>Add built-in field</span>
+            <select value={detailPickerValue} onChange={(event) => setDetailPickerValue(event.target.value)}>
+              <option value="">Select built-in detail...</option>
+              {availableSuggestedFields.map((field) => (
+                <option key={field.key} value={field.key}>{field.label}{field.group ? ` (${field.group})` : ""}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field" style={{ flex: '0 1 180px', minWidth: 0 }}>
+            <span>Section</span>
+            <input
+              type="text"
+              list={`${inputIdPrefix}-detail-sections`}
+              value={detailTargetSection}
+              onChange={(event) => setDetailTargetSection(event.target.value)}
+              placeholder="Optional section…"
+            />
+          </label>
+          <div style={{ display: 'flex', gap: '6px', paddingBottom: '1px' }}>
+            <button type="button" className="button button--secondary button--sm" onClick={addSuggestedField} disabled={!detailPickerValue}>Add Field</button>
+            <button type="button" className="button button--ghost button--sm" onClick={addFieldDefinition}>+ Custom</button>
           </div>
-          <div className="asset-studio__detail-groups">
-            {unsectionedFieldDefinitions.length > 0 && (
-              <section className="asset-studio__detail-group">
-                <div className="asset-studio__detail-grid">
-                  {unsectionedFieldDefinitions.map(({ field, index }) => {
-                    const optionsValue = field.options.map((option) => option.value).join(", ");
-                    const isExpanded = expandedFieldEditors.includes(index);
+        </div>
 
-                    return (
-                      <article key={`${field.key}-${index}`} className="asset-studio__detail-slot" style={isExpanded ? { border: '1px solid var(--border)', background: 'var(--surface-sunken)', marginBottom: '8px' } : undefined}>
-                        
-                        <div className="asset-studio__detail-card-header">
-                          <h4>{field.label || "New detail"}</h4>
-                          <p>{field.helpText}</p>
-                        </div>
-                        
-                        {isExpanded ? (
-                          <label className="field" style={{ padding: '0 8px' }}>
-                            <span>Detail name</span>
-                            <input type="text" value={field.label} onChange={(event) => handleFieldLabelChange(index, event.target.value)} placeholder="e.g. &quot;VIN&quot;" />
-                          </label>
-                        ) : (
-                          <div className={field.type === "boolean" ? "asset-studio__detail-value asset-studio__detail-value--boolean" : "field"}>
-                            {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
-                              setFieldValues((currentValues) => ({...currentValues, [field.key]: nextValue}));
-                            })}
+        <table className="workbench-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Type</th>
+              <th>Value</th>
+              <th style={{ width: '72px' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {fieldDefinitions.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="workbench-table__empty">No custom fields yet — add one above</td>
+              </tr>
+            ) : null}
+
+            {unsectionedFieldDefinitions.map(({ field, index }) => {
+              const isExpanded = expandedFieldEditors.includes(index);
+              const optionsValue = field.options.map((opt) => opt.value).join(", ");
+              return (
+                <Fragment key={`row-${field.key}-${index}`}>
+                  <tr className={isExpanded ? "workbench-table__row--active" : undefined}>
+                    <td style={{ fontWeight: 500 }}>{field.label || <em style={{ color: 'var(--ink-muted)', fontStyle: 'normal' }}>New field</em>}</td>
+                    <td style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>{getFieldTypeLabel(field.type)}</td>
+                    <td>
+                      {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                        setFieldValues((current) => ({ ...current, [field.key]: nextValue }));
+                      })}
+                    </td>
+                    <td>
+                      <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
+                        {isExpanded ? "Done" : "Edit"}
+                      </button>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr className="workbench-table__edit">
+                      <td colSpan={4}>
+                        <div className="workbench-grid" style={{ padding: '8px 4px' }}>
+                          <label className="field"><span>Label</span><input type="text" value={field.label} onChange={(evt) => handleFieldLabelChange(index, evt.target.value)} placeholder="e.g. VIN" /></label>
+                          <label className="field"><span>Format</span><select value={field.type} onChange={(evt) => updateFieldDefinition(index, { type: evt.target.value as AssetFieldType })}>{fieldTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
+                          <label className="field"><span>Section</span><input type="text" list={`${inputIdPrefix}-detail-sections`} value={field.group ?? ""} onChange={(evt) => updateFieldDefinition(index, { group: evt.target.value.trim() || undefined })} /></label>
+                          <label className="field"><span>Unit</span><input type="text" value={field.unit ?? ""} onChange={(evt) => updateFieldDefinition(index, { unit: evt.target.value.trim() || undefined })} /></label>
+                          {(field.type === "select" || field.type === "multiselect") && (
+                            <label className="field field--full"><span>Options (comma separated)</span><input type="text" value={optionsValue} onChange={(evt) => updateFieldDefinition(index, { options: evt.target.value.split(",").map((s) => s.trim()).filter(Boolean).map((o) => ({ label: o, value: o })) })} /></label>
+                          )}
+                          <label className="field field--full"><span>Help text</span><input type="text" value={field.helpText ?? ""} onChange={(evt) => updateFieldDefinition(index, { helpText: evt.target.value.trim() || undefined })} /></label>
+                          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between' }}>
+                            <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
+                            <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>Done</button>
                           </div>
-                        )}
-                        
-                        <div className="inline-actions" style={{ paddingRight: '8px' }}>
-                          <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
-                            {isExpanded ? "Done" : "Edit"}
-                          </button>
                         </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
 
-                        {isExpanded && (
-                          <div className="asset-studio__detail-settings grid-column-full" style={{ gridColumn: '1 / -1', padding: '1rem', background: 'var(--surface)', margin: '8px', border: '1px solid var(--border)', borderRadius: '4px', display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
-                            <label className="field">
-                              <span>Format</span>
-                              <select value={field.type} onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}>
-                                {fieldTypeOptions.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
-                              </select>
-                            </label>
-                            <label className="field">
-                              <span>Section</span>
-                              <input type="text" list={`${inputIdPrefix}-detail-sections`} value={field.group ?? ""} onChange={(event) => updateFieldDefinition(index, { group: event.target.value.trim() || undefined })} />
-                            </label>
-                            <label className="field">
-                              <span>Unit</span>
-                              <input type="text" value={field.unit ?? ""} onChange={(event) => updateFieldDefinition(index, { unit: event.target.value.trim() || undefined })} />
-                            </label>
-                            {(field.type === "select" || field.type === "multiselect") && (
-                              <label className="field field--full">
-                                <span>Options (comma separated)</span>
-                                <input type="text" value={optionsValue} onChange={(event) => updateFieldDefinition(index, { options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({label: option, value: option})) })} />
-                              </label>
-                            )}
-                            <label className="field field--full" style={{ gridColumn: '1 / -1' }}>
-                              <span>Help text</span>
-                              <input type="text" value={field.helpText ?? ""} onChange={(event) => updateFieldDefinition(index, { helpText: event.target.value.trim() || undefined })} />
-                            </label>
-                            <div style={{ gridColumn: '1 / -1', textAlign: 'right' }}>
-                              <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove Property</button>
-                            </div>
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {detailSections.map((groupLabel) => {
+            {detailSections.filter((s) => !LIFECYCLE_SECTION_NAMES.includes(s)).map((groupLabel) => {
               const fields = groupedFieldDefinitions[groupLabel] ?? [];
               if (fields.length === 0) return null;
-
               return (
-                <section key={groupLabel} className="asset-studio__detail-group">
-                  <div className="asset-studio__detail-group-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <h3>{groupLabel}</h3>
-                    <button type="button" className="button button--ghost button--sm" onClick={() => removeSection(groupLabel)} style={{ padding: '0 4px', fontSize: '0.7rem' }}>Remove Section</button>
-                  </div>
-
-                  <div className="asset-studio__detail-grid">
-                    {fields.map(({ field, index }) => {
-                      const optionsValue = field.options.map((option) => option.value).join(", ");
-                      const isExpanded = expandedFieldEditors.includes(index);
-
-                      return (
-                        <article key={`${field.key}-${index}`} className="asset-studio__detail-slot" style={isExpanded ? { border: '1px solid var(--border)', background: 'var(--surface-sunken)', marginBottom: '8px' } : undefined}>
-                          
-                          <div className="asset-studio__detail-card-header">
-                            <h4>{field.label || "New detail"}</h4>
-                            {field.helpText && <p>{field.helpText}</p>}
-                          </div>
-                          
-                          {isExpanded ? (
-                            <label className="field" style={{ padding: '0 8px' }}>
-                              <span>Detail name</span>
-                              <input type="text" value={field.label} onChange={(event) => handleFieldLabelChange(index, event.target.value)} />
-                            </label>
-                          ) : (
-                            <div className={field.type === "boolean" ? "asset-studio__detail-value asset-studio__detail-value--boolean" : "field"}>
-                              {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
-                                setFieldValues((currentValues) => ({...currentValues, [field.key]: nextValue}));
-                              })}
-                            </div>
-                          )}
-                          
-                          <div className="inline-actions" style={{ paddingRight: '8px' }}>
+                <Fragment key={`section-${groupLabel}`}>
+                  <tr className="workbench-table__section-head">
+                    <td colSpan={3}>{groupLabel}</td>
+                    <td>
+                      <button type="button" className="button button--ghost button--xs" onClick={() => removeSection(groupLabel)} title="Remove section">✕ Remove</button>
+                    </td>
+                  </tr>
+                  {fields.map(({ field, index }) => {
+                    const isExpanded = expandedFieldEditors.includes(index);
+                    const optionsValue = field.options.map((opt) => opt.value).join(", ");
+                    return (
+                      <Fragment key={`row-${field.key}-${index}`}>
+                        <tr className={isExpanded ? "workbench-table__row--active" : undefined}>
+                          <td style={{ fontWeight: 500 }}>{field.label || <em style={{ color: 'var(--ink-muted)', fontStyle: 'normal' }}>New field</em>}</td>
+                          <td style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>{getFieldTypeLabel(field.type)}</td>
+                          <td>
+                            {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
+                              setFieldValues((current) => ({ ...current, [field.key]: nextValue }));
+                            })}
+                          </td>
+                          <td>
                             <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
                               {isExpanded ? "Done" : "Edit"}
                             </button>
-                          </div>
-
-                          {isExpanded && (
-                            <div className="asset-studio__detail-settings grid-column-full" style={{ gridColumn: '1 / -1', padding: '1rem', background: 'var(--surface)', margin: '8px', border: '1px solid var(--border)', borderRadius: '4px', display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
-                              <label className="field">
-                                <span>Format</span>
-                                <select value={field.type} onChange={(event) => updateFieldDefinition(index, { type: event.target.value as AssetFieldType })}>
-                                  {fieldTypeOptions.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
-                                </select>
-                              </label>
-                              <label className="field">
-                                <span>Section</span>
-                                <input type="text" list={`${inputIdPrefix}-detail-sections`} value={field.group ?? ""} onChange={(event) => updateFieldDefinition(index, { group: event.target.value.trim() || undefined })} />
-                              </label>
-                              <label className="field">
-                                <span>Unit</span>
-                                <input type="text" value={field.unit ?? ""} onChange={(event) => updateFieldDefinition(index, { unit: event.target.value.trim() || undefined })} />
-                              </label>
-                              {(field.type === "select" || field.type === "multiselect") && (
-                                <label className="field field--full" style={{ gridColumn: '1 / -1' }}>
-                                  <span>Options</span>
-                                  <input type="text" value={optionsValue} onChange={(event) => updateFieldDefinition(index, { options: event.target.value.split(",").map((item) => item.trim()).filter(Boolean).map((option) => ({label: option, value: option})) })} />
-                                </label>
-                              )}
-                              <label className="field field--full" style={{ gridColumn: '1 / -1' }}>
-                                <span>Help text</span>
-                                <input type="text" value={field.helpText ?? ""} onChange={(event) => updateFieldDefinition(index, { helpText: event.target.value.trim() || undefined })} />
-                              </label>
-                              <div style={{ gridColumn: '1 / -1', textAlign: 'right' }}>
-                                <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove Property</button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="workbench-table__edit">
+                            <td colSpan={4}>
+                              <div className="workbench-grid" style={{ padding: '8px 4px' }}>
+                                <label className="field"><span>Label</span><input type="text" value={field.label} onChange={(evt) => handleFieldLabelChange(index, evt.target.value)} /></label>
+                                <label className="field"><span>Format</span><select value={field.type} onChange={(evt) => updateFieldDefinition(index, { type: evt.target.value as AssetFieldType })}>{fieldTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
+                                <label className="field"><span>Section</span><input type="text" list={`${inputIdPrefix}-detail-sections`} value={field.group ?? ""} onChange={(evt) => updateFieldDefinition(index, { group: evt.target.value.trim() || undefined })} /></label>
+                                <label className="field"><span>Unit</span><input type="text" value={field.unit ?? ""} onChange={(evt) => updateFieldDefinition(index, { unit: evt.target.value.trim() || undefined })} /></label>
+                                {(field.type === "select" || field.type === "multiselect") && (
+                                  <label className="field field--full"><span>Options (comma separated)</span><input type="text" value={optionsValue} onChange={(evt) => updateFieldDefinition(index, { options: evt.target.value.split(",").map((s) => s.trim()).filter(Boolean).map((o) => ({ label: o, value: o })) })} /></label>
+                                )}
+                                <label className="field field--full"><span>Help text</span><input type="text" value={field.helpText ?? ""} onChange={(evt) => updateFieldDefinition(index, { helpText: evt.target.value.trim() || undefined })} /></label>
+                                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between' }}>
+                                  <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
+                                  <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>Done</button>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </Fragment>
               );
             })}
-          </div>
-
-          <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--surface-sunken)', borderRadius: '8px' }}>
-            <div style={{ marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500, color: 'var(--ink-muted)' }}>Additional Details</div>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <select 
-                style={{ flex: 1, minWidth: '200px', padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} 
-                value={detailPickerValue} 
-                onChange={(event) => setDetailPickerValue(event.target.value)}
-              >
-                <option value="">Select built-in detail...</option>
-                {availableSuggestedFields.map((field) => (
-                  <option key={field.key} value={field.key}>{field.label} {field.group ? `(${field.group})` : ""}</option>
-                ))}
-              </select>
-              <button type="button" className="button button--secondary" onClick={addSuggestedField} disabled={!detailPickerValue}>Add</button>
-              
-              <div style={{ width: '1px', height: '28px', background: 'var(--border)', margin: '0 4px' }} />
-              
-              <button type="button" className="button button--ghost" onClick={addFieldDefinition}>+ Custom Property</button>
-            </div>
-          </div>
-        </section>
-      )}
-
-﻿      {/* Section 3: Lifecycle & Tracking */}
-      <section className="panel panel--studio">
-        <div className="panel-header">
-          <h2>Lifecycle & Advanced Records</h2>
-        </div>
-        <p className="asset-studio__details-intro" style={{ marginBottom: '16px' }}>
-          Expand sections to track location, purchase records, warranty status, and other lifetime details.
-        </p>
-
-        <div className="asset-studio__detail-groups">
-          <details className="asset-studio__detail-group">
-            <summary className="asset-studio__detail-group-header" style={{ cursor: 'pointer', listStylePosition: 'inside' }}>
-              <h3>Hierarchy & Condition</h3>
-            </summary>
-            <div className="form-grid" style={{ padding: '8px' }}>
-              <label className="field">
-                <span>Parent Asset</span>
-                <select name="parentAssetId" defaultValue={initialAsset?.parentAssetId ?? ""}>
-                  <option value="">No parent asset</option>
-                  {availableParentAssets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>{asset.name}</option>
-                  ))}
-                </select>
-                <small>Build hierarchies like property → system → component.</small>
-              </label>
-              <label className="field">
-                <span>Condition Score</span>
-                <input type="number" name="conditionScore" min="1" max="10" step="1" defaultValue={initialAsset?.conditionScore ?? ""} placeholder="1-10" />
-              </label>
-            </div>
-          </details>
-
-          <details className="asset-studio__detail-group">
-            <summary className="asset-studio__detail-group-header" style={{ cursor: 'pointer', listStylePosition: 'inside' }}>
-              <h3>Purchase Details</h3>
-            </summary>
-            <div className="form-grid" style={{ padding: '8px' }}>
-              <label className="field"><span>Purchase Price</span><input type="number" name="purchaseDetails.price" min="0" step="0.01" defaultValue={initialAsset?.purchaseDetails?.price ?? ""} /></label>
-              <label className="field"><span>Vendor</span><input type="text" name="purchaseDetails.vendor" defaultValue={initialAsset?.purchaseDetails?.vendor ?? ""} /></label>
-              <label className="field"><span>Purchase Condition</span><select name="purchaseDetails.condition" defaultValue={initialAsset?.purchaseDetails?.condition ?? ""}><option value="">Unknown</option><option value="new">New</option><option value="used">Used</option><option value="refurbished">Refurbished</option></select></label>
-              <label className="field"><span>Financing</span><input type="text" name="purchaseDetails.financing" defaultValue={initialAsset?.purchaseDetails?.financing ?? ""} /></label>
-              <label className="field field--full"><span>Receipt Reference</span><input type="text" name="purchaseDetails.receiptRef" defaultValue={initialAsset?.purchaseDetails?.receiptRef ?? ""} /></label>
-            </div>
-          </details>
-
-          <details className="asset-studio__detail-group">
-            <summary className="asset-studio__detail-group-header" style={{ cursor: 'pointer', listStylePosition: 'inside' }}>
-              <h3>Warranty</h3>
-            </summary>
-            <div className="form-grid" style={{ padding: '8px' }}>
-              <label className="field"><span>Warranty Provider</span><input type="text" name="warrantyDetails.provider" defaultValue={initialAsset?.warrantyDetails?.provider ?? ""} /></label>
-              <label className="field"><span>Policy / Contract</span><input type="text" name="warrantyDetails.policyNumber" defaultValue={initialAsset?.warrantyDetails?.policyNumber ?? ""} /></label>
-              <label className="field"><span>Warranty Start</span><input type="date" name="warrantyDetails.startDate" defaultValue={initialAsset?.warrantyDetails?.startDate ? initialAsset.warrantyDetails.startDate.slice(0, 10) : ""} /></label>
-              <label className="field"><span>Warranty End</span><input type="date" name="warrantyDetails.endDate" defaultValue={initialAsset?.warrantyDetails?.endDate ? initialAsset.warrantyDetails.endDate.slice(0, 10) : ""} /></label>
-              <label className="field"><span>Coverage Type</span><input type="text" name="warrantyDetails.coverageType" defaultValue={initialAsset?.warrantyDetails?.coverageType ?? ""} /></label>
-              <label className="field field--full"><span>Warranty Notes</span><textarea name="warrantyDetails.notes" rows={2} defaultValue={initialAsset?.warrantyDetails?.notes ?? ""} /></label>
-            </div>
-          </details>
-
-          <details className="asset-studio__detail-group">
-            <summary className="asset-studio__detail-group-header" style={{ cursor: 'pointer', listStylePosition: 'inside' }}>
-              <h3>Location & Property</h3>
-            </summary>
-            <div className="form-grid" style={{ padding: '8px' }}>
-              <label className="field"><span>Property</span><input type="text" name="locationDetails.propertyName" defaultValue={initialAsset?.locationDetails?.propertyName ?? ""} /></label>
-              <label className="field"><span>Building</span><input type="text" name="locationDetails.building" defaultValue={initialAsset?.locationDetails?.building ?? ""} /></label>
-              <label className="field"><span>Room / Area</span><input type="text" name="locationDetails.room" defaultValue={initialAsset?.locationDetails?.room ?? ""} /></label>
-              <label className="field"><span>Latitude</span><input type="number" name="locationDetails.latitude" min="-90" max="90" step="0.000001" defaultValue={initialAsset?.locationDetails?.latitude ?? ""} /></label>
-              <label className="field"><span>Longitude</span><input type="number" name="locationDetails.longitude" min="-180" max="180" step="0.000001" defaultValue={initialAsset?.locationDetails?.longitude ?? ""} /></label>
-              <label className="field field--full"><span>Location Notes</span><textarea name="locationDetails.notes" rows={2} defaultValue={initialAsset?.locationDetails?.notes ?? ""} /></label>
-            </div>
-          </details>
-
-          <details className="asset-studio__detail-group">
-            <summary className="asset-studio__detail-group-header" style={{ cursor: 'pointer', listStylePosition: 'inside' }}>
-              <h3>Insurance</h3>
-            </summary>
-            <div className="form-grid" style={{ padding: '8px' }}>
-              <label className="field"><span>Insurance Provider</span><input type="text" name="insuranceDetails.provider" defaultValue={initialAsset?.insuranceDetails?.provider ?? ""} /></label>
-              <label className="field"><span>Policy Number</span><input type="text" name="insuranceDetails.policyNumber" defaultValue={initialAsset?.insuranceDetails?.policyNumber ?? ""} /></label>
-              <label className="field"><span>Coverage Amount</span><input type="number" name="insuranceDetails.coverageAmount" min="0" step="0.01" defaultValue={initialAsset?.insuranceDetails?.coverageAmount ?? ""} /></label>
-              <label className="field"><span>Deductible</span><input type="number" name="insuranceDetails.deductible" min="0" step="0.01" defaultValue={initialAsset?.insuranceDetails?.deductible ?? ""} /></label>
-              <label className="field"><span>Renewal Date</span><input type="date" name="insuranceDetails.renewalDate" defaultValue={initialAsset?.insuranceDetails?.renewalDate ? initialAsset.insuranceDetails.renewalDate.slice(0, 10) : ""} /></label>
-              <label className="field field--full"><span>Insurance Notes</span><textarea name="insuranceDetails.notes" rows={2} defaultValue={initialAsset?.insuranceDetails?.notes ?? ""} /></label>
-            </div>
-          </details>
-
-          <details className="asset-studio__detail-group">
-            <summary className="asset-studio__detail-group-header" style={{ cursor: 'pointer', listStylePosition: 'inside' }}>
-              <h3>Disposition</h3>
-            </summary>
-            <div className="form-grid" style={{ padding: '8px' }}>
-              <label className="field"><span>Disposition Method</span><select name="dispositionDetails.method" defaultValue={initialAsset?.dispositionDetails?.method ?? ""}><option value="">None</option><option value="sold">Sold</option><option value="donated">Donated</option><option value="scrapped">Scrapped</option><option value="recycled">Recycled</option><option value="lost">Lost</option></select></label>
-              <label className="field"><span>Disposition Date</span><input type="date" name="dispositionDetails.date" defaultValue={initialAsset?.dispositionDetails?.date ? initialAsset.dispositionDetails.date.slice(0, 10) : ""} /></label>
-              <label className="field"><span>Sale Price</span><input type="number" name="dispositionDetails.salePrice" min="0" step="0.01" defaultValue={initialAsset?.dispositionDetails?.salePrice ?? ""} /></label>
-              <label className="field"><span>Buyer Info</span><input type="text" name="dispositionDetails.buyerInfo" defaultValue={initialAsset?.dispositionDetails?.buyerInfo ?? ""} /></label>
-              <label className="field field--full"><span>Disposition Notes</span><textarea name="dispositionDetails.notes" rows={2} defaultValue={initialAsset?.dispositionDetails?.notes ?? ""} /></label>
-            </div>
-          </details>
-
-        </div>
+          </tbody>
+        </table>
       </section>
 
-      <section className="panel panel--studio">
+      {/* ── Section 3: Lifecycle & Advanced Records ── */}
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Lifecycle & Advanced Records</h3>
+        </div>
+        <p className="workbench-section__hint">Expand sections to track location, purchase records, warranty status, and other lifetime details.</p>
+
+        <details className="workbench-details">
+          <summary><span>Hierarchy & Condition</span></summary>
+          <div className="workbench-grid" style={{ padding: '8px 0' }}>
+            <label className="field">
+              <span>Parent Asset</span>
+              <select name="parentAssetId" defaultValue={initialAsset?.parentAssetId ?? ""}>
+                <option value="">No parent asset</option>
+                {availableParentAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>{asset.name}</option>
+                ))}
+              </select>
+              <small>Build hierarchies like property → system → component.</small>
+            </label>
+            <label className="field">
+              <span>Condition Score</span>
+              <input type="number" name="conditionScore" min="1" max="10" step="1" defaultValue={initialAsset?.conditionScore ?? ""} placeholder="1-10" />
+            </label>
+          </div>
+          {renderSectionCustomFields("Hierarchy & Condition")}
+        </details>
+
+        <details className="workbench-details">
+          <summary><span>Purchase Details</span></summary>
+          <div className="workbench-grid" style={{ padding: '8px 0' }}>
+            <label className="field"><span>Purchase Price</span><input type="number" name="purchaseDetails.price" min="0" step="0.01" defaultValue={initialAsset?.purchaseDetails?.price ?? ""} /></label>
+            <label className="field"><span>Vendor</span><input type="text" name="purchaseDetails.vendor" defaultValue={initialAsset?.purchaseDetails?.vendor ?? ""} /></label>
+            <label className="field"><span>Purchase Condition</span><select name="purchaseDetails.condition" defaultValue={initialAsset?.purchaseDetails?.condition ?? ""}><option value="">Unknown</option><option value="new">New</option><option value="used">Used</option><option value="refurbished">Refurbished</option></select></label>
+            <label className="field"><span>Financing</span><input type="text" name="purchaseDetails.financing" defaultValue={initialAsset?.purchaseDetails?.financing ?? ""} /></label>
+            <label className="field field--full"><span>Receipt Reference</span><input type="text" name="purchaseDetails.receiptRef" defaultValue={initialAsset?.purchaseDetails?.receiptRef ?? ""} /></label>
+          </div>
+          {renderSectionCustomFields("Purchase Details")}
+        </details>
+
+        <details className="workbench-details">
+          <summary><span>Warranty</span></summary>
+          <div className="workbench-grid" style={{ padding: '8px 0' }}>
+            <label className="field"><span>Warranty Provider</span><input type="text" name="warrantyDetails.provider" defaultValue={initialAsset?.warrantyDetails?.provider ?? ""} /></label>
+            <label className="field"><span>Policy / Contract</span><input type="text" name="warrantyDetails.policyNumber" defaultValue={initialAsset?.warrantyDetails?.policyNumber ?? ""} /></label>
+            <label className="field"><span>Warranty Start</span><input type="date" name="warrantyDetails.startDate" defaultValue={initialAsset?.warrantyDetails?.startDate ? initialAsset.warrantyDetails.startDate.slice(0, 10) : ""} /></label>
+            <label className="field"><span>Warranty End</span><input type="date" name="warrantyDetails.endDate" defaultValue={initialAsset?.warrantyDetails?.endDate ? initialAsset.warrantyDetails.endDate.slice(0, 10) : ""} /></label>
+            <label className="field"><span>Coverage Type</span><input type="text" name="warrantyDetails.coverageType" defaultValue={initialAsset?.warrantyDetails?.coverageType ?? ""} /></label>
+            <label className="field field--full"><span>Warranty Notes</span><textarea name="warrantyDetails.notes" rows={2} defaultValue={initialAsset?.warrantyDetails?.notes ?? ""} /></label>
+          </div>
+          {renderSectionCustomFields("Warranty")}
+        </details>
+
+        <details className="workbench-details">
+          <summary><span>Location & Property</span></summary>
+          <div className="workbench-grid" style={{ padding: '8px 0' }}>
+            <label className="field"><span>Property</span><input type="text" name="locationDetails.propertyName" defaultValue={initialAsset?.locationDetails?.propertyName ?? ""} /></label>
+            <label className="field"><span>Building</span><input type="text" name="locationDetails.building" defaultValue={initialAsset?.locationDetails?.building ?? ""} /></label>
+            <label className="field"><span>Room / Area</span><input type="text" name="locationDetails.room" defaultValue={initialAsset?.locationDetails?.room ?? ""} /></label>
+            <label className="field"><span>Latitude</span><input type="number" name="locationDetails.latitude" min="-90" max="90" step="0.000001" defaultValue={initialAsset?.locationDetails?.latitude ?? ""} /></label>
+            <label className="field"><span>Longitude</span><input type="number" name="locationDetails.longitude" min="-180" max="180" step="0.000001" defaultValue={initialAsset?.locationDetails?.longitude ?? ""} /></label>
+            <label className="field field--full"><span>Location Notes</span><textarea name="locationDetails.notes" rows={2} defaultValue={initialAsset?.locationDetails?.notes ?? ""} /></label>
+          </div>
+          {renderSectionCustomFields("Location & Property")}
+        </details>
+
+        <details className="workbench-details">
+          <summary><span>Insurance</span></summary>
+          <div className="workbench-grid" style={{ padding: '8px 0' }}>
+            <label className="field"><span>Insurance Provider</span><input type="text" name="insuranceDetails.provider" defaultValue={initialAsset?.insuranceDetails?.provider ?? ""} /></label>
+            <label className="field"><span>Policy Number</span><input type="text" name="insuranceDetails.policyNumber" defaultValue={initialAsset?.insuranceDetails?.policyNumber ?? ""} /></label>
+            <label className="field"><span>Coverage Amount</span><input type="number" name="insuranceDetails.coverageAmount" min="0" step="0.01" defaultValue={initialAsset?.insuranceDetails?.coverageAmount ?? ""} /></label>
+            <label className="field"><span>Deductible</span><input type="number" name="insuranceDetails.deductible" min="0" step="0.01" defaultValue={initialAsset?.insuranceDetails?.deductible ?? ""} /></label>
+            <label className="field"><span>Renewal Date</span><input type="date" name="insuranceDetails.renewalDate" defaultValue={initialAsset?.insuranceDetails?.renewalDate ? initialAsset.insuranceDetails.renewalDate.slice(0, 10) : ""} /></label>
+            <label className="field field--full"><span>Insurance Notes</span><textarea name="insuranceDetails.notes" rows={2} defaultValue={initialAsset?.insuranceDetails?.notes ?? ""} /></label>
+          </div>
+          {renderSectionCustomFields("Insurance")}
+        </details>
+
+        <details className="workbench-details">
+          <summary><span>Disposition</span></summary>
+          <div className="workbench-grid" style={{ padding: '8px 0' }}>
+            <label className="field"><span>Disposition Method</span><select name="dispositionDetails.method" defaultValue={initialAsset?.dispositionDetails?.method ?? ""}><option value="">None</option><option value="sold">Sold</option><option value="donated">Donated</option><option value="scrapped">Scrapped</option><option value="recycled">Recycled</option><option value="lost">Lost</option></select></label>
+            <label className="field"><span>Disposition Date</span><input type="date" name="dispositionDetails.date" defaultValue={initialAsset?.dispositionDetails?.date ? initialAsset.dispositionDetails.date.slice(0, 10) : ""} /></label>
+            <label className="field"><span>Sale Price</span><input type="number" name="dispositionDetails.salePrice" min="0" step="0.01" defaultValue={initialAsset?.dispositionDetails?.salePrice ?? ""} /></label>
+            <label className="field"><span>Buyer Info</span><input type="text" name="dispositionDetails.buyerInfo" defaultValue={initialAsset?.dispositionDetails?.buyerInfo ?? ""} /></label>
+            <label className="field field--full"><span>Disposition Notes</span><textarea name="dispositionDetails.notes" rows={2} defaultValue={initialAsset?.dispositionDetails?.notes ?? ""} /></label>
+          </div>
+          {renderSectionCustomFields("Disposition")}
+        </details>
+      </section>
+
+      {/* ── Section 4: Save as Template ── */}
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Template</h3>
+        </div>
         <label className="checkbox-field">
           <input type="checkbox" checked={saveAsPreset} onChange={(event) => setSaveAsPreset(event.target.checked)} />
-          <span>Save this setup as a template</span>
+          <span>Save this setup as a reusable template</span>
         </label>
-
         {saveAsPreset && (
-          <div className="form-grid" style={{ marginTop: '1rem' }}>
+          <div className="workbench-grid" style={{ marginTop: '8px' }}>
             <label className="field">
               <span>Template Name</span>
               <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder="e.g. &quot;My Vehicle Profile&quot;" required={saveAsPreset} />
@@ -1511,8 +1537,10 @@ export function AssetProfileWorkbench({
         )}
       </section>
 
-      <div className="inline-actions inline-actions--end" style={{ marginTop: '2rem' }}>
-        <button type="submit" className="button button--primary" style={{ padding: "12px 32px", fontSize: "1.1rem" }}>{submitLabel}</button>
+      {/* ── Sticky Action Bar ── */}
+      <div className="workbench-bar">
+        <div></div>
+        <button type="submit" className="button button--primary">{submitLabel}</button>
       </div>
     </form>
   );

@@ -339,45 +339,37 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
             <div className="panel__header">
               <h2>Portfolio Controls</h2>
             </div>
-            <div className="panel__body--padded project-filter-panel__body">
-              <form method="GET" className="project-filter-form">
+            <div className="panel__body--padded project-filter-bar">
+              <form method="GET" className="project-filter-form inline-filter-form">
                 <input type="hidden" name="householdId" value={household.id} />
-                <div className="project-filter-form__grid">
-                  <label className="field field--full">
-                    <span>Search projects</span>
+                <div className="inline-filter-form__group">
+                  <div className="search-input-wrapper">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <input
                       type="search"
                       name="q"
                       defaultValue={rawSearchQuery}
-                      placeholder="Name, description, notes, or status"
+                      placeholder="Search projects..."
+                      className="input--ghost"
                     />
-                  </label>
-                  <label className="field">
-                    <span>Status</span>
-                    <select name="status" defaultValue={selectedStatus ?? ""}>
-                      <option value="">All statuses</option>
-                      {projectStatusValues.map((status) => (
-                        <option key={status} value={status}>{projectStatusLabels[status]}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Sort</span>
-                    <select name="sort" defaultValue={selectedSort}>
-                      {projectSortValues.map((sort) => (
-                        <option key={sort} value={sort}>{projectSortLabels[sort]}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="inline-actions">
-                  <button type="submit" className="button button--primary button--sm">Apply</button>
-                  <Link
-                    href={buildProjectsHref({ householdId: household.id })}
-                    className="button button--ghost button--sm"
-                  >
-                    Clear filters
-                  </Link>
+                  </div>
+                  <select name="status" defaultValue={selectedStatus ?? ""} className="select--ghost">
+                    <option value="">All statuses</option>
+                    {projectStatusValues.map((status) => (
+                      <option key={status} value={status}>{projectStatusLabels[status]}</option>
+                    ))}
+                  </select>
+                  <select name="sort" defaultValue={selectedSort} className="select--ghost">
+                    {projectSortValues.map((sort) => (
+                      <option key={sort} value={sort}>{projectSortLabels[sort]}</option>
+                    ))}
+                  </select>
+                  <button type="submit" className="button button--primary button--sm">Filter</button>
+                  { (rawSearchQuery || selectedStatus || selectedSort !== "risk") && (
+                    <Link href={buildProjectsHref({ householdId: household.id })} className="text-link text-link--muted" style={{ fontSize: '0.875rem' }}>
+                      Clear
+                    </Link>
+                  )}
                 </div>
               </form>
 
@@ -445,101 +437,81 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                 <div className="panel__header">
                   <h2>Project Portfolio ({portfolioProjects.length})</h2>
                 </div>
-                <div className="panel__body--padded">
+                <div className="panel__body">
                   {portfolioProjects.length === 0 ? (
-                    <p className="panel__empty">No projects match the current filters. Adjust the scope or create a new project to populate the portfolio view.</p>
+                    <div className="panel__body--padded">
+                      <p className="panel__empty">No projects match the current filters. Adjust the scope or create a new project to populate the portfolio view.</p>
+                    </div>
                   ) : (
-                    <div className="project-portfolio-grid">
-                      {portfolioProjects.map((project) => {
-                        const tone = getRiskTone(project);
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Project</th>
+                          <th>Status</th>
+                          <th>Progress</th>
+                          <th>Target</th>
+                          <th>Budget</th>
+                          <th>Material Plan</th>
+                          <th>Updated</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {portfolioProjects.map((project) => {
+                          const tone = getRiskTone(project);
+                          const subtitle = project.description && project.description.length > 50 ? `${project.description.slice(0, 50)}...` : project.description;
 
-                        return (
-                          <article key={project.id} className={`project-portfolio-card project-portfolio-card--${tone}`}>
-                            <div className="project-portfolio-card__topline">
-                              <span className="pill">{projectStatusLabels[project.status]}</span>
-                              <span className={`project-risk-badge project-risk-badge--${tone}`}>{getRiskLabel(project)}</span>
-                            </div>
-
-                            <div className="project-portfolio-card__header">
-                              <div>
-                                <h3>{project.name}</h3>
-                                <p>{project.description ?? "No description captured yet."}</p>
-                              </div>
-                              <Link href={`/projects/${project.id}?householdId=${household.id}`} className="button button--ghost button--sm">
-                                Open
-                              </Link>
-                            </div>
-
-                            <div className="project-portfolio-card__metrics">
-                              <div className="project-metric">
-                                <span>Progress</span>
-                                <strong>{project.percentComplete}%</strong>
-                                <small>{project.completedTaskCount} of {project.taskCount} tasks complete</small>
-                              </div>
-                              <div className="project-metric">
-                                <span>Committed</span>
-                                <strong>{formatCurrency(project.committedCost, "$0.00")}</strong>
-                                <small>{formatCurrency(project.totalSpent, "$0.00")} actual spend</small>
-                              </div>
-                              <div className="project-metric">
-                                <span>Materials</span>
-                                <strong>{getCoverageLabel(project)}</strong>
-                                <small>{project.inventoryLineCount} linked inventory lines</small>
-                              </div>
-                              <div className="project-metric">
-                                <span>Phases</span>
-                                <strong>{project.completedPhaseCount} / {project.phaseCount}</strong>
-                                <small>{getTargetLabel(project)}</small>
-                              </div>
-                            </div>
-
-                            <div className="project-meter-stack">
-                              <div className="project-meter">
-                                <div className="project-meter__labels">
-                                  <span>Completion</span>
-                                  <strong>{project.percentComplete}%</strong>
+                          return (
+                            <tr key={project.id} className={`row--${tone === 'neutral' ? 'default' : tone}`}>
+                              <td>
+                                <div className="data-table__primary">
+                                  <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">{project.name}</Link>
                                 </div>
-                                <div className="project-meter__track">
+                                <div className="data-table__secondary">
+                                  {tone !== 'neutral' && tone !== 'accent' ? (
+                                    <strong style={{ color: `var(--${tone}-text, var(--${tone}))` }}>{getRiskLabel(project)}</strong>
+                                  ) : (
+                                    subtitle || getRiskLabel(project)
+                                  )}
+                                </div>
+                              </td>
+                              <td><span className={`status-chip status-chip--${tone === 'neutral' ? 'default' : tone}`}>{projectStatusLabels[project.status]}</span></td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <strong>{project.percentComplete}%</strong>
+                                  <small className="data-table__secondary">{project.completedTaskCount}/{project.taskCount}</small>
+                                </div>
+                                <div className="project-meter__track" style={{ height: 4, width: 80, marginTop: 4, marginBottom: 4 }}>
                                   <span className="project-meter__fill" style={{ width: `${Math.min(project.percentComplete, 100)}%` }} />
                                 </div>
-                              </div>
-
-                              <div className="project-meter">
-                                <div className="project-meter__labels">
-                                  <span>Material allocation</span>
-                                  <strong>{project.materialCoverage === null ? "No material plan" : `${Math.round(project.materialCoverage * 100)}%`}</strong>
-                                </div>
-                                <div className="project-meter__track">
-                                  <span
-                                    className="project-meter__fill project-meter__fill--secondary"
-                                    style={{ width: `${Math.min(Math.round((project.materialCoverage ?? 0) * 100), 100)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <dl className="project-kpi-list">
-                              <div>
-                                <dt>Budget</dt>
-                                <dd>{formatCurrency(project.totalBudgeted, "Unbudgeted")}</dd>
-                              </div>
-                              <div>
-                                <dt>Material plan</dt>
-                                <dd>{formatCurrency(project.plannedInventoryCost, "$0.00")}</dd>
-                              </div>
-                              <div>
-                                <dt>Units remaining</dt>
-                                <dd>{project.totalInventoryRemaining}</dd>
-                              </div>
-                              <div>
-                                <dt>Updated</dt>
-                                <dd>{formatDate(project.updatedAt, "Recently")}</dd>
-                              </div>
-                            </dl>
-                          </article>
-                        );
-                      })}
-                    </div>
+                              </td>
+                              <td>
+                                <strong>{getTargetLabel(project)}</strong>
+                                <div className="data-table__secondary">{project.completedPhaseCount} of {project.phaseCount} phases</div>
+                              </td>
+                              <td>
+                                <strong>{formatCurrency(project.committedCost, "$0.00")}</strong>
+                                {project.totalBudgeted && project.totalBudgeted > 0 ? (
+                                  <div className="data-table__secondary">{Math.round((project.committedCost / project.totalBudgeted) * 100)}% of {formatCurrency(project.totalBudgeted, "$0")}</div>
+                                ) : (
+                                  <div className="data-table__secondary">Unbudgeted</div>
+                                )}
+                              </td>
+                              <td>
+                                <strong>{getCoverageLabel(project)}</strong>
+                                <div className="data-table__secondary">{project.inventoryLineCount} lines</div>
+                              </td>
+                              <td>
+                                {formatDate(project.updatedAt, "Recently")}
+                              </td>
+                              <td>
+                                <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">Open</Link>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   )}
                 </div>
               </section>

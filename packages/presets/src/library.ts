@@ -657,6 +657,46 @@ export const presetLibrary = [
     ]
   }),
   libraryPreset({
+    key: "lawn-mower-maintenance",
+    label: "Lawn Mower Maintenance",
+    category: "yard",
+    description: "A dedicated maintenance profile for push mowers, self-propelled mowers, riding mowers, and zero-turn mowers with engine service, deck care, drive system checks, blade tracking, and seasonal prep schedules.",
+    tags: ["yard", "mower", "lawn", "seasonal"],
+    suggestedCustomFields: [
+      field({ key: "mowerType", label: "Mower Type", type: "select", options: ["push", "self-propelled", "riding", "zero-turn", "robotic", "reel"] }),
+      field({ key: "brand", label: "Brand", type: "string" }),
+      field({ key: "model", label: "Model", type: "string" }),
+      field({ key: "powerType", label: "Power Type", type: "select", options: ["gas 4-stroke", "gas 2-stroke", "battery", "electric corded", "diesel"] }),
+      field({ key: "deckSize", label: "Deck Size", type: "string", placeholder: "42 inch" }),
+      field({ key: "engineDisplacement", label: "Engine Displacement", type: "string", placeholder: "190cc" }),
+      field({ key: "oilType", label: "Oil Type", type: "string", placeholder: "SAE 30" }),
+      field({ key: "sparkPlugNumber", label: "Spark Plug Number", type: "string" }),
+      field({ key: "bladePartNumber", label: "Blade Part Number", type: "string" }),
+      field({ key: "driveType", label: "Drive Type", type: "select", options: ["manual push", "belt drive", "hydrostatic", "electric drive"] }),
+      field({ key: "storageLocation", label: "Storage Location", type: "string" }),
+      field({ key: "purchaseDate", label: "Purchase Date", type: "date" })
+    ],
+    metricTemplates: [
+      metric({ key: "runtime_hours", name: "Runtime Hours", unit: "hours", startingValue: 0 })
+    ],
+    scheduleTemplates: [
+      schedule({ key: "oil_change", name: "Oil change", description: "Track the most common gas mower service item on both runtime and calendar intervals so infrequent seasonal use does not hide overdue oil.", triggerTemplate: { type: "compound", intervalDays: 180, metricKey: "runtime_hours", intervalValue: 50, logic: "whichever_first", leadTimeDays: 14, leadTimeValue: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14, upcomingLeadValue: 5 }), tags: ["engine", "fluids"], quickLogLabel: "Oil changed" }),
+      schedule({ key: "air_filter_service", name: "Air filter service", description: "Mowers ingest dust, pollen, and grass clippings fast. This keeps filter cleaning or replacement from slipping until the engine starts running rich.", triggerTemplate: { type: "compound", intervalDays: 90, metricKey: "runtime_hours", intervalValue: 25, logic: "whichever_first", leadTimeDays: 14, leadTimeValue: 3 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14, upcomingLeadValue: 3 }), tags: ["engine", "filters"] }),
+      schedule({ key: "spark_plug_replacement", name: "Spark plug replacement", description: "Replace the plug on a real schedule instead of waiting for rough starts, misfires, or spring no-start troubleshooting.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "runtime_hours", intervalValue: 100, logic: "whichever_first", leadTimeDays: 21, leadTimeValue: 10 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21, upcomingLeadValue: 10 }), tags: ["engine", "ignition"] }),
+      schedule({ key: "blade_service", name: "Blade sharpening or replacement", description: "Dull blades tear grass, stress the engine, and make the lawn look bad before most owners realize what changed.", triggerTemplate: { type: "usage", metricKey: "runtime_hours", intervalValue: 22.5, leadTimeValue: 3 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadValue: 3 }), tags: ["deck", "cutting"] }),
+      schedule({ key: "deck_cleaning", name: "Deck cleaning and scraping", description: "Packed grass under the deck hurts airflow, cut quality, and deck life. This is one of the easiest high-value mower-specific tasks to miss.", triggerTemplate: { type: "compound", intervalDays: 30, metricKey: "runtime_hours", intervalValue: 10, logic: "whichever_first", leadTimeDays: 5, leadTimeValue: 2 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5, upcomingLeadValue: 2, overdueCadenceDays: 7 }), tags: ["deck", "cleaning"] }),
+      schedule({ key: "drive_belt_inspection", name: "Drive belt inspection", description: "Relevant to self-propelled, riding, and zero-turn units. Belt wear usually shows up first as weak drive engagement or inconsistent ground speed.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["drive", "wear items"] }),
+      schedule({ key: "tire_pressure_check", name: "Tire pressure check", description: "Uneven tire pressure is a common cause of uneven cuts on riding and zero-turn mowers, even when the blades are fine.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["tires"] }),
+      schedule({ key: "hydrostatic_transmission_fluid", name: "Hydrostatic transmission fluid", description: "Longer-horizon service for hydrostatic machines where fluid condition directly affects drive feel, heat, and long-term transmission life.", triggerTemplate: { type: "compound", intervalDays: 730, metricKey: "runtime_hours", intervalValue: 200, logic: "whichever_first", leadTimeDays: 30, leadTimeValue: 20 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30, upcomingLeadValue: 20, overdueCadenceDays: 30 }), tags: ["drive", "fluids"] }),
+      schedule({ key: "grease_fittings", name: "Grease fittings and pivot points", description: "Track grease zerks and pivot points on spindles, steering linkages, and front axles before wear starts showing up as slop or noisy operation.", triggerTemplate: { type: "usage", metricKey: "runtime_hours", intervalValue: 25, leadTimeValue: 3 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadValue: 3 }), tags: ["lubrication"] }),
+      schedule({ key: "battery_maintenance", name: "Battery maintenance", description: "Covers both starting batteries on riding mowers and storage care for battery-powered units between heavy-use periods.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["electrical"] }),
+      schedule({ key: "fuel_stabilizer", name: "Fuel stabilizer or fuel drain (winterization)", description: "Do this before storage so stale fuel, varnish, and hard spring starts do not turn into preventable carburetor cleanup.", triggerTemplate: { type: "seasonal", month: 10, day: 15, leadTimeDays: 14 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 14, overdueCadenceDays: 7, maxOverdueNotifications: 4 }), tags: ["seasonal", "fuel", "storage"] }),
+      schedule({ key: "spring_prep", name: "Spring pre-season prep", description: "Commission the mower for the season with a full pre-use review: fluids, battery health, blades, tire pressure, and safety interlocks.", triggerTemplate: { type: "seasonal", month: 3, day: 15, leadTimeDays: 14 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 14, overdueCadenceDays: 7, maxOverdueNotifications: 4 }), tags: ["seasonal", "commissioning"] }),
+      schedule({ key: "safety_feature_inspection", name: "Safety feature inspection", description: "Verify blade brake, operator-presence controls, discharge guards, shields, and interlocks before a failed safety system becomes an injury problem.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 21 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 21, overdueCadenceDays: 7, maxOverdueNotifications: 4 }), tags: ["safety"] }),
+      schedule({ key: "fuel_filter_replacement", name: "Fuel filter replacement", description: "Many riding mowers and larger gas units have a separate inline fuel filter that quietly creates drivability issues when ignored.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "runtime_hours", intervalValue: 100, logic: "whichever_first", leadTimeDays: 21, leadTimeValue: 10 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21, upcomingLeadValue: 10 }), tags: ["engine", "filters", "fuel"] })
+    ]
+  }),
+  libraryPreset({
     key: "hvac-system-management",
     label: "HVAC System Management",
     category: "hvac",

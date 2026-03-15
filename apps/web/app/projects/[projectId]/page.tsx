@@ -169,7 +169,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               </div>
             </div>
             <div className="panel__body--padded">
-              <div className="project-portfolio-grid">
+              <div className="project-phase-stack" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {project.phases.map((phase) => {
                   const phaseDetail = phaseDetailsById.get(phase.id);
 
@@ -178,24 +178,26 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   }
 
                   return (
-                    <details key={phase.id} className="project-phase-details" style={{ width: "100%" }}>
-                      <summary style={{ listStyle: "none", cursor: "pointer" }}>
+                    <details key={phase.id} className="project-phase-details" style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                      <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
                         <ProjectPhaseCard phase={phase} />
                       </summary>
-                      <ProjectPhaseDetail
-                        householdId={household.id}
-                        projectId={project.id}
-                        phase={phaseDetail}
-                        householdMembers={householdMembers}
-                        serviceProviders={serviceProviders}
-                        budgetCategories={project.budgetCategories}
-                        inventoryItems={householdInventory.items}
-                      />
+                      <div className="project-phase-details__content" style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
+                        <ProjectPhaseDetail
+                          householdId={household.id}
+                          projectId={project.id}
+                          phase={phaseDetail}
+                          householdMembers={householdMembers}
+                          serviceProviders={serviceProviders}
+                          budgetCategories={project.budgetCategories}
+                          inventoryItems={householdInventory.items}
+                        />
+                      </div>
                     </details>
                   );
                 })}
               </div>
-              <div className="panel__body--padded" style={{ marginTop: 20, borderTop: "1px solid var(--border)" }}>
+              <div className="panel__body--padded" style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingLeft: 0, paddingRight: 0 }}>
                 <form action={createProjectPhaseAction}>
                   <input type="hidden" name="householdId" value={household.id} />
                   <input type="hidden" name="projectId" value={project.id} />
@@ -267,9 +269,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   </div>
                 </div>
                 <div className="panel__body--padded">
-                  <form action={updateProjectAction} className="asset-studio asset-studio--industrial project-creation-studio">
-                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId variant="studio" />
-                    <div className="inline-actions" style={{ marginTop: 20 }}>
+                  <form action={updateProjectAction} className="workbench-form">
+                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
                       <button type="submit" className="button">Save Project</button>
                     </div>
                   </form>
@@ -289,8 +291,8 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   <form action={addProjectAssetAction}>
                     <input type="hidden" name="householdId" value={household.id} />
                     <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <label className="field field--full">
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <label className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
                         <span>Asset</span>
                         <select name="assetId" required defaultValue="">
                           <option value="" disabled>Select an asset</option>
@@ -299,44 +301,45 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                           ))}
                         </select>
                       </label>
-                      <label className="field">
+                      <label className="field" style={{ flex: '1 1 160px', minWidth: 0 }}>
                         <span>Role</span>
-                        <input name="role" placeholder="Primary asset, affected system, workspace" />
+                        <input name="role" placeholder="Primary, affected system…" />
                       </label>
-                      <label className="field field--full">
-                        <span>Notes</span>
-                        <textarea name="notes" rows={2} placeholder="Why this asset is part of the project" />
-                      </label>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button" disabled={availableAssets.length === 0}>Link Asset</button>
+                      <button type="submit" className="button button--sm" disabled={availableAssets.length === 0} style={{ alignSelf: 'flex-end' }}>Link Asset</button>
                     </div>
                   </form>
                 </div>
-                <div className="panel__body">
-                  {project.assets.length === 0 ? <p className="panel__empty">No assets are linked to this project.</p> : null}
-                  <div className="schedule-stack">
-                    {project.assets.map((asset) => (
-                      <div key={asset.id} className="schedule-card">
-                        <div className="schedule-card__summary">
-                          <div>
-                            <div className="data-table__primary">
-                              {asset.asset ? <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link> : "Unknown asset"}
-                            </div>
-                            <div className="data-table__secondary">{asset.asset?.category ?? "Unknown"} · {asset.role ?? "No role set"}</div>
-                            {asset.notes ? <div className="data-table__secondary">{asset.notes}</div> : null}
-                          </div>
-                          <form action={removeProjectAssetAction}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="projectAssetId" value={asset.id} />
-                            <button type="submit" className="button button--ghost">Remove</button>
-                          </form>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {project.assets.length === 0 ? (
+                  <p className="panel__empty">No assets are linked to this project.</p>
+                ) : (
+                  <table className="workbench-table">
+                    <thead>
+                      <tr>
+                        <th>Asset</th>
+                        <th>Category</th>
+                        <th>Role</th>
+                        <th style={{ width: '72px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.assets.map((asset) => (
+                        <tr key={asset.id}>
+                          <td>{asset.asset ? <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link> : "Unknown asset"}</td>
+                          <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>{asset.asset?.category ?? "—"}</td>
+                          <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>{asset.role ?? "—"}</td>
+                          <td>
+                            <form action={removeProjectAssetAction}>
+                              <input type="hidden" name="householdId" value={household.id} />
+                              <input type="hidden" name="projectId" value={project.id} />
+                              <input type="hidden" name="projectAssetId" value={asset.id} />
+                              <button type="submit" className="button button--ghost button--sm">Remove</button>
+                            </form>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </section>
 
               <section className="panel detail-tile">

@@ -89,7 +89,7 @@ export function ProjectBudgetBreakdown({
           </div>
         </div>
 
-        <div className="schedule-stack">
+        <div className="budget-category-list" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {categories.map((category) => {
             const remaining = (category.budgetAmount ?? 0) - category.actualSpend;
             const meter = category.budgetAmount && category.budgetAmount > 0
@@ -97,62 +97,68 @@ export function ProjectBudgetBreakdown({
               : 0;
 
             return (
-              <div key={category.id} className="schedule-card">
-                <form action={updateProjectBudgetCategoryAction}>
-                  <input type="hidden" name="householdId" value={householdId} />
-                  <input type="hidden" name="projectId" value={projectId} />
-                  <input type="hidden" name="categoryId" value={category.id} />
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Category</span>
-                      <input name="name" defaultValue={category.name} required />
-                    </label>
-                    <label className="field">
-                      <span>Budget Amount</span>
-                      <input name="budgetAmount" type="number" min="0" step="0.01" defaultValue={category.budgetAmount ?? ""} />
-                    </label>
-                    <label className="field">
-                      <span>Sort Order</span>
-                      <input name="sortOrder" type="number" step="1" defaultValue={category.sortOrder ?? ""} />
-                    </label>
-                    <label className="field field--full">
-                      <span>Notes</span>
-                      <textarea name="notes" rows={2} defaultValue={category.notes ?? ""} />
-                    </label>
-                  </div>
-
-                  <div className="project-meter" style={{ marginTop: 16 }}>
-                    <div className="project-meter__labels">
-                      <span>{formatCurrency(category.actualSpend, "$0.00")} spent across {category.expenseCount} expenses</span>
-                      <strong>{formatCurrency(remaining, "$0.00")}</strong>
+              <details key={category.id} className="budget-category-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
+                <summary style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer", listStyle: "none", gap: "16px" }}>
+                  <div style={{ flex: "1 1 auto" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                      <strong style={{ fontSize: "0.9375rem" }}>{category.name}</strong>
+                      <strong style={{ fontSize: "0.9375rem" }}>{formatCurrency(category.actualSpend, "$0")} / {formatCurrency(category.budgetAmount, "Uncapped")}</strong>
                     </div>
-                    <div className="project-meter__track">
+                    <div className="project-meter__track" style={{ height: "4px" }}>
                       <span className="project-meter__fill project-meter__fill--secondary" style={{ width: `${meter}%` }} />
                     </div>
                   </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </summary>
+                
+                <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
+                  <form action={updateProjectBudgetCategoryAction} style={{ marginTop: "12px" }}>
+                    <input type="hidden" name="householdId" value={householdId} />
+                    <input type="hidden" name="projectId" value={projectId} />
+                    <input type="hidden" name="categoryId" value={category.id} />
+                    <div className="form-grid" style={{ gap: "12px" }}>
+                      <label className="field">
+                        <span>Category</span>
+                        <input name="name" defaultValue={category.name} required />
+                      </label>
+                      <label className="field">
+                        <span>Budget Amount</span>
+                        <input name="budgetAmount" type="number" min="0" step="0.01" defaultValue={category.budgetAmount ?? ""} />
+                      </label>
+                      <label className="field">
+                        <span>Sort Order</span>
+                        <input name="sortOrder" type="number" step="1" defaultValue={category.sortOrder ?? ""} />
+                      </label>
+                      <label className="field field--full">
+                        <span>Notes</span>
+                        <textarea name="notes" rows={2} defaultValue={category.notes ?? ""} />
+                      </label>
+                    </div>
 
-                  <div className="inline-actions" style={{ marginTop: 16 }}>
-                    <button type="submit" className="button button--ghost">Save Category</button>
-                  </div>
-                </form>
-
-                <form action={deleteProjectBudgetCategoryAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-                  <input type="hidden" name="householdId" value={householdId} />
-                  <input type="hidden" name="projectId" value={projectId} />
-                  <input type="hidden" name="categoryId" value={category.id} />
-                  <button type="submit" className="button button--danger">Delete Category</button>
-                </form>
-              </div>
+                    <div className="inline-actions" style={{ marginTop: 12 }}>
+                      <button type="submit" className="button button--ghost button--sm">Save Changes</button>
+                      <button formAction={deleteProjectBudgetCategoryAction} className="button button--danger button--sm">Delete</button>
+                    </div>
+                  </form>
+                </div>
+              </details>
             );
           })}
 
-          <div className="schedule-card">
-            <div className="data-table__primary">Uncategorized</div>
-            <div className="data-table__secondary">{formatCurrency(uncategorizedSpend, "$0.00")} across expenses without a budget category.</div>
-          </div>
+          {uncategorizedSpend > 0 && (
+            <div className="budget-category-card" style={{ background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: "8px", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <strong style={{ display: "block", color: "var(--text-secondary)" }}>Uncategorized</strong>
+                <span className="data-table__secondary" style={{ fontSize: "0.8125rem" }}>Expenses without a budget category</span>
+              </div>
+              <strong style={{ color: "var(--text-secondary)" }}>{formatCurrency(uncategorizedSpend, "$0.00")}</strong>
+            </div>
+          )}
         </div>
 
-        <form action={createProjectBudgetCategoryAction} style={{ marginTop: 20 }}>
+        <form action={createProjectBudgetCategoryAction} style={{ marginTop: 24, padding: "16px", background: "var(--surface-hover)", borderRadius: "8px" }}>
           <input type="hidden" name="householdId" value={householdId} />
           <input type="hidden" name="projectId" value={projectId} />
           <div className="form-grid">

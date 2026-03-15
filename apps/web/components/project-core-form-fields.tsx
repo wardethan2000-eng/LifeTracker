@@ -7,7 +7,6 @@ type ProjectCoreFormFieldsProps = {
   householdId: string;
   project?: Project;
   includeProjectId?: boolean;
-  variant?: "default" | "studio";
 };
 
 const projectStatusOptions = [
@@ -97,8 +96,7 @@ const toDateInputValue = (value: string | null | undefined): string => value ? v
 export function ProjectCoreFormFields({
   householdId,
   project,
-  includeProjectId = false,
-  variant = "default"
+  includeProjectId = false
 }: ProjectCoreFormFieldsProps) {
   const [selectedTemplateKey, setSelectedTemplateKey] = useState("");
   const [draft, setDraft] = useState<ProjectDraft>({
@@ -117,219 +115,126 @@ export function ProjectCoreFormFields({
     setDraft((current) => ({ ...current, [field]: value }));
   };
 
-  const applySelectedTemplate = (): void => {
-    if (!selectedTemplate) {
-      return;
-    }
-
-    setDraft((current) => ({
-      ...current,
-      status: selectedTemplate.status,
-      description: selectedTemplate.scopeSummary,
-      notes: selectedTemplate.executionNotes
-    }));
-  };
-
-  if (variant === "studio") {
-    return (
-      <>
-        <input type="hidden" name="householdId" value={householdId} />
-        {includeProjectId && project ? <input type="hidden" name="projectId" value={project.id} /> : null}
-        <input type="hidden" name="templateKey" value={selectedTemplate?.key ?? ""} />
-        <input type="hidden" name="suggestedPhasesJson" value={JSON.stringify(selectedTemplate?.suggestedPhases ?? [])} />
-
-        <div className="asset-studio__field-stack">
-          <section className="asset-studio__field-card project-template-card">
-            <div className="asset-studio__field-card-header">
-              <div>
-                <h3>Project Template</h3>
-                <p>Start from a project type to pre-shape the scope summary, status, and execution notes the same way asset templates guide new assets.</p>
-              </div>
-            </div>
-
-            <div className="project-template-card__controls">
-              <label className="field project-template-card__field">
-                <span>Template</span>
-                <select value={selectedTemplateKey} onChange={(event) => setSelectedTemplateKey(event.target.value)}>
-                  <option value="">None (blank)</option>
-                  {projectTemplates.map((template) => (
-                    <option key={template.key} value={template.key}>{template.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="inline-actions">
-                <button type="button" className="button button--ghost button--sm" onClick={applySelectedTemplate} disabled={!selectedTemplate}>
-                  Apply Template
-                </button>
-              </div>
-            </div>
-
-            {selectedTemplate ? (
-              <div className="project-template-card__preview">
-                <p>{selectedTemplate.description}</p>
-                <ul className="project-template-card__checklist">
-                  {selectedTemplate.checklist.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-                <div className="data-table__secondary" style={{ marginTop: 12 }}>
-                  Suggested phases: {selectedTemplate.suggestedPhases.join(" -> ")}
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="asset-studio__field-card">
-            <div className="asset-studio__field-card-header">
-              <div>
-                <h3>Core Identity</h3>
-                <p>Define the job, its current state, and the scope statement everyone will see first.</p>
-              </div>
-            </div>
-
-            <div className="form-grid asset-studio__core-grid">
-              <label className="field field--full">
-                <span>Project Name</span>
-                <input id="project-name" name="name" value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="Kitchen refresh, roof replacement, spring maintenance" required />
-              </label>
-
-              <label className="field">
-                <span>Status</span>
-                <select id="project-status" name="status" value={draft.status} onChange={(event) => updateDraft("status", event.target.value as ProjectStatus)}>
-                  {projectStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-                <small>Use planning for backlog work and active once execution has started.</small>
-              </label>
-
-              <label className="field field--full">
-                <span>Description</span>
-                <textarea
-                  id="project-description"
-                  name="description"
-                  rows={3}
-                  value={draft.description}
-                  onChange={(event) => updateDraft("description", event.target.value)}
-                  placeholder="Scope, intent, or expected outcome"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="asset-studio__field-card">
-            <div className="asset-studio__field-card-header">
-              <div>
-                <h3>Budget & Timeline</h3>
-                <p>Capture the financial ceiling and the dates the dashboard should use for rollout and risk tracking.</p>
-              </div>
-            </div>
-
-            <div className="form-grid asset-studio__core-grid">
-              <label className="field">
-                <span>Budget</span>
-                <input id="project-budget" name="budgetAmount" type="number" min="0" step="0.01" value={draft.budgetAmount} onChange={(event) => updateDraft("budgetAmount", event.target.value)} placeholder="0.00" />
-              </label>
-
-              <label className="field">
-                <span>Start Date</span>
-                <input id="project-start-date" name="startDate" type="date" value={draft.startDate} onChange={(event) => updateDraft("startDate", event.target.value)} />
-              </label>
-
-              <label className="field">
-                <span>Target End Date</span>
-                <input id="project-target-end-date" name="targetEndDate" type="date" value={draft.targetEndDate} onChange={(event) => updateDraft("targetEndDate", event.target.value)} />
-              </label>
-            </div>
-          </section>
-
-          <section className="asset-studio__field-card">
-            <div className="asset-studio__field-card-header">
-              <div>
-                <h3>Execution Notes</h3>
-                <p>Record dependencies, procurement constraints, contractor details, or any setup notes the team should inherit.</p>
-              </div>
-            </div>
-
-            <div className="form-grid asset-studio__core-grid">
-              <label className="field field--full">
-                <span>Notes</span>
-                <textarea
-                  id="project-notes"
-                  name="notes"
-                  rows={5}
-                  value={draft.notes}
-                  onChange={(event) => updateDraft("notes", event.target.value)}
-                  placeholder="Dependencies, purchase plans, constraints, vendor notes"
-                />
-              </label>
-            </div>
-          </section>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <input type="hidden" name="householdId" value={householdId} />
       {includeProjectId && project ? <input type="hidden" name="projectId" value={project.id} /> : null}
+      <input type="hidden" name="templateKey" value={selectedTemplate?.key ?? ""} />
+      <input type="hidden" name="suggestedPhasesJson" value={JSON.stringify(selectedTemplate?.suggestedPhases ?? [])} />
 
-      <div className="form-grid">
-        <div className="field field--full">
-          <label htmlFor="project-name">Project Name</label>
-          <input id="project-name" name="name" value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="Kitchen refresh, roof replacement, spring maintenance" required />
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Blueprint</h3>
         </div>
+        <div className="workbench-grid">
+          <label className="field">
+            <span>Start from a template</span>
+            <select
+              value={selectedTemplateKey}
+              onChange={(event) => {
+                const key = event.target.value;
+                setSelectedTemplateKey(key);
+                const tpl = projectTemplates.find((t) => t.key === key);
+                if (tpl) {
+                  setDraft((current) => ({
+                    ...current,
+                    status: tpl.status,
+                    description: tpl.scopeSummary,
+                    notes: tpl.executionNotes
+                  }));
+                }
+              }}
+            >
+              <option value="">None (blank project)</option>
+              {projectTemplates.map((template) => (
+                <option key={template.key} value={template.key}>{template.label}</option>
+              ))}
+            </select>
+          </label>
+          {selectedTemplate && (
+            <div className="field" style={{ gridColumn: 'span 2' }}>
+              <span>About this template</span>
+              <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)', marginTop: '2px' }}>{selectedTemplate.description}</p>
+              <details style={{ marginTop: '4px' }}>
+                <summary style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', cursor: 'pointer' }}>Suggested phases ({selectedTemplate.suggestedPhases.length})</summary>
+                <ol style={{ fontSize: '0.78rem', margin: '6px 0 0 16px', color: 'var(--ink-light)', padding: 0 }}>
+                  {selectedTemplate.suggestedPhases.map((phase) => <li key={phase}>{phase}</li>)}
+                </ol>
+              </details>
+            </div>
+          )}
+        </div>
+      </section>
 
-        <div className="field field--full">
-          <label htmlFor="project-description">Description</label>
-          <textarea
-            id="project-description"
-            name="description"
-            rows={3}
-            value={draft.description}
-            onChange={(event) => updateDraft("description", event.target.value)}
-            placeholder="Scope, intent, or expected outcome"
-          />
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Core Identity</h3>
         </div>
+        <div className="workbench-grid">
+          <label className="field field--full">
+            <span>Project Name</span>
+            <input id="project-name" name="name" value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="Kitchen refresh, roof replacement, spring maintenance" required />
+          </label>
+          <label className="field">
+            <span>Status</span>
+            <select id="project-status" name="status" value={draft.status} onChange={(event) => updateDraft("status", event.target.value as ProjectStatus)}>
+              {projectStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field field--full">
+            <span>Description</span>
+            <textarea
+              id="project-description"
+              name="description"
+              rows={3}
+              value={draft.description}
+              onChange={(event) => updateDraft("description", event.target.value)}
+              placeholder="Scope, intent, or expected outcome"
+            />
+          </label>
+        </div>
+      </section>
 
-        <div className="field">
-          <label htmlFor="project-status">Status</label>
-          <select id="project-status" name="status" value={draft.status} onChange={(event) => updateDraft("status", event.target.value as ProjectStatus)}>
-            {projectStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Budget & Timeline</h3>
         </div>
+        <div className="workbench-grid">
+          <label className="field">
+            <span>Budget</span>
+            <input id="project-budget" name="budgetAmount" type="number" min="0" step="0.01" value={draft.budgetAmount} onChange={(event) => updateDraft("budgetAmount", event.target.value)} placeholder="0.00" />
+          </label>
+          <label className="field">
+            <span>Start Date</span>
+            <input id="project-start-date" name="startDate" type="date" value={draft.startDate} onChange={(event) => updateDraft("startDate", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Target End Date</span>
+            <input id="project-target-end-date" name="targetEndDate" type="date" value={draft.targetEndDate} onChange={(event) => updateDraft("targetEndDate", event.target.value)} />
+          </label>
+        </div>
+      </section>
 
-        <div className="field">
-          <label htmlFor="project-budget">Budget</label>
-          <input id="project-budget" name="budgetAmount" type="number" min="0" step="0.01" value={draft.budgetAmount} onChange={(event) => updateDraft("budgetAmount", event.target.value)} placeholder="0.00" />
+      <section className="workbench-section">
+        <div className="workbench-section__head">
+          <h3>Execution Notes</h3>
         </div>
-
-        <div className="field">
-          <label htmlFor="project-start-date">Start Date</label>
-          <input id="project-start-date" name="startDate" type="date" value={draft.startDate} onChange={(event) => updateDraft("startDate", event.target.value)} />
+        <div className="workbench-grid">
+          <label className="field field--full">
+            <span>Notes</span>
+            <textarea
+              id="project-notes"
+              name="notes"
+              rows={4}
+              value={draft.notes}
+              onChange={(event) => updateDraft("notes", event.target.value)}
+              placeholder="Dependencies, purchase plans, constraints, vendor notes"
+            />
+          </label>
         </div>
-
-        <div className="field">
-          <label htmlFor="project-target-end-date">Target End Date</label>
-          <input id="project-target-end-date" name="targetEndDate" type="date" value={draft.targetEndDate} onChange={(event) => updateDraft("targetEndDate", event.target.value)} />
-        </div>
-
-        <div className="field field--full">
-          <label htmlFor="project-notes">Notes</label>
-          <textarea
-            id="project-notes"
-            name="notes"
-            rows={4}
-            value={draft.notes}
-            onChange={(event) => updateDraft("notes", event.target.value)}
-            placeholder="Dependencies, purchase plans, constraints, vendor notes"
-          />
-        </div>
-      </div>
+      </section>
     </>
   );
 }
