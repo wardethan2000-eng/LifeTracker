@@ -98,6 +98,7 @@ export function ProjectCoreFormFields({
   project,
   includeProjectId = false
 }: ProjectCoreFormFieldsProps) {
+  const isCreateMode = !project;
   const [selectedTemplateKey, setSelectedTemplateKey] = useState("");
   const [draft, setDraft] = useState<ProjectDraft>({
     name: project?.name ?? "",
@@ -108,11 +109,27 @@ export function ProjectCoreFormFields({
     targetEndDate: toDateInputValue(project?.targetEndDate),
     notes: project?.notes ?? ""
   });
+  const [phaseDrafts, setPhaseDrafts] = useState<string[]>([]);
 
   const selectedTemplate = projectTemplates.find((template) => template.key === selectedTemplateKey);
+  const serializedPhaseDrafts = JSON.stringify(
+    phaseDrafts.map((phase) => phase.trim()).filter((phase) => phase.length > 0)
+  );
 
   const updateDraft = <Field extends keyof ProjectDraft>(field: Field, value: ProjectDraft[Field]): void => {
     setDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const updatePhaseDraft = (index: number, value: string): void => {
+    setPhaseDrafts((current) => current.map((phase, phaseIndex) => (phaseIndex === index ? value : phase)));
+  };
+
+  const addPhaseDraft = (): void => {
+    setPhaseDrafts((current) => [...current, ""]);
+  };
+
+  const removePhaseDraft = (index: number): void => {
+    setPhaseDrafts((current) => current.filter((_, phaseIndex) => phaseIndex !== index));
   };
 
   return (
@@ -120,13 +137,13 @@ export function ProjectCoreFormFields({
       <input type="hidden" name="householdId" value={householdId} />
       {includeProjectId && project ? <input type="hidden" name="projectId" value={project.id} /> : null}
       <input type="hidden" name="templateKey" value={selectedTemplate?.key ?? ""} />
-      <input type="hidden" name="suggestedPhasesJson" value={JSON.stringify(selectedTemplate?.suggestedPhases ?? [])} />
+      <input type="hidden" name="suggestedPhasesJson" value={serializedPhaseDrafts} />
 
       <section className="workbench-section">
         <div className="workbench-section__head">
           <h3>Blueprint</h3>
         </div>
-        <div className="workbench-grid">
+        <div className="project-blueprint-layout">
           <label className="field">
             <span>Start from a template</span>
             <select
@@ -142,6 +159,9 @@ export function ProjectCoreFormFields({
                     description: tpl.scopeSummary,
                     notes: tpl.executionNotes
                   }));
+                  if (isCreateMode) {
+                    setPhaseDrafts([...tpl.suggestedPhases]);
+                  }
                 }
               }}
             >
@@ -152,18 +172,56 @@ export function ProjectCoreFormFields({
             </select>
           </label>
           {selectedTemplate && (
-            <div className="field" style={{ gridColumn: 'span 2' }}>
+            <div className="project-template-summary">
               <span>About this template</span>
-              <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)', marginTop: '2px' }}>{selectedTemplate.description}</p>
-              <details style={{ marginTop: '4px' }}>
-                <summary style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', cursor: 'pointer' }}>Suggested phases ({selectedTemplate.suggestedPhases.length})</summary>
-                <ol style={{ fontSize: '0.78rem', margin: '6px 0 0 16px', color: 'var(--ink-light)', padding: 0 }}>
+              <p>{selectedTemplate.description}</p>
+              <details>
+                <summary>Suggested phases ({selectedTemplate.suggestedPhases.length})</summary>
+                <ol>
                   {selectedTemplate.suggestedPhases.map((phase) => <li key={phase}>{phase}</li>)}
                 </ol>
               </details>
             </div>
           )}
         </div>
+        {isCreateMode && (
+          <div className="project-phase-drafts">
+            <div className="workbench-section__head">
+              <h3>Initial Phases</h3>
+              <button type="button" className="button button--ghost button--xs" onClick={addPhaseDraft}>Add Phase</button>
+            </div>
+            <p className="project-phase-drafts__hint">
+              Define the starting phases for this project now. Template suggestions can be edited before the project is created.
+            </p>
+            {phaseDrafts.length > 0 ? (
+              <div className="project-phase-drafts__list">
+                {phaseDrafts.map((phase, index) => (
+                  <div key={`phase-draft-${index}`} className="project-phase-drafts__row">
+                    <label className="field">
+                      <span>Phase {index + 1}</span>
+                      <input
+                        value={phase}
+                        onChange={(event) => updatePhaseDraft(index, event.target.value)}
+                        placeholder="Planning, procurement, execution"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="button button--ghost button--xs"
+                      onClick={() => removePhaseDraft(index)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="project-phase-drafts__empty">
+                No phases added yet. Start blank or add the first phase now.
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="workbench-section">

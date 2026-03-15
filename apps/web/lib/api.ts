@@ -132,6 +132,7 @@ import {
   type UpdateServiceProviderInput,
   type UpdateUsageMetricInput,
   type AllocateProjectInventoryInput,
+  type UsageMetric,
   type UsageMetricEntry,
   type UsageProjection,
   usageMetricEntrySchema,
@@ -1283,14 +1284,12 @@ export const createMaintenanceLog = async (
 export const createMetric = async (
   assetId: string,
   input: CreateUsageMetricInput
-): Promise<void> => {
-  await apiRequest({
+): Promise<UsageMetric> => apiRequest({
     path: `/v1/assets/${assetId}/metrics`,
     method: "POST",
     body: input,
     schema: usageMetricResponseSchema
   });
-};
 
 export const createSchedule = async (
   assetId: string,

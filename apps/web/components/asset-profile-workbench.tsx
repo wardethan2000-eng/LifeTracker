@@ -52,6 +52,18 @@ type Blueprint = {
   scheduleTemplates: PresetScheduleTemplate[];
 };
 
+type MetricTemplateDraft = PresetUsageMetricTemplate & {
+  enabled: boolean;
+  currentValue: number;
+  lastRecordedAt: string;
+};
+
+type ScheduleTemplateDraft = PresetScheduleTemplate & {
+  enabled: boolean;
+  lastCompletedAt: string;
+  usageValue: string;
+};
+
 type CoreDetailField = {
   id: string;
   section?: string;
@@ -691,6 +703,95 @@ const createFieldDefinition = (): AssetFieldDefinition => ({
 
 const mergeFieldDefinitions = (templateFields: AssetFieldDefinition[]): AssetFieldDefinition[] => cloneFieldDefinitions(templateFields);
 
+const toOptionalIsoString = (value: string): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
+};
+
+const toLocalDateTimeValue = (value: string | undefined): string => {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.valueOf())) {
+    return "";
+  }
+
+  const pad = (input: number): string => String(input).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toMetricTemplateDraft = (template: PresetUsageMetricTemplate): MetricTemplateDraft => ({
+  ...template,
+  enabled: true,
+  currentValue: template.startingValue,
+  lastRecordedAt: ""
+});
+
+const toScheduleTemplateDraft = (template: PresetScheduleTemplate): ScheduleTemplateDraft => ({
+  ...template,
+  enabled: true,
+  lastCompletedAt: "",
+  usageValue: ""
+});
+
+const toPresetMetricTemplate = (draft: MetricTemplateDraft): PresetUsageMetricTemplate => ({
+  key: draft.key,
+  name: draft.name,
+  unit: draft.unit,
+  startingValue: draft.startingValue,
+  allowManualEntry: draft.allowManualEntry,
+  helpText: draft.helpText
+});
+
+const toPresetScheduleTemplate = (draft: ScheduleTemplateDraft): PresetScheduleTemplate => ({
+  key: draft.key,
+  name: draft.name,
+  description: draft.description,
+  triggerTemplate: draft.triggerTemplate,
+  notificationConfig: draft.notificationConfig,
+  tags: draft.tags,
+  quickLogLabel: draft.quickLogLabel
+});
+
+const getScheduleMetricKey = (template: Pick<PresetScheduleTemplate, "triggerTemplate">): string | undefined => {
+  if (template.triggerTemplate.type === "usage" || template.triggerTemplate.type === "compound") {
+    return template.triggerTemplate.metricKey;
+  }
+
+  return undefined;
+};
+
+const formatPresetTriggerSummary = (template: Pick<PresetScheduleTemplate, "triggerTemplate">): string => {
+  const trigger = template.triggerTemplate;
+
+  if (trigger.type === "interval") {
+    return `Every ${trigger.intervalDays} days`;
+  }
+
+  if (trigger.type === "usage") {
+    return `Every ${trigger.intervalValue.toLocaleString()} ${trigger.metricKey}`;
+  }
+
+  if (trigger.type === "seasonal") {
+    return `Seasonal on ${trigger.month}/${trigger.day}`;
+  }
+
+  if (trigger.type === "compound") {
+    return `Every ${trigger.intervalDays} days or ${trigger.intervalValue.toLocaleString()} ${trigger.metricKey}`;
+  }
+
+  return trigger.dueAt ? `One-time on ${toLocalDateTimeValue(trigger.dueAt) || trigger.dueAt}` : "One-time";
+};
+
 const renderFieldValueInput = (
   field: AssetFieldDefinition,
   value: AssetFieldValue,
@@ -827,6 +928,7 @@ export function AssetProfileWorkbench({
     : initialBlueprint
       ? mergeFieldDefinitions(initialBlueprint.fieldDefinitions)
       : [];
+  const isCreateMode = !initialAsset;
 
   const [category, setCategory] = useState<AssetCategory>(initialAsset?.category ?? initialBlueprint?.category ?? "vehicle");
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string>(initialBlueprint?.id ?? "");
@@ -838,8 +940,12 @@ export function AssetProfileWorkbench({
   );
   const [assetTypeLabel, setAssetTypeLabel] = useState(initialAsset?.assetTypeLabel ?? initialBlueprint?.label ?? "");
   const [assetTypeDescription, setAssetTypeDescription] = useState(initialAsset?.assetTypeDescription ?? initialBlueprint?.description ?? "");
-  const [metricTemplates, setMetricTemplates] = useState<PresetUsageMetricTemplate[]>(initialBlueprint?.metricTemplates ?? []);
-  const [scheduleTemplates, setScheduleTemplates] = useState<PresetScheduleTemplate[]>(initialBlueprint?.scheduleTemplates ?? []);
+  const [metricDrafts, setMetricDrafts] = useState<MetricTemplateDraft[]>(
+    initialBlueprint?.metricTemplates.map(toMetricTemplateDraft) ?? []
+  );
+  const [scheduleDrafts, setScheduleDrafts] = useState<ScheduleTemplateDraft[]>(
+    initialBlueprint?.scheduleTemplates.map(toScheduleTemplateDraft) ?? []
+  );
   const [saveAsPreset, setSaveAsPreset] = useState(false);
   const [detailPickerValue, setDetailPickerValue] = useState("");
   const [detailTargetSection, setDetailTargetSection] = useState("");
@@ -856,6 +962,12 @@ export function AssetProfileWorkbench({
     : fieldDefinitions.length > 0
       ? "inline"
       : "manual";
+  const metricTemplates = metricDrafts
+    .filter((draft) => draft.enabled)
+    .map(toPresetMetricTemplate);
+  const scheduleTemplates = scheduleDrafts
+    .filter((draft) => draft.enabled)
+    .map(toPresetScheduleTemplate);
   const assetTypeKey = selectedBlueprint?.key ?? (assetTypeLabel ? slugify(assetTypeLabel) : "");
   const dynamicSections = getDistinctGroups(fieldDefinitions);
   const detailSections = Array.from(new Set([...dynamicSections, ...manualSections]));
@@ -873,6 +985,7 @@ export function AssetProfileWorkbench({
       ...blueprintSuggestionFields
     ]);
   const availableSuggestedFields = suggestionPool.filter((suggestion) => !fieldDefinitions.some((field) => field.key === suggestion.key));
+  const enabledMetricKeys = new Set(metricDrafts.filter((draft) => draft.enabled).map((draft) => draft.key));
   const groupedFieldDefinitions = fieldDefinitions.reduce<Record<string, Array<{ field: AssetFieldDefinition; index: number }>>>((groups, field, index) => {
     const key = field.group?.trim() || "General";
 
@@ -902,8 +1015,8 @@ export function AssetProfileWorkbench({
     const nextBlueprint = blueprintOptions.find((preset) => preset.id === nextId);
 
     if (!nextBlueprint) {
-      setMetricTemplates([]);
-      setScheduleTemplates([]);
+      setMetricDrafts([]);
+      setScheduleDrafts([]);
       setAssetTypeLabel("");
       setAssetTypeDescription("");
       const resetFields: AssetFieldDefinition[] = [];
@@ -915,8 +1028,8 @@ export function AssetProfileWorkbench({
     setCategory(nextBlueprint.category);
     setAssetTypeLabel(nextBlueprint.label);
     setAssetTypeDescription(nextBlueprint.description ?? "");
-    setMetricTemplates(nextBlueprint.metricTemplates);
-    setScheduleTemplates(nextBlueprint.scheduleTemplates);
+    setMetricDrafts(nextBlueprint.metricTemplates.map(toMetricTemplateDraft));
+    setScheduleDrafts(nextBlueprint.scheduleTemplates.map(toScheduleTemplateDraft));
     const merged = mergeFieldDefinitions(nextBlueprint.fieldDefinitions);
     setFieldDefinitions(merged);
     setFieldValues(buildFieldValueMap(merged));
@@ -1109,6 +1222,22 @@ export function AssetProfileWorkbench({
     setExpandedFieldEditors((current) => [...current, fieldDefinitions.length]);
   };
 
+  const updateMetricDraft = (index: number, update: Partial<MetricTemplateDraft>): void => {
+    setMetricDrafts((current) => current.map((draft, draftIndex) => (
+      draftIndex === index
+        ? { ...draft, ...update }
+        : draft
+    )));
+  };
+
+  const updateScheduleDraft = (index: number, update: Partial<ScheduleTemplateDraft>): void => {
+    setScheduleDrafts((current) => current.map((draft, draftIndex) => (
+      draftIndex === index
+        ? { ...draft, ...update }
+        : draft
+    )));
+  };
+
   const fieldDefinitionJson = JSON.stringify(fieldDefinitions.map((field, index) => ({
     ...field,
     order: index,
@@ -1122,6 +1251,28 @@ export function AssetProfileWorkbench({
         .map((field) => [field.key, fieldValues[field.key] ?? buildDefaultFieldValue(field)])
     )
   );
+
+  const metricDraftsJson = JSON.stringify(metricDrafts.map((draft) => {
+    const lastRecordedAt = toOptionalIsoString(draft.lastRecordedAt);
+
+    return {
+      ...toPresetMetricTemplate(draft),
+      enabled: draft.enabled,
+      currentValue: draft.currentValue,
+      ...(lastRecordedAt ? { lastRecordedAt } : {})
+    };
+  }));
+  const scheduleDraftsJson = JSON.stringify(scheduleDrafts.map((draft) => {
+    const lastCompletedAt = toOptionalIsoString(draft.lastCompletedAt);
+    const usageValue = draft.usageValue.trim().length > 0 ? Number(draft.usageValue) : undefined;
+
+    return {
+      ...toPresetScheduleTemplate(draft),
+      enabled: draft.enabled,
+      ...(lastCompletedAt ? { lastCompletedAt } : {}),
+      ...(usageValue !== undefined && !Number.isNaN(usageValue) ? { usageValue } : {})
+    };
+  }));
   const templateLabel = category === "aircraft" ? "Aircraft Subcategory" : "Start from Template";
   const templateDescription = selectedBlueprint?.description
     ?? (category === "aircraft"
@@ -1200,6 +1351,8 @@ export function AssetProfileWorkbench({
       <input type="hidden" name="presetProfileId" value={selectedBlueprint?.source === "custom" ? selectedBlueprint.presetProfileId ?? "" : ""} />
       <input type="hidden" name="metricTemplatesJson" value={JSON.stringify(metricTemplates)} />
       <input type="hidden" name="scheduleTemplatesJson" value={JSON.stringify(scheduleTemplates)} />
+      <input type="hidden" name="metricDraftsJson" value={metricDraftsJson} />
+      <input type="hidden" name="scheduleDraftsJson" value={scheduleDraftsJson} />
       <input type="hidden" name="saveAsPreset" value={saveAsPreset ? "true" : "false"} />
 
       <datalist id={`${inputIdPrefix}-detail-sections`}>
@@ -1447,43 +1600,97 @@ export function AssetProfileWorkbench({
             title="Maintenance Schedules"
             modalTitle="Schedule Templates"
             previewContent={<CompactSchedulePreview scheduleTemplates={scheduleTemplates} />}
+            actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
           >
             <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', marginBottom: '16px' }}>
-              Schedule templates from the selected preset. These become live schedules when the asset is created.
+              {isCreateMode
+                ? 'Choose which preset schedules to create, rename them if needed, and optionally record when they were last completed.'
+                : 'These template-derived schedules describe the preset profile. Live schedules are managed in the asset Maintenance tab.'}
             </p>
-            {scheduleTemplates.length === 0 ? (
+            {scheduleDrafts.length === 0 ? (
               <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No schedule templates â€” select a template in Core Identity to populate these.</p>
             ) : (
-              <table className="workbench-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Trigger</th>
-                    <th>Tags</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scheduleTemplates.map((template, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 500 }}>{template.name}</td>
-                      <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>
-                        {template.triggerTemplate.type === "interval" && `Every ${template.triggerTemplate.intervalDays} days`}
-                        {template.triggerTemplate.type === "usage" && `Every ${template.triggerTemplate.intervalValue.toLocaleString()} ${template.triggerTemplate.metricKey}`}
-                        {template.triggerTemplate.type === "seasonal" && `Month ${template.triggerTemplate.month}, Day ${template.triggerTemplate.day}`}
-                        {template.triggerTemplate.type === "compound" && `Every ${template.triggerTemplate.intervalDays}d or ${template.triggerTemplate.intervalValue} ${template.triggerTemplate.metricKey}`}
-                        {template.triggerTemplate.type === "one_time" && `One-time`}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {template.tags.map((tag) => (
-                            <span key={tag} className="pill">{tag}</span>
-                          ))}
-                        </div>
-                      </td>
+              <div className="workbench-table-wrap">
+                <table className="workbench-table">
+                  <thead>
+                    <tr>
+                      <th>Use</th>
+                      <th>Name</th>
+                      <th>Trigger</th>
+                      <th>Last Completed</th>
+                      <th>Usage at Completion</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {scheduleDrafts.map((draft, index) => {
+                      const metricKey = getScheduleMetricKey(draft);
+                      const dependsOnDisabledMetric = metricKey ? !enabledMetricKeys.has(metricKey) : false;
+                      const isEnabled = draft.enabled && !dependsOnDisabledMetric;
+
+                      return (
+                        <tr key={draft.key}>
+                          <td className="workbench-table__checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isEnabled}
+                              disabled={!isCreateMode || dependsOnDisabledMetric}
+                              aria-label={`Use schedule ${draft.name}`}
+                              onChange={(event) => updateScheduleDraft(index, { enabled: event.target.checked })}
+                            />
+                          </td>
+                          <td>
+                            <div className="workbench-table__control">
+                              <input
+                                type="text"
+                                value={draft.name}
+                                disabled={!isCreateMode || !isEnabled}
+                                onChange={(event) => updateScheduleDraft(index, { name: event.target.value })}
+                              />
+                              {metricKey ? (
+                                <small className="workbench-table__hint">
+                                  Depends on usage metric: {metricKey}
+                                  {dependsOnDisabledMetric ? ' — enable that metric to create this schedule.' : ''}
+                                </small>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="workbench-table__control">
+                              <span>{formatPresetTriggerSummary(draft)}</span>
+                              {draft.tags.length > 0 ? (
+                                <small className="workbench-table__hint">{draft.tags.join(', ')}</small>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>
+                            <input
+                              type="datetime-local"
+                              value={draft.lastCompletedAt}
+                              disabled={!isCreateMode || !isEnabled}
+                              onChange={(event) => updateScheduleDraft(index, { lastCompletedAt: event.target.value })}
+                            />
+                          </td>
+                          <td>
+                            {metricKey ? (
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={draft.usageValue}
+                                disabled={!isCreateMode || !isEnabled}
+                                placeholder="Optional"
+                                onChange={(event) => updateScheduleDraft(index, { usageValue: event.target.value })}
+                              />
+                            ) : (
+                              <span style={{ color: 'var(--ink-muted)' }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </ExpandableCard>
 
@@ -1492,31 +1699,94 @@ export function AssetProfileWorkbench({
             title="Usage Metrics"
             modalTitle="Usage Metric Templates"
             previewContent={<CompactMetricPreview metricTemplates={metricTemplates} />}
+            actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
           >
             <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', marginBottom: '16px' }}>
-              Metric templates from the selected preset. These become trackable metrics once the asset is created.
+              {isCreateMode
+                ? 'Choose which preset metrics to track and set their initial readings before the asset is created.'
+                : 'These template-derived metrics describe the preset profile. Live readings are managed in the asset Usage Metrics tab.'}
             </p>
-            {metricTemplates.length === 0 ? (
+            {metricDrafts.length === 0 ? (
               <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No metric templates â€” select a template in Core Identity to populate these.</p>
             ) : (
-              <table className="workbench-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Unit</th>
-                    <th>Starting Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metricTemplates.map((template, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 500 }}>{template.name}</td>
-                      <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>{template.unit}</td>
-                      <td style={{ color: 'var(--ink-muted)', fontSize: '0.82rem' }}>{template.startingValue}</td>
+              <div className="workbench-table-wrap">
+                <table className="workbench-table">
+                  <thead>
+                    <tr>
+                      <th>Use</th>
+                      <th>Metric</th>
+                      <th>Unit</th>
+                      <th>Current Value</th>
+                      <th>Recorded At</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {metricDrafts.map((draft, index) => (
+                      <tr key={draft.key}>
+                        <td className="workbench-table__checkbox">
+                          <input
+                            type="checkbox"
+                            checked={draft.enabled}
+                            disabled={!isCreateMode}
+                            aria-label={`Use metric ${draft.name}`}
+                            onChange={(event) => {
+                              const nextEnabled = event.target.checked;
+                              updateMetricDraft(index, { enabled: nextEnabled });
+
+                              if (!nextEnabled) {
+                                setScheduleDrafts((current) => current.map((scheduleDraft) => (
+                                  getScheduleMetricKey(scheduleDraft) === draft.key
+                                    ? { ...scheduleDraft, enabled: false }
+                                    : scheduleDraft
+                                )));
+                              }
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <div className="workbench-table__control">
+                            <input
+                              type="text"
+                              value={draft.name}
+                              disabled={!isCreateMode || !draft.enabled}
+                              onChange={(event) => updateMetricDraft(index, { name: event.target.value })}
+                            />
+                            {draft.helpText ? <small className="workbench-table__hint">{draft.helpText}</small> : null}
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={draft.unit}
+                            disabled={!isCreateMode || !draft.enabled}
+                            onChange={(event) => updateMetricDraft(index, { unit: event.target.value })}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={draft.currentValue}
+                            disabled={!isCreateMode || !draft.enabled}
+                            onChange={(event) => updateMetricDraft(index, {
+                              currentValue: event.target.value === '' ? 0 : Number(event.target.value)
+                            })}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="datetime-local"
+                            value={draft.lastRecordedAt}
+                            disabled={!isCreateMode || !draft.enabled}
+                            onChange={(event) => updateMetricDraft(index, { lastRecordedAt: event.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </ExpandableCard>
         </div>

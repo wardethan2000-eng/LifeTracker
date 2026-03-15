@@ -1391,10 +1391,13 @@ textarea { resize: vertical; }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px 12px;
+  align-items: start;
 }
 
 .workbench-form .field {
   gap: 2px;
+  align-content: start;
+  align-self: start;
 }
 
 .workbench-form .field > span,
@@ -1418,6 +1421,89 @@ textarea { resize: vertical; }
 .workbench-form .field small {
   font-size: 0.72rem;
   color: var(--ink-muted);
+}
+
+.project-blueprint-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.project-blueprint-layout > * {
+  min-width: 0;
+}
+
+.project-template-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-template-summary > span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.project-template-summary p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.project-template-summary details {
+  margin-top: 2px;
+}
+
+.project-template-summary summary {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.project-template-summary ol {
+  margin: 6px 0 0 18px;
+  padding: 0;
+  font-size: 0.78rem;
+  color: var(--ink-light);
+}
+
+.project-phase-drafts {
+  display: grid;
+  gap: 8px;
+}
+
+.project-phase-drafts__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.project-phase-drafts__list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-phase-drafts__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.project-phase-drafts__row .field {
+  min-width: 0;
+}
+
+.project-phase-drafts__empty {
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  background: var(--surface-alt);
 }
 
 /* ── Workbench Table (repeating content) ── */
@@ -1996,6 +2082,11 @@ textarea { resize: vertical; }
   }
 
   .workbench-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-blueprint-layout,
+  .project-phase-drafts__row {
     grid-template-columns: 1fr;
   }
 
@@ -2837,6 +2928,14 @@ textarea { resize: vertical; }
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.card__header-note {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .card__header-left {

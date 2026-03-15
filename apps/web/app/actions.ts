@@ -243,7 +243,75 @@ type AssetProfilePayload = {
   presetProfileId: string | undefined;
   metricTemplates: PresetUsageMetricTemplate[];
   scheduleTemplates: PresetScheduleTemplate[];
+  metricDrafts: MetricDraftPayload[];
+  scheduleDrafts: ScheduleDraftPayload[];
 };
+
+type MetricDraftPayload = PresetUsageMetricTemplate & {
+  enabled: boolean;
+  currentValue: number;
+  lastRecordedAt?: string;
+};
+
+type ScheduleDraftPayload = PresetScheduleTemplate & {
+  enabled: boolean;
+  lastCompletedAt?: string;
+  usageValue?: number;
+};
+
+const parseMetricDrafts = (formData: FormData): MetricDraftPayload[] => parseJsonField(formData, "metricDraftsJson", {
+  parse: (value: unknown): MetricDraftPayload[] => {
+    if (!Array.isArray(value)) {
+      throw new Error("metricDraftsJson must be an array.");
+    }
+
+    return value.map((entry) => {
+      if (typeof entry !== "object" || entry === null) {
+        throw new Error("Invalid metric draft.");
+      }
+
+      const record = entry as Record<string, unknown>;
+      const template = presetUsageMetricTemplateSchema.parse(entry);
+      const currentValue = typeof record.currentValue === "number" && Number.isFinite(record.currentValue)
+        ? record.currentValue
+        : template.startingValue;
+
+      return {
+        ...template,
+        enabled: typeof record.enabled === "boolean" ? record.enabled : true,
+        currentValue,
+        ...(typeof record.lastRecordedAt === "string" ? { lastRecordedAt: record.lastRecordedAt } : {})
+      };
+    });
+  }
+}, []);
+
+const parseScheduleDrafts = (formData: FormData): ScheduleDraftPayload[] => parseJsonField(formData, "scheduleDraftsJson", {
+  parse: (value: unknown): ScheduleDraftPayload[] => {
+    if (!Array.isArray(value)) {
+      throw new Error("scheduleDraftsJson must be an array.");
+    }
+
+    return value.map((entry) => {
+      if (typeof entry !== "object" || entry === null) {
+        throw new Error("Invalid schedule draft.");
+      }
+
+      const record = entry as Record<string, unknown>;
+      const template = presetScheduleTemplateSchema.parse(entry);
+      const usageValue = typeof record.usageValue === "number" && Number.isFinite(record.usageValue)
+        ? record.usageValue
+        : undefined;
+
+      return {
+        ...template,
+        enabled: typeof record.enabled === "boolean" ? record.enabled : true,
+        ...(typeof record.lastCompletedAt === "string" ? { lastCompletedAt: record.lastCompletedAt } : {}),
+        ...(usageValue !== undefined ? { usageValue } : {})
+      };
+    });
+  }
+}, []);
 
 const parseAssetProfilePayload = (formData: FormData): AssetProfilePayload => {
   const assetTypeVersion = getOptionalNumber(formData, "assetTypeVersion") ?? 1;
@@ -262,8 +330,121 @@ const parseAssetProfilePayload = (formData: FormData): AssetProfilePayload => {
     presetKey: getOptionalString(formData, "presetKey"),
     presetProfileId: getOptionalString(formData, "presetProfileId"),
     metricTemplates: parseJsonField(formData, "metricTemplatesJson", presetUsageMetricTemplateSchema.array(), []),
-    scheduleTemplates: parseJsonField(formData, "scheduleTemplatesJson", presetScheduleTemplateSchema.array(), [])
+    scheduleTemplates: parseJsonField(formData, "scheduleTemplatesJson", presetScheduleTemplateSchema.array(), []),
+    metricDrafts: parseMetricDrafts(formData),
+    scheduleDrafts: parseScheduleDrafts(formData)
   };
+};
+
+const buildTriggerFromPresetTemplate = (
+  triggerTemplate: PresetScheduleTemplate["triggerTemplate"],
+  metricIdByKey: Map<string, string>
+): MaintenanceTrigger | null => {
+  switch (triggerTemplate.type) {
+    case "interval":
+      return {
+        type: "interval",
+        intervalDays: triggerTemplate.intervalDays,
+        ...(triggerTemplate.anchorDate ? { anchorDate: triggerTemplate.anchorDate } : {}),
+        leadTimeDays: triggerTemplate.leadTimeDays
+      };
+    case "usage": {
+      const metricId = metricIdByKey.get(triggerTemplate.metricKey);
+
+      if (!metricId) {
+        return null;
+      }
+
+      return {
+        type: "usage",
+        metricId,
+        intervalValue: triggerTemplate.intervalValue,
+        leadTimeValue: triggerTemplate.leadTimeValue
+      };
+    }
+    case "seasonal":
+      return {
+        type: "seasonal",
+        month: triggerTemplate.month,
+        day: triggerTemplate.day,
+        leadTimeDays: triggerTemplate.leadTimeDays
+      };
+    case "compound": {
+      const metricId = metricIdByKey.get(triggerTemplate.metricKey);
+
+      if (!metricId) {
+        return null;
+      }
+
+      return {
+        type: "compound",
+        intervalDays: triggerTemplate.intervalDays,
+        metricId,
+        intervalValue: triggerTemplate.intervalValue,
+        logic: triggerTemplate.logic,
+        leadTimeDays: triggerTemplate.leadTimeDays,
+        leadTimeValue: triggerTemplate.leadTimeValue
+      };
+    }
+    case "one_time":
+      return {
+        type: "one_time",
+        dueAt: triggerTemplate.dueAt,
+        leadTimeDays: triggerTemplate.leadTimeDays
+      };
+    default:
+      return null;
+  }
+};
+
+const createAssetAutomationFromDrafts = async (assetId: string, profile: AssetProfilePayload): Promise<void> => {
+  const metricIdByKey = new Map<string, string>();
+
+  for (const draft of profile.metricDrafts.filter((entry) => entry.enabled)) {
+    const createdMetric = await createMetric(assetId, {
+      name: draft.name,
+      unit: draft.unit,
+      currentValue: draft.currentValue,
+      ...(draft.lastRecordedAt ? { lastRecordedAt: draft.lastRecordedAt } : {})
+    });
+
+    metricIdByKey.set(draft.key, createdMetric.id);
+  }
+
+  for (const draft of profile.scheduleDrafts.filter((entry) => entry.enabled)) {
+    const triggerConfig = buildTriggerFromPresetTemplate(draft.triggerTemplate, metricIdByKey);
+
+    if (!triggerConfig) {
+      continue;
+    }
+
+    const metricKey = draft.triggerTemplate.type === "usage" || draft.triggerTemplate.type === "compound"
+      ? draft.triggerTemplate.metricKey
+      : undefined;
+    const metricId = metricKey ? metricIdByKey.get(metricKey) : undefined;
+
+    const createdSchedule = await createSchedule(assetId, {
+      assetId,
+      name: draft.name,
+      triggerConfig,
+      notificationConfig: draft.notificationConfig,
+      ...(draft.description ? { description: draft.description } : {}),
+      ...(metricId ? { metricId } : {})
+    });
+
+    if (draft.lastCompletedAt) {
+      const completionInput: CompleteMaintenanceScheduleInput = {
+        completedAt: draft.lastCompletedAt,
+        metadata: {}
+      };
+
+      if (draft.usageValue !== undefined) {
+        completionInput.usageValue = draft.usageValue;
+      }
+
+      await completeSchedule(assetId, createdSchedule.id, completionInput);
+    }
+  }
 };
 
 const maybeCreatePresetProfileFromForm = async (
@@ -680,26 +861,10 @@ export async function createAssetAction(formData: FormData): Promise<void> {
     throw error;
   }
 
-  if (profile.presetSource === "library" && profile.presetKey) {
-    try {
-      await applyPreset(asset.id, {
-        source: "library",
-        presetKey: profile.presetKey
-      });
-    } catch (error) {
-      console.error("[createAssetAction] applyPreset (library) failed:", error);
-    }
-  }
-
-  if (profile.presetSource === "custom" && profile.presetProfileId) {
-    try {
-      await applyPreset(asset.id, {
-        source: "custom",
-        presetProfileId: profile.presetProfileId
-      });
-    } catch (error) {
-      console.error("[createAssetAction] applyPreset (custom) failed:", error);
-    }
+  try {
+    await createAssetAutomationFromDrafts(asset.id, profile);
+  } catch (error) {
+    console.error("[createAssetAction] Failed to create metric/schedule drafts:", error);
   }
 
   await maybeCreatePresetProfileFromForm(
@@ -1343,15 +1508,23 @@ export async function createProjectAction(formData: FormData): Promise<void> {
 
   const rawSuggestedPhases = getOptionalString(formData, "suggestedPhasesJson");
   if (rawSuggestedPhases) {
-    const suggestedPhases = JSON.parse(rawSuggestedPhases) as string[];
+    let suggestedPhases: string[] = [];
+
+    try {
+      const parsed = JSON.parse(rawSuggestedPhases) as unknown;
+      if (Array.isArray(parsed)) {
+        suggestedPhases = parsed
+          .filter((phaseName): phaseName is string => typeof phaseName === "string")
+          .map((phaseName) => phaseName.trim())
+          .filter((phaseName) => phaseName.length > 0);
+      }
+    } catch {
+      suggestedPhases = [];
+    }
 
     for (const [index, phaseName] of suggestedPhases.entries()) {
-      if (!phaseName || !phaseName.trim()) {
-        continue;
-      }
-
       await createProjectPhase(householdId, project.id, {
-        name: phaseName.trim(),
+        name: phaseName,
         status: "pending",
         sortOrder: index
       });
