@@ -17,6 +17,7 @@ type InventoryItemEditFormProps = {
 export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: InventoryItemEditFormProps): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [itemType, setItemType] = useState<"consumable" | "equipment">(item.itemType === "equipment" ? "equipment" : "consumable");
 
   const handleBarcodeResult = useCallback((result: BarcodeLookupResult) => {
     const form = document.getElementById("inventory-edit-form") as HTMLFormElement | null;
@@ -78,6 +79,11 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
     if (name) {
       input.name = name;
     }
+
+    input.itemType = itemType;
+
+    const conditionStatus = getString("conditionStatus");
+    input.conditionStatus = conditionStatus || null;
 
     const partNumber = getString("partNumber");
     if (partNumber !== undefined) {
@@ -168,6 +174,13 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
         <span style={{ display: "block", marginBottom: 4, fontSize: "0.85rem", color: "var(--ink-muted)" }}>Look Up by Barcode</span>
         <BarcodeLookupField onResult={handleBarcodeResult} />
       </div>
+      <div className="field field--full inventory-type-toggle" style={{ marginBottom: 8 }}>
+        <span className="inventory-type-toggle__label">Item Type</span>
+        <div className="inventory-type-toggle__options">
+          <button type="button" className={`inventory-type-toggle__btn${itemType === "consumable" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setItemType("consumable")}>Consumable</button>
+          <button type="button" className={`inventory-type-toggle__btn${itemType === "equipment" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setItemType("equipment")}>Equipment</button>
+        </div>
+      </div>
       <label className="field">
         <span>Name</span>
         <input type="text" name="name" defaultValue={item.name} required />
@@ -192,14 +205,30 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
         <span>On Hand</span>
         <input type="number" name="quantityOnHand" min="0" step="0.01" defaultValue={item.quantityOnHand} />
       </label>
-      <label className="field">
-        <span>Reorder When At</span>
-        <input type="number" name="reorderThreshold" min="0" step="0.01" defaultValue={item.reorderThreshold ?? ""} />
-      </label>
-      <label className="field">
-        <span>Usually Buy</span>
-        <input type="number" name="reorderQuantity" min="0" step="0.01" defaultValue={item.reorderQuantity ?? ""} />
-      </label>
+      {itemType === "equipment" && (
+        <label className="field">
+          <span>Condition</span>
+          <select name="conditionStatus" defaultValue={item.conditionStatus ?? ""}>
+            <option value="">No condition set</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="needs_repair">Needs Repair</option>
+            <option value="needs_replacement">Needs Replacement</option>
+          </select>
+        </label>
+      )}
+      {itemType === "consumable" && (
+        <>
+          <label className="field">
+            <span>Reorder When At</span>
+            <input type="number" name="reorderThreshold" min="0" step="0.01" defaultValue={item.reorderThreshold ?? ""} />
+          </label>
+          <label className="field">
+            <span>Usually Buy</span>
+            <input type="number" name="reorderQuantity" min="0" step="0.01" defaultValue={item.reorderQuantity ?? ""} />
+          </label>
+        </>
+      )}
       <label className="field">
         <span>Last Price</span>
         <input type="number" name="unitCost" min="0" step="0.01" defaultValue={item.unitCost ?? ""} />

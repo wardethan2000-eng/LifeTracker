@@ -33,6 +33,9 @@ import type {
   CreateServiceProviderInput,
   CreateUsageMetricEntryInput,
   CreateUsageMetricInput,
+  CreateHobbyInput,
+  HobbySessionLifecycleMode,
+  HobbyStatus,
   MaintenanceTrigger,
   PresetScheduleTemplate,
   PresetUsageMetricTemplate,
@@ -86,6 +89,7 @@ import {
   createMetric,
   createAsset,
   createHousehold,
+  createHobby,
   createInventoryItem,
   createMaintenanceLog,
   createPresetProfile,
@@ -747,6 +751,8 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
     unit: getOptionalString(formData, "unit") ?? "each"
   };
 
+  const itemType = getOptionalString(formData, "itemType");
+  const conditionStatus = getOptionalString(formData, "conditionStatus");
   const partNumber = getOptionalString(formData, "partNumber");
   const category = getOptionalString(formData, "category");
   const manufacturer = getOptionalString(formData, "manufacturer");
@@ -757,6 +763,14 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
   const unitCost = getOptionalNumber(formData, "unitCost");
   const storageLocation = getOptionalString(formData, "storageLocation");
   const notes = getOptionalString(formData, "notes");
+
+  if (itemType === "consumable" || itemType === "equipment") {
+    input.itemType = itemType;
+  }
+
+  if (conditionStatus) {
+    input.conditionStatus = conditionStatus;
+  }
 
   if (partNumber) {
     input.partNumber = partNumber;
@@ -2287,4 +2301,28 @@ export async function revalidateAttachmentsAction(formData: FormData): Promise<v
   if (projectId && householdId) {
     revalidateProjectPaths(householdId, projectId);
   }
+}
+
+// ── Hobbies ──────────────────────────────────────────────────────────
+
+export async function createHobbyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const input: CreateHobbyInput = {
+    name: getRequiredString(formData, "name"),
+  };
+
+  const description = getOptionalString(formData, "description");
+  const status = getOptionalString(formData, "status") as HobbyStatus | undefined;
+  const hobbyType = getOptionalString(formData, "hobbyType");
+  const lifecycleMode = getOptionalString(formData, "lifecycleMode") as HobbySessionLifecycleMode | undefined;
+  const presetKey = getOptionalString(formData, "presetKey");
+
+  if (description) input.description = description;
+  if (status) input.status = status;
+  if (hobbyType) input.hobbyType = hobbyType;
+  if (lifecycleMode) input.lifecycleMode = lifecycleMode;
+  if (presetKey) input.presetKey = presetKey;
+
+  const hobby = await createHobby(householdId, input);
+  redirect(`/hobbies/${hobby.id}`);
 }

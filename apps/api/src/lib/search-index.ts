@@ -40,7 +40,8 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   project: "Projects",
   service_provider: "Service Providers",
   inventory_item: "Inventory Items",
-  comment: "Comments"
+  comment: "Comments",
+  hobby: "Hobbies"
 };
 
 const SEARCH_GROUP_ORDER: SearchEntityType[] = [
@@ -50,7 +51,8 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "project",
   "service_provider",
   "inventory_item",
-  "comment"
+  "comment",
+  "hobby"
 ];
 
 const normalizeText = (value: string | null | undefined): string | null => {
@@ -613,6 +615,39 @@ export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId
   ]);
 };
 
+export const syncHobbyToSearchIndex = async (prisma: SearchPrisma, hobbyId: string): Promise<void> => {
+  const hobby = await prisma.hobby.findUnique({
+    where: { id: hobbyId },
+    select: {
+      id: true,
+      householdId: true,
+      name: true,
+      description: true,
+      hobbyType: true,
+      status: true
+    }
+  });
+
+  if (!hobby) {
+    await deleteSearchIndexEntry(prisma, "hobby", hobbyId);
+    return;
+  }
+
+  await upsertSearchIndexEntry(prisma, {
+    householdId: hobby.householdId,
+    entityType: "hobby",
+    entityId: hobby.id,
+    title: hobby.name,
+    subtitle: hobby.hobbyType ?? hobby.status,
+    body: joinText(hobby.description, hobby.hobbyType),
+    entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`,
+    entityMeta: {
+      status: hobby.status,
+      hobbyType: hobby.hobbyType
+    }
+  });
+};
+
 export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: string): Promise<void> => {
   await prisma.$executeRaw`
     DELETE FROM "SearchIndex"
@@ -676,6 +711,15 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const comment of comments) {
     await syncCommentToSearchIndex(prisma, comment.id);
+  }
+
+  const hobbies = await prisma.hobby.findMany({
+    where: { householdId },
+    select: { id: true }
+  });
+
+  for (const hobby of hobbies) {
+    await syncHobbyToSearchIndex(prisma, hobby.id);
   }
 };
 

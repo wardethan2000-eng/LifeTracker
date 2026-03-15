@@ -30,6 +30,13 @@ import { projectPhaseRoutes } from "./routes/projects/phases.js";
 import { searchRoutes } from "./routes/search/index.js";
 import { attachmentRoutes } from "./routes/attachments/index.js";
 import { barcodeRoutes } from "./routes/barcode.js";
+import { hobbyRoutes } from "./routes/hobbies/index.js";
+import { hobbyRecipeRoutes } from "./routes/hobbies/recipes.js";
+import { hobbySessionRoutes } from "./routes/hobbies/sessions.js";
+import { hobbyMetricRoutes } from "./routes/hobbies/metrics.js";
+import { hobbyLogRoutes } from "./routes/hobbies/logs.js";
+import { hobbyLinkRoutes } from "./routes/hobbies/links.js";
+import { hobbyShoppingListRoutes } from "./routes/hobbies/shopping-list.js";
 
 export const buildApp = () => {
   const app = Fastify({
@@ -69,6 +76,13 @@ export const buildApp = () => {
   app.register(searchRoutes);
   app.register(barcodeRoutes);
   app.register(attachmentRoutes);
+  app.register(hobbyRoutes);
+  app.register(hobbyRecipeRoutes);
+  app.register(hobbySessionRoutes);
+  app.register(hobbyMetricRoutes);
+  app.register(hobbyLogRoutes);
+  app.register(hobbyLinkRoutes);
+  app.register(hobbyShoppingListRoutes);
 
   return app;
 };

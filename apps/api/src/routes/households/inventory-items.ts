@@ -28,6 +28,7 @@ const listInventoryQuerySchema = z.object({
   category: z.string().min(1).max(120).optional(),
   search: z.string().min(1).max(200).optional(),
   lowStock: z.coerce.boolean().optional(),
+  itemType: z.enum(["consumable", "equipment"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   cursor: z.string().cuid().optional()
 });
@@ -58,6 +59,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       const created = await tx.inventoryItem.create({
         data: {
           householdId: params.householdId,
+          itemType: input.itemType ?? "consumable",
+          conditionStatus: input.conditionStatus ?? null,
           name: input.name,
           partNumber: input.partNumber ?? null,
           description: input.description ?? null,
@@ -111,6 +114,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const where: Prisma.InventoryItemWhereInput = {
       householdId: params.householdId,
       ...(query.category ? { category: query.category } : {}),
+      ...(query.itemType ? { itemType: query.itemType } : {}),
       ...(query.search ? {
         OR: [
           { name: { contains: query.search, mode: "insensitive" } },
@@ -157,6 +161,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const items = await app.prisma.inventoryItem.findMany({
       where: {
         householdId: params.householdId,
+        itemType: "consumable",
         reorderThreshold: { not: null }
       },
       orderBy: { createdAt: "desc" }
@@ -234,6 +239,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
         where: { id: existing.id },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.itemType !== undefined ? { itemType: input.itemType } : {}),
+          ...(input.conditionStatus !== undefined ? { conditionStatus: input.conditionStatus ?? null } : {}),
           ...(input.partNumber !== undefined ? { partNumber: input.partNumber ?? null } : {}),
           ...(input.description !== undefined ? { description: input.description ?? null } : {}),
           ...(input.category !== undefined ? { category: input.category ?? null } : {}),

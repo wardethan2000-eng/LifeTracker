@@ -36,6 +36,8 @@ type InventorySummaryRecord = Pick<
   InventoryItem,
   | "id"
   | "householdId"
+  | "itemType"
+  | "conditionStatus"
   | "name"
   | "partNumber"
   | "description"
@@ -93,6 +95,8 @@ export class InventoryError extends Error {
 export const toInventoryItemSummaryResponse = (item: InventorySummaryRecord) => inventoryItemSummarySchema.parse({
   id: item.id,
   householdId: item.householdId,
+  itemType: item.itemType,
+  conditionStatus: item.conditionStatus ?? null,
   name: item.name,
   partNumber: item.partNumber ?? null,
   description: item.description ?? null,

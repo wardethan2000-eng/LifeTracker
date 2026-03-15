@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
 import { InventoryEditableRow } from "../../components/inventory-editable-row";
+import { InventoryFilterBar } from "../../components/inventory-filter-bar";
 import { InventorySection } from "../../components/inventory-section";
 import {
   ApiError,
@@ -63,6 +64,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
+  const itemTypeFilter = typeof params.itemType === "string" && (params.itemType === "consumable" || params.itemType === "equipment") ? params.itemType : undefined;
+  const isEquipmentView = itemTypeFilter === "equipment";
 
   try {
     const me = await getMe();
@@ -80,7 +83,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     }
 
     const [{ items }, lowStockItems] = await Promise.all([
-      getHouseholdInventory(household.id, { limit: 100 }),
+      getHouseholdInventory(household.id, { limit: 100, ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}) }),
       getHouseholdLowStockInventory(household.id)
     ]);
 
@@ -149,6 +152,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             </div>
           </section>
 
+          <InventoryFilterBar currentFilter={itemTypeFilter ?? "all"} />
+
+          {!isEquipmentView && (
           <section className="panel">
             <div className="panel__header">
               <h2>Reorder Watchlist</h2>
@@ -192,6 +198,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               )}
             </div>
           </section>
+          )}
 
           <InventorySection householdId={household.id} totalCount={items.length} categoryOptions={categoryOptions}>
             {items.length === 0 ? (
@@ -210,8 +217,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                       <thead>
                         <tr>
                           <th>Item</th>
-                          <th>On Hand</th>
-                          <th>Reorder Rule</th>
+                          <th>{isEquipmentView ? "Count" : "On Hand"}</th>
+                          <th>{isEquipmentView ? "Condition" : "Reorder Rule"}</th>
                           <th>Last Price</th>
                           <th>Supplier</th>
                           <th>Status</th>
@@ -227,10 +234,16 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                                 {[item.partNumber, item.manufacturer].filter(Boolean).join(" • ") || "No part number or maker recorded"}
                               </div>
                             </td>
-                            <td>{formatStockAmount(item.quantityOnHand, item.unit)}</td>
+                            <td>{item.itemType === "equipment" ? `${item.quantityOnHand} unit${item.quantityOnHand === 1 ? "" : "s"}` : formatStockAmount(item.quantityOnHand, item.unit)}</td>
                             <td>
-                              <div className="data-table__primary">{formatReorderPoint(item.reorderThreshold, item.unit)}</div>
-                              <div className="data-table__secondary">{formatRestockPlan(item.reorderQuantity, item.unit)}</div>
+                              {item.itemType === "equipment" ? (
+                                <div className="data-table__primary">{item.conditionStatus ? item.conditionStatus.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "No condition set"}</div>
+                              ) : (
+                                <>
+                                  <div className="data-table__primary">{formatReorderPoint(item.reorderThreshold, item.unit)}</div>
+                                  <div className="data-table__secondary">{formatRestockPlan(item.reorderQuantity, item.unit)}</div>
+                                </>
+                              )}
                             </td>
                             <td>{formatCurrency(item.unitCost, "No recent price")}</td>
                             <td>{item.preferredSupplier ?? "—"}</td>

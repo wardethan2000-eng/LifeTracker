@@ -1,0 +1,362 @@
+import {
+  createHobbyAssetInputSchema,
+  createHobbyInventoryItemInputSchema,
+  createHobbyProjectInputSchema,
+  createHobbyInventoryCategoryInputSchema
+} from "@lifekeeper/types";
+import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
+import { assertMembership } from "../../lib/asset-access.js";
+
+const hobbyParamsSchema = z.object({
+  householdId: z.string().cuid(),
+  hobbyId: z.string().cuid()
+});
+
+const hobbyAssetParamsSchema = hobbyParamsSchema.extend({
+  hobbyAssetId: z.string().cuid()
+});
+
+const hobbyInventoryItemParamsSchema = hobbyParamsSchema.extend({
+  hobbyInventoryItemId: z.string().cuid()
+});
+
+const hobbyProjectParamsSchema = hobbyParamsSchema.extend({
+  hobbyProjectId: z.string().cuid()
+});
+
+const categoryParamsSchema = hobbyParamsSchema.extend({
+  categoryId: z.string().cuid()
+});
+
+export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
+  const BASE = "/v1/households/:householdId/hobbies/:hobbyId/links";
+
+  // ── Asset links ──────────────────────────────
+
+  // GET .../links/assets
+  app.get(`${BASE}/assets`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const links = await app.prisma.hobbyAsset.findMany({
+      where: { hobbyId, hobby: { householdId } },
+      include: {
+        asset: { select: { id: true, name: true, category: true } }
+      }
+    });
+
+    return reply.send(links.map((link) => ({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      assetId: link.assetId,
+      role: link.role,
+      notes: link.notes,
+      asset: link.asset,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    })));
+  });
+
+  // POST .../links/assets
+  app.post(`${BASE}/assets`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const input = createHobbyAssetInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: hobbyId, householdId }
+    });
+    if (!hobby) {
+      return reply.code(404).send({ error: "Hobby not found" });
+    }
+
+    const link = await app.prisma.hobbyAsset.create({
+      data: {
+        hobbyId,
+        assetId: input.assetId,
+        role: input.role ?? null,
+        notes: input.notes ?? null,
+      },
+      include: {
+        asset: { select: { id: true, name: true, category: true } }
+      }
+    });
+
+    return reply.code(201).send({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      assetId: link.assetId,
+      role: link.role,
+      notes: link.notes,
+      asset: link.asset,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    });
+  });
+
+  // DELETE .../links/assets/:hobbyAssetId
+  app.delete(`${BASE}/assets/:hobbyAssetId`, async (request, reply) => {
+    const { householdId, hobbyId, hobbyAssetId } = hobbyAssetParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const existing = await app.prisma.hobbyAsset.findFirst({
+      where: { id: hobbyAssetId, hobbyId, hobby: { householdId } }
+    });
+    if (!existing) {
+      return reply.code(404).send({ error: "Asset link not found" });
+    }
+
+    await app.prisma.hobbyAsset.delete({ where: { id: hobbyAssetId } });
+
+    return reply.code(204).send();
+  });
+
+  // ── Inventory links ──────────────────────────
+
+  // GET .../links/inventory
+  app.get(`${BASE}/inventory`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const links = await app.prisma.hobbyInventoryItem.findMany({
+      where: { hobbyId, hobby: { householdId } },
+      include: {
+        inventoryItem: { select: { id: true, name: true, quantityOnHand: true, unit: true } }
+      }
+    });
+
+    return reply.send(links.map((link) => ({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      inventoryItemId: link.inventoryItemId,
+      notes: link.notes,
+      inventoryItem: link.inventoryItem,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    })));
+  });
+
+  // POST .../links/inventory
+  app.post(`${BASE}/inventory`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const input = createHobbyInventoryItemInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: hobbyId, householdId }
+    });
+    if (!hobby) {
+      return reply.code(404).send({ error: "Hobby not found" });
+    }
+
+    const link = await app.prisma.hobbyInventoryItem.create({
+      data: {
+        hobbyId,
+        inventoryItemId: input.inventoryItemId,
+        notes: input.notes ?? null,
+      },
+      include: {
+        inventoryItem: { select: { id: true, name: true, quantityOnHand: true, unit: true } }
+      }
+    });
+
+    return reply.code(201).send({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      inventoryItemId: link.inventoryItemId,
+      notes: link.notes,
+      inventoryItem: link.inventoryItem,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    });
+  });
+
+  // DELETE .../links/inventory/:hobbyInventoryItemId
+  app.delete(`${BASE}/inventory/:hobbyInventoryItemId`, async (request, reply) => {
+    const { householdId, hobbyId, hobbyInventoryItemId } = hobbyInventoryItemParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const existing = await app.prisma.hobbyInventoryItem.findFirst({
+      where: { id: hobbyInventoryItemId, hobbyId, hobby: { householdId } }
+    });
+    if (!existing) {
+      return reply.code(404).send({ error: "Inventory link not found" });
+    }
+
+    await app.prisma.hobbyInventoryItem.delete({ where: { id: hobbyInventoryItemId } });
+
+    return reply.code(204).send();
+  });
+
+  // ── Project links ────────────────────────────
+
+  // GET .../links/projects
+  app.get(`${BASE}/projects`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const links = await app.prisma.hobbyProject.findMany({
+      where: { hobbyId, hobby: { householdId } },
+      include: {
+        project: { select: { id: true, name: true, status: true } }
+      }
+    });
+
+    return reply.send(links.map((link) => ({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      projectId: link.projectId,
+      notes: link.notes,
+      project: link.project,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    })));
+  });
+
+  // POST .../links/projects
+  app.post(`${BASE}/projects`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const input = createHobbyProjectInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: hobbyId, householdId }
+    });
+    if (!hobby) {
+      return reply.code(404).send({ error: "Hobby not found" });
+    }
+
+    const link = await app.prisma.hobbyProject.create({
+      data: {
+        hobbyId,
+        projectId: input.projectId,
+        notes: input.notes ?? null,
+      },
+      include: {
+        project: { select: { id: true, name: true, status: true } }
+      }
+    });
+
+    return reply.code(201).send({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      projectId: link.projectId,
+      notes: link.notes,
+      project: link.project,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    });
+  });
+
+  // DELETE .../links/projects/:hobbyProjectId
+  app.delete(`${BASE}/projects/:hobbyProjectId`, async (request, reply) => {
+    const { householdId, hobbyId, hobbyProjectId } = hobbyProjectParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const existing = await app.prisma.hobbyProject.findFirst({
+      where: { id: hobbyProjectId, hobbyId, hobby: { householdId } }
+    });
+    if (!existing) {
+      return reply.code(404).send({ error: "Project link not found" });
+    }
+
+    await app.prisma.hobbyProject.delete({ where: { id: hobbyProjectId } });
+
+    return reply.code(204).send();
+  });
+
+  // ── Inventory categories ─────────────────────
+
+  // GET .../links/inventory-categories
+  app.get(`${BASE}/inventory-categories`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const categories = await app.prisma.hobbyInventoryCategory.findMany({
+      where: { hobbyId, hobby: { householdId } },
+      orderBy: { sortOrder: "asc" }
+    });
+
+    return reply.send(categories.map((c) => ({
+      id: c.id,
+      hobbyId: c.hobbyId,
+      categoryName: c.categoryName,
+      sortOrder: c.sortOrder,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    })));
+  });
+
+  // POST .../links/inventory-categories
+  app.post(`${BASE}/inventory-categories`, async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const input = createHobbyInventoryCategoryInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: hobbyId, householdId }
+    });
+    if (!hobby) {
+      return reply.code(404).send({ error: "Hobby not found" });
+    }
+
+    const category = await app.prisma.hobbyInventoryCategory.create({
+      data: {
+        hobbyId,
+        categoryName: input.categoryName,
+        sortOrder: input.sortOrder ?? null,
+      }
+    });
+
+    return reply.code(201).send({
+      id: category.id,
+      hobbyId: category.hobbyId,
+      categoryName: category.categoryName,
+      sortOrder: category.sortOrder,
+      createdAt: category.createdAt.toISOString(),
+      updatedAt: category.updatedAt.toISOString(),
+    });
+  });
+
+  // DELETE .../links/inventory-categories/:categoryId
+  app.delete(`${BASE}/inventory-categories/:categoryId`, async (request, reply) => {
+    const { householdId, hobbyId, categoryId } = categoryParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    await assertMembership(app.prisma, householdId, userId);
+
+    const existing = await app.prisma.hobbyInventoryCategory.findFirst({
+      where: { id: categoryId, hobbyId, hobby: { householdId } }
+    });
+    if (!existing) {
+      return reply.code(404).send({ error: "Category not found" });
+    }
+
+    await app.prisma.hobbyInventoryCategory.delete({ where: { id: categoryId } });
+
+    return reply.code(204).send();
+  });
+};

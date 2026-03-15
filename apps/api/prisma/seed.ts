@@ -29,6 +29,8 @@ const inventoryItemWheelWeightId = "clkeeperinventory000000004";
 const inventoryItemShopTowelId = "clkeeperinventory000000005";
 const inventoryItemRosinPaperId = "clkeeperinventory000000006";
 const inventoryItemPainterTapeId = "clkeeperinventory000000007";
+const inventoryItemMultimeterId = "clkeeperinventory000000008";
+const inventoryItemDrillId = "clkeeperinventory000000009";
 const phasePlanningId = "clkeeperphase000000000001";
 const phaseDemolitionId = "clkeeperphase000000000002";
 const phaseInstallationId = "clkeeperphase000000000003";
@@ -40,6 +42,38 @@ const supplyCabinetHardwareId = "clkeepersupply00000000002";
 const supplyPendantLightsId = "clkeepersupply00000000003";
 
 const subProjectId = "clkeepersubproj000000000001";
+
+// Hobby seed IDs
+const hobbyId = "clkeeperhobby000000000001";
+const hobbyRecipeApaId = "clkeeperrecipe00000000001";
+const hobbyRecipeStoutId = "clkeeperrecipe00000000002";
+const hobbySessionBatch1Id = "clkeepersession0000000001";
+const hobbySessionBatch2Id = "clkeepersession0000000002";
+const hobbySessionBatch3Id = "clkeepersession0000000003";
+const hobbyMetricOgId = "clkeeperhmetric0000000001";
+const hobbyMetricFgId = "clkeeperhmetric0000000002";
+const hobbyMetricPhId = "clkeeperhmetric0000000003";
+const hobbyMetricFermTempId = "clkeeperhmetric0000000004";
+const hobbyMetricBatchVolId = "clkeeperhmetric0000000005";
+const hobbyMetricPreBoilId = "clkeeperhmetric0000000006";
+const hobbyMetricMashTempId = "clkeeperhmetric0000000007";
+const hobbyPipelinePlannedId = "clkeeperpipeline000000001";
+const hobbyPipelineBrewDayId = "clkeeperpipeline000000002";
+const hobbyPipelinePrimaryId = "clkeeperpipeline000000003";
+const hobbyPipelineSecondaryId = "clkeeperpipeline000000004";
+const hobbyPipelineCarbId = "clkeeperpipeline000000005";
+const hobbyPipelineCondId = "clkeeperpipeline000000006";
+const hobbyPipelinePackageId = "clkeeperpipeline000000007";
+const hobbyPipelineTastingId = "clkeeperpipeline000000008";
+const hobbyPipelineCompletedId = "clkeeperpipeline000000009";
+const hobbyInvPaleMaltId = "clkeeperinventory000000010";
+const hobbyInvCascadeHopsId = "clkeeperinventory000000011";
+const hobbyInvUs05YeastId = "clkeeperinventory000000012";
+const hobbyInvCrystal40Id = "clkeeperinventory000000013";
+const hobbyInvIrishMossId = "clkeeperinventory000000014";
+const hobbyInvStarSanId = "clkeeperinventory000000015";
+const hobbyInvPrimingSugarId = "clkeeperinventory000000016";
+const hobbyInvFlakedOatsId = "clkeeperinventory000000017";
 
 async function main(): Promise<void> {
   await prisma.user.upsert({
@@ -767,6 +801,42 @@ async function main(): Promise<void> {
       unitCost: 7.25,
       storageLocation: "Basement project rack",
       notes: "Used for layout marks, dust-control seams, and finish protection"
+    },
+    {
+      id: inventoryItemMultimeterId,
+      name: "Digital Multimeter",
+      partNumber: "DMM-200",
+      category: "Tools & Consumables",
+      manufacturer: "Fluke",
+      quantityOnHand: 1,
+      unit: "each",
+      reorderThreshold: null,
+      reorderQuantity: null,
+      preferredSupplier: "Home Depot",
+      supplierUrl: "https://example.com/fluke-dmm",
+      unitCost: 89.99,
+      storageLocation: "Workshop tool drawer",
+      notes: "General purpose multimeter for household electrical checks",
+      itemType: "equipment" as const,
+      conditionStatus: "good"
+    },
+    {
+      id: inventoryItemDrillId,
+      name: "Cordless Drill/Driver",
+      partNumber: "DCD-780",
+      category: "Tools & Consumables",
+      manufacturer: "DeWalt",
+      quantityOnHand: 1,
+      unit: "each",
+      reorderThreshold: null,
+      reorderQuantity: null,
+      preferredSupplier: "Lowe's",
+      supplierUrl: "https://example.com/dewalt-drill",
+      unitCost: 129.0,
+      storageLocation: "Garage tool wall",
+      notes: "20V MAX drill, shared across all household projects",
+      itemType: "equipment" as const,
+      conditionStatus: "good"
     }
   ] as const;
 
@@ -788,7 +858,9 @@ async function main(): Promise<void> {
         supplierUrl: item.supplierUrl,
         unitCost: item.unitCost,
         storageLocation: item.storageLocation,
-        notes: item.notes
+        notes: item.notes,
+        itemType: "itemType" in item ? item.itemType : "consumable",
+        conditionStatus: "conditionStatus" in item ? item.conditionStatus : null
       },
       create: {
         id: item.id,
@@ -806,7 +878,9 @@ async function main(): Promise<void> {
         supplierUrl: item.supplierUrl,
         unitCost: item.unitCost,
         storageLocation: item.storageLocation,
-        notes: item.notes
+        notes: item.notes,
+        itemType: "itemType" in item ? item.itemType : "consumable",
+        conditionStatus: "conditionStatus" in item ? item.conditionStatus : null
       }
     });
   }
@@ -831,7 +905,9 @@ async function main(): Promise<void> {
           inventoryItemWheelWeightId,
           inventoryItemShopTowelId,
           inventoryItemRosinPaperId,
-          inventoryItemPainterTapeId
+          inventoryItemPainterTapeId,
+          inventoryItemMultimeterId,
+          inventoryItemDrillId
         ]
       }
     }
@@ -1699,7 +1775,11 @@ async function main(): Promise<void> {
     { action: "project.phase.status_updated", entityType: "project_phase", entityId: phasePlanningId, userId: ownerUserId, metadata: { projectId, status: "completed" } },
     { action: "project.budget_category.created", entityType: "project_budget_category", entityId: budgetCabinetryId, userId: ownerUserId, metadata: { projectId, name: "Cabinetry + Finish Materials" } },
     { action: "project.supply.created", entityType: "project_phase_supply", entityId: supplyProtectionId, userId: ownerUserId, metadata: { projectId, phaseId: phaseDemolitionId, name: "Floor protection rolls" } },
-    { action: "member.invited", entityType: "household", entityId: householdId, userId: ownerUserId, metadata: { email: "invited@lifekeeper.app" } }
+    { action: "member.invited", entityType: "household", entityId: householdId, userId: ownerUserId, metadata: { email: "invited@lifekeeper.app" } },
+    { action: "hobby.created", entityType: "hobby", entityId: hobbyId, userId: ownerUserId, metadata: { name: "Beer Brewing" } },
+    { action: "hobby.session.created", entityType: "hobby_session", entityId: hobbySessionBatch1Id, userId: ownerUserId, metadata: { hobbyId, name: "Batch #1 — American Pale Ale" } },
+    { action: "hobby.session.completed", entityType: "hobby_session", entityId: hobbySessionBatch1Id, userId: ownerUserId, metadata: { hobbyId, name: "Batch #1 — American Pale Ale" } },
+    { action: "hobby.session.created", entityType: "hobby_session", entityId: hobbySessionBatch2Id, userId: ownerUserId, metadata: { hobbyId, name: "Batch #2 — Oatmeal Stout" } }
   ];
   for (const entry of activityEntries) {
     await prisma.activityLog.create({
@@ -1738,6 +1818,418 @@ async function main(): Promise<void> {
     }
   });
 
+  // ── Tier 3: Hobby — Beer Brewing ─────────────────────────────────────────
+
+  // Hobby
+  await prisma.hobby.upsert({
+    where: { id: hobbyId },
+    update: {},
+    create: {
+      id: hobbyId,
+      householdId,
+      name: "Beer Brewing",
+      description: "Homebrewing beer — extract and all-grain batches",
+      status: "active",
+      hobbyType: "beer-brewing",
+      lifecycleMode: "pipeline",
+      customFields: {
+        brewingMethod: "All-Grain",
+        defaultBatchSize: "5 gallons",
+        fermentationVesselType: "Bucket",
+        carbonationMethod: "Bottle Conditioning",
+        waterSource: "Municipal (treated)",
+        brewhouse: "Garage Setup",
+      },
+      fieldDefinitions: [
+        { key: "brewingMethod", label: "Brewing Method", type: "select", options: ["All-Grain", "Extract", "Partial Mash", "BIAB"] },
+        { key: "defaultBatchSize", label: "Default Batch Size", type: "string" },
+        { key: "fermentationVesselType", label: "Fermentation Vessel Type", type: "select", options: ["Bucket", "Carboy", "Conical", "Keg"] },
+        { key: "carbonationMethod", label: "Carbonation Method", type: "select", options: ["Bottle Conditioning", "Force Carbonation", "Spunding"] },
+        { key: "waterSource", label: "Water Source", type: "string" },
+        { key: "brewhouse", label: "Brewhouse / Setup Name", type: "string" },
+      ],
+      notes: "Started brewing in January 2026. Focused on pale ales and stouts.",
+      createdById: ownerUserId,
+    },
+  });
+
+  // Pipeline steps
+  const pipelineSteps = [
+    { id: hobbyPipelinePlannedId, label: "Planned", sortOrder: 0, color: "#94a3b8", isFinal: false },
+    { id: hobbyPipelineBrewDayId, label: "Brew Day", sortOrder: 1, color: "#f59e0b", isFinal: false },
+    { id: hobbyPipelinePrimaryId, label: "Primary Fermentation", sortOrder: 2, color: "#ef4444", isFinal: false },
+    { id: hobbyPipelineSecondaryId, label: "Secondary / Dry Hop", sortOrder: 3, color: "#f97316", isFinal: false },
+    { id: hobbyPipelineCarbId, label: "Carbonation", sortOrder: 4, color: "#eab308", isFinal: false },
+    { id: hobbyPipelineCondId, label: "Conditioning", sortOrder: 5, color: "#22c55e", isFinal: false },
+    { id: hobbyPipelinePackageId, label: "Packaging", sortOrder: 6, color: "#06b6d4", isFinal: false },
+    { id: hobbyPipelineTastingId, label: "Tasting / Evaluation", sortOrder: 7, color: "#8b5cf6", isFinal: false },
+    { id: hobbyPipelineCompletedId, label: "Completed", sortOrder: 8, color: "#10b981", isFinal: true },
+  ];
+
+  for (const step of pipelineSteps) {
+    await prisma.hobbySessionStatusStep.upsert({
+      where: { id: step.id },
+      update: {},
+      create: { ...step, hobbyId },
+    });
+  }
+
+  // Metric definitions
+  const metricDefs = [
+    { id: hobbyMetricOgId, name: "Original Gravity", unit: "SG", metricType: "numeric", description: "Specific gravity before fermentation" },
+    { id: hobbyMetricFgId, name: "Final Gravity", unit: "SG", metricType: "numeric", description: "Specific gravity after fermentation" },
+    { id: hobbyMetricPhId, name: "Mash pH", unit: "pH", metricType: "numeric", description: "pH of the mash" },
+    { id: hobbyMetricFermTempId, name: "Fermentation Temperature", unit: "°F", metricType: "numeric", description: "Temperature during primary fermentation" },
+    { id: hobbyMetricBatchVolId, name: "Batch Volume", unit: "gal", metricType: "numeric", description: "Final volume into fermenter" },
+    { id: hobbyMetricPreBoilId, name: "Pre-Boil Gravity", unit: "SG", metricType: "numeric", description: "Specific gravity before the boil" },
+    { id: hobbyMetricMashTempId, name: "Mash Temperature", unit: "°F", metricType: "numeric", description: "Strike/rest temperature of the mash" },
+  ];
+
+  for (const m of metricDefs) {
+    await prisma.hobbyMetricDefinition.upsert({
+      where: { hobbyId_name: { hobbyId, name: m.name } },
+      update: {},
+      create: { ...m, hobbyId },
+    });
+  }
+
+  // Inventory categories
+  const invCategories = [
+    "Base Malts", "Specialty Malts", "Hops", "Yeast", "Adjuncts",
+    "Water Chemistry", "Fining Agents", "Priming / Carbonation",
+    "Sanitizers", "Packaging",
+  ];
+  for (let i = 0; i < invCategories.length; i++) {
+    const catName = invCategories[i]!;
+    await prisma.hobbyInventoryCategory.upsert({
+      where: { hobbyId_categoryName: { hobbyId, categoryName: catName } },
+      update: {},
+      create: { hobbyId, categoryName: catName, sortOrder: i },
+    });
+  }
+
+  // Brewing inventory items
+  const brewInvItems = [
+    { id: hobbyInvPaleMaltId, name: "2-Row Pale Malt", unit: "lb", quantityOnHand: 25, itemType: "consumable" as const, reorderThreshold: 10 },
+    { id: hobbyInvCascadeHopsId, name: "Cascade Hops", unit: "oz", quantityOnHand: 8, itemType: "consumable" as const, reorderThreshold: 4 },
+    { id: hobbyInvUs05YeastId, name: "US-05 Yeast", unit: "pkt", quantityOnHand: 3, itemType: "consumable" as const, reorderThreshold: 2 },
+    { id: hobbyInvCrystal40Id, name: "Crystal 40L", unit: "lb", quantityOnHand: 5, itemType: "consumable" as const, reorderThreshold: 2 },
+    { id: hobbyInvIrishMossId, name: "Irish Moss", unit: "oz", quantityOnHand: 4, itemType: "consumable" as const, reorderThreshold: 2 },
+    { id: hobbyInvStarSanId, name: "Star San", unit: "oz", quantityOnHand: 16, itemType: "equipment" as const, reorderThreshold: 8 },
+    { id: hobbyInvPrimingSugarId, name: "Priming Sugar (Corn Sugar)", unit: "oz", quantityOnHand: 20, itemType: "consumable" as const, reorderThreshold: 5 },
+    { id: hobbyInvFlakedOatsId, name: "Flaked Oats", unit: "lb", quantityOnHand: 3, itemType: "consumable" as const, reorderThreshold: 1 },
+  ];
+
+  for (const item of brewInvItems) {
+    await prisma.inventoryItem.upsert({
+      where: { id: item.id },
+      update: { quantityOnHand: item.quantityOnHand },
+      create: { ...item, householdId },
+    });
+    await prisma.hobbyInventoryItem.upsert({
+      where: { hobbyId_inventoryItemId: { hobbyId, inventoryItemId: item.id } },
+      update: {},
+      create: { hobbyId, inventoryItemId: item.id },
+    });
+  }
+
+  // Recipe 1: Simple American Pale Ale (preset recipe)
+  await prisma.hobbyRecipe.upsert({
+    where: { id: hobbyRecipeApaId },
+    update: {},
+    create: {
+      id: hobbyRecipeApaId,
+      hobbyId,
+      name: "Simple American Pale Ale",
+      description: "A clean, hop-forward American Pale Ale with Cascade and Centennial hops. Great starter recipe.",
+      sourceType: "preset",
+      styleCategory: "American Pale Ale",
+      estimatedDuration: "240",
+      estimatedCost: 32.0,
+      yield: "5 gallons",
+      notes: "Starter recipe from preset library.",
+    },
+  });
+
+  // APA ingredients
+  await prisma.hobbyRecipeIngredient.deleteMany({ where: { recipeId: hobbyRecipeApaId } });
+  const apaIngredients = [
+    { name: "2-Row Pale Malt", quantity: 9, unit: "lb", category: "Base Malts", sortOrder: 0, inventoryItemId: hobbyInvPaleMaltId },
+    { name: "Crystal 40L", quantity: 0.75, unit: "lb", category: "Specialty Malts", sortOrder: 1, inventoryItemId: hobbyInvCrystal40Id },
+    { name: "Cascade Hops (60 min)", quantity: 1, unit: "oz", category: "Hops", sortOrder: 2, inventoryItemId: hobbyInvCascadeHopsId },
+    { name: "Cascade Hops (15 min)", quantity: 0.5, unit: "oz", category: "Hops", sortOrder: 3 },
+    { name: "Cascade Hops (Flame Out)", quantity: 0.5, unit: "oz", category: "Hops", sortOrder: 4 },
+    { name: "US-05 Yeast", quantity: 1, unit: "pkt", category: "Yeast", sortOrder: 5, inventoryItemId: hobbyInvUs05YeastId },
+    { name: "Irish Moss", quantity: 1, unit: "tsp", category: "Fining Agents", sortOrder: 6 },
+  ];
+
+  for (const ing of apaIngredients) {
+    await prisma.hobbyRecipeIngredient.create({
+      data: { recipeId: hobbyRecipeApaId, ...ing },
+    });
+  }
+
+  // APA steps
+  const apaSteps = [
+    { title: "Heat Strike Water", description: "Heat 4 gallons to 164°F", sortOrder: 0, durationMinutes: 30, stepType: "mash" },
+    { title: "Mash In", description: "Add grains, target 152°F rest", sortOrder: 1, durationMinutes: 60, stepType: "mash" },
+    { title: "Mash Out", description: "Raise to 168°F for 10 min", sortOrder: 2, durationMinutes: 10, stepType: "mash" },
+    { title: "Sparge", description: "Sparge with 170°F water, collect 6.5 gal", sortOrder: 3, durationMinutes: 20, stepType: "sparge" },
+    { title: "Bring to Boil", description: "Bring wort to rolling boil", sortOrder: 4, durationMinutes: 15, stepType: "boil" },
+    { title: "60 min Hop Addition", description: "Add 1 oz Cascade", sortOrder: 5, durationMinutes: 45, stepType: "boil" },
+    { title: "15 min Hop Addition", description: "Add 0.5 oz Cascade + Irish Moss", sortOrder: 6, durationMinutes: 14, stepType: "boil" },
+    { title: "Flame Out Hops", description: "Add 0.5 oz Cascade at flame out", sortOrder: 7, durationMinutes: 1, stepType: "boil" },
+    { title: "Chill Wort", description: "Cool to 65°F with immersion chiller", sortOrder: 8, durationMinutes: 20, stepType: "cool" },
+    { title: "Transfer to Fermenter", description: "Transfer wort and pitch yeast", sortOrder: 9, durationMinutes: 10, stepType: "ferment" },
+    { title: "Primary Fermentation", description: "Ferment at 66°F for 14 days", sortOrder: 10, durationMinutes: 20160, stepType: "ferment" },
+    { title: "Bottle", description: "Prime with 4.5 oz corn sugar, bottle", sortOrder: 11, durationMinutes: 60, stepType: "package" },
+    { title: "Carbonate / Condition", description: "Store at room temp 14 days", sortOrder: 12, durationMinutes: 20160, stepType: "condition" },
+  ];
+
+  // Delete existing recipe steps/ingredients before re-creating (idempotent)
+  await prisma.hobbyRecipeStep.deleteMany({ where: { recipeId: hobbyRecipeApaId } });
+  for (const step of apaSteps) {
+    await prisma.hobbyRecipeStep.create({
+      data: { recipeId: hobbyRecipeApaId, ...step },
+    });
+  }
+
+  // Recipe 2: Oatmeal Stout (user recipe)
+  await prisma.hobbyRecipe.upsert({
+    where: { id: hobbyRecipeStoutId },
+    update: {},
+    create: {
+      id: hobbyRecipeStoutId,
+      hobbyId,
+      name: "Oatmeal Stout",
+      description: "A smooth, full-bodied stout with oatmeal for silky mouthfeel and roasted malt character.",
+      sourceType: "user",
+      styleCategory: "Oatmeal Stout",
+      estimatedDuration: "240",
+      estimatedCost: 35.0,
+      yield: "5 gallons",
+    },
+  });
+
+  // Stout ingredients
+  const stoutIngredients = [
+    { name: "2-Row Pale Malt", quantity: 8, unit: "lb", category: "Base Malts", sortOrder: 0, inventoryItemId: hobbyInvPaleMaltId },
+    { name: "Flaked Oats", quantity: 1, unit: "lb", category: "Adjuncts", sortOrder: 1, inventoryItemId: hobbyInvFlakedOatsId },
+    { name: "Crystal 40L", quantity: 0.5, unit: "lb", category: "Specialty Malts", sortOrder: 2, inventoryItemId: hobbyInvCrystal40Id },
+    { name: "Roasted Barley", quantity: 0.75, unit: "lb", category: "Specialty Malts", sortOrder: 3 },
+    { name: "Chocolate Malt", quantity: 0.5, unit: "lb", category: "Specialty Malts", sortOrder: 4 },
+    { name: "East Kent Goldings (60 min)", quantity: 1.5, unit: "oz", category: "Hops", sortOrder: 5 },
+    { name: "Fuggle (15 min)", quantity: 0.5, unit: "oz", category: "Hops", sortOrder: 6 },
+    { name: "US-05 Yeast", quantity: 1, unit: "pkt", category: "Yeast", sortOrder: 7, inventoryItemId: hobbyInvUs05YeastId },
+  ];
+
+  await prisma.hobbyRecipeIngredient.deleteMany({ where: { recipeId: hobbyRecipeStoutId } });
+  for (const ing of stoutIngredients) {
+    await prisma.hobbyRecipeIngredient.create({
+      data: { recipeId: hobbyRecipeStoutId, ...ing },
+    });
+  }
+
+  // Stout steps
+  const stoutSteps = [
+    { title: "Heat Strike Water", sortOrder: 0, durationMinutes: 30, stepType: "mash" },
+    { title: "Mash In", description: "Add grains, target 154°F", sortOrder: 1, durationMinutes: 60, stepType: "mash" },
+    { title: "Sparge", sortOrder: 2, durationMinutes: 20, stepType: "sparge" },
+    { title: "Boil with Hops", description: "60 min boil, add hops per schedule", sortOrder: 3, durationMinutes: 60, stepType: "boil" },
+    { title: "Cool & Transfer", sortOrder: 4, durationMinutes: 30, stepType: "cool" },
+    { title: "Pitch Yeast", sortOrder: 5, durationMinutes: 5, stepType: "ferment" },
+    { title: "Primary Fermentation", description: "14 days at 64°F", sortOrder: 6, durationMinutes: 20160, stepType: "ferment" },
+    { title: "Bottle & Carbonate", sortOrder: 7, durationMinutes: 20160, stepType: "package" },
+  ];
+
+  await prisma.hobbyRecipeStep.deleteMany({ where: { recipeId: hobbyRecipeStoutId } });
+  for (const step of stoutSteps) {
+    await prisma.hobbyRecipeStep.create({
+      data: { recipeId: hobbyRecipeStoutId, ...step },
+    });
+  }
+
+  // Session 1: Batch #1 — APA (completed)
+  await prisma.hobbySession.upsert({
+    where: { id: hobbySessionBatch1Id },
+    update: {},
+    create: {
+      id: hobbySessionBatch1Id,
+      hobbyId,
+      recipeId: hobbyRecipeApaId,
+      name: "Batch #1 — American Pale Ale",
+      status: "completed",
+      startDate: new Date("2026-02-01T09:00:00Z"),
+      completedDate: new Date("2026-03-01T12:00:00Z"),
+      pipelineStepId: hobbyPipelineCompletedId,
+      totalCost: 28.50,
+      rating: 4,
+      notes: "First all-grain batch. Hit targets well. Slight chill haze but great flavor.",
+    },
+  });
+
+  // Session 1 steps (all completed)
+  await prisma.hobbySessionStep.deleteMany({ where: { sessionId: hobbySessionBatch1Id } });
+  const batch1Steps = apaSteps.map((s, i) => ({
+    sessionId: hobbySessionBatch1Id,
+    title: s.title,
+    description: s.description,
+    sortOrder: i,
+    durationMinutes: s.durationMinutes,
+    isCompleted: true,
+    completedAt: new Date(Date.UTC(2026, 1, 1, 9 + i, 0, 0)),
+  }));
+  for (const step of batch1Steps) {
+    await prisma.hobbySessionStep.create({ data: step });
+  }
+
+  // Session 1 ingredients
+  await prisma.hobbySessionIngredient.deleteMany({ where: { sessionId: hobbySessionBatch1Id } });
+  for (const ing of apaIngredients) {
+    await prisma.hobbySessionIngredient.create({
+      data: {
+        sessionId: hobbySessionBatch1Id,
+        name: ing.name,
+        quantityUsed: ing.quantity,
+        unit: ing.unit,
+        unitCost: ing.name.includes("Malt") ? 1.5 : ing.name.includes("Hops") ? 2.0 : 0.5,
+        ...(ing.inventoryItemId ? { inventoryItemId: ing.inventoryItemId } : {}),
+      },
+    });
+  }
+
+  // Session 1 metric readings
+  await prisma.hobbyMetricReading.deleteMany({ where: { sessionId: hobbySessionBatch1Id } });
+  const batch1Readings = [
+    { metricDefinitionId: hobbyMetricOgId, value: 1.052, readingDate: new Date("2026-02-01T14:00:00Z"), notes: "Hit target OG" },
+    { metricDefinitionId: hobbyMetricFgId, value: 1.012, readingDate: new Date("2026-02-15T10:00:00Z"), notes: "Stable over 3 days" },
+    { metricDefinitionId: hobbyMetricFermTempId, value: 66, readingDate: new Date("2026-02-03T08:00:00Z"), notes: "Holding steady" },
+    { metricDefinitionId: hobbyMetricMashTempId, value: 152, readingDate: new Date("2026-02-01T10:30:00Z") },
+    { metricDefinitionId: hobbyMetricBatchVolId, value: 5.25, readingDate: new Date("2026-02-01T15:00:00Z") },
+  ];
+  for (const r of batch1Readings) {
+    await prisma.hobbyMetricReading.create({
+      data: { ...r, sessionId: hobbySessionBatch1Id },
+    });
+  }
+
+  // Session 1 journal entries
+  await prisma.hobbyLog.deleteMany({ where: { sessionId: hobbySessionBatch1Id } });
+  await prisma.hobbyLog.createMany({
+    data: [
+      {
+        hobbyId,
+        sessionId: hobbySessionBatch1Id,
+        title: "Brew Day Notes",
+        content: "Smooth brew day overall. Mash temp held well at 152°F. Pre-boil gravity was 1.044, right on target. Used immersion chiller — reached pitching temp in about 20 min. Wort looked crystal clear going into the fermenter.",
+        logDate: new Date("2026-02-01T16:00:00Z"),
+        logType: "progress",
+      },
+      {
+        hobbyId,
+        sessionId: hobbySessionBatch1Id,
+        title: "Tasting Notes — 2 Weeks in Bottle",
+        content: "Poured clear amber with a nice white head. Cascade aroma is prominent. Clean malt backbone with moderate bitterness. Slight chill haze when cold. Would bump up the flame-out hops to 1 oz next time for more aroma punch.",
+        logDate: new Date("2026-03-01T18:00:00Z"),
+        logType: "tasting",
+      },
+    ],
+  });
+
+  // Session 2: Batch #2 — Oatmeal Stout (active, in primary fermentation)
+  await prisma.hobbySession.upsert({
+    where: { id: hobbySessionBatch2Id },
+    update: {},
+    create: {
+      id: hobbySessionBatch2Id,
+      hobbyId,
+      recipeId: hobbyRecipeStoutId,
+      name: "Batch #2 — Oatmeal Stout",
+      status: "active",
+      startDate: new Date("2026-03-10T09:00:00Z"),
+      pipelineStepId: hobbyPipelinePrimaryId,
+      notes: "Second batch. Trying the oatmeal stout recipe.",
+    },
+  });
+
+  // Session 2 steps (brew day completed, fermentation in progress)
+  await prisma.hobbySessionStep.deleteMany({ where: { sessionId: hobbySessionBatch2Id } });
+  for (let i = 0; i < stoutSteps.length; i++) {
+    const s = stoutSteps[i]!;
+    await prisma.hobbySessionStep.create({
+      data: {
+        sessionId: hobbySessionBatch2Id,
+        title: s.title,
+        description: s.description ?? null,
+        sortOrder: i,
+        durationMinutes: s.durationMinutes,
+        isCompleted: i <= 5, // brew day steps completed
+        ...(i <= 5 ? { completedAt: new Date(Date.UTC(2026, 2, 10, 9 + i, 0, 0)) } : {}),
+      },
+    });
+  }
+
+  // Session 2 ingredients
+  await prisma.hobbySessionIngredient.deleteMany({ where: { sessionId: hobbySessionBatch2Id } });
+  for (const ing of stoutIngredients) {
+    await prisma.hobbySessionIngredient.create({
+      data: {
+        sessionId: hobbySessionBatch2Id,
+        name: ing.name,
+        quantityUsed: ing.quantity,
+        unit: ing.unit,
+        ...(ing.inventoryItemId ? { inventoryItemId: ing.inventoryItemId } : {}),
+      },
+    });
+  }
+
+  // Session 2 metric reading: OG
+  await prisma.hobbyMetricReading.deleteMany({ where: { sessionId: hobbySessionBatch2Id } });
+  await prisma.hobbyMetricReading.create({
+    data: {
+      metricDefinitionId: hobbyMetricOgId,
+      sessionId: hobbySessionBatch2Id,
+      value: 1.058,
+      readingDate: new Date("2026-03-10T14:00:00Z"),
+      notes: "Slightly above target — extra efficiency from fine crush",
+    },
+  });
+
+  // Session 3: Batch #3 — West Coast IPA (planned, no recipe)
+  await prisma.hobbySession.upsert({
+    where: { id: hobbySessionBatch3Id },
+    update: {},
+    create: {
+      id: hobbySessionBatch3Id,
+      hobbyId,
+      name: "Batch #3 — West Coast IPA",
+      status: "planned",
+      pipelineStepId: hobbyPipelinePlannedId,
+      notes: "Planning a West Coast IPA. Need to develop the recipe first.",
+    },
+  });
+
+  // General hobby journal entries (not scoped to a session)
+  await prisma.hobbyLog.deleteMany({ where: { hobbyId, sessionId: null } });
+  await prisma.hobbyLog.createMany({
+    data: [
+      {
+        hobbyId,
+        title: "Getting Started",
+        content: "Ordered the basic all-grain setup. Going to start with extract kits and transition to all-grain once I have the process down.",
+        logDate: new Date("2026-01-15T12:00:00Z"),
+        logType: "note",
+      },
+      {
+        hobbyId,
+        title: "Equipment Arrived",
+        content: "Brew kettle, fermenter, bottling bucket, auto-siphon, and hydrometer all arrived. Star San for sanitizing. Ready to brew!",
+        logDate: new Date("2026-01-25T14:00:00Z"),
+        logType: "progress",
+      },
+    ],
+  });
+
   await rebuildSearchIndex(prisma, householdId);
 
   console.log(JSON.stringify({
@@ -1753,7 +2245,8 @@ async function main(): Promise<void> {
     inventoryItemOilFilterId,
     inventoryItemCabinFilterId,
     projectId,
-    invitationId
+    invitationId,
+    hobbyId
   }, null, 2));
 }
 

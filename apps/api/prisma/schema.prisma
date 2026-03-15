@@ -104,6 +104,35 @@ enum AttachmentEntityType {
   inventory_item
 }
 
+enum InventoryItemType {
+  consumable
+  equipment
+}
+
+enum HobbyStatus {
+  active
+  paused
+  archived
+}
+
+enum HobbySessionLifecycleMode {
+  binary
+  pipeline
+}
+
+enum HobbyRecipeSourceType {
+  preset
+  user
+  imported
+}
+
+enum HobbyLogType {
+  note
+  tasting
+  progress
+  issue
+}
+
 model User {
   id                      String                @id @default(cuid())
   clerkUserId             String                @unique
@@ -131,6 +160,7 @@ model User {
   authoredComments        Comment[]             @relation("CommentAuthor")
   projectNotes            ProjectNote[]         @relation("ProjectNoteAuthor")
   attachments             Attachment[]          @relation("AttachmentUploader")
+  createdHobbies          Hobby[]               @relation("HobbyCreator")
 }
 
 model Household {
@@ -152,6 +182,7 @@ model Household {
   incomingAssetTransfers AssetTransfer[]        @relation("AssetTransferToHousehold")
   invitations      HouseholdInvitation[]
   attachments      Attachment[]
+  hobbies          Hobby[]
 
   @@index([createdById])
 }
@@ -217,6 +248,7 @@ model Asset {
   projectAssets        ProjectAsset[]
   comments             Comment[]
   transfers            AssetTransfer[]
+  hobbyLinks           HobbyAsset[]
 
   @@index([householdId, isArchived])
   @@index([createdById])
@@ -459,6 +491,7 @@ model Project {
   tasks           ProjectTask[]
   expenses        ProjectExpense[]
   noteEntries     ProjectNote[]
+  hobbyLinks       HobbyProject[]
 
   @@index([householdId, status])
   @@index([parentProjectId])
@@ -467,6 +500,8 @@ model Project {
 model InventoryItem {
   id                 String                  @id @default(cuid())
   householdId        String
+  itemType           InventoryItemType       @default(consumable)
+  conditionStatus    String?
   name               String
   partNumber         String?
   description        String?
@@ -489,10 +524,14 @@ model InventoryItem {
   projectPhaseSupplies ProjectPhaseSupply[]
   transactions       InventoryTransaction[]
   maintenanceLogParts MaintenanceLogPart[]
+  hobbyLinks          HobbyInventoryItem[]
+  hobbyRecipeIngredients HobbyRecipeIngredient[]
+  hobbySessionIngredients HobbySessionIngredient[]
 
   @@index([householdId])
   @@index([householdId, category])
   @@index([householdId, partNumber])
+  @@index([householdId, itemType])
 }
 
 model AssetInventoryItem {
@@ -870,4 +909,283 @@ model Attachment {
   @@index([uploadedById])
   @@index([storageKey])
   @@index([status])
+}
+
+// ── Hobby Domain ────────────────────────────────────────────────────
+
+model Hobby {
+  id               String                    @id @default(cuid())
+  householdId      String
+  name             String
+  description      String?
+  status           HobbyStatus               @default(active)
+  hobbyType        String?
+  lifecycleMode    HobbySessionLifecycleMode @default(binary)
+  customFields     Json                      @default("{}")
+  fieldDefinitions Json                      @default("[]")
+  notes            String?
+  createdById      String
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  household        Household                 @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy        User                      @relation("HobbyCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  recipes          HobbyRecipe[]
+  sessions         HobbySession[]
+  metricDefinitions HobbyMetricDefinition[]
+  statusPipeline   HobbySessionStatusStep[]
+  logs             HobbyLog[]
+  assetLinks       HobbyAsset[]
+  inventoryLinks   HobbyInventoryItem[]
+  projectLinks     HobbyProject[]
+  inventoryCategories HobbyInventoryCategory[]
+
+  @@index([householdId, status])
+  @@index([createdById])
+}
+
+model HobbyAsset {
+  id          String   @id @default(cuid())
+  hobbyId     String
+  assetId     String
+  role        String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  hobby       Hobby    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([hobbyId, assetId])
+  @@index([hobbyId])
+  @@index([assetId])
+}
+
+model HobbyInventoryItem {
+  id              String        @id @default(cuid())
+  hobbyId         String
+  inventoryItemId String
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  hobby           Hobby         @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([hobbyId, inventoryItemId])
+  @@index([hobbyId])
+  @@index([inventoryItemId])
+}
+
+model HobbyProject {
+  id        String   @id @default(cuid())
+  hobbyId   String
+  projectId String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  hobby     Hobby    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([hobbyId, projectId])
+  @@index([hobbyId])
+  @@index([projectId])
+}
+
+model HobbyInventoryCategory {
+  id           String   @id @default(cuid())
+  hobbyId      String
+  categoryName String
+  sortOrder    Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  hobby        Hobby    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+
+  @@unique([hobbyId, categoryName])
+  @@index([hobbyId])
+}
+
+model HobbySessionStatusStep {
+  id        String   @id @default(cuid())
+  hobbyId   String
+  label     String
+  sortOrder Int
+  color     String?
+  isFinal   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  hobby     Hobby    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+
+  @@index([hobbyId, sortOrder])
+}
+
+model HobbyRecipe {
+  id                String                 @id @default(cuid())
+  hobbyId           String
+  name              String
+  description       String?
+  sourceType        HobbyRecipeSourceType  @default(user)
+  styleCategory     String?
+  customFields      Json                   @default("{}")
+  estimatedDuration String?
+  estimatedCost     Float?
+  yield             String?
+  notes             String?
+  isArchived        Boolean                @default(false)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  hobby             Hobby                  @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  ingredients       HobbyRecipeIngredient[]
+  steps             HobbyRecipeStep[]
+  sessions          HobbySession[]
+
+  @@index([hobbyId])
+  @@index([hobbyId, isArchived])
+}
+
+model HobbyRecipeIngredient {
+  id              String         @id @default(cuid())
+  recipeId        String
+  inventoryItemId String?
+  name            String
+  quantity        Float
+  unit            String
+  category        String?
+  notes           String?
+  sortOrder       Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  recipe          HobbyRecipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  sessionIngredients HobbySessionIngredient[]
+
+  @@index([recipeId, sortOrder])
+  @@index([inventoryItemId])
+}
+
+model HobbyRecipeStep {
+  id              String      @id @default(cuid())
+  recipeId        String
+  title           String
+  description     String?
+  sortOrder       Int         @default(0)
+  durationMinutes Int?
+  stepType        String      @default("generic")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  recipe          HobbyRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  sessionSteps    HobbySessionStep[]
+
+  @@index([recipeId, sortOrder])
+}
+
+model HobbySession {
+  id              String       @id @default(cuid())
+  hobbyId         String
+  recipeId        String?
+  name            String
+  status          String       @default("active")
+  startDate       DateTime?
+  completedDate   DateTime?
+  pipelineStepId  String?
+  customFields    Json         @default("{}")
+  totalCost       Float?
+  rating          Int?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  hobby           Hobby        @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  recipe          HobbyRecipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  ingredients     HobbySessionIngredient[]
+  steps           HobbySessionStep[]
+  metricReadings  HobbyMetricReading[]
+  logs            HobbyLog[]
+
+  @@index([hobbyId, status])
+  @@index([hobbyId, createdAt])
+  @@index([recipeId])
+}
+
+model HobbySessionIngredient {
+  id                   String                 @id @default(cuid())
+  sessionId            String
+  recipeIngredientId   String?
+  inventoryItemId      String?
+  name                 String
+  quantityUsed         Float
+  unit                 String
+  unitCost             Float?
+  notes                String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  session              HobbySession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  recipeIngredient     HobbyRecipeIngredient? @relation(fields: [recipeIngredientId], references: [id], onDelete: SetNull)
+  inventoryItem        InventoryItem?         @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([inventoryItemId])
+}
+
+model HobbySessionStep {
+  id              String           @id @default(cuid())
+  sessionId       String
+  recipeStepId    String?
+  title           String
+  description     String?
+  sortOrder       Int              @default(0)
+  isCompleted     Boolean          @default(false)
+  completedAt     DateTime?
+  durationMinutes Int?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  session         HobbySession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  recipeStep      HobbyRecipeStep? @relation(fields: [recipeStepId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, sortOrder])
+}
+
+model HobbyMetricDefinition {
+  id          String               @id @default(cuid())
+  hobbyId     String
+  name        String
+  unit        String
+  description String?
+  metricType  String               @default("numeric")
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  hobby       Hobby                @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  readings    HobbyMetricReading[]
+
+  @@unique([hobbyId, name])
+  @@index([hobbyId])
+}
+
+model HobbyMetricReading {
+  id                 String                @id @default(cuid())
+  metricDefinitionId String
+  sessionId          String?
+  value              Float
+  readingDate        DateTime
+  notes              String?
+  createdAt          DateTime              @default(now())
+  metricDefinition   HobbyMetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+  session            HobbySession?         @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([metricDefinitionId, readingDate])
+  @@index([sessionId])
+}
+
+model HobbyLog {
+  id        String        @id @default(cuid())
+  hobbyId   String
+  sessionId String?
+  title     String?
+  content   String
+  logDate   DateTime
+  logType   HobbyLogType  @default(note)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  hobby     Hobby         @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  session   HobbySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([hobbyId, logDate])
+  @@index([sessionId])
 }

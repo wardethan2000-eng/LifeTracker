@@ -699,6 +699,95 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
 }
 
+/* ── Inventory Filter Bar ── */
+
+.inventory-filter-bar {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 16px;
+}
+
+.inventory-filter-bar__tab {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.inventory-filter-bar__tab:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.inventory-filter-bar__tab--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.inventory-filter-bar__tab--active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Inventory Type Toggle ── */
+
+.inventory-type-toggle__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.inventory-type-toggle__options {
+  display: flex;
+  gap: 8px;
+}
+
+.inventory-type-toggle__btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.inventory-type-toggle__btn:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.inventory-type-toggle__btn--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.inventory-type-toggle__btn--active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.inventory-type-toggle__hint {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
 /* ── Tables ── */
 
 .data-table {
@@ -3873,4 +3962,228 @@ html[data-ui-density="compact"] .resource-layout__aside {
     max-width: 95vw;
     max-height: 80vh;
   }
+}
+
+/* ── Hobbies ──────────── */
+
+/* Pipeline step indicator */
+.hobby-pipeline-indicator {
+  padding: 12px 0;
+}
+
+.hobby-pipeline-indicator .hobby-pipeline-step {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  transition: background 0.2s;
+}
+
+.hobby-pipeline-step--completed {
+  background: var(--success);
+}
+
+.hobby-pipeline-step--active {
+  background: var(--accent);
+}
+
+.hobby-pipeline-step--upcoming {
+  background: var(--border);
+}
+
+/* Hobby tab bar */
+.hobby-tab-bar {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+  padding: 0 0 12px 0;
+  margin: 16px 0 24px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.hobby-tab-bar__item a {
+  text-decoration: none;
+  color: var(--ink-muted);
+  font-weight: normal;
+  padding-bottom: 12px;
+  display: block;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.hobby-tab-bar__item a:hover {
+  color: var(--ink);
+}
+
+.hobby-tab-bar__item--active a {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+
+/* Session card */
+.hobby-session-card {
+  display: block;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.hobby-session-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Recipe card */
+.hobby-recipe-card {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.hobby-recipe-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Journal entry card */
+.hobby-journal-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  border-left-width: 4px;
+  transition: border-color 0.15s;
+}
+
+.hobby-journal-card--note {
+  border-left-color: var(--ink-muted);
+}
+
+.hobby-journal-card--tasting {
+  border-left-color: var(--accent);
+}
+
+.hobby-journal-card--progress {
+  border-left-color: var(--success);
+}
+
+.hobby-journal-card--issue {
+  border-left-color: var(--warning);
+}
+
+/* Step checklist */
+.hobby-step-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.hobby-step-item--completed {
+  background: var(--surface);
+  opacity: 0.7;
+}
+
+.hobby-step-item__check {
+  font-size: 1.1rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.hobby-step-item__body {
+  flex: 1;
+}
+
+.hobby-step-item__title--done {
+  text-decoration: line-through;
+}
+
+/* Metric sparkline */
+.hobby-metric-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 40px;
+  margin-bottom: 16px;
+}
+
+.hobby-metric-sparkline__bar {
+  flex: 1;
+  min-height: 4px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  transition: height 0.2s;
+}
+
+/* Shopping list — highlight deficit rows */
+.hobby-shopping-deficit {
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+/* Hobby status filter strip (used on list page) */
+.hobby-status-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hobby-status-filter__btn {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.hobby-status-filter__btn:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.hobby-status-filter__btn--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Hobby preset details */
+.hobby-preset-details {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.hobby-preset-details__section {
+  margin-bottom: 12px;
+}
+
+.hobby-preset-details__section:last-child {
+  margin-bottom: 0;
+}
+
+.hobby-preset-details__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
 }

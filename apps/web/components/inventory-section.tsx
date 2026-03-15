@@ -49,6 +49,7 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
   const [prefillKey, setPrefillKey] = useState(0);
   const [showLinkPreview, setShowLinkPreview] = useState(false);
   const [supplierUrlInput, setSupplierUrlInput] = useState("");
+  const [itemType, setItemType] = useState<"consumable" | "equipment">("consumable");
 
   const mergedCategoryOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -154,6 +155,14 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
           <form action={createInventoryItemAction} key={prefillKey}>
             <input type="hidden" name="householdId" value={householdId} />
             <input type="hidden" name="category" value={resolvedCategory} />
+            <input type="hidden" name="itemType" value={itemType} />
+            <div className="inventory-type-toggle" style={{ marginBottom: 16 }}>
+              <span className="inventory-type-toggle__label">Item Type</span>
+              <div className="inventory-type-toggle__options">
+                <button type="button" className={`inventory-type-toggle__btn${itemType === "consumable" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setItemType("consumable")}>Consumable <span className="inventory-type-toggle__hint">supplies, ingredients, parts</span></button>
+                <button type="button" className={`inventory-type-toggle__btn${itemType === "equipment" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setItemType("equipment")}>Equipment <span className="inventory-type-toggle__hint">tools, instruments, gear</span></button>
+              </div>
+            </div>
             <div className="barcode-lookup-row" style={{ marginBottom: 16 }}>
               <label className="field field--full">
                 <span>Quick Add by Barcode</span>
@@ -207,14 +216,30 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
                 <span>Unit</span>
                 <input type="text" name="unit" placeholder="each, quarts, feet" defaultValue="each" />
               </label>
-              <label className="field">
-                <span>Reorder When At</span>
-                <input type="number" name="reorderThreshold" min="0" step="0.01" placeholder="1" />
-              </label>
-              <label className="field">
-                <span>Usually Buy</span>
-                <input type="number" name="reorderQuantity" min="0" step="0.01" placeholder="2" />
-              </label>
+              {itemType === "equipment" && (
+                <label className="field">
+                  <span>Condition</span>
+                  <select name="conditionStatus" defaultValue="">
+                    <option value="">No condition set</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="needs_repair">Needs Repair</option>
+                    <option value="needs_replacement">Needs Replacement</option>
+                  </select>
+                </label>
+              )}
+              {itemType === "consumable" && (
+                <>
+                  <label className="field">
+                    <span>Reorder When At</span>
+                    <input type="number" name="reorderThreshold" min="0" step="0.01" placeholder="1" />
+                  </label>
+                  <label className="field">
+                    <span>Usually Buy</span>
+                    <input type="number" name="reorderQuantity" min="0" step="0.01" placeholder="2" />
+                  </label>
+                </>
+              )}
               <label className="field">
                 <span>Last Price</span>
                 <input type="number" name="unitCost" min="0" step="0.01" placeholder="8.97" defaultValue={prefill.unitCost ?? ""} />
