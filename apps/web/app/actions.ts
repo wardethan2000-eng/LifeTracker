@@ -133,6 +133,7 @@ import {
   updateServiceProvider,
   updateMetric
 } from "../lib/api";
+import { normalizeExternalUrl } from "../lib/url";
 
 const getString = (formData: FormData, key: string): string => {
   const value = formData.get(key);
@@ -199,6 +200,22 @@ const getOptionalBoolean = (formData: FormData, key: string): boolean | undefine
   }
 
   return value === "true" || value === "on" || value === "1";
+};
+
+const getOptionalNormalizedUrl = (formData: FormData, key: string): string | undefined => {
+  const value = getOptionalString(formData, key);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = normalizeExternalUrl(value);
+
+  if (!normalized) {
+    throw new Error(`${key} must be a valid URL.`);
+  }
+
+  return normalized;
 };
 
 const getRepeatedStrings = (formData: FormData, key: string): string[] => formData
@@ -736,7 +753,7 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
   const reorderThreshold = getOptionalNumber(formData, "reorderThreshold");
   const reorderQuantity = getOptionalNumber(formData, "reorderQuantity");
   const preferredSupplier = getOptionalString(formData, "preferredSupplier");
-  const supplierUrl = getOptionalString(formData, "supplierUrl");
+  const supplierUrl = getOptionalNormalizedUrl(formData, "supplierUrl");
   const unitCost = getOptionalNumber(formData, "unitCost");
   const storageLocation = getOptionalString(formData, "storageLocation");
   const notes = getOptionalString(formData, "notes");
@@ -2087,7 +2104,7 @@ export async function createProjectPhaseSupplyAction(formData: FormData): Promis
   const estimatedUnitCost = getOptionalNumber(formData, "estimatedUnitCost");
   const actualUnitCost = getOptionalNumber(formData, "actualUnitCost");
   const supplier = getOptionalString(formData, "supplier");
-  const supplierUrl = getOptionalString(formData, "supplierUrl");
+  const supplierUrl = getOptionalNormalizedUrl(formData, "supplierUrl");
   const isProcured = getOptionalBoolean(formData, "isProcured");
   const isStaged = getOptionalBoolean(formData, "isStaged");
   const inventoryItemId = getOptionalString(formData, "inventoryItemId");

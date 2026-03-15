@@ -7,19 +7,130 @@ const USER_AGENT =
 const FETCH_TIMEOUT_MS = 10_000;
 
 const RETAILER_MAP: Record<string, string> = {
+  "amazon.de": "Amazon",
+  "amazon.fr": "Amazon",
+  "amazon.it": "Amazon",
+  "amazon.es": "Amazon",
+  "amazon.com.mx": "Amazon",
+  "amzn.to": "Amazon",
   "amazon.com": "Amazon",
   "amazon.ca": "Amazon",
   "amazon.co.uk": "Amazon",
   "homedepot.com": "Home Depot",
   "lowes.com": "Lowes",
   "autozone.com": "AutoZone",
+  "advanceautoparts.com": "Advance Auto Parts",
+  "napaonline.com": "NAPA Auto Parts",
+  "oreillyauto.com": "O'Reilly Auto Parts",
   "oreillys.com": "O'Reilly Auto Parts",
   "rockauto.com": "RockAuto",
   "walmart.com": "Walmart",
+  "ebay.com": "eBay",
+  "grainger.com": "Grainger",
   "harborfreight.com": "Harbor Freight",
   "acehardware.com": "Ace Hardware",
   "tractorsupply.com": "Tractor Supply",
+  "mcmaster.com": "McMaster-Carr",
+  "zoro.com": "Zoro",
+  "uline.com": "Uline",
+  "fcpeuro.com": "FCP Euro",
+  "summitracing.com": "Summit Racing",
+  "webstaurantstore.com": "WebstaurantStore",
 };
+
+const TRACKING_PARAM_PREFIXES = [
+  "utm_",
+  "ga_",
+  "gs_",
+  "mkt_",
+  "mc_",
+  "sc_",
+  "trk",
+  "tracking"
+] as const;
+
+const TRACKING_PARAM_NAMES = new Set([
+  "aaxitk",
+  "ascsubtag",
+  "camp",
+  "clickid",
+  "content-id",
+  "creative",
+  "dib",
+  "dib_tag",
+  "fbclid",
+  "gad_source",
+  "gclid",
+  "gclsrc",
+  "hsa_acc",
+  "hsa_ad",
+  "hsa_cam",
+  "hsa_grp",
+  "hsa_kw",
+  "hsa_mt",
+  "hsa_net",
+  "hsa_src",
+  "hsa_tgt",
+  "hsa_ver",
+  "irclickid",
+  "linkcode",
+  "msclkid",
+  "pd_rd_i",
+  "psc",
+  "qid",
+  "ref",
+  "ref_",
+  "srsltid",
+  "sr",
+  "tag",
+  "variant"
+]);
+
+const REDIRECT_PARAM_CANDIDATES = [
+  "url",
+  "u",
+  "target",
+  "dest",
+  "destination",
+  "redirect",
+  "redirect_url",
+  "redirect_uri",
+  "redir",
+  "r",
+  "to"
+] as const;
+
+const PRODUCT_HOSTS_TO_STRIP_QUERY = [
+  "amazon.com",
+  "amazon.ca",
+  "amazon.co.uk",
+  "amazon.de",
+  "amazon.fr",
+  "amazon.it",
+  "amazon.es",
+  "amazon.com.mx",
+  "autozone.com",
+  "advanceautoparts.com",
+  "oreillyauto.com",
+  "oreillyauto.parts",
+  "oreillys.com",
+  "napaonline.com",
+  "rockauto.com",
+  "fcpeuro.com",
+  "summitracing.com",
+  "homedepot.com",
+  "lowes.com",
+  "harborfreight.com",
+  "acehardware.com",
+  "tractorsupply.com",
+  "walmart.com",
+  "ebay.com",
+  "grainger.com",
+  "zoro.com",
+  "mcmaster.com",
+  "uline.com",
+  "webstaurantstore.com"
+] as const;
 
 const FIELD_LABELS: Record<string, string> = {
   name: "Product Name",
@@ -57,8 +168,133 @@ function detectRetailer(hostname: string): string | null {
 
 function stripTitleSuffix(title: string): string {
   return title
-    .replace(/\s*[\|\-–—@]\s*(Home Depot|Amazon\.com?|Lowes\.com?|AutoZone|Walmart\.com?|Harbor Freight|Ace Hardware|Tractor Supply|O'Reilly Auto Parts|RockAuto).*$/i, "")
+    .replace(/\s*[\|\-–—@]\s*(Home Depot|Amazon\.com?|Lowes\.com?|AutoZone|Advance Auto Parts|NAPA Auto Parts|Walmart\.com?|Harbor Freight|Ace Hardware|Tractor Supply|O'Reilly Auto Parts|RockAuto|eBay|Grainger|McMaster-Carr|Zoro|Uline|FCP Euro|Summit Racing|WebstaurantStore).*$/i, "")
     .trim();
+}
+
+function extractCandidateUrl(value: string): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const explicitMatch = trimmed.match(/https?:\/\/\S+/i);
+
+  if (explicitMatch) {
+    return explicitMatch[0];
+  }
+
+  const domainMatch = trimmed.match(/(?:[a-z0-9-]+\.)+[a-z]{2,}\S*/i);
+
+  if (domainMatch) {
+    return domainMatch[0];
+  }
+
+  return trimmed;
+}
+
+function withHttpProtocol(value: string): string {
+  if (/^[a-z][a-z\d+\-.]*:/i.test(value)) {
+    return value;
+  }
+
+  if (value.startsWith("//")) {
+    return `https:${value}`;
+  }
+
+  return `https://${value}`;
+}
+
+function isHttpUrl(url: URL): boolean {
+  return url.protocol === "http:" || url.protocol === "https:";
+}
+
+function matchesDomain(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+function unwrapRedirectUrl(url: URL): URL {
+  let current = url;
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    let nextValue: string | null = null;
+
+    for (const key of REDIRECT_PARAM_CANDIDATES) {
+      const candidate = current.searchParams.get(key);
+
+      if (candidate && /^(https?:)?\/\//i.test(candidate.trim())) {
+        nextValue = candidate.trim();
+        break;
+      }
+    }
+
+    if (!nextValue) {
+      if ((matchesDomain(current.hostname, "google.com") || matchesDomain(current.hostname, "bing.com")) && current.pathname === "/url") {
+        nextValue = current.searchParams.get("q")?.trim() ?? null;
+      } else if (matchesDomain(current.hostname, "l.facebook.com") || matchesDomain(current.hostname, "lm.facebook.com")) {
+        nextValue = current.searchParams.get("u")?.trim() ?? null;
+      }
+    }
+
+    if (!nextValue) {
+      break;
+    }
+
+    try {
+      const parsed = new URL(withHttpProtocol(nextValue));
+
+      if (!isHttpUrl(parsed)) {
+        break;
+      }
+
+      current = parsed;
+    } catch {
+      break;
+    }
+  }
+
+  return current;
+}
+
+function stripTrackingParams(url: URL): void {
+  const keys = [...url.searchParams.keys()];
+
+  for (const key of keys) {
+    const normalizedKey = key.toLowerCase();
+    const shouldDelete = TRACKING_PARAM_NAMES.has(normalizedKey)
+      || TRACKING_PARAM_PREFIXES.some((prefix) => normalizedKey.startsWith(prefix))
+      || normalizedKey.startsWith("pd_rd_")
+      || normalizedKey.startsWith("pf_rd_");
+
+    if (shouldDelete) {
+      url.searchParams.delete(key);
+    }
+  }
+}
+
+function shouldStripEntireQuery(url: URL): boolean {
+  const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+
+  if (!PRODUCT_HOSTS_TO_STRIP_QUERY.some((domain) => matchesDomain(hostname, domain))) {
+    return false;
+  }
+
+  const pathname = url.pathname.toLowerCase();
+
+  return [
+    "/dp/",
+    "/gp/",
+    "/ip/",
+    "/p/",
+    "/product/",
+    "/products/",
+    "/pd/",
+    "/itm/",
+    "/parts/",
+    "/sku/",
+    "/item/"
+  ].some((segment) => pathname.includes(segment));
 }
 
 function resolveUrl(relative: string, base: string): string | null {
@@ -275,7 +511,42 @@ function currencySymbol(code: string): string {
   return symbols[code.toUpperCase()] ?? "";
 }
 
+export function normalizeLinkPreviewUrl(value: string): string | null {
+  const candidate = extractCandidateUrl(value);
+
+  if (!candidate) {
+    return null;
+  }
+
+  try {
+    const parsed = unwrapRedirectUrl(new URL(withHttpProtocol(candidate)));
+
+    if (!isHttpUrl(parsed)) {
+      return null;
+    }
+
+    parsed.username = "";
+    parsed.password = "";
+    parsed.hash = "";
+    stripTrackingParams(parsed);
+
+    if (shouldStripEntireQuery(parsed)) {
+      parsed.search = "";
+    }
+
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
 export async function extractLinkPreview(url: string): Promise<LinkPreviewResponse> {
+  const normalizedUrl = normalizeLinkPreviewUrl(url);
+
+  if (!normalizedUrl) {
+    throw new Error("Invalid product URL.");
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -283,14 +554,14 @@ export async function extractLinkPreview(url: string): Promise<LinkPreviewRespon
   let finalUrl: string;
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(normalizedUrl, {
       headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" },
       signal: controller.signal,
       redirect: "follow",
     });
 
     if (!response.ok) {
-      throw new Error(`Fetch returned HTTP ${response.status} for ${url}`);
+      throw new Error(`Fetch returned HTTP ${response.status} for ${normalizedUrl}`);
     }
 
     html = await response.text();
@@ -354,7 +625,7 @@ export async function extractLinkPreview(url: string): Promise<LinkPreviewRespon
   const uniqueImages = [...new Set(imageUrls)].slice(0, 5);
 
   return {
-    url,
+    url: finalUrl,
     canonicalUrl,
     retailer,
     fields: fieldArray,

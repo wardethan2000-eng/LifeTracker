@@ -4,6 +4,7 @@ import type { BarcodeLookupResult, InventoryItemSummary, UpdateInventoryItemInpu
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
 import { updateInventoryItem } from "../lib/api";
+import { normalizeExternalUrl } from "../lib/url";
 import { BarcodeLookupField } from "./barcode-lookup-field";
 
 type InventoryItemEditFormProps = {
@@ -125,7 +126,15 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
 
     const supplierUrl = getString("supplierUrl");
     if (supplierUrl !== undefined) {
-      input.supplierUrl = supplierUrl;
+      const normalizedSupplierUrl = normalizeExternalUrl(supplierUrl);
+
+      if (!normalizedSupplierUrl) {
+        setSaving(false);
+        setError("Supplier Link must be a valid URL.");
+        return;
+      }
+
+      input.supplierUrl = normalizedSupplierUrl;
     }
 
     const unitCost = getNumber("unitCost");
@@ -201,7 +210,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
       </label>
       <label className="field field--full">
         <span>Supplier Link</span>
-        <input type="url" name="supplierUrl" defaultValue={item.supplierUrl ?? ""} />
+        <input type="text" name="supplierUrl" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} defaultValue={item.supplierUrl ?? ""} />
       </label>
       <label className="field field--full">
         <span>Storage Location</span>

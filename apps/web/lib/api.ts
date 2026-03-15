@@ -141,6 +141,7 @@ import {
   barcodeLookupResultSchema,
   type BarcodeLookupResult
 } from "@lifekeeper/types";
+import { normalizeExternalUrl } from "./url";
 
 type Schema<T> = {
   parse: (value: unknown) => T;
@@ -1377,7 +1378,7 @@ export const enqueueNotificationScan = async (householdId: string): Promise<void
 export const fetchLinkPreview = async (householdId: string, url: string): Promise<LinkPreviewResponse> => apiRequest({
   path: `/v1/households/${householdId}/link-preview`,
   method: "POST",
-  body: { url },
+  body: { url: normalizeExternalUrl(url) ?? url.trim() },
   schema: linkPreviewResponseSchema
 });
 

@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { createInventoryItemAction } from "../app/actions";
 import { BarcodeLookupField } from "./barcode-lookup-field";
 import { LinkPreviewDialog } from "./link-preview-dialog";
+import { normalizeExternalUrl } from "../lib/url";
 
 type InventoryPrefill = {
   name?: string | undefined;
@@ -47,6 +48,7 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
   const [prefill, setPrefill] = useState<InventoryPrefill>({});
   const [prefillKey, setPrefillKey] = useState(0);
   const [showLinkPreview, setShowLinkPreview] = useState(false);
+  const [supplierUrlInput, setSupplierUrlInput] = useState("");
 
   const mergedCategoryOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -114,13 +116,6 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
         <div className="panel__header-actions">
           <button
             type="button"
-            className="button button--sm"
-            onClick={() => setShowLinkPreview(true)}
-          >
-            Add from Link
-          </button>
-          <button
-            type="button"
             className={`button button--primary button--sm${showForm ? " button--active" : ""}`}
             onClick={() => setShowForm((current) => !current)}
           >
@@ -132,16 +127,20 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
       {showLinkPreview && (
         <LinkPreviewDialog
           householdId={householdId}
+          initialUrl={supplierUrlInput}
+          autoFetchOnOpen={Boolean(normalizeExternalUrl(supplierUrlInput))}
           onConfirm={(data) => {
             const priceRaw = data.fields.price?.replace(/[^\d.]/g, "") ?? "";
+            const nextSupplierUrl = data.sourceUrl ?? "";
             setPrefill({
               name: data.fields.name ?? "",
               partNumber: data.fields.partNumber ?? data.fields.sku ?? "",
               manufacturer: data.fields.brand ?? "",
               unitCost: priceRaw || undefined,
               preferredSupplier: data.retailer ?? "",
-              supplierUrl: data.sourceUrl ?? "",
+              supplierUrl: nextSupplierUrl,
             });
+            setSupplierUrlInput(nextSupplierUrl);
             setPrefillKey((k) => k + 1);
             setShowLinkPreview(false);
             setShowForm(true);
@@ -226,7 +225,28 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
               </label>
               <label className="field field--full">
                 <span>Supplier Link</span>
-                <input type="url" name="supplierUrl" placeholder="https://..." defaultValue={prefill.supplierUrl ?? ""} />
+                <div className="field-action-row">
+                  <input
+                    type="text"
+                    name="supplierUrl"
+                    inputMode="url"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    placeholder="amazon.com/... or https://..."
+                    value={supplierUrlInput}
+                    onChange={(event) => setSupplierUrlInput(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="button button--sm"
+                    onClick={() => setShowLinkPreview(true)}
+                    disabled={!supplierUrlInput.trim()}
+                  >
+                    Add from Link
+                  </button>
+                </div>
+                <small>Paste a product URL here, then import the product details.</small>
               </label>
               <label className="field field--full">
                 <span>Storage Location</span>

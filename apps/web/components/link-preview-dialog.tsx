@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
 import type { LinkPreviewField, LinkPreviewResponse } from "@lifekeeper/types";
 import { fetchLinkPreview } from "../lib/api";
+import { normalizeExternalUrl } from "../lib/url";
 
 type LinkPreviewConfirmData = {
   fields: Record<string, string>;
@@ -16,11 +17,11 @@ type LinkPreviewDialogProps = {
   householdId: string;
   onConfirm: (data: LinkPreviewConfirmData) => void;
   onCancel: () => void;
-  triggerLabel?: string;
+  initialUrl?: string;
+  autoFetchOnOpen?: boolean;
 };
 
 type DialogState =
-  | { phase: "closed" }
   | { phase: "input" }
   | { phase: "loading" }
   | { phase: "review"; data: LinkPreviewResponse; editedValues: Record<string, string> };
@@ -29,32 +30,33 @@ export function LinkPreviewDialog({
   householdId,
   onConfirm,
   onCancel,
-  triggerLabel = "Add from Link",
+  initialUrl = "",
+  autoFetchOnOpen = false,
 }: LinkPreviewDialogProps): JSX.Element {
-  const [state, setState] = useState<DialogState>({ phase: "closed" });
-  const [url, setUrl] = useState("");
+  const [state, setState] = useState<DialogState>({ phase: "input" });
+  const [url, setUrl] = useState(initialUrl);
   const [error, setError] = useState<string | null>(null);
-
-  const open = () => {
-    setUrl("");
-    setError(null);
-    setState({ phase: "input" });
-  };
+  const autoFetchStartedRef = useRef(false);
 
   const close = () => {
-    setState({ phase: "closed" });
-    setUrl("");
-    setError(null);
     onCancel();
   };
 
-  const handleFetch = async () => {
-    if (!url.trim()) return;
+  const handleFetch = useCallback(async (value = url) => {
+    const normalizedUrl = normalizeExternalUrl(value);
+
+    if (!normalizedUrl) {
+      setError("Enter a valid product URL.");
+      setState({ phase: "input" });
+      return;
+    }
+
+    setUrl(normalizedUrl);
     setError(null);
     setState({ phase: "loading" });
 
     try {
-      const data = await fetchLinkPreview(householdId, url.trim());
+      const data = await fetchLinkPreview(householdId, normalizedUrl);
       const initialValues: Record<string, string> = {};
       for (const field of data.fields) {
         if (field.value) {
@@ -67,7 +69,16 @@ export function LinkPreviewDialog({
       setError(message);
       setState({ phase: "input" });
     }
-  };
+  }, [householdId, url]);
+
+  useEffect(() => {
+    if (!autoFetchOnOpen || autoFetchStartedRef.current) {
+      return;
+    }
+
+    autoFetchStartedRef.current = true;
+    void handleFetch(initialUrl);
+  }, [autoFetchOnOpen, handleFetch, initialUrl]);
 
   const handleFieldChange = (key: string, value: string) => {
     if (state.phase !== "review") return;
@@ -92,21 +103,10 @@ export function LinkPreviewDialog({
     onConfirm({
       fields,
       imageUrl: data.imageUrls[0] ?? null,
-      sourceUrl: data.url,
+      sourceUrl: data.canonicalUrl ?? data.url,
       retailer: data.retailer,
     });
-
-    setState({ phase: "closed" });
-    setUrl("");
   };
-
-  if (state.phase === "closed") {
-    return (
-      <button type="button" className="button" onClick={open}>
-        {triggerLabel}
-      </button>
-    );
-  }
 
   const confidenceClass = (c: LinkPreviewField["confidence"]): string =>
     `link-preview--confidence link-preview--confidence-${c}`;
@@ -139,7 +139,9 @@ export function LinkPreviewDialog({
               <button
                 type="button"
                 className="button button--primary"
-                onClick={handleFetch}
+                onClick={() => {
+                  void handleFetch();
+                }}
                 disabled={state.phase === "loading" || !url.trim()}
               >
                 {state.phase === "loading" ? "Fetching…" : "Fetch"}
@@ -175,11 +177,11 @@ export function LinkPreviewDialog({
                 )}
                 <a
                   className="link-preview--source-url"
-                  href={state.data.url}
+                  href={state.data.canonicalUrl ?? state.data.url}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  {new URL(state.data.url).hostname}
+                  {new URL(state.data.canonicalUrl ?? state.data.url).hostname}
                 </a>
               </div>
               <div className="link-preview--fields-col">

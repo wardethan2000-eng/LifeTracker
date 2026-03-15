@@ -2,7 +2,7 @@ import { linkPreviewRequestSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { extractLinkPreview } from "../../lib/link-preview.js";
+import { extractLinkPreview, normalizeLinkPreviewUrl } from "../../lib/link-preview.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -18,7 +18,15 @@ export const householdLinkPreviewRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const input = linkPreviewRequestSchema.parse(request.body);
+    const rawBody = typeof request.body === "object" && request.body !== null
+      ? request.body as Record<string, unknown>
+      : {};
+
+    const input = linkPreviewRequestSchema.parse({
+      url: typeof rawBody.url === "string"
+        ? normalizeLinkPreviewUrl(rawBody.url) ?? rawBody.url.trim()
+        : rawBody.url
+    });
 
     try {
       const result = await extractLinkPreview(input.url);
