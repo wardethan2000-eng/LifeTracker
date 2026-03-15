@@ -857,7 +857,7 @@ export function AssetProfileWorkbench({
       ? "inline"
       : "manual";
   const assetTypeKey = selectedBlueprint?.key ?? (assetTypeLabel ? slugify(assetTypeLabel) : "");
-ï»¿  const dynamicSections = getDistinctGroups(fieldDefinitions);
+  const dynamicSections = getDistinctGroups(fieldDefinitions);
   const detailSections = Array.from(new Set([...dynamicSections, ...manualSections]));
   const blueprintSuggestionFields = selectedBlueprint ? selectedBlueprint.fieldDefinitions : [];
   const suggestionPool = dedupeSuggestedFields(category === "aircraft" && selectedBlueprint

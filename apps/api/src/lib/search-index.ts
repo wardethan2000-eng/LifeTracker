@@ -428,6 +428,10 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
       name: true,
       description: true,
       status: true,
+      parentProjectId: true,
+      parentProject: {
+        select: { name: true }
+      },
       phases: {
         select: {
           name: true,
@@ -460,6 +464,8 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     householdId: project.householdId,
     entityType: "project",
     entityId: project.id,
+    parentEntityId: project.parentProjectId ?? null,
+    parentEntityName: project.parentProject?.name ?? null,
     title: project.name,
     subtitle: project.status,
     body: joinText(project.description, phaseText),

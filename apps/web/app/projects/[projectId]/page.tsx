@@ -130,15 +130,40 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       <AppShell activePath="/projects">
         <header className="page-header">
           <div>
+            {project.breadcrumbs && project.breadcrumbs.length > 1 && (
+              <nav className="project-breadcrumbs" style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "0.82rem", color: "var(--ink-muted)", marginBottom: "4px" }}>
+                {project.breadcrumbs.map((crumb, index) => (
+                  <span key={crumb.id} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    {index > 0 && <span style={{ color: "var(--ink-muted)" }}>›</span>}
+                    {index < project.breadcrumbs.length - 1 ? (
+                      <Link href={`/projects/${crumb.id}?householdId=${household.id}`} className="text-link">{crumb.name}</Link>
+                    ) : (
+                      <span style={{ color: "var(--ink)", fontWeight: 500 }}>{crumb.name}</span>
+                    )}
+                  </span>
+                ))}
+              </nav>
+            )}
             <h1>{project.name}</h1>
             <p style={{ marginTop: 6 }}>{project.description ?? "Organize the work by phase, track structured budgets, and stage supplies before execution starts."}</p>
           </div>
           <div className="page-header__actions">
+            <Link href={`/projects/new?householdId=${household.id}&parentProjectId=${project.id}`} className="button button--ghost">+ Sub-project</Link>
             <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">Back to Projects</Link>
           </div>
         </header>
 
         <div className="page-body">
+          {project.treeStats && (
+            <div className="note" style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", marginBottom: "12px" }}>
+              <span><strong>Tree totals:</strong></span>
+              <span>{project.treeStats.descendantProjectCount} sub-project{project.treeStats.descendantProjectCount === 1 ? "" : "s"}</span>
+              <span>Budget: {formatCurrency(project.treeStats.treeBudgetTotal, "No budget")}</span>
+              <span>Spent: {formatCurrency(project.treeStats.treeSpentTotal, "$0.00")}</span>
+              <span>Tasks: {project.treeStats.treeCompletedTaskCount}/{project.treeStats.treeTaskCount} ({project.treeStats.treePercentComplete}%)</span>
+            </div>
+          )}
+
           <section className="stats-row">
             <div className="stat-card stat-card--accent">
               <span className="stat-card__label">Status</span>
@@ -166,6 +191,46 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               <span className="stat-card__sub">{inventoryLinkedSupplyCount} linked to inventory, {inventoryCoveredSupplyCount} fully coverable from stock</span>
             </div>
           </section>
+
+          {project.childProjects && project.childProjects.length > 0 && (
+            <section className="panel" style={{ marginBottom: "24px" }}>
+              <div className="panel__header">
+                <h2>Sub-projects ({project.childProjects.length})</h2>
+                <Link href={`/projects/new?householdId=${household.id}&parentProjectId=${project.id}`} className="button button--ghost button--sm">+ Add Sub-project</Link>
+              </div>
+              <div className="panel__body">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Status</th>
+                      <th>Progress</th>
+                      <th>Budget</th>
+                      <th>Spent</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.childProjects.map((child) => (
+                      <tr key={child.id}>
+                        <td>
+                          <div className="data-table__primary">{child.name}</div>
+                          {child.childProjectCount > 0 && (
+                            <div className="data-table__secondary">{child.childProjectCount} sub-project{child.childProjectCount === 1 ? "" : "s"}</div>
+                          )}
+                        </td>
+                        <td><span className="pill">{projectStatusLabels[child.status] ?? child.status}</span></td>
+                        <td>{child.percentComplete}% ({child.completedTaskCount}/{child.taskCount})</td>
+                        <td>{formatCurrency(child.budgetAmount, "No budget")}</td>
+                        <td>{formatCurrency(child.totalSpent, "$0.00")}</td>
+                        <td><Link href={`/projects/${child.id}?householdId=${household.id}`} className="data-table__link">Open</Link></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           <div className="resource-layout">
             <div className="resource-layout__primary">

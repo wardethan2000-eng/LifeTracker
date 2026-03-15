@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -40,7 +40,8 @@ const expenseParamsSchema = projectParamsSchema.extend({
 });
 
 const listProjectsQuerySchema = z.object({
-  status: projectStatusSchema.optional()
+  status: projectStatusSchema.optional(),
+  parentProjectId: z.string().optional()
 });
 
 const toProjectSummary = (
@@ -55,6 +56,8 @@ const toProjectSummary = (
     actualEndDate: Date | null;
     budgetAmount: number | null;
     notes: string | null;
+    parentProjectId: string | null;
+    depth: number;
     createdAt: Date;
     updatedAt: Date;
     expenses: { amount: number }[];
@@ -81,6 +84,8 @@ const toProjectSummary = (
     actualEndDate: project.actualEndDate?.toISOString() ?? null,
     budgetAmount: project.budgetAmount,
     notes: project.notes,
+    parentProjectId: project.parentProjectId,
+    depth: project.depth,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     totalBudgeted: project.budgetAmount,
@@ -188,6 +193,8 @@ const toProjectResponse = (project: {
   actualEndDate: Date | null;
   budgetAmount: number | null;
   notes: string | null;
+  parentProjectId: string | null;
+  depth: number;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
@@ -201,6 +208,8 @@ const toProjectResponse = (project: {
   actualEndDate: project.actualEndDate?.toISOString() ?? null,
   budgetAmount: project.budgetAmount,
   notes: project.notes,
+  parentProjectId: project.parentProjectId,
+  depth: project.depth,
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString()
 });
@@ -302,6 +311,81 @@ const toProjectExpenseResponse = (expense: {
   updatedAt: expense.updatedAt.toISOString()
 });
 
+const buildProjectBreadcrumbs = async (
+  prisma: PrismaClient,
+  projectId: string,
+  householdId: string
+): Promise<{ id: string; name: string }[]> => {
+  const result = await prisma.$queryRaw<{ id: string; name: string }[]>`
+    WITH RECURSIVE ancestors AS (
+      SELECT id, name, "parentProjectId"
+      FROM "Project"
+      WHERE id = ${projectId} AND "householdId" = ${householdId}
+      UNION ALL
+      SELECT p.id, p.name, p."parentProjectId"
+      FROM "Project" p
+      JOIN ancestors a ON p.id = a."parentProjectId"
+    )
+    SELECT id, name FROM ancestors
+  `;
+  return result.reverse();
+};
+
+const getProjectTreeStats = async (
+  prisma: PrismaClient,
+  projectId: string
+): Promise<{
+  treeBudgetTotal: number | null;
+  treeSpentTotal: number;
+  treeTaskCount: number;
+  treeCompletedTaskCount: number;
+  treePercentComplete: number;
+  descendantProjectCount: number;
+}> => {
+  const result = await prisma.$queryRaw<{
+    tree_budget: number | null;
+    tree_spent: number;
+    tree_tasks: bigint;
+    tree_completed: bigint;
+    descendant_count: bigint;
+  }[]>`
+    WITH RECURSIVE project_tree AS (
+      SELECT id FROM "Project" WHERE id = ${projectId}
+      UNION ALL
+      SELECT p.id FROM "Project" p
+      JOIN project_tree pt ON p."parentProjectId" = pt.id
+    )
+    SELECT
+      SUM(proj."budgetAmount") as tree_budget,
+      COALESCE(SUM(exp_agg.total), 0) as tree_spent,
+      COALESCE(SUM(task_agg.total), 0) as tree_tasks,
+      COALESCE(SUM(task_agg.completed), 0) as tree_completed,
+      (COUNT(DISTINCT pt.id) - 1) as descendant_count
+    FROM project_tree pt
+    JOIN "Project" proj ON proj.id = pt.id
+    LEFT JOIN LATERAL (
+      SELECT SUM(amount) as total FROM "ProjectExpense" WHERE "projectId" = pt.id
+    ) exp_agg ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'completed') as completed
+      FROM "ProjectTask" WHERE "projectId" = pt.id
+    ) task_agg ON true
+  `;
+
+  const row = result[0];
+  const taskCount = Number(row?.tree_tasks ?? 0);
+  const completedCount = Number(row?.tree_completed ?? 0);
+
+  return {
+    treeBudgetTotal: row?.tree_budget ?? null,
+    treeSpentTotal: Number(row?.tree_spent ?? 0),
+    treeTaskCount: taskCount,
+    treeCompletedTaskCount: completedCount,
+    treePercentComplete: taskCount > 0 ? Math.round((completedCount / taskCount) * 100) : 0,
+    descendantProjectCount: Number(row?.descendant_count ?? 0)
+  };
+};
+
 export const projectRoutes: FastifyPluginAsync = async (app) => {
   // ── Project CRUD ─────────────────────────────────────────────────
 
@@ -317,7 +401,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const where: Prisma.ProjectWhereInput = {
       householdId: params.householdId,
-      ...(query.status ? { status: query.status } : {})
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.parentProjectId !== undefined
+        ? { parentProjectId: query.parentProjectId === "null" ? null : query.parentProjectId }
+        : {})
     };
 
     const projects = await app.prisma.project.findMany({
@@ -344,6 +431,19 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
+    let depth = 0;
+    if (input.parentProjectId) {
+      const parentProject = await app.prisma.project.findFirst({
+        where: { id: input.parentProjectId, householdId: params.householdId }
+      });
+
+      if (!parentProject) {
+        return reply.code(400).send({ message: "Parent project not found in this household." });
+      }
+
+      depth = parentProject.depth + 1;
+    }
+
     const project = await app.prisma.project.create({
       data: {
         householdId: params.householdId,
@@ -353,7 +453,9 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         startDate: input.startDate ? new Date(input.startDate) : null,
         targetEndDate: input.targetEndDate ? new Date(input.targetEndDate) : null,
         budgetAmount: input.budgetAmount ?? null,
-        notes: input.notes ?? null
+        notes: input.notes ?? null,
+        parentProjectId: input.parentProjectId ?? null,
+        depth
       }
     });
 
@@ -422,13 +524,51 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
+    const breadcrumbs = await buildProjectBreadcrumbs(app.prisma as PrismaClient, project.id, params.householdId);
+
+    const childProjects = await app.prisma.project.findMany({
+      where: { parentProjectId: project.id, householdId: params.householdId },
+      include: {
+        tasks: { select: { status: true } },
+        expenses: { select: { amount: true } },
+        _count: { select: { childProjects: true } }
+      },
+      orderBy: { createdAt: "asc" }
+    });
+
+    const childSummaries = childProjects.map((child) => {
+      const taskCount = child.tasks.length;
+      const completedTaskCount = child.tasks.filter((t) => t.status === "completed").length;
+      return {
+        id: child.id,
+        name: child.name,
+        status: child.status,
+        depth: child.depth,
+        budgetAmount: child.budgetAmount,
+        startDate: child.startDate?.toISOString() ?? null,
+        targetEndDate: child.targetEndDate?.toISOString() ?? null,
+        taskCount,
+        completedTaskCount,
+        percentComplete: taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0,
+        totalSpent: child.expenses.reduce((sum, e) => sum + e.amount, 0),
+        childProjectCount: child._count.childProjects
+      };
+    });
+
+    const treeStats = childSummaries.length > 0
+      ? await getProjectTreeStats(app.prisma as PrismaClient, project.id)
+      : null;
+
     return {
       ...toProjectResponse(project),
       assets: project.assets.map(toProjectAssetResponse),
       tasks: project.tasks.map(toProjectTaskResponse),
       expenses: project.expenses.map(toProjectExpenseResponse),
       phases: project.phases.map(toProjectPhaseSummaryResponse),
-      budgetCategories: project.budgetCategories.map(toProjectBudgetCategoryResponse)
+      budgetCategories: project.budgetCategories.map(toProjectBudgetCategoryResponse),
+      breadcrumbs,
+      childProjects: childSummaries,
+      treeStats
     };
   });
 
@@ -459,6 +599,41 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.targetEndDate !== undefined) data.targetEndDate = input.targetEndDate ? new Date(input.targetEndDate) : null;
     if (input.budgetAmount !== undefined) data.budgetAmount = input.budgetAmount ?? null;
     if (input.notes !== undefined) data.notes = input.notes ?? null;
+
+    if (input.parentProjectId !== undefined) {
+      if (input.parentProjectId === null) {
+        data.parentProjectId = null;
+        data.depth = 0;
+      } else {
+        if (input.parentProjectId === existing.id) {
+          return reply.code(400).send({ message: "A project cannot be its own parent." });
+        }
+
+        const parentProject = await app.prisma.project.findFirst({
+          where: { id: input.parentProjectId, householdId: params.householdId }
+        });
+
+        if (!parentProject) {
+          return reply.code(400).send({ message: "Parent project not found in this household." });
+        }
+
+        const descendants = await app.prisma.$queryRaw<{ id: string }[]>`
+          WITH RECURSIVE tree AS (
+            SELECT id FROM "Project" WHERE "parentProjectId" = ${existing.id}
+            UNION ALL
+            SELECT p.id FROM "Project" p JOIN tree t ON p."parentProjectId" = t.id
+          )
+          SELECT id FROM tree
+        `;
+
+        if (descendants.some((d) => d.id === input.parentProjectId)) {
+          return reply.code(400).send({ message: "Cannot set parent to a descendant project — this would create a circular reference." });
+        }
+
+        data.parentProjectId = input.parentProjectId;
+        data.depth = parentProject.depth + 1;
+      }
+    }
 
     const project = await app.prisma.project.update({
       where: { id: existing.id },

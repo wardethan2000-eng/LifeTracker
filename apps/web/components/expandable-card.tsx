@@ -10,7 +10,7 @@ type ExpandableCardProps = {
   previewContent: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
-  badge?: { count: number; variant: "danger" | "warning" };
+  badge?: { count: number; variant: "danger" | "warning" | "neutral" };
 };
 
 export function ExpandableCard({

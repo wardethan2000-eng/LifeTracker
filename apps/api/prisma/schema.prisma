@@ -415,19 +415,24 @@ model Project {
   startDate     DateTime?
   targetEndDate DateTime?
   actualEndDate DateTime?
-  budgetAmount  Float?
-  notes         String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  assets        ProjectAsset[]
-  inventoryItems ProjectInventoryItem[]
-  phases        ProjectPhase[]
+  budgetAmount    Float?
+  notes           String?
+  parentProjectId String?
+  depth           Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  parentProject   Project?         @relation("ProjectHierarchy", fields: [parentProjectId], references: [id], onDelete: Cascade)
+  childProjects   Project[]        @relation("ProjectHierarchy")
+  assets          ProjectAsset[]
+  inventoryItems  ProjectInventoryItem[]
+  phases          ProjectPhase[]
   budgetCategories ProjectBudgetCategory[]
-  tasks         ProjectTask[]
-  expenses      ProjectExpense[]
+  tasks           ProjectTask[]
+  expenses        ProjectExpense[]
 
   @@index([householdId, status])
+  @@index([parentProjectId])
 }
 
 model InventoryItem {

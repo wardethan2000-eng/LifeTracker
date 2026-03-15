@@ -1045,8 +1045,39 @@ export const projectSchema = z.object({
   actualEndDate: z.string().datetime().nullable(),
   budgetAmount: z.number().nullable(),
   notes: z.string().nullable(),
+  parentProjectId: z.string().cuid().nullable().default(null),
+  depth: z.number().int().default(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
+});
+
+export const projectChildSummarySchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  status: projectStatusSchema,
+  depth: z.number().int(),
+  budgetAmount: z.number().nullable(),
+  startDate: z.string().datetime().nullable(),
+  targetEndDate: z.string().datetime().nullable(),
+  taskCount: z.number().int(),
+  completedTaskCount: z.number().int(),
+  percentComplete: z.number().int(),
+  totalSpent: z.number(),
+  childProjectCount: z.number().int()
+});
+
+export const projectBreadcrumbSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string()
+});
+
+export const projectTreeStatsSchema = z.object({
+  treeBudgetTotal: z.number().nullable(),
+  treeSpentTotal: z.number(),
+  treeTaskCount: z.number().int(),
+  treeCompletedTaskCount: z.number().int(),
+  treePercentComplete: z.number().int(),
+  descendantProjectCount: z.number().int()
 });
 
 export const createProjectSchema = z.object({
@@ -1056,7 +1087,8 @@ export const createProjectSchema = z.object({
   startDate: z.string().datetime().optional(),
   targetEndDate: z.string().datetime().optional(),
   budgetAmount: z.number().min(0).optional(),
-  notes: z.string().max(5000).optional()
+  notes: z.string().max(5000).optional(),
+  parentProjectId: z.string().cuid().optional()
 });
 
 export const updateProjectSchema = createProjectSchema.partial().extend({
@@ -1064,7 +1096,8 @@ export const updateProjectSchema = createProjectSchema.partial().extend({
   startDate: z.string().datetime().nullable().optional(),
   targetEndDate: z.string().datetime().nullable().optional(),
   budgetAmount: z.number().min(0).nullable().optional(),
-  notes: z.string().max(5000).nullable().optional()
+  notes: z.string().max(5000).nullable().optional(),
+  parentProjectId: z.string().cuid().nullable().optional()
 });
 
 export const projectAssetSchema = z.object({
@@ -1260,7 +1293,7 @@ export const projectTaskSchema = z.object({
   phaseId: z.string().cuid().nullable(),
   title: z.string(),
   description: z.string().nullable(),
-  status: z.string(),
+  status: projectTaskStatusSchema,
   assignedToId: z.string().cuid().nullable(),
   assignee: shallowUserSchema.nullable().default(null),
   dueDate: z.string().datetime().nullable(),
@@ -1374,7 +1407,10 @@ export const projectDetailSchema = projectSchema.extend({
   tasks: z.array(projectTaskSchema),
   expenses: z.array(projectExpenseSchema),
   phases: z.array(projectPhaseSummarySchema),
-  budgetCategories: z.array(projectBudgetCategorySummarySchema)
+  budgetCategories: z.array(projectBudgetCategorySummarySchema),
+  breadcrumbs: z.array(projectBreadcrumbSchema).default([]),
+  childProjects: z.array(projectChildSummarySchema).default([]),
+  treeStats: projectTreeStatsSchema.nullable().default(null)
 });
 
 export const projectPhaseListSchema = z.array(projectPhaseSummarySchema);
@@ -1665,6 +1701,9 @@ export type ProjectPhaseStatus = z.infer<typeof projectPhaseStatusSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type ProjectChildSummary = z.infer<typeof projectChildSummarySchema>;
+export type ProjectBreadcrumb = z.infer<typeof projectBreadcrumbSchema>;
+export type ProjectTreeStats = z.infer<typeof projectTreeStatsSchema>;
 export type ProjectAsset = z.infer<typeof projectAssetSchema>;
 export type CreateProjectAssetInput = z.infer<typeof createProjectAssetSchema>;
 export type ProjectPhaseChecklistItem = z.infer<typeof projectPhaseChecklistItemSchema>;

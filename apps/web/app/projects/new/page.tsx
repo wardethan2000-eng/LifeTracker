@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { createProjectAction } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
-import { ApiError, getMe } from "../../../lib/api";
+import { ApiError, getMe, getProjectDetail } from "../../../lib/api";
 
 type NewProjectPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -12,6 +12,7 @@ type NewProjectPageProps = {
 export default async function NewProjectPage({ searchParams }: NewProjectPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
+  const parentProjectId = typeof params.parentProjectId === "string" ? params.parentProjectId : undefined;
 
   try {
     const me = await getMe();
@@ -28,6 +29,10 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
       );
     }
 
+    const parentProject = parentProjectId
+      ? await getProjectDetail(household.id, parentProjectId).catch(() => null)
+      : null;
+
     return (
       <AppShell activePath="/projects">
         <header className="page-header">
@@ -41,8 +46,14 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
         </header>
 
         <div className="page-body">
+          {parentProjectId && parentProject && (
+            <div className="note" style={{ marginBottom: 16 }}>
+              Creating a sub-project under <Link href={`/projects/${parentProjectId}?householdId=${household.id}`} className="text-link"><strong>{parentProject.name}</strong></Link>
+            </div>
+          )}
           <form action={createProjectAction} className="workbench-form">
             <ProjectCoreFormFields householdId={household.id} />
+            {parentProjectId && <input type="hidden" name="parentProjectId" value={parentProjectId} />}
             <div className="workbench-bar">
               <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">Cancel</Link>
               <button type="submit" className="button button--primary">Create Project</button>

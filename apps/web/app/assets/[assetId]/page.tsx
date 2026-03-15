@@ -672,7 +672,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             <ExpandableCard
               title="Maintenance Schedules"
               modalTitle="Maintenance Schedules"
-              badge={detail.schedules.length > 0 ? { count: detail.schedules.length, variant: overdueCount > 0 ? "danger" : dueCount > 0 ? "warning" : "neutral" } : undefined}
+              {...(detail.schedules.length > 0 ? { badge: { count: detail.schedules.length, variant: overdueCount > 0 ? "danger" as const : dueCount > 0 ? "warning" as const : "neutral" as const } } : {})}
               previewContent={
                 <CompactMaintenanceSchedulePreview schedules={detail.schedules} />
               }

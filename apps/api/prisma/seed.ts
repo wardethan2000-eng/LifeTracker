@@ -39,6 +39,8 @@ const supplyProtectionId = "clkeepersupply00000000001";
 const supplyCabinetHardwareId = "clkeepersupply00000000002";
 const supplyPendantLightsId = "clkeepersupply00000000003";
 
+const subProjectId = "clkeepersubproj000000000001";
+
 async function main(): Promise<void> {
   await prisma.user.upsert({
     where: { clerkUserId: "dev_clerk_user_primary" },
@@ -934,6 +936,32 @@ async function main(): Promise<void> {
     }
   });
 
+  await prisma.project.upsert({
+    where: { id: subProjectId },
+    update: {
+      name: "Cabinet Hardware Selection",
+      parentProjectId: projectId,
+      depth: 1,
+      status: "active",
+      budgetAmount: 650,
+      description: "Research, compare, and procure cabinet hardware for all new cabinetry in the kitchen refresh.",
+      startDate: new Date("2026-03-10T00:00:00.000Z"),
+      targetEndDate: new Date("2026-04-01T00:00:00.000Z")
+    },
+    create: {
+      id: subProjectId,
+      householdId,
+      parentProjectId: projectId,
+      depth: 1,
+      name: "Cabinet Hardware Selection",
+      description: "Research, compare, and procure cabinet hardware for all new cabinetry in the kitchen refresh.",
+      status: "active",
+      budgetAmount: 650,
+      startDate: new Date("2026-03-10T00:00:00.000Z"),
+      targetEndDate: new Date("2026-04-01T00:00:00.000Z")
+    }
+  });
+
   await prisma.assetInventoryItem.createMany({
     data: [
       {
@@ -976,8 +1004,13 @@ async function main(): Promise<void> {
     skipDuplicates: true
   });
 
-  await prisma.projectAsset.create({
-    data: {
+  await prisma.projectAsset.upsert({
+    where: { projectId_assetId: { projectId, assetId: homeAssetId } },
+    update: {
+      role: "work area",
+      notes: "Primary kitchen space undergoing phased layout and finish updates"
+    },
+    create: {
       projectId,
       assetId: homeAssetId,
       role: "work area",

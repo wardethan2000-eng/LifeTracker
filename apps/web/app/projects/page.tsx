@@ -232,7 +232,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       : allProjectsPromise;
 
     const [allProjects, statusScopedProjects] = await Promise.all([allProjectsPromise, visibleProjectsPromise]);
-    const filteredProjects = statusScopedProjects.filter((project) => matchesProjectSearch(project, searchQuery));
+    // Show only root-level projects by default; when a search query is active, include all depths
+    const depthFilteredProjects = searchQuery.length > 0
+      ? statusScopedProjects
+      : statusScopedProjects.filter((project) => project.depth === 0);
+    const filteredProjects = depthFilteredProjects.filter((project) => matchesProjectSearch(project, searchQuery));
     const inventoryEntries = await Promise.all(
       filteredProjects.map(async (project) => ({
         projectId: project.id,
@@ -468,6 +472,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                                   <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">{project.name}</Link>
                                 </div>
                                 <div className="data-table__secondary">
+                                  {project.depth > 0 && (
+                                    <span style={{ marginRight: 6, opacity: 0.7 }}>Sub-project ·</span>
+                                  )}
                                   {tone !== 'neutral' && tone !== 'accent' ? (
                                     <strong style={{ color: `var(--${tone}-text, var(--${tone}))` }}>{getRiskLabel(project)}</strong>
                                   ) : (

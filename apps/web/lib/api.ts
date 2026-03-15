@@ -24,6 +24,9 @@ import {
   projectBudgetCategoryListSchema,
   projectBudgetCategorySchema,
   projectDetailSchema,
+  projectBreadcrumbSchema,
+  projectChildSummarySchema,
+  projectTreeStatsSchema,
   projectExpenseSchema,
   projectPhaseChecklistItemSchema,
   projectPhaseDetailSchema,
@@ -90,6 +93,9 @@ import {
   type ProjectPhaseDetail,
   type ProjectPhaseSupply,
   type ProjectPhaseSummary,
+  type ProjectChildSummary,
+  type ProjectBreadcrumb,
+  type ProjectTreeStats,
   type SearchEntityType,
   type SearchResponse,
   type ProjectSummary,
@@ -351,12 +357,17 @@ export const getHouseholdProjects = async (
   householdId: string,
   options?: {
     status?: ProjectStatus;
+    parentProjectId?: string | null;
   }
 ): Promise<ProjectSummary[]> => {
   const params = new URLSearchParams();
 
   if (options?.status) {
     params.set("status", options.status);
+  }
+
+  if (options?.parentProjectId !== undefined) {
+    params.set("parentProjectId", options.parentProjectId === null ? "null" : options.parentProjectId);
   }
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";

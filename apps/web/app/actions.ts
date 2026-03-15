@@ -1324,6 +1324,11 @@ export async function createProjectAction(formData: FormData): Promise<void> {
     input.notes = notes;
   }
 
+  const parentProjectId = getOptionalString(formData, "parentProjectId");
+  if (parentProjectId) {
+    input.parentProjectId = parentProjectId;
+  }
+
   const project = await createProject(householdId, input);
 
   const rawSuggestedPhases = getOptionalString(formData, "suggestedPhasesJson");
@@ -1357,7 +1362,8 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
     startDate: toNullableIsoString(getNullableString(formData, "startDate")),
     targetEndDate: toNullableIsoString(getNullableString(formData, "targetEndDate")),
     budgetAmount: getNullableNumber(formData, "budgetAmount"),
-    notes: getNullableString(formData, "notes")
+    notes: getNullableString(formData, "notes"),
+    parentProjectId: getNullableString(formData, "parentProjectId")
   };
 
   await updateProject(householdId, projectId, input);
