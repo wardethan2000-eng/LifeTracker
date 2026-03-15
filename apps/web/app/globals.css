@@ -43,6 +43,12 @@
   --density-font-size: 1rem;
   --density-summary-flow: row;
   --density-summary-align: flex-start;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-base: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
 }
 
 html[data-ui-density="relaxed"] {
@@ -3120,6 +3126,18 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .compact-preview__mini-table tr:last-child td {
   border-bottom: none;
+}
+
+.compact-preview__pill--muted {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--ink-muted);
+}
+
+.compact-preview__overflow {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin: 0;
 }
 
 .compact-preview__empty {

@@ -3,6 +3,7 @@ import {
   createProjectSchema,
   updateProjectSchema,
   createProjectAssetSchema,
+  updateProjectAssetSchema,
   createProjectTaskSchema,
   updateProjectTaskSchema,
   createQuickTodoSchema,
@@ -222,6 +223,7 @@ const toProjectAssetResponse = (pa: {
   id: string;
   projectId: string;
   assetId: string;
+  relationship: string;
   role: string | null;
   notes: string | null;
   createdAt: Date;
@@ -231,6 +233,7 @@ const toProjectAssetResponse = (pa: {
   id: pa.id,
   projectId: pa.projectId,
   assetId: pa.assetId,
+  relationship: pa.relationship,
   role: pa.role,
   notes: pa.notes,
   asset: pa.asset ?? undefined,
@@ -773,6 +776,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       data: {
         projectId: project.id,
         assetId: asset.id,
+        relationship: input.relationship ?? "target",
         role: input.role ?? null,
         notes: input.notes ?? null
       },
@@ -781,7 +785,61 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.asset.linked",
+      entityType: "project",
+      entityId: project.id,
+      metadata: { assetId: asset.id, assetName: asset.name, relationship: projectAsset.relationship }
+    });
+
     return reply.code(201).send(toProjectAssetResponse(projectAsset));
+  });
+
+  app.patch("/v1/households/:householdId/projects/:projectId/assets/:projectAssetId", async (request, reply) => {
+    const params = projectAssetParamsSchema.parse(request.params);
+    const input = updateProjectAssetSchema.parse(request.body);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.projectAsset.findFirst({
+      where: {
+        id: params.projectAssetId,
+        project: { id: params.projectId, householdId: params.householdId }
+      },
+      include: { asset: { select: { id: true, name: true, category: true } } }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Project asset link not found." });
+    }
+
+    const data: Prisma.ProjectAssetUncheckedUpdateInput = {};
+    if (input.relationship !== undefined) data.relationship = input.relationship;
+    if (input.role !== undefined) data.role = input.role ?? null;
+    if (input.notes !== undefined) data.notes = input.notes ?? null;
+
+    const projectAsset = await app.prisma.projectAsset.update({
+      where: { id: existing.id },
+      data,
+      include: { asset: { select: { id: true, name: true, category: true } } }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.asset.updated",
+      entityType: "project",
+      entityId: params.projectId,
+      metadata: { projectAssetId: existing.id, relationship: projectAsset.relationship }
+    });
+
+    return reply.send(toProjectAssetResponse(projectAsset));
   });
 
   app.delete("/v1/households/:householdId/projects/:projectId/assets/:projectAssetId", async (request, reply) => {

@@ -38,9 +38,12 @@ export const assetFieldTypeValues = [
 ] as const;
 export const customFieldTemplateTypeValues = assetFieldTypeValues;
 
+export const projectAssetRelationshipValues = ["target", "produces", "consumes", "supports"] as const;
+
 export const assetCategorySchema = z.enum(assetCategoryValues);
 export const assetVisibilitySchema = z.enum(assetVisibilityValues);
 export const householdRoleSchema = z.enum(householdRoleValues);
+export const projectAssetRelationshipSchema = z.enum(projectAssetRelationshipValues);
 export const authSourceSchema = z.enum(authSourceValues);
 export const notificationTypeSchema = z.enum(notificationTypeValues);
 export const triggerTypeSchema = z.enum(triggerTypeValues);
@@ -1107,6 +1110,7 @@ export const projectAssetSchema = z.object({
   id: z.string().cuid(),
   projectId: z.string().cuid(),
   assetId: z.string().cuid(),
+  relationship: projectAssetRelationshipSchema.default("target"),
   role: z.string().nullable(),
   notes: z.string().nullable(),
   asset: shallowAssetSchema.optional(),
@@ -1116,8 +1120,15 @@ export const projectAssetSchema = z.object({
 
 export const createProjectAssetSchema = z.object({
   assetId: z.string().cuid(),
+  relationship: projectAssetRelationshipSchema.default("target").optional(),
   role: z.string().max(200).optional(),
   notes: z.string().max(2000).optional()
+});
+
+export const updateProjectAssetSchema = z.object({
+  relationship: projectAssetRelationshipSchema.optional(),
+  role: z.string().max(200).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional()
 });
 
 export const projectPhaseChecklistItemSchema = z.object({
@@ -1770,8 +1781,10 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ProjectChildSummary = z.infer<typeof projectChildSummarySchema>;
 export type ProjectBreadcrumb = z.infer<typeof projectBreadcrumbSchema>;
 export type ProjectTreeStats = z.infer<typeof projectTreeStatsSchema>;
+export type ProjectAssetRelationship = z.infer<typeof projectAssetRelationshipSchema>;
 export type ProjectAsset = z.infer<typeof projectAssetSchema>;
 export type CreateProjectAssetInput = z.infer<typeof createProjectAssetSchema>;
+export type UpdateProjectAssetInput = z.infer<typeof updateProjectAssetSchema>;
 export type ProjectPhaseChecklistItem = z.infer<typeof projectPhaseChecklistItemSchema>;
 export type CreateProjectPhaseChecklistItemInput = z.infer<typeof createProjectPhaseChecklistItemSchema>;
 export type UpdateProjectPhaseChecklistItemInput = z.infer<typeof updateProjectPhaseChecklistItemSchema>;

@@ -17,6 +17,7 @@ import type {
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
   CreateProjectAssetInput,
+  UpdateProjectAssetInput,
   CreateProjectBudgetCategoryInput,
   CreateProjectExpenseInput,
   CreateProjectNoteInput,
@@ -62,6 +63,7 @@ import { redirect } from "next/navigation";
 import {
   acceptInvitation,
   addProjectAsset,
+  updateProjectAsset,
   allocateProjectInventory,
   allocateSupplyFromInventory,
   applyPreset,
@@ -1403,8 +1405,13 @@ export async function addProjectAssetAction(formData: FormData): Promise<void> {
     assetId: getRequiredString(formData, "assetId")
   };
 
+  const relationship = getOptionalString(formData, "relationship");
   const role = getOptionalString(formData, "role");
   const notes = getOptionalString(formData, "notes");
+
+  if (relationship) {
+    input.relationship = relationship as CreateProjectAssetInput["relationship"];
+  }
 
   if (role) {
     input.role = role;
@@ -1415,6 +1422,30 @@ export async function addProjectAssetAction(formData: FormData): Promise<void> {
   }
 
   await addProjectAsset(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectAssetAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const projectAssetId = getRequiredString(formData, "projectAssetId");
+  const input: UpdateProjectAssetInput = {};
+
+  const relationship = getOptionalString(formData, "relationship");
+  const role = formData.has("role") ? (getString(formData, "role") || null) : undefined;
+  const notes = formData.has("notes") ? (getString(formData, "notes") || null) : undefined;
+
+  if (relationship) {
+    input.relationship = relationship as UpdateProjectAssetInput["relationship"];
+  }
+  if (role !== undefined) {
+    input.role = role;
+  }
+  if (notes !== undefined) {
+    input.notes = notes;
+  }
+
+  await updateProjectAsset(householdId, projectId, projectAssetId, input);
   revalidateProjectPaths(householdId, projectId);
 }
 

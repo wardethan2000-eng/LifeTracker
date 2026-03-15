@@ -57,6 +57,7 @@ import {
   type UpdateProjectNoteInput,
   type ProjectNote,
   type CreateProjectAssetInput,
+  type UpdateProjectAssetInput,
   type CreateProjectBudgetCategoryInput,
   type CreateProjectExpenseInput,
   type CreateProjectPhaseChecklistItemInput,
@@ -926,6 +927,18 @@ export const addProjectAsset = async (
 ): Promise<ProjectAsset> => apiRequest({
   path: `/v1/households/${householdId}/projects/${projectId}/assets`,
   method: "POST",
+  body: input,
+  schema: projectAssetSchema
+});
+
+export const updateProjectAsset = async (
+  householdId: string,
+  projectId: string,
+  projectAssetId: string,
+  input: UpdateProjectAssetInput
+): Promise<ProjectAsset> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/assets/${projectAssetId}`,
+  method: "PATCH",
   body: input,
   schema: projectAssetSchema
 });
