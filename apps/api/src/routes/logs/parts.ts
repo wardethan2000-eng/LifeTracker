@@ -10,7 +10,7 @@ import {
   InventoryError,
   toMaintenanceLogPartWithInventoryResponse
 } from "../../lib/inventory.js";
-import { toMaintenanceLogPartResponse } from "../../lib/presenters.js";
+import { toMaintenanceLogPartResponse } from "../../lib/serializers/index.js";
 
 const logParamsSchema = z.object({
   assetId: z.string().cuid(),

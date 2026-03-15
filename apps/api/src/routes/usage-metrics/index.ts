@@ -8,7 +8,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
-import { toUsageMetricResponse, toUsageMetricEntryResponse } from "../../lib/presenters.js";
+import { toUsageMetricResponse, toUsageMetricEntryResponse } from "../../lib/serializers/index.js";
 import { recalculateAssetSchedules } from "../../lib/schedule-state.js";
 import { calculateUsageRate, projectNextDueValue } from "@lifekeeper/utils";
 

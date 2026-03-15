@@ -2,7 +2,7 @@ import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema 
 import type { PrismaClient } from "@prisma/client";
 import { assertMembership, getAccessibleAsset, getMembership, personalAssetAccessWhere } from "./asset-access.js";
 import { toMaintenanceLogResponse } from "./maintenance-logs.js";
-import { toAssetResponse, toNotificationResponse, toUsageMetricResponse } from "./presenters.js";
+import { toAssetResponse, toNotificationResponse, toUsageMetricResponse } from "./serializers/index.js";
 import { toMaintenanceScheduleResponse } from "./schedule-state.js";
 
 const formatDueSummary = (schedule: ReturnType<typeof toMaintenanceScheduleResponse>, currentMetricValue: number | null, metricUnit: string | null): string => {

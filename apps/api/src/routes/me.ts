@@ -1,6 +1,6 @@
 import { meResponseSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { toUserProfileResponse } from "../lib/presenters.js";
+import { toUserProfileResponse } from "../lib/serializers/index.js";
 
 export const meRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/me", async (request, reply) => {

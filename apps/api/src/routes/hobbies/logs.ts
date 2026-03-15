@@ -6,6 +6,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
+import { toLogResponse } from "../../lib/serializers/index.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -23,28 +24,6 @@ const listLogsQuerySchema = z.object({
   endDate: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().optional()
-});
-
-const toLogResponse = (log: {
-  id: string;
-  hobbyId: string;
-  sessionId: string | null;
-  title: string | null;
-  content: string;
-  logDate: Date;
-  logType: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: log.id,
-  hobbyId: log.hobbyId,
-  sessionId: log.sessionId,
-  title: log.title,
-  content: log.content,
-  logDate: log.logDate.toISOString(),
-  logType: log.logType,
-  createdAt: log.createdAt.toISOString(),
-  updatedAt: log.updatedAt.toISOString(),
 });
 
 export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {

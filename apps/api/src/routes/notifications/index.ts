@@ -10,7 +10,7 @@ import {
   parseNotificationPreferences,
   toNotificationResponse,
   toUserProfileResponse
-} from "../../lib/presenters.js";
+} from "../../lib/serializers/index.js";
 
 const notificationParamsSchema = z.object({
   notificationId: z.string().cuid()

@@ -11,6 +11,11 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import {
+  toIngredientResponse,
+  toRecipeResponse,
+  toStepResponse
+} from "../../lib/serializers/index.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -36,86 +41,6 @@ const listRecipesQuerySchema = z.object({
 
 const reorderStepsBodySchema = z.object({
   stepIds: z.array(z.string().cuid())
-});
-
-const toRecipeResponse = (recipe: {
-  id: string;
-  hobbyId: string;
-  name: string;
-  description: string | null;
-  sourceType: string;
-  styleCategory: string | null;
-  customFields: Prisma.JsonValue;
-  estimatedDuration: string | null;
-  estimatedCost: number | null;
-  yield: string | null;
-  notes: string | null;
-  isArchived: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: recipe.id,
-  hobbyId: recipe.hobbyId,
-  name: recipe.name,
-  description: recipe.description,
-  sourceType: recipe.sourceType,
-  styleCategory: recipe.styleCategory,
-  customFields: recipe.customFields as Record<string, unknown>,
-  estimatedDuration: recipe.estimatedDuration,
-  estimatedCost: recipe.estimatedCost,
-  yield: recipe.yield,
-  notes: recipe.notes,
-  isArchived: recipe.isArchived,
-  createdAt: recipe.createdAt.toISOString(),
-  updatedAt: recipe.updatedAt.toISOString(),
-});
-
-const toIngredientResponse = (ing: {
-  id: string;
-  recipeId: string;
-  inventoryItemId: string | null;
-  name: string;
-  quantity: number;
-  unit: string;
-  category: string | null;
-  notes: string | null;
-  sortOrder: number;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: ing.id,
-  recipeId: ing.recipeId,
-  inventoryItemId: ing.inventoryItemId,
-  name: ing.name,
-  quantity: ing.quantity,
-  unit: ing.unit,
-  category: ing.category,
-  notes: ing.notes,
-  sortOrder: ing.sortOrder,
-  createdAt: ing.createdAt.toISOString(),
-  updatedAt: ing.updatedAt.toISOString(),
-});
-
-const toStepResponse = (step: {
-  id: string;
-  recipeId: string;
-  title: string;
-  description: string | null;
-  sortOrder: number;
-  durationMinutes: number | null;
-  stepType: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: step.id,
-  recipeId: step.recipeId,
-  title: step.title,
-  description: step.description,
-  sortOrder: step.sortOrder,
-  durationMinutes: step.durationMinutes,
-  stepType: step.stepType,
-  createdAt: step.createdAt.toISOString(),
-  updatedAt: step.updatedAt.toISOString(),
 });
 
 export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {

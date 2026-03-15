@@ -10,7 +10,7 @@ import type { HouseholdRole, Prisma, User } from "@prisma/client";
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
-import { toUserProfileResponse } from "../../lib/presenters.js";
+import { toUserProfileResponse } from "../../lib/serializers/index.js";
 import { logActivity } from "../../lib/activity-log.js";
 
 const householdParamsSchema = z.object({

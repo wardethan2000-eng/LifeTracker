@@ -10,6 +10,7 @@ import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { syncHobbyToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { findHobbyPreset, hobbyPresetToDefinition, applyHobbyPreset } from "../../lib/hobby-presets.js";
+import { toHobbyResponse, toHobbySummaryResponse } from "../../lib/serializers/index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -24,67 +25,6 @@ const listHobbiesQuerySchema = z.object({
   search: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().optional()
-});
-
-const toHobbyResponse = (hobby: {
-  id: string;
-  householdId: string;
-  name: string;
-  description: string | null;
-  status: string;
-  hobbyType: string | null;
-  lifecycleMode: string;
-  customFields: Prisma.JsonValue;
-  fieldDefinitions: Prisma.JsonValue;
-  notes: string | null;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: hobby.id,
-  householdId: hobby.householdId,
-  name: hobby.name,
-  description: hobby.description,
-  status: hobby.status,
-  hobbyType: hobby.hobbyType,
-  lifecycleMode: hobby.lifecycleMode,
-  customFields: hobby.customFields as Record<string, unknown>,
-  fieldDefinitions: hobby.fieldDefinitions as unknown[],
-  notes: hobby.notes,
-  createdById: hobby.createdById,
-  createdAt: hobby.createdAt.toISOString(),
-  updatedAt: hobby.updatedAt.toISOString(),
-});
-
-const toHobbySummaryResponse = (hobby: {
-  id: string;
-  householdId: string;
-  name: string;
-  description: string | null;
-  status: string;
-  hobbyType: string | null;
-  lifecycleMode: string;
-  customFields: Prisma.JsonValue;
-  fieldDefinitions: Prisma.JsonValue;
-  notes: string | null;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-  _count: {
-    recipes: number;
-    sessions: number;
-    assetLinks: number;
-    inventoryLinks: number;
-  };
-  sessions: { status: string }[];
-}) => ({
-  ...toHobbyResponse(hobby),
-  recipeCount: hobby._count.recipes,
-  sessionCount: hobby._count.sessions,
-  activeSessionCount: hobby.sessions.filter((s) => s.status === "active").length,
-  completedSessionCount: hobby.sessions.filter((s) => s.status === "completed").length,
-  linkedAssetCount: hobby._count.assetLinks,
-  linkedInventoryCount: hobby._count.inventoryLinks,
 });
 
 export const hobbyRoutes: FastifyPluginAsync = async (app) => {

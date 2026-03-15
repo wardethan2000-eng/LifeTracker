@@ -25,7 +25,7 @@ import {
   buildAssetLabelUrl,
   ensureAssetTag
 } from "../../lib/asset-tags.js";
-import { toAssetResponse } from "../../lib/presenters.js";
+import { toAssetResponse } from "../../lib/serializers/index.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { syncAssetFamilyToSearchIndex } from "../../lib/search-index.js";
 

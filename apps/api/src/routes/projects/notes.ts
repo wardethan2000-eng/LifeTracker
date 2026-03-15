@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { toProjectNoteResponse } from "../../lib/serializers/index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -24,42 +25,6 @@ const noteListQuerySchema = z.object({
   category: z.string().optional(),
   phaseId: z.string().cuid().optional(),
   pinned: z.enum(["true", "false"]).optional()
-});
-
-const toProjectNoteResponse = (note: {
-  id: string;
-  projectId: string;
-  phaseId: string | null;
-  title: string;
-  body: string;
-  url: string | null;
-  category: string;
-  attachmentUrl: string | null;
-  attachmentName: string | null;
-  isPinned: boolean;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy?: { id: string; displayName: string | null } | null;
-  phase?: { name: string } | null;
-}) => ({
-  id: note.id,
-  projectId: note.projectId,
-  phaseId: note.phaseId,
-  title: note.title,
-  body: note.body,
-  url: note.url,
-  category: note.category,
-  attachmentUrl: note.attachmentUrl,
-  attachmentName: note.attachmentName,
-  isPinned: note.isPinned,
-  createdById: note.createdById,
-  createdBy: note.createdBy
-    ? { id: note.createdBy.id, displayName: note.createdBy.displayName }
-    : null,
-  phaseName: note.phase?.name ?? null,
-  createdAt: note.createdAt.toISOString(),
-  updatedAt: note.updatedAt.toISOString()
 });
 
 const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {

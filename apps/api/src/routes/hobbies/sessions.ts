@@ -12,6 +12,12 @@ import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { applyInventoryTransaction } from "../../lib/inventory.js";
+import {
+  toSessionIngredientResponse,
+  toSessionResponse,
+  toSessionStepResponse,
+  toSessionSummaryResponse
+} from "../../lib/serializers/index.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -39,92 +45,6 @@ const listSessionsQuerySchema = z.object({
 
 const reorderStepsBodySchema = z.object({
   stepIds: z.array(z.string().cuid())
-});
-
-const toSessionResponse = (session: {
-  id: string;
-  hobbyId: string;
-  recipeId: string | null;
-  name: string;
-  status: string;
-  startDate: Date | null;
-  completedDate: Date | null;
-  pipelineStepId: string | null;
-  customFields: Prisma.JsonValue;
-  totalCost: number | null;
-  rating: number | null;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: session.id,
-  hobbyId: session.hobbyId,
-  recipeId: session.recipeId,
-  name: session.name,
-  status: session.status,
-  startDate: session.startDate?.toISOString() ?? null,
-  completedDate: session.completedDate?.toISOString() ?? null,
-  pipelineStepId: session.pipelineStepId,
-  customFields: session.customFields as Record<string, unknown>,
-  totalCost: session.totalCost,
-  rating: session.rating,
-  notes: session.notes,
-  createdAt: session.createdAt.toISOString(),
-  updatedAt: session.updatedAt.toISOString(),
-});
-
-const toSessionIngredientResponse = (ing: {
-  id: string;
-  sessionId: string;
-  recipeIngredientId: string | null;
-  inventoryItemId: string | null;
-  name: string;
-  quantityUsed: number;
-  unit: string;
-  unitCost: number | null;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: ing.id,
-  sessionId: ing.sessionId,
-  recipeIngredientId: ing.recipeIngredientId,
-  inventoryItemId: ing.inventoryItemId,
-  name: ing.name,
-  quantityUsed: ing.quantityUsed,
-  unit: ing.unit,
-  unitCost: ing.unitCost,
-  notes: ing.notes,
-  createdAt: ing.createdAt.toISOString(),
-  updatedAt: ing.updatedAt.toISOString(),
-});
-
-const toSessionStepResponse = (step: {
-  id: string;
-  sessionId: string;
-  recipeStepId: string | null;
-  title: string;
-  description: string | null;
-  sortOrder: number;
-  isCompleted: boolean;
-  completedAt: Date | null;
-  durationMinutes: number | null;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: step.id,
-  sessionId: step.sessionId,
-  recipeStepId: step.recipeStepId,
-  title: step.title,
-  description: step.description,
-  sortOrder: step.sortOrder,
-  isCompleted: step.isCompleted,
-  completedAt: step.completedAt?.toISOString() ?? null,
-  durationMinutes: step.durationMinutes,
-  notes: step.notes,
-  createdAt: step.createdAt.toISOString(),
-  updatedAt: step.updatedAt.toISOString(),
 });
 
 export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
@@ -171,15 +91,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const nextCursor = hasMore ? items[items.length - 1]!.id : null;
 
     return reply.send({
-      items: items.map((s) => ({
-        ...toSessionResponse(s),
-        ingredientCount: s._count.ingredients,
-        stepCount: s._count.steps,
-        completedStepCount: s.steps.filter((st) => st.isCompleted).length,
-        metricReadingCount: s._count.metricReadings,
-        logCount: s._count.logs,
-        recipeName: s.recipe?.name ?? null,
-      })),
+      items: items.map(toSessionSummaryResponse),
       nextCursor,
     });
   });

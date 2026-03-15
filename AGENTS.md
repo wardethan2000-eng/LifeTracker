@@ -42,7 +42,7 @@ Run `pnpm db:generate` after every Prisma schema change before writing code that
 - Routes live in `apps/api/src/routes/` grouped by domain (assets, schedules, projects, comments, etc.).
 - Every route file exports a `FastifyPluginAsync` registered on the app instance.
 - Route paths are versioned: `/v1/assets`, `/v1/households/:householdId/projects`, etc.
-- All responses serialize dates as ISO strings. Use `toISOString()` helper functions defined at the top of each route file (e.g. `toAssetResponse`, `toProjectTaskResponse`).
+- All responses serialize dates as ISO strings. Response serializer functions live in `apps/api/src/lib/serializers/` organized by domain (e.g., `serializers/assets.ts`, `serializers/projects.ts`). Import them from `../../lib/serializers/index.js` in route files. Never define inline `to*Response` functions in route files - always add new serializers to the appropriate domain file in the serializers directory.
 - Household scoping: most queries filter by household membership. Use `getAccessibleAsset()` from `apps/api/src/lib/asset-access.ts` for asset-level checks.
 - Activity logging: call `logActivity()` from `apps/api/src/lib/activity-log.ts` after create/update/delete mutations.
 - Search index: call `syncToSearchIndex` / `removeSearchIndexEntry` from `apps/api/src/lib/search-index.ts` when entities that participate in search are mutated.

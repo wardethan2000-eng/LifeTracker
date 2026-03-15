@@ -7,7 +7,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
-import { toAssetTransferResponse } from "../../lib/presenters.js";
+import { toAssetTransferResponse } from "../../lib/serializers/index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()

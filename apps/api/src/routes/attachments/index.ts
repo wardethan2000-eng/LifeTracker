@@ -10,6 +10,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { toAttachmentResponse } from "../../lib/serializers/index.js";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -27,30 +28,6 @@ const sanitizeFilename = (filename: string): string =>
 
 const buildStorageKey = (householdId: string, attachmentId: string, filename: string): string =>
   `households/${householdId}/attachments/${attachmentId}/${sanitizeFilename(filename)}`;
-
-const toAttachmentResponse = (
-  attachment: PrismaAttachment & { uploadedBy?: { id: string; displayName: string | null } | null }
-) => attachmentSchema.parse({
-  id: attachment.id,
-  householdId: attachment.householdId,
-  uploadedById: attachment.uploadedById,
-  uploadedBy: attachment.uploadedBy
-    ? { id: attachment.uploadedBy.id, displayName: attachment.uploadedBy.displayName }
-    : null,
-  entityType: attachment.entityType,
-  entityId: attachment.entityId,
-  storageKey: attachment.storageKey,
-  originalFilename: attachment.originalFilename,
-  mimeType: attachment.mimeType,
-  fileSize: attachment.fileSize,
-  thumbnailKey: attachment.thumbnailKey,
-  ocrResult: attachment.ocrResult as Record<string, unknown> | null,
-  caption: attachment.caption,
-  sortOrder: attachment.sortOrder,
-  status: attachment.status,
-  createdAt: attachment.createdAt.toISOString(),
-  updatedAt: attachment.updatedAt.toISOString(),
-});
 
 const validateEntityOwnership = async (
   prisma: PrismaClient,

@@ -12,7 +12,7 @@ import {
   notificationPreferencesSchema,
   type NotificationPreferences
 } from "@lifekeeper/types";
-import { toNotificationResponse } from "./presenters.js";
+import { toNotificationResponse } from "./serializers/index.js";
 
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 

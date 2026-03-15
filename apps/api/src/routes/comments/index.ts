@@ -6,6 +6,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { toCommentResponse } from "../../lib/serializers/index.js";
 import { syncCommentToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
@@ -14,28 +15,6 @@ const assetParamsSchema = z.object({
 
 const commentParamsSchema = assetParamsSchema.extend({
   commentId: z.string().cuid()
-});
-
-const toCommentResponse = (comment: {
-  id: string;
-  assetId: string;
-  authorId: string;
-  body: string;
-  parentCommentId: string | null;
-  editedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  author: { id: string; displayName: string | null };
-}) => ({
-  id: comment.id,
-  assetId: comment.assetId,
-  authorId: comment.authorId,
-  author: { id: comment.author.id, displayName: comment.author.displayName },
-  body: comment.body,
-  parentCommentId: comment.parentCommentId,
-  editedAt: comment.editedAt?.toISOString() ?? null,
-  createdAt: comment.createdAt.toISOString(),
-  updatedAt: comment.updatedAt.toISOString()
 });
 
 export const commentRoutes: FastifyPluginAsync = async (app) => {

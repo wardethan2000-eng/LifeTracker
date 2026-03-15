@@ -6,7 +6,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { toServiceProviderResponse } from "../../lib/presenters.js";
+import { toServiceProviderResponse } from "../../lib/serializers/index.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { syncServiceProviderToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 

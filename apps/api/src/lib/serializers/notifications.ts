@@ -1,0 +1,13 @@
+import type { Notification } from "@prisma/client";
+import { notificationSchema } from "@lifekeeper/types";
+
+export const toNotificationResponse = (
+  notification: Pick<Notification, "id" | "userId" | "householdId" | "assetId" | "scheduleId" | "dedupeKey" | "type" | "channel" | "status" | "title" | "body" | "scheduledFor" | "sentAt" | "readAt" | "escalationLevel" | "payload" | "createdAt" | "updatedAt">
+) => notificationSchema.parse({
+  ...notification,
+  scheduledFor: notification.scheduledFor.toISOString(),
+  sentAt: notification.sentAt?.toISOString() ?? null,
+  readAt: notification.readAt?.toISOString() ?? null,
+  createdAt: notification.createdAt.toISOString(),
+  updatedAt: notification.updatedAt.toISOString()
+});
