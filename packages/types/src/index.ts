@@ -1881,6 +1881,8 @@ export const linkPreviewFieldSchema = z.object({
   source: z.enum(["json-ld", "og", "meta", "html", "inferred"])
 });
 
+export const linkPreviewExtractionModeSchema = z.enum(["full", "fallback"]);
+
 export const linkPreviewResponseSchema = z.object({
   url: z.string().url(),
   canonicalUrl: z.string().url().nullable(),
@@ -1888,6 +1890,8 @@ export const linkPreviewResponseSchema = z.object({
   fields: z.array(linkPreviewFieldSchema),
   imageUrls: z.array(z.string().url()),
   rawTitle: z.string().nullable(),
+  extractionMode: linkPreviewExtractionModeSchema.default("full"),
+  warningMessage: z.string().nullable().default(null),
   fetchedAt: z.string().datetime()
 });
 

@@ -111,6 +111,12 @@ export function LinkPreviewDialog({
   const confidenceClass = (c: LinkPreviewField["confidence"]): string =>
     `link-preview--confidence link-preview--confidence-${c}`;
 
+  const useMultilineField = (field: LinkPreviewField): boolean =>
+    field.key === "description"
+    || field.key === "features"
+    || field.key === "fitment"
+    || (state.phase === "review" && (state.editedValues[field.key] ?? "").length > 140);
+
   return (
     <div className="link-preview--overlay" role="dialog" aria-modal="true" onMouseDown={(e) => {
       if (e.target === e.currentTarget) close();
@@ -159,6 +165,11 @@ export function LinkPreviewDialog({
 
         {state.phase === "review" && (
           <>
+            {state.data.warningMessage && (
+              <div className="link-preview--warning">
+                {state.data.warningMessage}
+              </div>
+            )}
             <div className="link-preview--review">
               <div className="link-preview--image-col">
                 {state.data.imageUrls[0] ? (
@@ -191,17 +202,28 @@ export function LinkPreviewDialog({
                       <span className={confidenceClass(field.confidence)} title={`${field.confidence} confidence (${field.source})`} />
                       {field.label}
                     </span>
-                    <input
-                      type="text"
-                      className="input"
-                      value={state.editedValues[field.key] ?? ""}
-                      onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                    />
+                    {useMultilineField(field) ? (
+                      <textarea
+                        className="input"
+                        rows={field.key === "fitment" ? 5 : 4}
+                        value={state.editedValues[field.key] ?? ""}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        className="input"
+                        value={state.editedValues[field.key] ?? ""}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                      />
+                    )}
                   </div>
                 ))}
                 {state.data.fields.length === 0 && (
                   <p style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>
-                    No product metadata could be extracted from this page.
+                    {state.data.extractionMode === "fallback"
+                      ? "Only limited details could be inferred from the link."
+                      : "No product metadata could be extracted from this page."}
                   </p>
                 )}
               </div>

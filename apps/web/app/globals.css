@@ -3500,6 +3500,16 @@ html[data-ui-density="compact"] .resource-layout__aside {
   margin-top: 8px;
 }
 
+.link-preview--warning {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-border);
+  border-radius: 12px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 0.88rem;
+}
+
 @media (max-width: 640px) {
   .link-preview--review {
     grid-template-columns: 1fr;

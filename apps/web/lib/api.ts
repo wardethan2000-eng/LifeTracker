@@ -1382,12 +1382,52 @@ export const enqueueNotificationScan = async (householdId: string): Promise<void
   });
 };
 
-export const fetchLinkPreview = async (householdId: string, url: string): Promise<LinkPreviewResponse> => apiRequest({
-  path: `/v1/households/${householdId}/link-preview`,
-  method: "POST",
-  body: { url: normalizeExternalUrl(url) ?? url.trim() },
-  schema: linkPreviewResponseSchema
-});
+export const fetchLinkPreview = async (householdId: string, url: string): Promise<LinkPreviewResponse> => {
+  const normalizedUrl = normalizeExternalUrl(url) ?? url.trim();
+
+  if (typeof window === "undefined") {
+    return apiRequest({
+      path: `/v1/households/${householdId}/link-preview`,
+      method: "POST",
+      body: { url: normalizedUrl },
+      schema: linkPreviewResponseSchema
+    });
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`/api/households/${householdId}/link-preview`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ url: normalizedUrl })
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message
+      ? ` ${error.message}`
+      : "";
+
+    throw new ApiError(
+      `Unable to reach the web link preview route.${detail}`,
+      503
+    );
+  }
+
+  const payload = await parseJson(response);
+
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+
+    throw new ApiError(message, response.status);
+  }
+
+  return linkPreviewResponseSchema.parse(payload);
+};
 
 export const lookupBarcode = async (barcode: string, barcodeFormat?: string): Promise<BarcodeLookupResult> => apiRequest({
   path: "/v1/barcode/lookup",

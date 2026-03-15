@@ -8,6 +8,24 @@ const householdParamsSchema = z.object({
   householdId: z.string().cuid()
 });
 
+function detectRetailerFromUrl(value: string): string | null {
+  try {
+    const hostname = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+
+    if (hostname === "homedepot.com" || hostname.endsWith(".homedepot.com")) {
+      return "Home Depot";
+    }
+
+    if (hostname === "amazon.com" || hostname.endsWith(".amazon.com")) {
+      return "Amazon";
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export const householdLinkPreviewRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/households/:householdId/link-preview", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
@@ -33,9 +51,15 @@ export const householdLinkPreviewRoutes: FastifyPluginAsync = async (app) => {
       return result;
     } catch (err) {
       const detail = err instanceof Error ? err.message : "";
+      const retailer = detectRetailerFromUrl(input.url);
+      const blockedMessage = retailer && /HTTP 403/i.test(detail)
+        ? `${retailer} blocked automated extraction from the server. Try a different retailer link, or use the page details manually if the partial import is not enough.`
+        : null;
+
       request.log.warn({ err, url: input.url }, "link-preview extraction failed");
       return reply.code(422).send({
-        message: `Unable to extract product information from this URL. The site may be blocking automated requests or the page structure is not recognized.${detail ? ` (${detail})` : ""}`
+        message: blockedMessage
+          ?? `Unable to extract product information from this URL. The site may be blocking automated requests or the page structure is not recognized.${detail ? ` (${detail})` : ""}`
       });
     }
   });
