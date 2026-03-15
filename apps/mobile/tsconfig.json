@@ -4,5 +4,5 @@
     "jsx": "react-jsx",
     "lib": ["ES2022"]
   },
-  "include": ["App.tsx"]
+  "include": ["App.tsx", "components/**/*.tsx", "screens/**/*.tsx"]
 }

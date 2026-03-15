@@ -27,6 +27,7 @@ import { projectInventoryRoutes } from "./routes/projects/inventory.js";
 import { projectNoteRoutes } from "./routes/projects/notes.js";
 import { projectPhaseRoutes } from "./routes/projects/phases.js";
 import { searchRoutes } from "./routes/search/index.js";
+import { barcodeRoutes } from "./routes/barcode.js";
 
 export const buildApp = () => {
   const app = Fastify({
@@ -63,6 +64,7 @@ export const buildApp = () => {
   app.register(projectPhaseRoutes);
   app.register(projectNoteRoutes);
   app.register(searchRoutes);
+  app.register(barcodeRoutes);
 
   return app;
 };

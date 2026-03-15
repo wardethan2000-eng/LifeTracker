@@ -17,6 +17,7 @@ import {
   inventoryTransactionSchema,
   inventoryItemSummarySchema,
   libraryPresetSchema,
+  linkPreviewResponseSchema,
   lowStockInventoryItemSchema,
   meResponseSchema,
   notificationSchema,
@@ -85,6 +86,7 @@ import {
   type HouseholdMember,
   type HouseholdSummary,
   type CreateInventoryItemInput,
+  type UpdateInventoryItemInput,
   type InventoryItemSummary,
   type InventoryProjectLinkDetail,
   type LibraryPreset,
@@ -134,7 +136,9 @@ import {
   type UsageProjection,
   usageMetricEntrySchema,
   usageProjectionSchema,
-  usageMetricResponseSchema
+  usageMetricResponseSchema,
+  barcodeLookupResultSchema,
+  type BarcodeLookupResult
 } from "@lifekeeper/types";
 
 type Schema<T> = {
@@ -608,6 +612,17 @@ export const createInventoryItem = async (
 ): Promise<InventoryItemSummary> => apiRequest({
   path: `/v1/households/${householdId}/inventory`,
   method: "POST",
+  body: input,
+  schema: inventoryItemSummarySchema
+});
+
+export const updateInventoryItem = async (
+  householdId: string,
+  inventoryItemId: string,
+  input: UpdateInventoryItemInput
+): Promise<InventoryItemSummary> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/${inventoryItemId}`,
+  method: "PATCH",
   body: input,
   schema: inventoryItemSummarySchema
 });
@@ -1365,4 +1380,11 @@ export const fetchLinkPreview = async (householdId: string, url: string): Promis
   method: "POST",
   body: { url },
   schema: linkPreviewResponseSchema
+});
+
+export const lookupBarcode = async (barcode: string, barcodeFormat?: string): Promise<BarcodeLookupResult> => apiRequest({
+  path: "/v1/barcode/lookup",
+  method: "POST",
+  body: { barcode, ...(barcodeFormat ? { barcodeFormat } : {}) },
+  schema: barcodeLookupResultSchema
 });

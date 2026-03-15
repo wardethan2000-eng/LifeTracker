@@ -3310,3 +3310,45 @@ html[data-ui-density="compact"] .resource-layout__aside {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Barcode Lookup ────────────────────────────────────────────────── */
+
+.barcode-lookup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.barcode-lookup__input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.barcode-lookup__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.barcode-lookup__status {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.barcode-lookup__status--success {
+  color: var(--success);
+}
+
+.barcode-lookup__status--error {
+  color: var(--danger);
+}
+
+.barcode-lookup__status--neutral {
+  color: var(--ink-muted);
+}

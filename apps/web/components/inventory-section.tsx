@@ -1,17 +1,19 @@
 "use client";
 
+import type { BarcodeLookupResult } from "@lifekeeper/types";
 import type { JSX, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createInventoryItemAction } from "../app/actions";
+import { BarcodeLookupField } from "./barcode-lookup-field";
 import { LinkPreviewDialog } from "./link-preview-dialog";
 
 type InventoryPrefill = {
-  name?: string;
-  partNumber?: string;
-  manufacturer?: string;
-  unitCost?: string;
-  preferredSupplier?: string;
-  supplierUrl?: string;
+  name?: string | undefined;
+  partNumber?: string | undefined;
+  manufacturer?: string | undefined;
+  unitCost?: string | undefined;
+  preferredSupplier?: string | undefined;
+  supplierUrl?: string | undefined;
 };
 
 type InventorySectionProps = {
@@ -70,6 +72,35 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
     return values;
   }, [categoryOptions]);
 
+  const handleBarcodeResult = useCallback((result: BarcodeLookupResult) => {
+    if (result.found) {
+      setPrefill((prev) => ({
+        ...prev,
+        name: result.productName ?? prev.name ?? "",
+        manufacturer: result.brand ?? prev.manufacturer ?? "",
+        partNumber: result.barcode
+      }));
+
+      if (result.category) {
+        const match = mergedCategoryOptions.find(
+          (opt) => opt.toLowerCase() === result.category!.toLowerCase()
+        );
+
+        if (match) {
+          setSelectedCategory(match);
+        } else {
+          setSelectedCategory(customCategoryValue);
+          setCustomCategory(result.category);
+        }
+      }
+    } else {
+      setPrefill((prev) => ({ ...prev, partNumber: result.barcode }));
+    }
+
+    setPrefillKey((k) => k + 1);
+    setShowForm(true);
+  }, [mergedCategoryOptions]);
+
   const resolvedCategory = selectedCategory === customCategoryValue ? customCategory.trim() : selectedCategory;
   const showCustomCategoryField = selectedCategory === customCategoryValue;
 
@@ -124,6 +155,12 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
           <form action={createInventoryItemAction} key={prefillKey}>
             <input type="hidden" name="householdId" value={householdId} />
             <input type="hidden" name="category" value={resolvedCategory} />
+            <div className="barcode-lookup-row" style={{ marginBottom: 16 }}>
+              <label className="field field--full">
+                <span>Quick Add by Barcode</span>
+                <BarcodeLookupField onResult={handleBarcodeResult} />
+              </label>
+            </div>
             <div className="form-grid">
               <label className="field">
                 <span>Name</span>

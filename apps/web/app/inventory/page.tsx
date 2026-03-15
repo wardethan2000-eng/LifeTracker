@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
+import { InventoryEditableRow } from "../../components/inventory-editable-row";
 import { InventorySection } from "../../components/inventory-section";
 import {
   ApiError,
@@ -219,7 +220,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                       </thead>
                       <tbody>
                         {categoryItems.map((item) => (
-                          <tr key={item.id} className={[item.lowStock ? "row--due" : null, item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ") || undefined}>
+                          <InventoryEditableRow key={item.id} householdId={household.id} item={item} className={[item.lowStock ? "row--due" : null, item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ") || ""}>
                             <td>
                               <div className="data-table__primary">{item.name}</div>
                               <div className="data-table__secondary">
@@ -239,7 +240,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                               </span>
                             </td>
                             <td>{item.storageLocation ?? "—"}</td>
-                          </tr>
+                          </InventoryEditableRow>
                         ))}
                       </tbody>
                     </table>

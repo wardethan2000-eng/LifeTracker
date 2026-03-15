@@ -1888,3 +1888,25 @@ export type LinkPreviewField = z.infer<typeof linkPreviewFieldSchema>;
 export type LinkPreviewResponse = z.infer<typeof linkPreviewResponseSchema>;
 export type LinkPreviewRequest = z.infer<typeof linkPreviewRequestSchema>;
 
+// ── Barcode Lookup Schemas ───────────────────────────────────────────
+
+export const barcodeLookupRequestSchema = z.object({
+  barcode: z.string().min(1).max(100),
+  barcodeFormat: z.string().max(30).optional()
+});
+
+export const barcodeLookupResultSchema = z.object({
+  barcode: z.string(),
+  barcodeFormat: z.string(),
+  found: z.boolean(),
+  productName: z.string().nullable(),
+  brand: z.string().nullable(),
+  description: z.string().nullable(),
+  category: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  cachedAt: z.string().datetime().nullable()
+});
+
+export type BarcodeLookupRequest = z.infer<typeof barcodeLookupRequestSchema>;
+export type BarcodeLookupResult = z.infer<typeof barcodeLookupResultSchema>;
+

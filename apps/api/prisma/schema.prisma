@@ -809,3 +809,24 @@ model Comment {
   @@index([authorId])
   @@index([parentCommentId])
 }
+
+// ── Barcode Lookup Cache ─────────────────────────────────────────────
+
+model BarcodeLookup {
+  id             String   @id @default(cuid())
+  barcode        String   @unique
+  barcodeFormat  String
+  productName    String?
+  brand          String?
+  description    String?
+  category       String?
+  imageUrl       String?
+  sourceProvider String
+  rawResponse    Json     @default("{}")
+  lookupCount    Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([barcode])
+  @@index([createdAt])
+}

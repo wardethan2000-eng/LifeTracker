@@ -1,0 +1,97 @@
+"use client";
+
+import type { BarcodeLookupResult } from "@lifekeeper/types";
+import type { JSX } from "react";
+import { useCallback, useRef, useState } from "react";
+import { lookupBarcode } from "../lib/api";
+
+type BarcodeLookupFieldProps = {
+  onResult: (result: BarcodeLookupResult) => void;
+  disabled?: boolean;
+  className?: string;
+};
+
+type StatusState = {
+  message: string;
+  variant: "success" | "error" | "neutral";
+} | null;
+
+export function BarcodeLookupField({ onResult, disabled, className }: BarcodeLookupFieldProps): JSX.Element {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<StatusState>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showStatus = useCallback((message: string, variant: "success" | "error" | "neutral") => {
+    setStatus({ message, variant });
+
+    if (dismissTimer.current) {
+      clearTimeout(dismissTimer.current);
+    }
+
+    dismissTimer.current = setTimeout(() => setStatus(null), 4000);
+  }, []);
+
+  const handleLookup = useCallback(async () => {
+    const barcode = inputRef.current?.value.trim();
+
+    if (!barcode) {
+      return;
+    }
+
+    setLoading(true);
+    setStatus(null);
+
+    try {
+      const result = await lookupBarcode(barcode);
+      onResult(result);
+
+      if (result.found) {
+        showStatus(`Found: ${result.productName ?? barcode}`, "success");
+      } else {
+        showStatus("No product match — barcode copied to part number", "neutral");
+      }
+
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+    } catch {
+      showStatus("Lookup failed — try again", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [onResult, showStatus]);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleLookup();
+    }
+  }, [handleLookup]);
+
+  return (
+    <div className={`barcode-lookup${className ? ` ${className}` : ""}`}>
+      <input
+        ref={inputRef}
+        type="text"
+        className="barcode-lookup__input"
+        placeholder="Scan or type barcode / UPC"
+        disabled={disabled || loading}
+        onKeyDown={handleKeyDown}
+      />
+      <button
+        type="button"
+        className="button button--sm"
+        disabled={disabled || loading}
+        onClick={handleLookup}
+      >
+        {loading ? "Looking up…" : "Lookup"}
+      </button>
+      {status && (
+        <span className={`barcode-lookup__status barcode-lookup__status--${status.variant}`}>
+          {status.message}
+        </span>
+      )}
+    </div>
+  );
+}

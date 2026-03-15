@@ -1,5 +1,7 @@
 import { createAssetSchema } from "@lifekeeper/types";
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScanScreen } from "./screens/ScanScreen";
 
 const exampleAsset = createAssetSchema.parse({
   householdId: "clkeeperhouse000000000001",
@@ -12,6 +14,12 @@ const exampleAsset = createAssetSchema.parse({
 });
 
 export default function App() {
+  const [showScanner, setShowScanner] = useState(false);
+
+  if (showScanner) {
+    return <ScanScreen onBack={() => setShowScanner(false)} />;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.card}>
@@ -22,6 +30,9 @@ export default function App() {
         </Text>
         <Text style={styles.assetLabel}>{exampleAsset.name}</Text>
         <Text style={styles.assetMeta}>{exampleAsset.category} asset preset-ready</Text>
+        <TouchableOpacity style={styles.scanButton} onPress={() => setShowScanner(true)}>
+          <Text style={styles.scanButtonText}>Scan a Barcode</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -66,5 +77,17 @@ const styles = StyleSheet.create({
     color: "#9dc9b0",
     fontSize: 14,
     textTransform: "capitalize"
+  },
+  scanButton: {
+    marginTop: 12,
+    backgroundColor: "#0d9488",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center"
+  },
+  scanButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600"
   }
 });
