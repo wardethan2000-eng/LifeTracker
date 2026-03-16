@@ -1,7 +1,13 @@
 import Link from "next/link";
 import type { Notification } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { markNotificationReadAction, markNotificationsReadAction, enqueueNotificationScanAction } from "../../actions";
+import {
+  enqueueNotificationScanAction,
+  markNotificationReadAction,
+  markNotificationUnreadAction,
+  markNotificationsReadAction,
+  markNotificationsUnreadAction
+} from "../../actions";
 import { ApiError, getHouseholdNotifications, getMe } from "../../../lib/api";
 import { formatDateTime, formatNotificationTone } from "../../../lib/formatters";
 
@@ -12,6 +18,7 @@ type NotificationsPageProps = {
 const channelOptions = ["all", "push", "email", "digest"] as const;
 const statusOptions = ["all", "unread", "read"] as const;
 const typeOptions = ["all", "overdue", "due", "due_soon", "inventory_low_stock", "announcement", "digest"] as const;
+const limitOptions = [25, 50, 100] as const;
 
 const getNotificationTypeLabel = (value: Notification["type"]): string => value
   .replace(/_/g, " ")
@@ -27,6 +34,31 @@ const getNotificationBucket = (notification: Notification): "overdue" | "dueSoon
   }
 
   return "informational";
+};
+
+const buildNotificationsHref = (params: {
+  status: string;
+  channel: string;
+  type: string;
+  limit: number;
+  cursor?: string;
+  history?: string[];
+}): string => {
+  const query = new URLSearchParams();
+  query.set("status", params.status);
+  query.set("channel", params.channel);
+  query.set("type", params.type);
+  query.set("limit", String(params.limit));
+
+  if (params.cursor) {
+    query.set("cursor", params.cursor);
+  }
+
+  if (params.history && params.history.length > 0) {
+    query.set("history", params.history.join(","));
+  }
+
+  return `/notifications?${query.toString()}`;
 };
 
 function NotificationTable({ notifications }: { notifications: Notification[] }): JSX.Element {
@@ -68,10 +100,15 @@ function NotificationTable({ notifications }: { notifications: Notification[] })
                   {notification.assetId && (
                     <Link href={`/assets/${notification.assetId}`} className="data-table__link">View Asset</Link>
                   )}
-                  {!notification.readAt && notification.status !== "read" && (
+                  {!notification.readAt && notification.status !== "read" ? (
                     <form action={markNotificationReadAction}>
                       <input type="hidden" name="notificationId" value={notification.id} />
                       <button type="submit" className="button button--ghost button--sm">Mark Read</button>
+                    </form>
+                  ) : (
+                    <form action={markNotificationUnreadAction}>
+                      <input type="hidden" name="notificationId" value={notification.id} />
+                      <button type="submit" className="button button--ghost button--sm">Undo</button>
                     </form>
                   )}
                 </div>
@@ -95,6 +132,13 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const type = typeof params.type === "string" && typeOptions.includes(params.type as (typeof typeOptions)[number])
     ? params.type as (typeof typeOptions)[number]
     : "all";
+  const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
+    ? Number(params.limit)
+    : 25;
+  const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
+  const history = typeof params.history === "string"
+    ? params.history.split(",").map((value) => value.trim()).filter(Boolean)
+    : [];
 
   try {
     const me = await getMe();
@@ -111,14 +155,22 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
       );
     }
 
-    const notificationList = await getHouseholdNotifications(household.id, { limit: 100, status });
-    const filteredNotifications = notificationList.notifications
-      .filter((notification) => channel === "all" || notification.channel === channel)
-      .filter((notification) => type === "all" || notification.type === type);
+    const notificationList = await getHouseholdNotifications(household.id, {
+      limit,
+      status,
+      ...(cursor ? { cursor } : {}),
+      ...(channel !== "all" ? { channel } : {}),
+      ...(type !== "all" ? { type } : {})
+    });
+    const filteredNotifications = notificationList.notifications;
     const visibleUnreadNotifications = filteredNotifications.filter((notification) => !notification.readAt && notification.status !== "read");
+    const visibleReadNotifications = filteredNotifications.filter((notification) => notification.readAt || notification.status === "read");
     const overdueNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "overdue");
     const dueSoonNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "dueSoon");
     const informationalNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "informational");
+    const previousCursor = history.length > 0 ? history[history.length - 1] : undefined;
+    const previousHistory = history.slice(0, -1);
+    const nextHistory = cursor ? [...history, cursor] : history;
 
     return (
       <>
@@ -131,6 +183,14 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                   <input key={notification.id} type="hidden" name="notificationId" value={notification.id} />
                 ))}
                 <button type="submit" className="button button--primary">Mark Visible Read</button>
+              </form>
+            ) : null}
+            {visibleReadNotifications.length > 0 ? (
+              <form action={markNotificationsUnreadAction}>
+                {visibleReadNotifications.map((notification) => (
+                  <input key={notification.id} type="hidden" name="notificationId" value={notification.id} />
+                ))}
+                <button type="submit" className="button button--ghost">Undo Visible Read</button>
               </form>
             ) : null}
             <form action={enqueueNotificationScanAction}>
@@ -174,6 +234,14 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                     <option value="inventory_low_stock">Low stock</option>
                     <option value="announcement">Announcement</option>
                     <option value="digest">Digest</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Page Size</span>
+                  <select name="limit" defaultValue={String(limit)}>
+                    <option value="25">25 notifications</option>
+                    <option value="50">50 notifications</option>
+                    <option value="100">100 notifications</option>
                   </select>
                 </label>
                 <div className="inline-actions field field--full">
@@ -247,6 +315,50 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
               ) : (
                 <NotificationTable notifications={informationalNotifications} />
               )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Pagination</h2>
+              <span className="pill">Showing {filteredNotifications.length} on this page</span>
+            </div>
+            <div className="panel__body--padded" style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+              <div className="data-table__secondary">
+                Cursor-based pages keep the order stable while filters stay applied.
+              </div>
+              <div className="inline-actions">
+                {previousCursor ? (
+                  <Link
+                    href={buildNotificationsHref({
+                      status,
+                      channel,
+                      type,
+                      limit,
+                      cursor: previousCursor,
+                      history: previousHistory
+                    })}
+                    className="button button--ghost"
+                  >
+                    Previous Page
+                  </Link>
+                ) : null}
+                {notificationList.nextCursor ? (
+                  <Link
+                    href={buildNotificationsHref({
+                      status,
+                      channel,
+                      type,
+                      limit,
+                      cursor: notificationList.nextCursor,
+                      history: nextHistory
+                    })}
+                    className="button button--primary"
+                  >
+                    Next Page
+                  </Link>
+                ) : null}
+              </div>
             </div>
           </section>
         </div>

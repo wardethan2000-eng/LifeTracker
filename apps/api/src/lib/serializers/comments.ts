@@ -8,6 +8,7 @@ export const toCommentResponse = (comment: {
   body: string;
   parentCommentId: string | null;
   editedAt: Date | null;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   author: { id: string; displayName: string | null };
@@ -19,6 +20,7 @@ export const toCommentResponse = (comment: {
   body: comment.body,
   parentCommentId: comment.parentCommentId,
   editedAt: comment.editedAt?.toISOString() ?? null,
+  deletedAt: comment.deletedAt?.toISOString() ?? null,
   createdAt: comment.createdAt.toISOString(),
   updatedAt: comment.updatedAt.toISOString()
 });

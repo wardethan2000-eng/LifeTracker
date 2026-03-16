@@ -20,6 +20,7 @@ export const toAttachmentResponse = (
   caption: attachment.caption,
   sortOrder: attachment.sortOrder,
   status: attachment.status,
+  deletedAt: attachment.deletedAt?.toISOString() ?? null,
   createdAt: attachment.createdAt.toISOString(),
   updatedAt: attachment.updatedAt.toISOString()
 });

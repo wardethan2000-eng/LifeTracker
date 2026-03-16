@@ -15,4 +15,5 @@ export const toNotificationResponse = (
 export const toHouseholdNotificationListResponse = (value: {
   notifications: Array<ReturnType<typeof toNotificationResponse>>;
   unreadCount: number;
+  nextCursor?: string | null;
 }) => householdNotificationListSchema.parse(value);

@@ -793,7 +793,8 @@ export const householdDashboardSchema = z.object({
 
 export const householdNotificationListSchema = z.object({
   notifications: z.array(notificationSchema),
-  unreadCount: z.number().int().min(0)
+  unreadCount: z.number().int().min(0),
+  nextCursor: z.string().cuid().nullable().default(null)
 });
 
 export const createMaintenanceScheduleSchema = z.object({
@@ -2188,6 +2189,7 @@ export const commentSchema = z.object({
   body: z.string(),
   parentCommentId: z.string().cuid().nullable(),
   editedAt: z.string().datetime().nullable(),
+  deletedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 });
@@ -2287,6 +2289,7 @@ export const searchEntityTypeValues = [
   "schedule",
   "log",
   "timeline_entry",
+  "asset_transfer",
   "project",
   "service_provider",
   "inventory_item",
@@ -2741,6 +2744,7 @@ export const attachmentSchema = z.object({
   caption: z.string().nullable(),
   sortOrder: z.number().int().nullable(),
   status: attachmentStatusSchema,
+  deletedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

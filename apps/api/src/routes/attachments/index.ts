@@ -180,7 +180,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const attachment = await app.prisma.attachment.findFirst({
-      where: { id: attachmentId, householdId, status: "pending" },
+      where: { id: attachmentId, householdId, status: "pending", deletedAt: null },
     });
     if (!attachment) {
       return reply.code(404).send({ message: "Attachment not found." });
@@ -229,7 +229,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const where: Record<string, unknown> = { householdId, status: "active" };
+    const where: Record<string, unknown> = { householdId, status: "active", deletedAt: null };
     if (query.entityType) where.entityType = query.entityType;
     if (query.entityId) where.entityId = query.entityId;
 
@@ -255,7 +255,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const attachment = await app.prisma.attachment.findFirst({
-      where: { id: attachmentId, householdId, status: "active" },
+      where: { id: attachmentId, householdId, status: "active", deletedAt: null },
     });
     if (!attachment) {
       return reply.code(404).send({ message: "Attachment not found." });
@@ -277,7 +277,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const attachment = await app.prisma.attachment.findFirst({
-      where: { id: attachmentId, householdId, status: "active" },
+      where: { id: attachmentId, householdId, status: "active", deletedAt: null },
     });
     if (!attachment) {
       return reply.code(404).send({ message: "Attachment not found." });
@@ -308,7 +308,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const attachment = await app.prisma.attachment.findFirst({
-      where: { id: attachmentId, householdId, status: { not: "deleted" } },
+      where: { id: attachmentId, householdId, deletedAt: null, status: { not: "deleted" } },
     });
     if (!attachment) {
       return reply.code(404).send({ message: "Attachment not found." });
@@ -316,7 +316,10 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
 
     await app.prisma.attachment.update({
       where: { id: attachmentId },
-      data: { status: "deleted" },
+      data: {
+        status: "deleted",
+        deletedAt: new Date()
+      },
     });
 
     await logActivity(app.prisma, {

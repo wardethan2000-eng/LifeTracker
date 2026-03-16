@@ -128,6 +128,7 @@ import {
   deleteSchedule,
   enqueueNotificationScan,
   markNotificationRead,
+  markNotificationUnread,
   recordConditionAssessment,
   removeProjectAsset,
   reorderProjectPhases,
@@ -1068,6 +1069,21 @@ export async function markNotificationsReadAction(formData: FormData): Promise<v
     .filter(Boolean);
 
   await Promise.all(notificationIds.map((notificationId) => markNotificationRead(notificationId)));
+  revalidatePath("/notifications");
+}
+
+export async function markNotificationUnreadAction(formData: FormData): Promise<void> {
+  await markNotificationUnread(getRequiredString(formData, "notificationId"));
+  revalidatePath("/notifications");
+}
+
+export async function markNotificationsUnreadAction(formData: FormData): Promise<void> {
+  const notificationIds = formData
+    .getAll("notificationId")
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .filter(Boolean);
+
+  await Promise.all(notificationIds.map((notificationId) => markNotificationUnread(notificationId)));
   revalidatePath("/notifications");
 }
 

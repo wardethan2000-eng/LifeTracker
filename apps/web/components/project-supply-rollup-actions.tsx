@@ -10,6 +10,7 @@ import {
   updateProjectPhaseSupplyAction
 } from "../app/actions";
 import { ExpandableCard } from "./expandable-card";
+import { ConfirmActionForm } from "./confirm-action-form";
 
 type ProjectSupplyRollupActionsProps = {
   householdId: string;
@@ -81,13 +82,22 @@ export function ProjectSupplyRollupActions({
             </button>
           </form>
         ) : null}
-        <form action={deleteProjectPhaseSupplyAction}>
-          <input type="hidden" name="householdId" value={householdId} />
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="phaseId" value={phaseId} />
-          <input type="hidden" name="supplyId" value={supply.id} />
-          <button type="submit" className="button button--danger button--sm">Delete</button>
-        </form>
+        <ConfirmActionForm
+          action={deleteProjectPhaseSupplyAction}
+          hiddenFields={[
+            { name: "householdId", value: householdId },
+            { name: "projectId", value: projectId },
+            { name: "phaseId", value: phaseId },
+            { name: "supplyId", value: supply.id }
+          ]}
+          prompt="Delete this supply line?"
+          triggerLabel="Delete"
+          confirmLabel="Yes, delete"
+          className="inline-actions"
+          triggerClassName="button button--danger button--sm"
+          confirmClassName="button button--danger button--sm"
+          cancelClassName="button button--ghost button--sm"
+        />
       </div>
 
       {isEditing ? (

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { toAssetTransferResponse } from "../../lib/serializers/index.js";
+import { syncAssetFamilyToSearchIndex, syncAssetTransferToSearchIndex } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -181,6 +182,8 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
         return created;
       });
 
+      void syncAssetTransferToSearchIndex(app.prisma, transfer.id).catch(console.error);
+
       return reply.code(201).send(toAssetTransferResponse(transfer, {
         fromUser: transfer.fromUser,
         toUser: transfer.toUser,
@@ -209,7 +212,7 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ message: "Target user must be a member of the destination household." });
     }
 
-    const transfer = await app.prisma.$transaction(async (tx) => {
+    const transferResult = await app.prisma.$transaction(async (tx) => {
       const scopeAssets = await collectTransferScopeAssets(tx as unknown as PrismaClient, asset);
       const assetIds = scopeAssets.map((entry) => entry.id);
       const now = new Date();
@@ -253,9 +256,9 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
         }))
       });
 
-      const created = await tx.assetTransfer.findFirstOrThrow({
+      const createdTransfers = await tx.assetTransfer.findMany({
         where: {
-          assetId: asset.id,
+          assetId: { in: assetIds },
           transferType: "household_transfer",
           initiatedById: request.auth.userId,
           transferredAt: now
@@ -266,6 +269,12 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
           initiatedBy: { select: { id: true, displayName: true } }
         }
       });
+
+      const created = createdTransfers.find((entry) => entry.assetId === asset.id);
+
+      if (!created) {
+        throw new Error("Asset transfer record was not created for the requested asset.");
+      }
 
       await logActivity(tx, {
         householdId: asset.householdId,
@@ -299,13 +308,22 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
-      return created;
+      return {
+        created,
+        assetIds,
+        transferIds: createdTransfers.map((entry) => entry.id)
+      };
     });
 
-    return reply.code(201).send(toAssetTransferResponse(transfer, {
-      fromUser: transfer.fromUser,
-      toUser: transfer.toUser,
-      initiatedBy: transfer.initiatedBy
+    void Promise.all([
+      ...transferResult.assetIds.map((assetId) => syncAssetFamilyToSearchIndex(app.prisma, assetId)),
+      ...transferResult.transferIds.map((transferId) => syncAssetTransferToSearchIndex(app.prisma, transferId))
+    ]).catch(console.error);
+
+    return reply.code(201).send(toAssetTransferResponse(transferResult.created, {
+      fromUser: transferResult.created.fromUser,
+      toUser: transferResult.created.toUser,
+      initiatedBy: transferResult.created.initiatedBy
     }));
   });
 

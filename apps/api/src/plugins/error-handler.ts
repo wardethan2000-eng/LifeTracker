@@ -29,16 +29,42 @@ export const errorHandlerPlugin = fp(async (app) => {
       return reply.code(404).send({ message: "Resource not found." });
     }
 
-    if (isRecord(error) && error.code === "P2002") {
+    if (isRecord(error) && typeof error.code === "string") {
       const meta = isRecord(error.meta) ? error.meta : null;
-      const target = Array.isArray(meta?.target)
-        ? meta.target.filter((field): field is string => typeof field === "string")
-        : null;
 
-      return reply.code(409).send({
-        message: "A record with this value already exists.",
-        ...(target && target.length > 0 ? { fields: target } : {})
-      });
+      if (error.code === "P2002") {
+        const target = Array.isArray(meta?.target)
+          ? meta.target.filter((field): field is string => typeof field === "string")
+          : null;
+
+        return reply.code(409).send({
+          message: "A record with this value already exists.",
+          ...(target && target.length > 0 ? { fields: target } : {})
+        });
+      }
+
+      if (error.code === "P2003") {
+        const field = typeof meta?.field_name === "string" ? meta.field_name : null;
+
+        return reply.code(409).send({
+          message: "This operation would violate a required relationship.",
+          ...(field ? { field } : {})
+        });
+      }
+
+      if (error.code === "P2014") {
+        return reply.code(409).send({
+          message: "This operation would break a required relationship between records."
+        });
+      }
+
+      if (error.code === "P2025") {
+        const cause = typeof meta?.cause === "string" ? meta.cause : null;
+
+        return reply.code(404).send({
+          message: cause ?? "Resource not found."
+        });
+      }
     }
 
     if (isRecord(error) && typeof error.statusCode === "number") {

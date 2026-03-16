@@ -281,7 +281,7 @@ model Asset {
   updatedAt            DateTime              @updatedAt
   household            Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
   createdBy            User                  @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  owner                User?                 @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owner                User?                 @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   parentAsset          Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id], onDelete: SetNull)
   childAssets          Asset[]               @relation("AssetHierarchy")
   usageMetrics         UsageMetric[]
@@ -940,7 +940,7 @@ model SearchIndex {
   entityMeta       Json?
   updatedAt        DateTime               @updatedAt
 
-  @@unique([entityType, entityId])
+  @@unique([householdId, entityType, entityId])
   @@index([householdId, entityType])
 }
 
@@ -1004,6 +1004,7 @@ model Comment {
   body            String
   parentCommentId String?
   editedAt        DateTime?
+  deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
@@ -1060,6 +1061,7 @@ model Attachment {
   caption          String?
   sortOrder        Int?
   status           String               @default("pending")
+  deletedAt        DateTime?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   household        Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)

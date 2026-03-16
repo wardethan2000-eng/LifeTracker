@@ -1269,7 +1269,13 @@ export const getNotifications = async (options?: {
 
 export const getHouseholdNotifications = async (
   householdId: string,
-  options?: { limit?: number; status?: "all" | "unread" | "read" }
+  options?: {
+    limit?: number;
+    status?: "all" | "unread" | "read";
+    cursor?: string;
+    channel?: "push" | "email" | "digest";
+    type?: "due_soon" | "due" | "overdue" | "digest" | "announcement" | "inventory_low_stock";
+  }
 ): Promise<HouseholdNotificationList> => {
   const params = new URLSearchParams();
 
@@ -1279,6 +1285,18 @@ export const getHouseholdNotifications = async (
 
   if (options?.status) {
     params.set("status", options.status);
+  }
+
+  if (options?.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  if (options?.channel) {
+    params.set("channel", options.channel);
+  }
+
+  if (options?.type) {
+    params.set("type", options.type);
   }
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
@@ -2638,6 +2656,12 @@ export const restoreAsset = async (assetId: string): Promise<Asset> => apiReques
 
 export const markNotificationRead = async (notificationId: string): Promise<Notification> => apiRequest({
   path: `/v1/notifications/${notificationId}/read`,
+  method: "PATCH",
+  schema: notificationSchema
+});
+
+export const markNotificationUnread = async (notificationId: string): Promise<Notification> => apiRequest({
+  path: `/v1/notifications/${notificationId}/unread`,
   method: "PATCH",
   schema: notificationSchema
 });

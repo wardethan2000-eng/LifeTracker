@@ -23,7 +23,10 @@ const notificationParamsSchema = z.object({
 
 const listHouseholdNotificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
-  status: z.enum(["all", "unread", "read"]).default("all")
+  status: z.enum(["all", "unread", "read"]).default("all"),
+  cursor: z.string().cuid().optional(),
+  channel: z.enum(["push", "email", "digest"]).optional(),
+  type: z.enum(["due_soon", "due", "overdue", "digest", "announcement", "inventory_low_stock"]).optional()
 });
 
 const listNotificationsQuerySchema = z.object({
@@ -48,21 +51,59 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
+    let cursorFilter = {};
+
+    if (query.cursor) {
+      const cursorNotification = await app.prisma.notification.findFirst({
+        where: {
+          id: query.cursor,
+          userId: request.auth.userId,
+          householdId: params.householdId
+        },
+        select: {
+          id: true,
+          scheduledFor: true,
+          createdAt: true
+        }
+      });
+
+      if (cursorNotification) {
+        cursorFilter = {
+          OR: [
+            { scheduledFor: { lt: cursorNotification.scheduledFor } },
+            {
+              scheduledFor: cursorNotification.scheduledFor,
+              OR: [
+                { createdAt: { lt: cursorNotification.createdAt } },
+                {
+                  createdAt: cursorNotification.createdAt,
+                  id: { lt: cursorNotification.id }
+                }
+              ]
+            }
+          ]
+        };
+      }
+    }
+
     const notificationWhere = {
       userId: request.auth.userId,
       householdId: params.householdId,
+      ...(query.channel ? { channel: query.channel } : {}),
+      ...(query.type ? { type: query.type } : {}),
       ...(query.status === "unread"
         ? { readAt: null }
         : query.status === "read"
           ? { readAt: { not: null } }
-          : {})
+          : {}),
+      ...cursorFilter
     };
 
     const [notifications, unreadCount] = await Promise.all([
       app.prisma.notification.findMany({
         where: notificationWhere,
-        orderBy: [{ scheduledFor: "desc" }, { createdAt: "desc" }],
-        take: query.limit
+        orderBy: [{ scheduledFor: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+        take: query.limit + 1
       }),
       app.prisma.notification.count({
         where: {
@@ -73,9 +114,14 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
       })
     ]);
 
+    const hasMore = notifications.length > query.limit;
+    const pageNotifications = hasMore ? notifications.slice(0, query.limit) : notifications;
+    const nextCursor = hasMore ? pageNotifications[pageNotifications.length - 1]?.id ?? null : null;
+
     return toHouseholdNotificationListResponse({
-      notifications: notifications.map(toNotificationResponse),
-      unreadCount
+      notifications: pageNotifications.map(toNotificationResponse),
+      unreadCount,
+      nextCursor
     });
   });
 
@@ -113,6 +159,30 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
       data: {
         status: "read",
         readAt: notification.readAt ?? new Date()
+      }
+    });
+
+    return toNotificationResponse(updated);
+  });
+
+  app.patch("/v1/notifications/:notificationId/unread", async (request, reply) => {
+    const params = notificationParamsSchema.parse(request.params);
+    const notification = await app.prisma.notification.findFirst({
+      where: {
+        id: params.notificationId,
+        userId: request.auth.userId
+      }
+    });
+
+    if (!notification) {
+      return reply.code(404).send({ message: "Notification not found." });
+    }
+
+    const updated = await app.prisma.notification.update({
+      where: { id: notification.id },
+      data: {
+        status: notification.sentAt ? "sent" : "pending",
+        readAt: null
       }
     });
 

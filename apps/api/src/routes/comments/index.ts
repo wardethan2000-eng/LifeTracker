@@ -29,7 +29,10 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const comments = await app.prisma.comment.findMany({
-      where: { assetId: asset.id },
+      where: {
+        assetId: asset.id,
+        deletedAt: null
+      },
       include: {
         author: { select: { id: true, displayName: true } }
       },
@@ -79,7 +82,11 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.parentCommentId) {
       const parent = await app.prisma.comment.findFirst({
-        where: { id: input.parentCommentId, assetId: asset.id }
+        where: {
+          id: input.parentCommentId,
+          assetId: asset.id,
+          deletedAt: null
+        }
       });
 
       if (!parent) {
@@ -129,7 +136,11 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.comment.findFirst({
-      where: { id: params.commentId, assetId: asset.id }
+      where: {
+        id: params.commentId,
+        assetId: asset.id,
+        deletedAt: null
+      }
     });
 
     if (!existing) {
@@ -180,7 +191,11 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.comment.findFirst({
-      where: { id: params.commentId, assetId: asset.id }
+      where: {
+        id: params.commentId,
+        assetId: asset.id,
+        deletedAt: null
+      }
     });
 
     if (!existing) {
@@ -196,11 +211,17 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     // This could be revisited to cascade-delete if desired.
     await app.prisma.$transaction(async (tx) => {
       await tx.comment.updateMany({
-        where: { parentCommentId: existing.id },
+        where: {
+          parentCommentId: existing.id,
+          deletedAt: null
+        },
         data: { parentCommentId: null }
       });
 
-      await tx.comment.delete({ where: { id: existing.id } });
+      await tx.comment.update({
+        where: { id: existing.id },
+        data: { deletedAt: new Date() }
+      });
     });
 
     await logActivity(app.prisma, {
