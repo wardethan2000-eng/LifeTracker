@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../components/app-shell";
 import { ApiError, getHouseholdAssets, getMe } from "../../lib/api";
 import {
   formatCategoryLabel,
@@ -22,12 +21,12 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
 
     if (!household) {
       return (
-        <AppShell activePath="/assets">
+        <>
           <header className="page-header"><h1>Assets</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -37,7 +36,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
     );
 
     return (
-      <AppShell activePath="/assets">
+      <>
         <header className="page-header">
           <h1>Assets</h1>
           <div className="page-header__actions">
@@ -94,12 +93,12 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/assets">
+        <>
           <header className="page-header"><h1>Assets</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -108,7 +107,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

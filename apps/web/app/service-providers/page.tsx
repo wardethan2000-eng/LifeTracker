@@ -5,7 +5,6 @@ import {
   deleteServiceProviderAction,
   updateServiceProviderAction
 } from "../actions";
-import { AppShell } from "../../components/app-shell";
 import { ApiError, getHouseholdServiceProviders, getMe } from "../../lib/api";
 
 type ServiceProvidersPageProps = {
@@ -23,19 +22,19 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
 
     if (!household) {
       return (
-        <AppShell activePath="/service-providers">
+        <>
           <header className="page-header"><h1>Service Providers</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     const providers = await getHouseholdServiceProviders(household.id);
 
     return (
-      <AppShell activePath="/service-providers">
+      <>
         <header className="page-header">
           <div>
             <h1>Service Providers</h1>
@@ -108,12 +107,12 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/service-providers">
+        <>
           <header className="page-header"><h1>Service Providers</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -122,7 +121,7 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

@@ -1,6 +1,5 @@
 import type { JSX } from "react";
 import { createAssetAction } from "../../actions";
-import { AppShell } from "../../../components/app-shell";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
 import { ApiError, getHouseholdAssets, getHouseholdPresets, getLibraryPresets, getMe } from "../../../lib/api";
 import Link from "next/link";
@@ -12,12 +11,12 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
 
     if (!household) {
       return (
-        <AppShell activePath="/assets/new">
+        <>
           <header className="page-header"><h1>Add Asset</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -28,7 +27,7 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
     ]);
 
     return (
-      <AppShell activePath="/assets/new">
+      <>
         <header className="page-header">
           <div>
             <h1>Add New Asset</h1>
@@ -45,12 +44,12 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
             customPresets={customPresets}
           />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/assets/new">
+        <>
           <header className="page-header"><h1>Add Asset</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -59,7 +58,7 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

@@ -4,7 +4,6 @@ import {
   createSessionFromRecipeAction,
   deleteHobbyRecipeAction,
 } from "../../../../actions";
-import { AppShell } from "../../../../../components/app-shell";
 import { HobbyRecipeDeleteButton } from "../../../../../components/hobby-recipe-delete-button";
 import { ApiError, getHobbyDetail, getHobbyRecipe, getMe } from "../../../../../lib/api";
 
@@ -59,10 +58,10 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
 
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Recipe</h1></header>
           <div className="page-body"><p>No household found.</p></div>
-        </AppShell>
+        </>
       );
     }
 
@@ -75,7 +74,7 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
     const sortedSteps = [...recipe.steps].sort((left, right) => left.sortOrder - right.sortOrder);
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=recipes`} className="text-link" style={{ fontSize: "0.85rem" }}>
@@ -246,12 +245,12 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
             </aside>
           </div>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Recipe</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -260,7 +259,7 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

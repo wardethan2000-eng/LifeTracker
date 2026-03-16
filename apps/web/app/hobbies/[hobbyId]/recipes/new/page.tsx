@@ -1,7 +1,6 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import { createHobbyRecipeAction } from "../../../../actions";
-import { AppShell } from "../../../../../components/app-shell";
 import { HobbyRecipeWorkbench } from "../../../../../components/hobby-recipe-workbench";
 import { ApiError, getHobbyDetail, getMe } from "../../../../../lib/api";
 
@@ -18,17 +17,17 @@ export default async function NewHobbyRecipePage({ params }: NewHobbyRecipePageP
 
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>New Recipe</h1></header>
           <div className="page-body"><p>No household found.</p></div>
-        </AppShell>
+        </>
       );
     }
 
     const hobby = await getHobbyDetail(household.id, hobbyId);
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=recipes`} className="text-link" style={{ fontSize: "0.85rem" }}>
@@ -48,12 +47,12 @@ export default async function NewHobbyRecipePage({ params }: NewHobbyRecipePageP
             hobbyInventoryLinks={hobby.inventoryLinks}
           />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>New Recipe</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -62,7 +61,7 @@ export default async function NewHobbyRecipePage({ params }: NewHobbyRecipePageP
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

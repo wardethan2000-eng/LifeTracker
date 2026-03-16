@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { createProjectAction } from "../../actions";
-import { AppShell } from "../../../components/app-shell";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
 import { ApiError, getMe, getProjectDetail } from "../../../lib/api";
 
@@ -20,12 +19,12 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
 
     if (!household) {
       return (
-        <AppShell activePath="/projects">
+        <>
           <header className="page-header"><h1>New Project</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -34,7 +33,7 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
       : null;
 
     return (
-      <AppShell activePath="/projects">
+      <>
         <header className="page-header">
           <div>
             <h1>Create Project</h1>
@@ -60,12 +59,12 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
             </div>
           </form>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/projects">
+        <>
           <header className="page-header"><h1>Create Project</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -74,7 +73,7 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

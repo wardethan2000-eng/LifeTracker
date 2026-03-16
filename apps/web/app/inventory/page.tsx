@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../components/app-shell";
 import { InventoryBulkActions } from "../../components/inventory-bulk-actions";
 import { InventoryEditableRow } from "../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../components/inventory-filter-bar";
@@ -89,12 +88,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
     if (!household) {
       return (
-        <AppShell activePath="/inventory">
+        <>
           <header className="page-header"><h1>Inventory</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -152,7 +151,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     const outOfStockCount = items.filter((item) => item.quantityOnHand <= 0).length;
 
     return (
-      <AppShell activePath="/inventory">
+      <>
         <header className="page-header">
           <div>
             <h1>Inventory</h1>
@@ -313,12 +312,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
           <InventoryTransactionHistory householdId={household.id} />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/inventory">
+        <>
           <header className="page-header"><h1>Inventory</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -327,7 +326,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

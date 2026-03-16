@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../components/app-shell";
 import { ApiError, getHouseholdDueWork, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../../lib/formatters";
 
@@ -11,12 +10,12 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
 
     if (!household) {
       return (
-        <AppShell activePath="/maintenance">
+        <>
           <header className="page-header"><h1>Maintenance</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -25,7 +24,7 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
     const dueScheduleCount = dueWork.filter((item) => item.status === "due").length;
 
     return (
-      <AppShell activePath="/maintenance">
+      <>
         <header className="page-header">
           <h1>Maintenance Queue</h1>
         </header>
@@ -108,12 +107,12 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/maintenance">
+        <>
           <header className="page-header"><h1>Maintenance</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -122,7 +121,7 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

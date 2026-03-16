@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../../components/app-shell";
 import { ComparativeAnalyticsWorkspace } from "../../../components/comparative-analytics-workspace";
 import { ApiError, getHouseholdAssets, getMe } from "../../../lib/api";
 
@@ -25,19 +24,19 @@ export default async function ComparativeAnalyticsPage({ searchParams }: Compara
 
     if (!household) {
       return (
-        <AppShell activePath="/analytics/comparative">
+        <>
           <header className="page-header"><h1>Comparative Analytics</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     const assets = await getHouseholdAssets(household.id);
 
     return (
-      <AppShell activePath="/analytics/comparative">
+      <>
         <header className="page-header">
           <div>
             <h1>Comparative Analytics</h1>
@@ -61,12 +60,12 @@ export default async function ComparativeAnalyticsPage({ searchParams }: Compara
         <div className="page-body">
           <ComparativeAnalyticsWorkspace householdId={household.id} assets={assets} />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/analytics/comparative">
+        <>
           <header className="page-header"><h1>Comparative Analytics</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -75,7 +74,7 @@ export default async function ComparativeAnalyticsPage({ searchParams }: Compara
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

@@ -1,7 +1,6 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import { createHobbySessionAction } from "../../../../actions";
-import { AppShell } from "../../../../../components/app-shell";
 import { HobbySessionWorkbench } from "../../../../../components/hobby-session-workbench";
 import { ApiError, getHobbyDetail, getHobbyRecipes, getMe } from "../../../../../lib/api";
 
@@ -18,10 +17,10 @@ export default async function NewHobbySessionPage({ params }: NewHobbySessionPag
 
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>New Session</h1></header>
           <div className="page-body"><p>No household found.</p></div>
-        </AppShell>
+        </>
       );
     }
 
@@ -31,7 +30,7 @@ export default async function NewHobbySessionPage({ params }: NewHobbySessionPag
     ]);
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=sessions`} className="text-link" style={{ fontSize: "0.85rem" }}>
@@ -49,12 +48,12 @@ export default async function NewHobbySessionPage({ params }: NewHobbySessionPag
             recipes={recipes}
           />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>New Session</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -63,7 +62,7 @@ export default async function NewHobbySessionPage({ params }: NewHobbySessionPag
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

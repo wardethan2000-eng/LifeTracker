@@ -6,7 +6,6 @@ import {
   softDeleteAssetAction,
   unarchiveAssetAction
 } from "../../actions";
-import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
 import { AssetTabNav } from "../../../components/asset-tab-nav";
 import {
@@ -31,7 +30,7 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
     const detail = await getAssetDetail(assetId);
 
     return (
-      <AppShell activePath="/assets">
+      <>
         <div className="detail-topbar">
           <Link href="/assets" className="text-link">&larr; Back to Assets</Link>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -79,7 +78,7 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
 
           <main>{children}</main>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {

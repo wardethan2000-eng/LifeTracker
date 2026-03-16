@@ -1,7 +1,6 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import { updateHobbyRecipeAction } from "../../../../../actions";
-import { AppShell } from "../../../../../../components/app-shell";
 import { HobbyRecipeWorkbench } from "../../../../../../components/hobby-recipe-workbench";
 import { ApiError, getHobbyDetail, getHobbyRecipe, getMe } from "../../../../../../lib/api";
 
@@ -18,10 +17,10 @@ export default async function EditHobbyRecipePage({ params }: EditHobbyRecipePag
 
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Edit Recipe</h1></header>
           <div className="page-body"><p>No household found.</p></div>
-        </AppShell>
+        </>
       );
     }
 
@@ -31,7 +30,7 @@ export default async function EditHobbyRecipePage({ params }: EditHobbyRecipePag
     ]);
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}/recipes/${recipeId}`} className="text-link" style={{ fontSize: "0.85rem" }}>
@@ -52,12 +51,12 @@ export default async function EditHobbyRecipePage({ params }: EditHobbyRecipePag
             hobbyInventoryLinks={hobby.inventoryLinks}
           />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Edit Recipe</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -66,7 +65,7 @@ export default async function EditHobbyRecipePage({ params }: EditHobbyRecipePag
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

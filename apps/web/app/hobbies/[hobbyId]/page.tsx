@@ -6,7 +6,6 @@ import {
   deleteHobbyAction,
   restoreHobbyAction,
 } from "../../actions";
-import { AppShell } from "../../../components/app-shell";
 import { HobbyDangerActions } from "../../../components/hobby-danger-actions";
 import { HobbyJournalManager } from "../../../components/hobby-journal-manager";
 import { HobbyLinksManager } from "../../../components/hobby-links-manager";
@@ -72,10 +71,10 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
     const household = me.households[0];
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Hobby</h1></header>
           <div className="page-body"><p>No household found.</p></div>
-        </AppShell>
+        </>
       );
     }
 
@@ -431,7 +430,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
     );
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <Link href="/hobbies" className="text-link" style={{ fontSize: "0.85rem" }}>← All Hobbies</Link>
@@ -475,12 +474,12 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           {tab === "settings" ? renderSettingsTab() : null}
         </main>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Hobby</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -489,7 +488,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

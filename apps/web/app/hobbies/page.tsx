@@ -1,7 +1,6 @@
 import type { HobbyStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../components/app-shell";
 import { ApiError, getHouseholdHobbies, getMe } from "../../lib/api";
 
 type HobbiesPageProps = {
@@ -38,12 +37,12 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
 
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Hobbies</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -58,7 +57,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
     const totalRecipes = hobbies.reduce((sum, h) => sum + h.recipeCount, 0);
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <h1>Hobbies</h1>
@@ -159,12 +158,12 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
             </div>
           )}
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Hobbies</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -173,7 +172,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

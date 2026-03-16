@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { createHouseholdAction, enqueueNotificationScanAction } from "./actions";
-import { AppShell } from "../components/app-shell";
 import { DashboardDueWork } from "../components/dashboard-due-work";
 import { DashboardNotificationsAside } from "../components/dashboard-notifications-aside";
 import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getMe } from "../lib/api";
@@ -118,7 +117,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
     const dueAssets = sortedAssets.filter((a) => a.overdueScheduleCount === 0 && a.dueScheduleCount > 0).length;
 
     return (
-      <AppShell activePath="/">
+      <>
         <header className="page-header">
           <h1>Dashboard</h1>
           <div className="page-header__actions">
@@ -261,7 +260,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             </div>
           </div>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) return <DashboardError message={error.message} />;

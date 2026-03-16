@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../../components/app-shell";
 import { ComplianceAnalyticsWorkspace } from "../../../components/compliance-analytics-workspace";
 import { ApiError, getHouseholdAssets, getMe } from "../../../lib/api";
 
@@ -25,19 +24,19 @@ export default async function ComplianceAnalyticsPage({ searchParams }: Complian
 
     if (!household) {
       return (
-        <AppShell activePath="/analytics/compliance">
+        <>
           <header className="page-header"><h1>Schedule &amp; Compliance Analytics</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     const assets = await getHouseholdAssets(household.id);
 
     return (
-      <AppShell activePath="/analytics/compliance">
+      <>
         <header className="page-header">
           <div>
             <h1>Schedule &amp; Compliance Analytics</h1>
@@ -63,12 +62,12 @@ export default async function ComplianceAnalyticsPage({ searchParams }: Complian
         <div className="page-body">
           <ComplianceAnalyticsWorkspace householdId={household.id} assets={assets} />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/analytics/compliance">
+        <>
           <header className="page-header"><h1>Schedule &amp; Compliance Analytics</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -77,7 +76,7 @@ export default async function ComplianceAnalyticsPage({ searchParams }: Complian
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

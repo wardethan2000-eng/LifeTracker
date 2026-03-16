@@ -5,7 +5,6 @@ import {
   createInvitationAction,
   revokeInvitationAction
 } from "../actions";
-import { AppShell } from "../../components/app-shell";
 import { ApiError, getHouseholdInvitations, getMe } from "../../lib/api";
 import { formatDateTime } from "../../lib/formatters";
 
@@ -24,19 +23,19 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
 
     if (!household) {
       return (
-        <AppShell activePath="/invitations">
+        <>
           <header className="page-header"><h1>Invitations</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     const invitations = await getHouseholdInvitations(household.id);
 
     return (
-      <AppShell activePath="/invitations">
+      <>
         <header className="page-header">
           <div>
             <h1>Household Invitations</h1>
@@ -118,12 +117,12 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/invitations">
+        <>
           <header className="page-header"><h1>Invitations</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -132,7 +131,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

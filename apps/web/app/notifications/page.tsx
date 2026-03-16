@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { markNotificationReadAction, enqueueNotificationScanAction } from "../actions";
-import { AppShell } from "../../components/app-shell";
 import { ApiError, getHouseholdNotifications, getMe } from "../../lib/api";
 import { formatDateTime, formatNotificationTone } from "../../lib/formatters";
 
@@ -12,19 +11,19 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
 
     if (!household) {
       return (
-        <AppShell activePath="/notifications">
+        <>
           <header className="page-header"><h1>Notifications</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     const notificationList = await getHouseholdNotifications(household.id, { limit: 100 });
 
     return (
-      <AppShell activePath="/notifications">
+      <>
         <header className="page-header">
           <h1>Notifications</h1>
           <div className="page-header__actions">
@@ -96,12 +95,12 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/notifications">
+        <>
           <header className="page-header"><h1>Notifications</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -110,7 +109,7 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

@@ -2,7 +2,6 @@ import type { ProjectStatus, ProjectSummary } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
-import { AppShell } from "../../components/app-shell";
 import { ProjectPortfolioAside } from "../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../components/project-portfolio-stats";
 import { ProjectPortfolioTable } from "../../components/project-portfolio-table";
@@ -173,12 +172,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
 
     if (!household) {
       return (
-        <AppShell activePath="/projects">
+        <>
           <header className="page-header"><h1>Projects</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -203,7 +202,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       : "Across the current portfolio view";
 
     return (
-      <AppShell activePath="/projects">
+      <>
         <header className="page-header">
           <div>
             <h1>Projects</h1>
@@ -329,12 +328,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
             </div>
           </div>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/projects">
+        <>
           <header className="page-header"><h1>Projects</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -343,7 +342,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

@@ -1,6 +1,5 @@
 import type { JSX } from "react";
 import Link from "next/link";
-import { AppShell } from "../../../../../components/app-shell";
 import { HobbySessionDetail } from "../../../../../components/hobby-session-detail";
 import {
   advanceHobbySessionAction,
@@ -25,10 +24,10 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
     const household = me.households[0];
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Session</h1></header>
           <div className="page-body"><p>No household found.</p></div>
-        </AppShell>
+        </>
       );
     }
 
@@ -38,7 +37,7 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
     ]);
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <div style={{ display: "grid", gap: "4px" }}>
@@ -65,12 +64,12 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
           advanceHobbySessionAction={advanceHobbySessionAction}
           deleteHobbySessionAction={deleteHobbySessionAction}
         />
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>Session</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -79,7 +78,7 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

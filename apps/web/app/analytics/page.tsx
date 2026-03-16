@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../components/app-shell";
 import { InventoryAnalyticsAssetParts } from "../../components/inventory-analytics-asset-parts";
 import { InventoryAnalyticsCommonality } from "../../components/inventory-analytics-commonality";
 import { InventoryAnalyticsReorder } from "../../components/inventory-analytics-reorder";
@@ -136,7 +135,7 @@ const loadUsageHighlights = async (householdId: string): Promise<UsageHighlight[
       nextProjectedDue: projectedDates[0] ?? null,
       metricNames: metricInsights.map((insight) => insight.metricName)
     } satisfies UsageHighlight;
-  }))).filter((highlight): highlight is UsageHighlight => highlight !== null);
+  }))).filter((highlight) => highlight !== null);
 
   return highlights
     .sort((left, right) => (
@@ -160,7 +159,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   if (!household) {
     return (
-      <AppShell activePath="/analytics">
+      <>
         <header className="page-header">
           <h1>Analytics</h1>
         </header>
@@ -171,7 +170,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   }
 
@@ -625,7 +624,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   };
 
   return (
-    <AppShell activePath="/analytics">
+    <>
       <header className="page-header">
         <div>
           <h1>Analytics</h1>
@@ -654,6 +653,6 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         {tab === "compliance" ? renderComplianceTab() : null}
         {tab === "usage" ? renderUsageTab() : null}
       </div>
-    </AppShell>
+    </>
   );
 }

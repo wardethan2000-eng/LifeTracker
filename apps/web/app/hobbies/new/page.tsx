@@ -1,6 +1,5 @@
 import type { JSX } from "react";
 import { createHobbyAction } from "../../actions";
-import { AppShell } from "../../../components/app-shell";
 import { HobbyWorkbench } from "../../../components/hobby-workbench";
 import { ApiError, getMe } from "../../../lib/api";
 import { hobbyPresetLibrary } from "@lifekeeper/presets";
@@ -13,17 +12,17 @@ export default async function NewHobbyPage(): Promise<JSX.Element> {
 
     if (!household) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>New Hobby</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     return (
-      <AppShell activePath="/hobbies">
+      <>
         <header className="page-header">
           <div>
             <h1>New Hobby</h1>
@@ -38,12 +37,12 @@ export default async function NewHobbyPage(): Promise<JSX.Element> {
             presets={hobbyPresetLibrary}
           />
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/hobbies">
+        <>
           <header className="page-header"><h1>New Hobby</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -52,7 +51,7 @@ export default async function NewHobbyPage(): Promise<JSX.Element> {
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw error;

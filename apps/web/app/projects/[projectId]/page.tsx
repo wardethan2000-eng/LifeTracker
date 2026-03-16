@@ -28,7 +28,6 @@ import {
   updateProjectExpenseAction,
   updateProjectTaskAction
 } from "../../actions";
-import { AppShell } from "../../../components/app-shell";
 import { Card } from "../../../components/card";
 import { CompactPhasePreview } from "../../../components/compact-phase-preview";
 import { CompactTaskPreview } from "../../../components/compact-task-preview";
@@ -40,6 +39,7 @@ import { ProjectProgressBar } from "../../../components/project-progress-bar";
 import { ProjectShoppingListSection } from "../../../components/project-shopping-list-section";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
 import { ProjectSupplyStatCards } from "../../../components/project-supply-stat-cards";
+import { ProjectSupplyRollupActions } from "../../../components/project-supply-rollup-actions";
 import { AttachmentSection } from "../../../components/attachment-section";
 import {
   createTaskChecklistItemAction,
@@ -55,7 +55,6 @@ import {
   getHouseholdServiceProviders,
   getMe,
   getProjectDetail,
-  getProjectNotes,
   getProjectNotes
 } from "../../../lib/api";
 import { formatCurrency, formatDate } from "../../../lib/formatters";
@@ -196,12 +195,12 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
     if (!household) {
       return (
-        <AppShell activePath="/projects">
+        <>
           <header className="page-header"><h1>Project Detail</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/projects" className="text-link">Go back to projects</Link>.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
@@ -247,7 +246,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     }
 
     return (
-      <AppShell activePath="/projects">
+      <>
         <header className="page-header">
           <div>
             {project.breadcrumbs && project.breadcrumbs.length > 1 && (
@@ -799,12 +798,12 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             </div>
           </div>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/projects">
+        <>
           <header className="page-header"><h1>Project Detail</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -813,7 +812,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 

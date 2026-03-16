@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { AppShell } from "../../components/app-shell";
 import { HouseholdCsvExportButton } from "../../components/asset-export-actions";
 import { ApiError, getHouseholdActivity, getMe } from "../../lib/api";
 import { formatDateTime } from "../../lib/formatters";
@@ -25,19 +24,19 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
 
     if (!household) {
       return (
-        <AppShell activePath="/activity">
+        <>
           <header className="page-header"><h1>Activity</h1></header>
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
-        </AppShell>
+        </>
       );
     }
 
     const activity = await getHouseholdActivity(household.id);
 
     return (
-      <AppShell activePath="/activity">
+      <>
         <header className="page-header">
           <div>
             <h1>Activity Log</h1>
@@ -79,12 +78,12 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
             </div>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <AppShell activePath="/activity">
+        <>
           <header className="page-header"><h1>Activity</h1></header>
           <div className="page-body">
             <div className="panel">
@@ -93,7 +92,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
               </div>
             </div>
           </div>
-        </AppShell>
+        </>
       );
     }
 
