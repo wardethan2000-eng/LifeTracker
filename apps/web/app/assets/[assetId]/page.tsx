@@ -35,6 +35,7 @@ import { LogMaintenanceForm } from "../../../components/log-maintenance-form";
 import { ScheduleCardActions } from "../../../components/schedule-card-actions";
 import { ScheduleForm } from "../../../components/schedule-form";
 import { ScheduleInventoryLinks } from "../../../components/schedule-inventory-links";
+import { SchedulePartsReadiness } from "../../../components/schedule-parts-readiness";
 import {
   ApiError,
   getAssetComments,
@@ -779,6 +780,10 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                         assetId={detail.asset.id}
                         scheduleId={schedule.id}
                         householdId={detail.asset.householdId}
+                      />
+                      <SchedulePartsReadiness
+                        assetId={detail.asset.id}
+                        scheduleId={schedule.id}
                       />
                       <ScheduleCardActions
                         assetId={detail.asset.id}

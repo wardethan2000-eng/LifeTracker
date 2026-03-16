@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { createHouseholdAction, enqueueNotificationScanAction, markNotificationReadAction } from "./actions";
 import { AppShell } from "../components/app-shell";
-import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getMe } from "../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getHouseholdPartsReadiness, getMe } from "../lib/api";
 import { formatCategoryLabel, formatDateTime, formatDueLabel, formatNotificationTone } from "../lib/formatters";
 
 type HomePageProps = {
@@ -67,6 +67,10 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
     const dashboard = await getHouseholdDashboard(selectedHousehold.id);
+    const readiness = dashboard.dueWork.length > 0
+      ? await getHouseholdPartsReadiness(selectedHousehold.id, dashboard.dueWork.map((item) => item.scheduleId))
+      : null;
+    const readinessByScheduleId = new Map((readiness?.schedules ?? []).map((item) => [item.scheduleId, item]));
 
     const sortedAssets = [...dashboard.assets].sort(
       (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -147,7 +151,11 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                         </tr>
                       </thead>
                       <tbody>
-                        {dashboard.dueWork.map((item) => (
+                        {dashboard.dueWork.map((item) => {
+                          const partsReadiness = readinessByScheduleId.get(item.scheduleId);
+                          const deficitItems = partsReadiness?.items.filter((entry) => entry.deficit > 0) ?? [];
+
+                          return (
                           <tr key={item.scheduleId} className={`row--${item.status}`}>
                             <td>
                               <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
@@ -157,7 +165,22 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                               <div className="data-table__secondary">{formatCategoryLabel(item.assetCategory)}</div>
                             </td>
                             <td>
-                              <div className="data-table__primary">{item.scheduleName}</div>
+                              <div className="data-table__primary dashboard-schedule-name">
+                                <span>{item.scheduleName}</span>
+                                {partsReadiness && !partsReadiness.allReady && deficitItems.length > 0 ? (
+                                  <details className="parts-readiness-badge">
+                                    <summary>Missing parts</summary>
+                                    <div className="parts-readiness-badge__popover">
+                                      {deficitItems.map((entry) => (
+                                        <div key={entry.inventoryItemId} className="parts-readiness-badge__row">
+                                          <strong>{entry.itemName}</strong>
+                                          <span>Short {entry.deficit} {entry.unit}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </details>
+                                ) : null}
+                              </div>
                               <div className="data-table__secondary">{item.summary}</div>
                             </td>
                             <td>
@@ -172,7 +195,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                               <Link href={`/assets/${item.assetId}`} className="data-table__link">View</Link>
                             </td>
                           </tr>
-                        ))}
+                        );})}
                       </tbody>
                     </table>
                   )}

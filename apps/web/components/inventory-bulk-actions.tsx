@@ -219,7 +219,7 @@ export function InventoryBulkActions({ householdId }: InventoryBulkActionsProps)
           </p>
           {importResult.errors.length > 0 && (
             <ul>
-              {importResult.errors.map((entry) => (
+              {importResult.errors.map((entry: ImportInventoryResult["errors"][number]) => (
                 <li key={`${entry.index}-${entry.message}`}>Row {entry.index + 2}: {entry.message}</li>
               ))}
             </ul>

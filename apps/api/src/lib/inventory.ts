@@ -5,7 +5,9 @@ import type {
 import {
   type CreateMaintenanceLogPartInput,
   type CreateInventoryTransactionInput,
-  type InventoryTransactionType
+  type InventoryTransactionType,
+  type SchedulePartReadinessItem,
+  type SchedulePartsReadiness
 } from "@lifekeeper/types";
 import {
   applyInventoryDelta,
@@ -38,6 +40,127 @@ export const getHouseholdInventoryItem = async (
     householdId
   }
 });
+
+type ScheduleInventoryReadinessRecord = {
+  scheduleId: string;
+  quantityPerService: number;
+  inventoryItem: {
+    id: string;
+    name: string;
+    partNumber: string | null;
+    quantityOnHand: number;
+    unit: string;
+    reorderThreshold: number | null;
+  };
+};
+
+const buildSchedulePartsReadiness = (
+  scheduleId: string,
+  links: ScheduleInventoryReadinessRecord[]
+): SchedulePartsReadiness => {
+  const items: SchedulePartReadinessItem[] = links.map((link) => {
+    const quantityNeeded = link.quantityPerService;
+    const quantityOnHand = link.inventoryItem.quantityOnHand;
+    const deficit = Math.max(0, quantityNeeded - quantityOnHand);
+
+    return {
+      inventoryItemId: link.inventoryItem.id,
+      itemName: link.inventoryItem.name,
+      itemPartNumber: link.inventoryItem.partNumber,
+      unit: link.inventoryItem.unit,
+      quantityNeeded,
+      quantityOnHand,
+      deficit,
+      ready: deficit === 0
+    };
+  });
+
+  const readyCount = items.filter((item) => item.ready).length;
+
+  return {
+    scheduleId,
+    allReady: readyCount === items.length,
+    totalLinkedItems: items.length,
+    readyCount,
+    items
+  };
+};
+
+export const computeSchedulePartsReadiness = async (
+  prisma: PrismaExecutor,
+  scheduleId: string
+): Promise<SchedulePartsReadiness> => {
+  const links = await prisma.scheduleInventoryItem.findMany({
+    where: { scheduleId },
+    select: {
+      scheduleId: true,
+      quantityPerService: true,
+      inventoryItem: {
+        select: {
+          id: true,
+          name: true,
+          partNumber: true,
+          quantityOnHand: true,
+          unit: true,
+          reorderThreshold: true
+        }
+      }
+    }
+  });
+
+  return buildSchedulePartsReadiness(scheduleId, links);
+};
+
+export const computeBulkSchedulePartsReadiness = async (
+  prisma: PrismaExecutor,
+  scheduleIds: string[]
+): Promise<Map<string, SchedulePartsReadiness>> => {
+  const readinessMap = new Map<string, SchedulePartsReadiness>();
+
+  if (scheduleIds.length === 0) {
+    return readinessMap;
+  }
+
+  const links = await prisma.scheduleInventoryItem.findMany({
+    where: {
+      scheduleId: {
+        in: scheduleIds
+      }
+    },
+    select: {
+      scheduleId: true,
+      quantityPerService: true,
+      inventoryItem: {
+        select: {
+          id: true,
+          name: true,
+          partNumber: true,
+          quantityOnHand: true,
+          unit: true,
+          reorderThreshold: true
+        }
+      }
+    }
+  });
+
+  const grouped = links.reduce<Map<string, ScheduleInventoryReadinessRecord[]>>((map, link) => {
+    const existing = map.get(link.scheduleId);
+
+    if (existing) {
+      existing.push(link);
+    } else {
+      map.set(link.scheduleId, [link]);
+    }
+
+    return map;
+  }, new Map());
+
+  for (const scheduleId of scheduleIds) {
+    readinessMap.set(scheduleId, buildSchedulePartsReadiness(scheduleId, grouped.get(scheduleId) ?? []));
+  }
+
+  return readinessMap;
+};
 
 export const applyInventoryTransaction = async (
   prisma: Prisma.TransactionClient,

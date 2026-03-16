@@ -968,6 +968,34 @@ export const scheduleInventoryLinkDetailSchema = scheduleInventoryItemSchema.ext
   inventoryItem: inventoryItemSummarySchema
 });
 
+export const schedulePartReadinessItemSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  itemName: z.string(),
+  itemPartNumber: z.string().nullable(),
+  unit: z.string(),
+  quantityNeeded: z.number(),
+  quantityOnHand: z.number(),
+  deficit: z.number(),
+  ready: z.boolean()
+});
+
+export const schedulePartsReadinessSchema = z.object({
+  scheduleId: z.string().cuid(),
+  allReady: z.boolean(),
+  totalLinkedItems: z.number(),
+  readyCount: z.number(),
+  items: z.array(schedulePartReadinessItemSchema)
+});
+
+export const bulkPartsReadinessSchema = z.object({
+  schedules: z.array(schedulePartsReadinessSchema),
+  summary: z.object({
+    totalSchedules: z.number(),
+    allReadyCount: z.number(),
+    notReadyCount: z.number()
+  })
+});
+
 export const createScheduleInventoryItemSchema = z.object({
   inventoryItemId: z.string().cuid(),
   quantityPerService: z.number().positive().default(1),
@@ -1847,6 +1875,9 @@ export type AssetInventoryItem = z.infer<typeof assetInventoryItemSchema>;
 export type CreateAssetInventoryItemInput = z.infer<typeof createAssetInventoryItemSchema>;
 export type ScheduleInventoryItem = z.infer<typeof scheduleInventoryItemSchema>;
 export type ScheduleInventoryLinkDetail = z.infer<typeof scheduleInventoryLinkDetailSchema>;
+export type SchedulePartReadinessItem = z.infer<typeof schedulePartReadinessItemSchema>;
+export type SchedulePartsReadiness = z.infer<typeof schedulePartsReadinessSchema>;
+export type BulkPartsReadiness = z.infer<typeof bulkPartsReadinessSchema>;
 export type CreateScheduleInventoryItemInput = z.infer<typeof createScheduleInventoryItemSchema>;
 export type UpdateScheduleInventoryItemInput = z.infer<typeof updateScheduleInventoryItemSchema>;
 export type ProjectInventoryItem = z.infer<typeof projectInventoryItemSchema>;

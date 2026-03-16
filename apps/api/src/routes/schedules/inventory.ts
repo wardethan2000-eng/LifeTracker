@@ -1,11 +1,12 @@
 import {
   createScheduleInventoryItemSchema,
+  schedulePartsReadinessSchema,
   updateScheduleInventoryItemSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
-import { getHouseholdInventoryItem } from "../../lib/inventory.js";
+import { computeSchedulePartsReadiness, getHouseholdInventoryItem } from "../../lib/inventory.js";
 import { toScheduleInventoryLinkDetailResponse } from "../../lib/serializers/index.js";
 
 const scheduleParamsSchema = z.object({
@@ -60,6 +61,25 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return links.map(toScheduleInventoryLinkDetailResponse);
+  });
+
+  app.get("/v1/assets/:assetId/schedules/:scheduleId/inventory/readiness", async (request, reply) => {
+    const params = scheduleParamsSchema.parse(request.params);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const schedule = await getScheduleForAsset(app, asset.id, params.scheduleId);
+
+    if (!schedule) {
+      return reply.code(404).send({ message: "Maintenance schedule not found." });
+    }
+
+    const readiness = await computeSchedulePartsReadiness(app.prisma, schedule.id);
+
+    return schedulePartsReadinessSchema.parse(readiness);
   });
 
   app.post("/v1/assets/:assetId/schedules/:scheduleId/inventory", async (request, reply) => {

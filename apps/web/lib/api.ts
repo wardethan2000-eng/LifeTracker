@@ -1,5 +1,4 @@
 import { cache } from "react";
-import { z } from "zod";
 import {
   activityLogSchema,
   assetDetailResponseSchema,
@@ -15,7 +14,9 @@ import {
   householdDashboardSchema,
   householdSummarySchema,
   inventoryProjectLinkDetailSchema,
+  bulkPartsReadinessSchema,
   scheduleInventoryLinkDetailSchema,
+  schedulePartsReadinessSchema,
   inventoryTransactionListSchema,
   inventoryTransactionSchema,
   inventoryItemSummarySchema,
@@ -89,6 +90,7 @@ import {
   type HouseholdMember,
   type HouseholdSummary,
   type CreateInventoryItemInput,
+  type BulkPartsReadiness,
   type CreateScheduleInventoryItemInput,
   type InventoryTransactionList,
   type InventoryTransactionQuery,
@@ -96,6 +98,7 @@ import {
   type InventoryItemSummary,
   type InventoryProjectLinkDetail,
   type ScheduleInventoryLinkDetail,
+  type SchedulePartsReadiness,
   type LibraryPreset,
   type LinkPreviewResponse,
   type LowStockInventoryItem,
@@ -227,7 +230,12 @@ type Schema<T> = {
   parse: (value: unknown) => T;
 };
 
-export type ImportInventoryResult = z.infer<typeof importInventoryResultSchema>;
+export type ImportInventoryResult = {
+  created: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+  createdItems: InventoryItemSummary[];
+};
 
 type RequestOptions<T> = {
   path: string;
@@ -262,15 +270,35 @@ const householdInventoryListSchema = {
   }
 };
 const householdLowStockListSchema = lowStockInventoryItemSchema.array();
-const importInventoryResultSchema = z.object({
-  created: z.number(),
-  skipped: z.number(),
-  errors: z.array(z.object({
-    index: z.number(),
-    message: z.string()
-  })),
-  createdItems: z.array(inventoryItemSummarySchema)
-});
+const importInventoryResultSchema: Schema<ImportInventoryResult> = {
+  parse: (value: unknown) => {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Invalid inventory import response.");
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return {
+      created: typeof record.created === "number" ? record.created : 0,
+      skipped: typeof record.skipped === "number" ? record.skipped : 0,
+      errors: Array.isArray(record.errors)
+        ? record.errors.map((entry) => {
+            if (typeof entry !== "object" || entry === null) {
+              throw new Error("Invalid inventory import error entry.");
+            }
+
+            const errorRecord = entry as Record<string, unknown>;
+
+            return {
+              index: typeof errorRecord.index === "number" ? errorRecord.index : 0,
+              message: typeof errorRecord.message === "string" ? errorRecord.message : "Unknown import error."
+            };
+          })
+        : [],
+      createdItems: inventoryItemSummarySchema.array().parse(record.createdItems ?? [])
+    };
+  }
+};
 const maintenanceLogListSchema = maintenanceLogSchema.array();
 const projectBudgetCategorySummarySchema = projectBudgetCategoryListSchema.element;
 const projectBudgetCategorySummaryListSchema = projectBudgetCategoryListSchema;
@@ -735,6 +763,24 @@ export const getHouseholdLowStockInventory = async (householdId: string): Promis
   path: `/v1/households/${householdId}/inventory/low-stock`,
   schema: householdLowStockListSchema
 });
+
+export const getHouseholdPartsReadiness = async (
+  householdId: string,
+  scheduleIds?: string[]
+): Promise<BulkPartsReadiness> => {
+  const query = new URLSearchParams();
+
+  if (scheduleIds && scheduleIds.length > 0) {
+    query.set("scheduleIds", scheduleIds.join(","));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/inventory/readiness${suffix}`,
+    schema: bulkPartsReadinessSchema
+  });
+};
 
 export const exportHouseholdInventory = async (householdId: string): Promise<string> => {
   const path = `/v1/households/${householdId}/inventory/export`;
@@ -1560,6 +1606,14 @@ export const getScheduleInventoryItems = async (
 ): Promise<ScheduleInventoryLinkDetail[]> => apiRequest({
   path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory`,
   schema: scheduleInventoryListSchema
+});
+
+export const getSchedulePartsReadiness = async (
+  assetId: string,
+  scheduleId: string
+): Promise<SchedulePartsReadiness> => apiRequest({
+  path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory/readiness`,
+  schema: schedulePartsReadinessSchema
 });
 
 export const createScheduleInventoryItem = async (

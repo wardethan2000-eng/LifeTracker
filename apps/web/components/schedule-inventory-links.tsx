@@ -90,8 +90,14 @@ export function ScheduleInventoryLinks({
       return;
     }
 
+    const [firstAvailableItem] = availableInventoryItems;
+
+    if (!firstAvailableItem) {
+      return;
+    }
+
     if (!selectedInventoryItemId || !availableInventoryItems.some((item) => item.id === selectedInventoryItemId)) {
-      setSelectedInventoryItemId(availableInventoryItems[0].id);
+      setSelectedInventoryItemId(firstAvailableItem.id);
     }
   }, [availableInventoryItems, selectedInventoryItemId]);
 

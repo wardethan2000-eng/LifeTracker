@@ -58,6 +58,7 @@
   ║  52. Barcode Lookup                                            ║
   ║  53. Attachments                                               ║
   ║  54. Hobby Domain                                              ║
+  ║  55. Section Filter                                            ║
   ║                                                                ║
   ╚══════════════════════════════════════════════════════════════════╝ */
 
@@ -2441,6 +2442,154 @@ textarea { resize: vertical; }
   color: var(--danger);
 }
 
+/* Parts Readiness */
+
+.parts-readiness {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.parts-readiness--ready {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.parts-readiness--warning {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.parts-readiness--empty,
+.parts-readiness--loading {
+  color: var(--ink-muted);
+  font-size: 0.84rem;
+}
+
+.parts-readiness__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.parts-readiness__summary p {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.parts-readiness__dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.parts-readiness--warning .parts-readiness__dot {
+  background: var(--warning);
+}
+
+.parts-readiness__list {
+  display: grid;
+  gap: 8px;
+}
+
+.parts-readiness__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--warning-border);
+}
+
+.parts-readiness__item-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.parts-readiness__item-meta {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.parts-readiness__deficit {
+  color: var(--warning);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-schedule-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.parts-readiness-badge {
+  position: relative;
+}
+
+.parts-readiness-badge summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.parts-readiness-badge summary::-webkit-details-marker {
+  display: none;
+}
+
+.parts-readiness-badge summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.parts-readiness-badge__popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 5;
+  min-width: 220px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.parts-readiness-badge__row {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.parts-readiness-badge__row span {
+  color: var(--warning);
+}
+
 @media (max-width: 720px) {
   .schedule-inventory-links__controls {
     grid-template-columns: 1fr;
@@ -2452,6 +2601,16 @@ textarea { resize: vertical; }
 
   .schedule-inventory-links__add-action .button {
     width: 100%;
+  }
+
+  .parts-readiness__item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .parts-readiness-badge__popover {
+    left: auto;
+    right: 0;
   }
 }
 
@@ -4963,6 +5122,94 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .session-rating__star.is-filled {
   color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 55. Section Filter
+  ═══════════════════════════════════════════════════════════════════ */
+
+.section-filter__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.section-filter__toggle:hover,
+.section-filter__toggle--active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.section-filter__toggle-icon,
+.section-filter__bar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-filter__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.section-filter__bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--accent);
+}
+
+.section-filter__input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.section-filter__input::placeholder {
+  color: var(--ink-muted);
+}
+
+.section-filter__clear {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.section-filter__clear:hover {
+  border-color: var(--border-strong);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.section-filter__count {
+  padding: 10px 16px 0;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
 }
 
 .session-saved-indicator {

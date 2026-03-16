@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import {
+  bulkPartsReadinessSchema,
   createInventoryItemSchema,
   inventoryItemSummarySchema,
   inventoryItemTypeSchema,
@@ -10,8 +11,10 @@ import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import {
   applyInventoryTransaction,
+  computeBulkSchedulePartsReadiness,
   getHouseholdInventoryItem
 } from "../../lib/inventory.js";
+import { toMaintenanceScheduleResponse } from "../../lib/schedule-state.js";
 import {
   toInventoryItemDetailResponse,
   toInventoryItemSummaryResponse,
@@ -39,6 +42,10 @@ const listInventoryQuerySchema = z.object({
 
 const inventoryDetailQuerySchema = z.object({
   transactionLimit: z.coerce.number().int().min(1).max(100).default(20)
+});
+
+const bulkInventoryReadinessQuerySchema = z.object({
+  scheduleIds: z.string().optional()
 });
 
 const inventoryExportColumns = [
@@ -192,6 +199,70 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       .type("text/csv")
       .header("Content-Disposition", 'attachment; filename="inventory-export.csv"')
       .send(csvString);
+  });
+
+  app.get("/v1/households/:householdId/inventory/readiness", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const query = bulkInventoryReadinessQuerySchema.parse(request.query);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const scheduleIds = query.scheduleIds
+      ? z.array(z.string().cuid()).parse(
+          query.scheduleIds
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      : await (async () => {
+          const now = new Date();
+          const upcomingCutoff = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+          const schedules = await app.prisma.maintenanceSchedule.findMany({
+            where: {
+              isActive: true,
+              asset: {
+                householdId: params.householdId,
+                isArchived: false
+              }
+            },
+            include: {
+              metric: {
+                select: {
+                  currentValue: true
+                }
+              }
+            }
+          });
+
+          return schedules
+            .map((schedule) => ({
+              id: schedule.id,
+              response: toMaintenanceScheduleResponse(schedule)
+            }))
+            .filter(({ response }) => (
+              response.status === "due"
+              || response.status === "overdue"
+              || (response.nextDueAt !== null && response.nextDueAt <= upcomingCutoff.toISOString())
+            ))
+            .map((schedule) => schedule.id);
+        })();
+
+    const readinessMap = await computeBulkSchedulePartsReadiness(app.prisma, scheduleIds);
+    const schedules = scheduleIds
+      .map((scheduleId) => readinessMap.get(scheduleId))
+      .filter((schedule): schedule is NonNullable<typeof schedule> => schedule !== undefined);
+    const allReadyCount = schedules.filter((schedule) => schedule.allReady).length;
+
+    return bulkPartsReadinessSchema.parse({
+      schedules,
+      summary: {
+        totalSchedules: schedules.length,
+        allReadyCount,
+        notReadyCount: schedules.length - allReadyCount
+      }
+    });
   });
 
   app.post("/v1/households/:householdId/inventory/import", async (request, reply) => {

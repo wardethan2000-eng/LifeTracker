@@ -470,6 +470,7 @@ const createAssetAutomationFromDrafts = async (assetId: string, profile: AssetPr
     if (draft.lastCompletedAt) {
       const completionInput: CompleteMaintenanceScheduleInput = {
         completedAt: draft.lastCompletedAt,
+        applyLinkedParts: true,
         metadata: {}
       };
 
