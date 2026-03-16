@@ -34,6 +34,7 @@ import { ExpandableCard } from "../../../components/expandable-card";
 import { LogMaintenanceForm } from "../../../components/log-maintenance-form";
 import { ScheduleCardActions } from "../../../components/schedule-card-actions";
 import { ScheduleForm } from "../../../components/schedule-form";
+import { ScheduleInventoryLinks } from "../../../components/schedule-inventory-links";
 import {
   ApiError,
   getAssetComments,
@@ -774,6 +775,11 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                         <div><dt>Assignee</dt><dd>{schedule.assignee?.displayName ?? "Unassigned"}</dd></div>
                         <div><dt>Trigger</dt><dd>{schedule.triggerConfig.type}</dd></div>
                       </dl>
+                      <ScheduleInventoryLinks
+                        assetId={detail.asset.id}
+                        scheduleId={schedule.id}
+                        householdId={detail.asset.householdId}
+                      />
                       <ScheduleCardActions
                         assetId={detail.asset.id}
                         scheduleId={schedule.id}

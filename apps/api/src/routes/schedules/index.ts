@@ -8,6 +8,10 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import {
+  createMaintenanceLogPartWithInventory,
+  InventoryError
+} from "../../lib/inventory.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
 import {
   syncScheduleCompletionFromLogs,
@@ -242,6 +246,19 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
             id: true,
             currentValue: true
           }
+        },
+        inventoryItems: {
+          include: {
+            inventoryItem: {
+              select: {
+                id: true,
+                name: true,
+                partNumber: true,
+                unitCost: true,
+                preferredSupplier: true
+              }
+            }
+          }
         }
       }
     });
@@ -251,6 +268,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
+    let inventoryWarnings: string[] = [];
 
     const result = await app.prisma.$transaction(async (tx) => {
       if (existing.metricId && input.usageValue !== undefined) {
@@ -285,9 +303,46 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const log = await tx.maintenanceLog.create({ data: logData });
+
+      if (input.applyLinkedParts && existing.inventoryItems.length > 0) {
+        for (const schedulePart of existing.inventoryItems) {
+          try {
+            const result = await createMaintenanceLogPartWithInventory(tx, {
+              householdId: asset.householdId,
+              logId: log.id,
+              userId: request.auth.userId,
+              input: {
+                inventoryItemId: schedulePart.inventoryItemId,
+                name: schedulePart.inventoryItem.name,
+                partNumber: schedulePart.inventoryItem.partNumber ?? undefined,
+                quantity: schedulePart.quantityPerService,
+                unitCost: schedulePart.inventoryItem.unitCost ?? undefined,
+                supplier: schedulePart.inventoryItem.preferredSupplier ?? undefined,
+                notes: schedulePart.notes ?? undefined
+              }
+            });
+
+            if (result.warning) {
+              inventoryWarnings.push(`${schedulePart.inventoryItem.name}: ${result.warning}`);
+            }
+          } catch (error) {
+            if (error instanceof InventoryError && error.code === "INVENTORY_ITEM_NOT_FOUND") {
+              throw new Error(error.message);
+            }
+
+            throw error;
+          }
+        }
+      }
+
+      const logWithParts = await tx.maintenanceLog.findUniqueOrThrow({
+        where: { id: log.id },
+        include: { parts: true }
+      });
+
       const schedule = await syncScheduleCompletionFromLogs(tx, existing.id);
 
-      return { log, schedule };
+      return { log: logWithParts, schedule };
     });
 
     if (!result.schedule) {
@@ -311,8 +366,9 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     ]).catch(console.error);
 
     return reply.code(201).send({
-      log: toMaintenanceLogResponse(result.log, []),
-      schedule: toMaintenanceScheduleResponse(result.schedule)
+      log: toMaintenanceLogResponse(result.log, result.log.parts),
+      schedule: toMaintenanceScheduleResponse(result.schedule),
+      inventoryWarnings
     });
   });
 

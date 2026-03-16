@@ -2296,6 +2296,102 @@ textarea { resize: vertical; }
   justify-content: flex-end;
 }
 
+/* Schedule Inventory Links */
+
+.schedule-inventory-links {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-alt);
+}
+
+.schedule-inventory-links__header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.schedule-inventory-links__header p {
+  margin: 4px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.83rem;
+}
+
+.schedule-inventory-links__table-wrap {
+  overflow-x: auto;
+}
+
+.schedule-inventory-links__table th,
+.schedule-inventory-links__table td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.schedule-inventory-links__quantity-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-inventory-links__quantity-field input {
+  width: 96px;
+}
+
+.schedule-inventory-links__quantity-field span {
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+}
+
+.schedule-inventory-links__actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.schedule-inventory-links__controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(140px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.schedule-inventory-links__add-quantity input {
+  min-width: 0;
+}
+
+.schedule-inventory-links__add-action {
+  display: flex;
+  align-items: end;
+}
+
+.schedule-inventory-links__empty,
+.schedule-inventory-links__error {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.schedule-inventory-links__empty {
+  color: var(--ink-muted);
+}
+
+.schedule-inventory-links__error {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .schedule-inventory-links__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-inventory-links__add-action {
+    width: 100%;
+  }
+
+  .schedule-inventory-links__add-action .button {
+    width: 100%;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 32. Log List
    ═══════════════════════════════════════════════════════════════════ */
@@ -2801,6 +2897,54 @@ textarea { resize: vertical; }
   border: 1px solid var(--accent-border);
   border-radius: var(--radius);
   background: var(--accent-bg);
+}
+
+.schedule-card__linked-parts {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.schedule-card__linked-parts-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.schedule-card__linked-parts-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-card__linked-part-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  align-items: center;
+}
+
+.schedule-card__linked-part-row div {
+  display: grid;
+  gap: 2px;
+}
+
+.schedule-card__linked-part-row span {
+  color: var(--ink-muted);
+  font-size: 0.84rem;
+}
+
+.schedule-card__linked-parts-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.84rem;
 }
 
 .schedule-card__delete-confirm {

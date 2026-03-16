@@ -1080,6 +1080,44 @@ async function main(): Promise<void> {
     skipDuplicates: true
   });
 
+  const existingOilFilterScheduleLink = await prisma.scheduleInventoryItem.findUnique({
+    where: {
+      scheduleId_inventoryItemId: {
+        scheduleId: maintenanceScheduleId,
+        inventoryItemId: inventoryItemOilFilterId
+      }
+    }
+  });
+
+  if (!existingOilFilterScheduleLink) {
+    await prisma.scheduleInventoryItem.create({
+      data: {
+        scheduleId: maintenanceScheduleId,
+        inventoryItemId: inventoryItemOilFilterId,
+        quantityPerService: 1
+      }
+    });
+  }
+
+  const existingOilScheduleLink = await prisma.scheduleInventoryItem.findUnique({
+    where: {
+      scheduleId_inventoryItemId: {
+        scheduleId: maintenanceScheduleId,
+        inventoryItemId: inventoryItemOilId
+      }
+    }
+  });
+
+  if (!existingOilScheduleLink) {
+    await prisma.scheduleInventoryItem.create({
+      data: {
+        scheduleId: maintenanceScheduleId,
+        inventoryItemId: inventoryItemOilId,
+        quantityPerService: 6
+      }
+    });
+  }
+
   await prisma.projectAsset.upsert({
     where: { projectId_assetId: { projectId, assetId: homeAssetId } },
     update: {

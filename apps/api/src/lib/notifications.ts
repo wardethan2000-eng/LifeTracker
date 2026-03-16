@@ -66,6 +66,22 @@ interface NotificationEvent {
   dedupeSuffix: string;
 }
 
+interface LowStockCandidate {
+  id: string;
+  householdId: string;
+  name: string;
+  quantityOnHand: number;
+  reorderThreshold: number;
+  unit: string;
+  preferredSupplier: string | null;
+  household: {
+    members: Array<{
+      userId: string;
+      user: Pick<User, "id" | "notificationPreferences">;
+    }>;
+  };
+}
+
 export interface NotificationScanResult {
   createdCount: number;
   createdNotificationIds: string[];
@@ -320,6 +336,15 @@ const getRecipients = (schedule: ScheduleCandidate): Recipient[] => {
   }));
 };
 
+const getHouseholdRecipients = (item: LowStockCandidate): Recipient[] => item.household.members.map((member) => ({
+  userId: member.userId,
+  preferences: parsePreferences(member.user.notificationPreferences)
+}));
+
+const formatQuantityValue = (value: number): string => Number.isInteger(value)
+  ? String(value)
+  : value.toFixed(2).replace(/\.0+$|0+$/g, "").replace(/\.$/, "");
+
 const createNotificationRecord = async (
   prisma: PrismaExecutor,
   schedule: ScheduleCandidate,
@@ -360,6 +385,81 @@ const createNotificationRecord = async (
 
     throw error;
   }
+};
+
+const hasRecentLowStockNotification = async (
+  prisma: PrismaExecutor,
+  itemId: string,
+  householdId: string,
+  recipient: Recipient,
+  channel: NotificationChannel,
+  since: Date
+) => prisma.notification.findFirst({
+  where: {
+    userId: recipient.userId,
+    householdId,
+    channel,
+    type: "inventory_low_stock",
+    createdAt: {
+      gte: since
+    },
+    dedupeKey: {
+      startsWith: `${recipient.userId}:${channel}:${itemId}:inventory-low-stock:`
+    }
+  },
+  select: {
+    id: true
+  }
+});
+
+const createLowStockNotificationRecord = async (
+  prisma: PrismaExecutor,
+  item: LowStockCandidate,
+  recipient: Recipient,
+  channel: NotificationChannel,
+  now: Date
+) => {
+  const recentNotification = await hasRecentLowStockNotification(
+    prisma,
+    item.id,
+    item.householdId,
+    recipient,
+    channel,
+    new Date(now.getTime() - (24 * 60 * 60 * 1000))
+  );
+
+  if (recentNotification) {
+    return null;
+  }
+
+  const supplierText = item.preferredSupplier ? ` Supplier: ${item.preferredSupplier}.` : "";
+
+  const notification = await prisma.notification.create({
+    data: {
+      userId: recipient.userId,
+      householdId: item.householdId,
+      dedupeKey: `${recipient.userId}:${channel}:${item.id}:inventory-low-stock:${now.toISOString()}`,
+      type: "inventory_low_stock",
+      channel,
+      status: "pending",
+      title: `Low stock: ${item.name}`,
+      body: `${formatQuantityValue(item.quantityOnHand)} ${item.unit} remaining (reorder at ${formatQuantityValue(item.reorderThreshold)}).${supplierText}`,
+      scheduledFor: now,
+      escalationLevel: 0,
+      payload: {
+        entityType: "inventory_item",
+        entityId: item.id,
+        itemName: item.name,
+        quantityOnHand: item.quantityOnHand,
+        reorderThreshold: item.reorderThreshold,
+        unit: item.unit,
+        preferredSupplier: item.preferredSupplier,
+        createdAt: now.toISOString()
+      } as Prisma.InputJsonValue
+    }
+  });
+
+  return notification.id;
 };
 
 export const scanAndCreateNotifications = async (
@@ -454,6 +554,59 @@ export const scanAndCreateNotifications = async (
           if (notificationId) {
             createdNotificationIds.push(notificationId);
           }
+        }
+      }
+    }
+  }
+
+  const lowStockItems = await prisma.inventoryItem.findMany({
+    where: {
+      itemType: "consumable",
+      reorderThreshold: {
+        not: null
+      },
+      ...(options.householdId ? { householdId: options.householdId } : {})
+    },
+    include: {
+      household: {
+        select: {
+          members: {
+            select: {
+              userId: true,
+              user: {
+                select: {
+                  id: true,
+                  notificationPreferences: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  for (const item of lowStockItems) {
+    if (item.reorderThreshold === null || item.quantityOnHand > item.reorderThreshold) {
+      continue;
+    }
+
+    const recipients = getHouseholdRecipients(item as LowStockCandidate);
+
+    for (const recipient of recipients) {
+      const channels = resolveChannels(recipient.preferences.enabledChannels, recipient.preferences);
+
+      for (const channel of channels) {
+        const notificationId = await createLowStockNotificationRecord(
+          prisma,
+          item as LowStockCandidate,
+          recipient,
+          channel,
+          now
+        );
+
+        if (notificationId) {
+          createdNotificationIds.push(notificationId);
         }
       }
     }

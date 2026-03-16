@@ -5,10 +5,13 @@ import type {
   InventoryTransaction,
   MaintenanceLogPart,
   Project,
-  ProjectInventoryItem
+  ProjectInventoryItem,
+  ScheduleInventoryItem
 } from "@prisma/client";
 import {
   assetInventoryItemSchema,
+  scheduleInventoryItemSchema,
+  scheduleInventoryLinkDetailSchema,
   inventoryAssetLinkDetailSchema,
   inventoryItemDetailSchema,
   inventoryItemSummarySchema,
@@ -152,6 +155,24 @@ export const toAssetInventoryLinkDetailResponse = (
   ...toAssetInventoryItemResponse(link),
   inventoryItem: toInventoryItemSummaryResponse(link.inventoryItem),
   asset: link.asset ?? undefined
+});
+
+export const toScheduleInventoryItemResponse = (
+  link: Pick<ScheduleInventoryItem, "id" | "scheduleId" | "inventoryItemId" | "quantityPerService" | "notes" | "createdAt" | "updatedAt">
+) => scheduleInventoryItemSchema.parse({
+  ...link,
+  notes: link.notes ?? null,
+  createdAt: link.createdAt.toISOString(),
+  updatedAt: link.updatedAt.toISOString()
+});
+
+export const toScheduleInventoryLinkDetailResponse = (
+  link: Pick<ScheduleInventoryItem, "id" | "scheduleId" | "inventoryItemId" | "quantityPerService" | "notes" | "createdAt" | "updatedAt"> & {
+    inventoryItem: InventorySummaryRecord;
+  }
+) => scheduleInventoryLinkDetailSchema.parse({
+  ...toScheduleInventoryItemResponse(link),
+  inventoryItem: toInventoryItemSummaryResponse(link.inventoryItem)
 });
 
 export const toProjectInventoryItemResponse = (

@@ -19,6 +19,7 @@ import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications/index.js";
 import { presetRoutes } from "./routes/presets/index.js";
 import { scheduleRoutes } from "./routes/schedules/index.js";
+import { scheduleInventoryRoutes } from "./routes/schedules/inventory.js";
 import { serviceProviderRoutes } from "./routes/service-providers/index.js";
 import { usageMetricRoutes } from "./routes/usage-metrics/index.js";
 import { activityLogRoutes } from "./routes/activity-logs/index.js";
@@ -64,6 +65,7 @@ export const buildApp = () => {
   app.register(assetTransferRoutes);
   app.register(usageMetricRoutes);
   app.register(scheduleRoutes);
+  app.register(scheduleInventoryRoutes);
   app.register(maintenanceLogRoutes);
   app.register(maintenanceLogPartRoutes);
   app.register(presetRoutes);

@@ -14,6 +14,7 @@ import {
   householdDashboardSchema,
   householdSummarySchema,
   inventoryProjectLinkDetailSchema,
+  scheduleInventoryLinkDetailSchema,
   inventoryTransactionListSchema,
   inventoryTransactionSchema,
   inventoryItemSummarySchema,
@@ -87,11 +88,13 @@ import {
   type HouseholdMember,
   type HouseholdSummary,
   type CreateInventoryItemInput,
+  type CreateScheduleInventoryItemInput,
   type InventoryTransactionList,
   type InventoryTransactionQuery,
   type UpdateInventoryItemInput,
   type InventoryItemSummary,
   type InventoryProjectLinkDetail,
+  type ScheduleInventoryLinkDetail,
   type LibraryPreset,
   type LinkPreviewResponse,
   type LowStockInventoryItem,
@@ -132,6 +135,7 @@ import {
   type UpdateProjectInput,
   type UpdateProjectTaskChecklistItemInput,
   type UpdateProjectTaskInput,
+  type UpdateScheduleInventoryItemInput,
   type UpdateServiceProviderInput,
   type UpdateUsageMetricInput,
   type AllocateProjectInventoryInput,
@@ -259,6 +263,7 @@ const maintenanceLogListSchema = maintenanceLogSchema.array();
 const projectBudgetCategorySummarySchema = projectBudgetCategoryListSchema.element;
 const projectBudgetCategorySummaryListSchema = projectBudgetCategoryListSchema;
 const projectInventoryListSchema = inventoryProjectLinkDetailSchema.array();
+const scheduleInventoryListSchema = scheduleInventoryLinkDetailSchema.array();
 const projectPhaseChecklistListSchema = projectPhaseChecklistItemSchema.array();
 const projectPhaseSummarySchema = projectPhaseListSchema.element;
 const projectPhaseSummaryListSchema = projectPhaseListSchema;
@@ -1434,6 +1439,48 @@ export const updateSchedule = async (
   body: input,
   schema: maintenanceScheduleSchema
 });
+
+export const getScheduleInventoryItems = async (
+  assetId: string,
+  scheduleId: string
+): Promise<ScheduleInventoryLinkDetail[]> => apiRequest({
+  path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory`,
+  schema: scheduleInventoryListSchema
+});
+
+export const createScheduleInventoryItem = async (
+  assetId: string,
+  scheduleId: string,
+  input: CreateScheduleInventoryItemInput
+): Promise<ScheduleInventoryLinkDetail> => apiRequest({
+  path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory`,
+  method: "POST",
+  body: input,
+  schema: scheduleInventoryLinkDetailSchema
+});
+
+export const updateScheduleInventoryItem = async (
+  assetId: string,
+  scheduleId: string,
+  inventoryItemId: string,
+  input: UpdateScheduleInventoryItemInput
+): Promise<ScheduleInventoryLinkDetail> => apiRequest({
+  path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory/${inventoryItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: scheduleInventoryLinkDetailSchema
+});
+
+export const deleteScheduleInventoryItem = async (
+  assetId: string,
+  scheduleId: string,
+  inventoryItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory/${inventoryItemId}`,
+    method: "DELETE"
+  });
+};
 
 export const deleteSchedule = async (
   assetId: string,

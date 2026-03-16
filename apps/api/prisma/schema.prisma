@@ -65,6 +65,7 @@ enum NotificationType {
   overdue
   digest
   announcement
+  inventory_low_stock
 }
 
 // Delivery channel selected for a notification.
@@ -381,6 +382,7 @@ model MaintenanceSchedule {
   assignedToId       String?
   logs               MaintenanceLog[]
   notifications      Notification[]
+  inventoryItems     ScheduleInventoryItem[]
   linkedProjectTasks ProjectTask[]    @relation("ProjectTaskSchedule")
   assignedTo         User?            @relation("ScheduleAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
@@ -593,6 +595,7 @@ model InventoryItem {
   updatedAt          DateTime                @updatedAt
   household          Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
   assetLinks         AssetInventoryItem[]
+  scheduleLinks      ScheduleInventoryItem[]
   projectLinks       ProjectInventoryItem[]
   projectPhaseSupplies ProjectPhaseSupply[]
   transactions       InventoryTransaction[]
@@ -621,6 +624,22 @@ model AssetInventoryItem {
 
   @@unique([assetId, inventoryItemId])
   @@index([assetId])
+  @@index([inventoryItemId])
+}
+
+// Join table linking a MaintenanceSchedule to inventory consumed on each service.
+model ScheduleInventoryItem {
+  id                 String              @id @default(cuid())
+  scheduleId         String
+  inventoryItemId    String
+  quantityPerService Float               @default(1)
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  schedule           MaintenanceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  inventoryItem      InventoryItem       @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, inventoryItemId])
   @@index([inventoryItemId])
 }
 

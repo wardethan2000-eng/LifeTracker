@@ -16,7 +16,7 @@ export const assetCategoryValues = [
 export const assetVisibilityValues = ["shared", "personal"] as const;
 export const householdRoleValues = ["owner", "member"] as const;
 export const authSourceValues = ["clerk", "dev-bypass"] as const;
-export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "announcement"] as const;
+export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "announcement", "inventory_low_stock"] as const;
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
@@ -817,6 +817,7 @@ export const completeMaintenanceScheduleSchema = z.object({
   completedAt: z.string().datetime().optional(),
   usageValue: z.number().min(0).optional(),
   cost: z.number().min(0).optional(),
+  applyLinkedParts: z.boolean().default(true),
   metadata: maintenanceLogMetadataSchema.default({})
 });
 
@@ -951,6 +952,31 @@ export const createAssetInventoryItemSchema = z.object({
   inventoryItemId: z.string().cuid(),
   notes: z.string().max(2000).optional(),
   recommendedQuantity: z.number().min(0).optional()
+});
+
+export const scheduleInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  scheduleId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  quantityPerService: z.number(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const scheduleInventoryLinkDetailSchema = scheduleInventoryItemSchema.extend({
+  inventoryItem: inventoryItemSummarySchema
+});
+
+export const createScheduleInventoryItemSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  quantityPerService: z.number().positive().default(1),
+  notes: z.string().max(2000).optional()
+});
+
+export const updateScheduleInventoryItemSchema = z.object({
+  quantityPerService: z.number().positive().optional(),
+  notes: z.string().max(2000).nullable().optional()
 });
 
 export const projectInventoryItemSchema = z.object({
@@ -1819,6 +1845,10 @@ export type InventoryTransactionWithItem = z.infer<typeof inventoryTransactionWi
 export type InventoryTransactionList = z.infer<typeof inventoryTransactionListSchema>;
 export type AssetInventoryItem = z.infer<typeof assetInventoryItemSchema>;
 export type CreateAssetInventoryItemInput = z.infer<typeof createAssetInventoryItemSchema>;
+export type ScheduleInventoryItem = z.infer<typeof scheduleInventoryItemSchema>;
+export type ScheduleInventoryLinkDetail = z.infer<typeof scheduleInventoryLinkDetailSchema>;
+export type CreateScheduleInventoryItemInput = z.infer<typeof createScheduleInventoryItemSchema>;
+export type UpdateScheduleInventoryItemInput = z.infer<typeof updateScheduleInventoryItemSchema>;
 export type ProjectInventoryItem = z.infer<typeof projectInventoryItemSchema>;
 export type CreateProjectInventoryItemInput = z.infer<typeof createProjectInventoryItemSchema>;
 export type UpdateProjectInventoryItemInput = z.infer<typeof updateProjectInventoryItemSchema>;

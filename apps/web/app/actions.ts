@@ -1120,6 +1120,7 @@ export async function completeScheduleAction(formData: FormData): Promise<void> 
   const assetId = getRequiredString(formData, "assetId");
   const scheduleId = getRequiredString(formData, "scheduleId");
   const input: CompleteMaintenanceScheduleInput = {
+    applyLinkedParts: getOptionalString(formData, "applyLinkedParts") !== "false",
     metadata: {}
   };
 

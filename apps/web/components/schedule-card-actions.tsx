@@ -1,7 +1,9 @@
 "use client";
 
+import type { ScheduleInventoryLinkDetail } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getScheduleInventoryItems } from "../lib/api";
 
 type ScheduleCardActionsProps = {
   assetId: string;
@@ -24,6 +26,49 @@ export function ScheduleCardActions({
 }: ScheduleCardActionsProps): JSX.Element {
   const [showForm, setShowForm] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [linkedParts, setLinkedParts] = useState<ScheduleInventoryLinkDetail[]>([]);
+  const [linkedPartsLoaded, setLinkedPartsLoaded] = useState(false);
+  const [linkedPartsError, setLinkedPartsError] = useState<string | null>(null);
+  const [applyLinkedParts, setApplyLinkedParts] = useState(true);
+
+  useEffect(() => {
+    if (!showForm || linkedPartsLoaded) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLinkedParts = async (): Promise<void> => {
+      try {
+        const nextLinkedParts = await getScheduleInventoryItems(assetId, scheduleId);
+
+        if (cancelled) {
+          return;
+        }
+
+        setLinkedParts(nextLinkedParts);
+        setApplyLinkedParts(nextLinkedParts.length > 0);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setLinkedParts([]);
+        setApplyLinkedParts(false);
+        setLinkedPartsError(error instanceof Error ? error.message : "Failed to load linked parts.");
+      } finally {
+        if (!cancelled) {
+          setLinkedPartsLoaded(true);
+        }
+      }
+    };
+
+    void loadLinkedParts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assetId, linkedPartsLoaded, scheduleId, showForm]);
 
   return (
     <div className="schedule-card__actions-area">
@@ -58,6 +103,7 @@ export function ScheduleCardActions({
         <form action={completeAction} className="form-grid schedule-card__complete-form">
           <input type="hidden" name="assetId" value={assetId} />
           <input type="hidden" name="scheduleId" value={scheduleId} />
+          <input type="hidden" name="applyLinkedParts" value={applyLinkedParts ? "true" : "false"} />
           <label className="field">
             <span>Log title</span>
             <input type="text" name="title" placeholder={scheduleName} />
@@ -78,6 +124,32 @@ export function ScheduleCardActions({
             <span>Notes</span>
             <textarea name="notes" rows={3} placeholder="Parts used, vendor, findings, or follow-up needed" />
           </label>
+          {linkedParts.length > 0 ? (
+            <div className="field field--full schedule-card__linked-parts">
+              <label className="schedule-card__linked-parts-toggle">
+                <input
+                  type="checkbox"
+                  checked={applyLinkedParts}
+                  onChange={(event) => setApplyLinkedParts(event.target.checked)}
+                />
+                <span>Consume linked required parts and add them to this log</span>
+              </label>
+              <div className="schedule-card__linked-parts-summary">
+                {linkedParts.map((part) => (
+                  <div key={part.id} className="schedule-card__linked-part-row">
+                    <div>
+                      <strong>{part.inventoryItem.name}</strong>
+                      <span>{part.inventoryItem.partNumber ?? "No part number"}</span>
+                    </div>
+                    <span>{part.quantityPerService} {part.inventoryItem.unit}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {linkedPartsError ? (
+            <p className="field field--full schedule-card__linked-parts-error">{linkedPartsError}</p>
+          ) : null}
           <div className="field field--full inline-actions inline-actions--end">
             <button type="submit" className="button button--primary">Save Completion</button>
           </div>
