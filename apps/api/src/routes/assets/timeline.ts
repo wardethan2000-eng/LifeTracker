@@ -180,6 +180,10 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
           where: {
             householdId: asset.householdId,
             entityType: "schedule",
+            metadata: {
+              path: ["assetId"],
+              equals: asset.id
+            },
             ...(query.since || query.until
               ? {
                   createdAt: {
@@ -303,7 +307,6 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
         }
       )),
       ...scheduleActivities
-        .filter((activity) => asRecord(activity.metadata).assetId === asset.id)
         .map((activity) => toTimelineItem(
           "schedule_change",
           {

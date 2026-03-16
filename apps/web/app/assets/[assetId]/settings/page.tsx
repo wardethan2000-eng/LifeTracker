@@ -15,13 +15,15 @@ type AssetSettingsPageProps = {
 
 export default async function AssetSettingsPage({ params }: AssetSettingsPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
-  const detail = await getAssetDetail(assetId);
-  const [libraryPresets, customPresets, householdAssets, householdMembers, transferHistory] = await Promise.all([
+  const [detail, libraryPresets, transferHistory] = await Promise.all([
+    getAssetDetail(assetId),
     getLibraryPresets(),
+    getAssetTransferHistory(assetId)
+  ]);
+  const [customPresets, householdAssets, householdMembers] = await Promise.all([
     getHouseholdPresets(detail.asset.householdId),
     getHouseholdAssets(detail.asset.householdId),
-    getHouseholdMembers(detail.asset.householdId),
-    getAssetTransferHistory(assetId)
+    getHouseholdMembers(detail.asset.householdId)
   ]);
 
   return (

@@ -474,17 +474,18 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const breadcrumbs = await buildProjectBreadcrumbs(app.prisma as PrismaClient, project.id, params.householdId);
-
-    const childProjects = await app.prisma.project.findMany({
-      where: { parentProjectId: project.id, householdId: params.householdId },
-      include: {
-        tasks: { select: { status: true, taskType: true, isCompleted: true } },
-        expenses: { select: { amount: true } },
-        _count: { select: { childProjects: true } }
-      },
-      orderBy: { createdAt: "asc" }
-    });
+    const [breadcrumbs, childProjects] = await Promise.all([
+      buildProjectBreadcrumbs(app.prisma as PrismaClient, project.id, params.householdId),
+      app.prisma.project.findMany({
+        where: { parentProjectId: project.id, householdId: params.householdId },
+        include: {
+          tasks: { select: { status: true, taskType: true, isCompleted: true } },
+          expenses: { select: { amount: true } },
+          _count: { select: { childProjects: true } }
+        },
+        orderBy: { createdAt: "asc" }
+      })
+    ]);
 
     const childSummaries = childProjects.map((child) => {
       const taskCount = child.tasks.length;

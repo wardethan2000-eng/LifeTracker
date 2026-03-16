@@ -401,6 +401,20 @@ const importInventoryResultSchema: Schema<ImportInventoryResult> = {
   }
 };
 const maintenanceLogListSchema = maintenanceLogSchema.array();
+const paginatedMaintenanceLogSchema: Schema<{ logs: MaintenanceLog[]; nextCursor: string | null }> = {
+  parse: (value: unknown) => {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Invalid paginated logs response.");
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return {
+      logs: maintenanceLogListSchema.parse(record.logs ?? []),
+      nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null
+    };
+  }
+};
 const notificationListSchema = notificationSchema.array();
 const projectBudgetCategorySummarySchema = projectBudgetCategoryListSchema.element;
 const projectBudgetCategorySummaryListSchema = projectBudgetCategoryListSchema;
@@ -1627,10 +1641,21 @@ export const deleteServiceProvider = async (householdId: string, providerId: str
   });
 };
 
-export const getAssetLogs = async (assetId: string): Promise<MaintenanceLog[]> => apiRequest({
-  path: `/v1/assets/${assetId}/logs`,
-  schema: maintenanceLogListSchema
-});
+export const getAssetLogs = async (
+  assetId: string,
+  options?: { scheduleId?: string; limit?: number; cursor?: string }
+): Promise<{ logs: MaintenanceLog[]; nextCursor: string | null }> => {
+  const params = new URLSearchParams();
+  if (options?.scheduleId) params.set("scheduleId", options.scheduleId);
+  if (options?.limit !== undefined) params.set("limit", String(options.limit));
+  if (options?.cursor) params.set("cursor", options.cursor);
+  const qs = params.toString();
+
+  return apiRequest({
+    path: `/v1/assets/${assetId}/logs${qs ? `?${qs}` : ""}`,
+    schema: paginatedMaintenanceLogSchema
+  });
+};
 
 export const deleteMetric = async (assetId: string, metricId: string): Promise<void> => {
   await apiRequest({

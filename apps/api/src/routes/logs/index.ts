@@ -27,7 +27,9 @@ const logParamsSchema = assetParamsSchema.extend({
 });
 
 const listLogsQuerySchema = z.object({
-  scheduleId: z.string().cuid().optional()
+  scheduleId: z.string().cuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().cuid().optional()
 });
 
 const toInputJsonValue = (value: Record<string, unknown>): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
@@ -64,10 +66,19 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       orderBy: [
         { completedAt: "desc" },
         { createdAt: "desc" }
-      ]
+      ],
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {})
     });
 
-    return logs.map(log => toMaintenanceLogResponse(log, log.parts));
+    const hasMore = logs.length > query.limit;
+    const page = hasMore ? logs.slice(0, query.limit) : logs;
+    const nextCursor = hasMore ? (page[page.length - 1]?.id ?? null) : null;
+
+    return {
+      logs: page.map(log => toMaintenanceLogResponse(log, log.parts)),
+      nextCursor
+    };
   });
 
   app.post("/v1/assets/:assetId/logs", async (request, reply) => {
@@ -191,20 +202,18 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    if (log.scheduleId) {
-      await syncScheduleCompletionFromLogs(app.prisma, log.scheduleId);
-    }
-
-    await logActivity(app.prisma, {
-      householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "log.created",
-      entityType: "log",
-      entityId: log.id,
-      metadata: { title: log.title, assetId: asset.id }
-    });
-
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      log.scheduleId ? syncScheduleCompletionFromLogs(app.prisma, log.scheduleId) : Promise.resolve(),
+      logActivity(app.prisma, {
+        householdId: asset.householdId,
+        userId: request.auth.userId,
+        action: "log.created",
+        entityType: "log",
+        entityId: log.id,
+        metadata: { title: log.title, assetId: asset.id }
+      }),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     void Promise.all([
       syncLogToSearchIndex(app.prisma, log.id),
@@ -323,11 +332,10 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       include: { parts: true }
     });
 
-    if (log.scheduleId) {
-      await syncScheduleCompletionFromLogs(app.prisma, log.scheduleId);
-    }
-
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      log.scheduleId ? syncScheduleCompletionFromLogs(app.prisma, log.scheduleId) : Promise.resolve(),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     void Promise.all([
       syncLogToSearchIndex(app.prisma, log.id),
@@ -360,11 +368,10 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id }
     });
 
-    if (existing.scheduleId) {
-      await syncScheduleCompletionFromLogs(app.prisma, existing.scheduleId);
-    }
-
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      existing.scheduleId ? syncScheduleCompletionFromLogs(app.prisma, existing.scheduleId) : Promise.resolve(),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     void Promise.all([
       removeSearchIndexEntry(app.prisma, "log", existing.id),

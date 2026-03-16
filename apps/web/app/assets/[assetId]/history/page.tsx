@@ -17,9 +17,7 @@ type AssetHistoryPageProps = {
 };
 
 export default async function AssetHistoryPage({ params, searchParams }: AssetHistoryPageProps): Promise<JSX.Element> {
-  const { assetId } = await params;
-  const detail = await getAssetDetail(assetId);
-  const resolvedSearchParams = await searchParams;
+  const [{ assetId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const sourceType = getSearchParamValue(resolvedSearchParams.sourceType);
   const category = getSearchParamValue(resolvedSearchParams.category);
   const search = getSearchParamValue(resolvedSearchParams.search);
@@ -36,7 +34,10 @@ export default async function AssetHistoryPage({ params, searchParams }: AssetHi
     ...(untilIso ? { until: untilIso } : {}),
     ...(cursor ? { cursor } : {})
   };
-  const historyTimeline = await getAssetTimeline(assetId, timelineQuery);
+  const [detail, historyTimeline] = await Promise.all([
+    getAssetDetail(assetId),
+    getAssetTimeline(assetId, timelineQuery)
+  ]);
 
   return (
     <AssetHistoryTab

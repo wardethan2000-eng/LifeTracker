@@ -169,31 +169,31 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
+    const extraLogActivity = schedule.assignedToId ? logActivity(app.prisma, {
       householdId: asset.householdId,
       userId: request.auth.userId,
-      action: "schedule.created",
+      action: "schedule.assigned",
       entityType: "schedule",
       entityId: schedule.id,
-      metadata: { name: schedule.name, assetId: asset.id }
-    });
+      metadata: {
+        name: schedule.name,
+        assetId: asset.id,
+        assignedToId: schedule.assignedToId
+      }
+    }) : Promise.resolve(null);
 
-    if (schedule.assignedToId) {
-      await logActivity(app.prisma, {
+    await Promise.all([
+      logActivity(app.prisma, {
         householdId: asset.householdId,
         userId: request.auth.userId,
-        action: "schedule.assigned",
+        action: "schedule.created",
         entityType: "schedule",
         entityId: schedule.id,
-        metadata: {
-          name: schedule.name,
-          assetId: asset.id,
-          assignedToId: schedule.assignedToId
-        }
-      });
-    }
-
-    await enqueueNotificationScan({ householdId: asset.householdId });
+        metadata: { name: schedule.name, assetId: asset.id }
+      }),
+      extraLogActivity,
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     void syncScheduleToSearchIndex(app.prisma, schedule.id).catch(console.error);
 
@@ -358,16 +358,17 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Maintenance schedule not found." });
     }
 
-    await logActivity(app.prisma, {
-      householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "schedule.completed",
-      entityType: "schedule",
-      entityId: existing.id,
-      metadata: { name: existing.name, assetId: asset.id }
-    });
-
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      logActivity(app.prisma, {
+        householdId: asset.householdId,
+        userId: request.auth.userId,
+        action: "schedule.completed",
+        entityType: "schedule",
+        entityId: existing.id,
+        metadata: { name: existing.name, assetId: asset.id }
+      }),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     void Promise.all([
       syncScheduleToSearchIndex(app.prisma, existing.id),

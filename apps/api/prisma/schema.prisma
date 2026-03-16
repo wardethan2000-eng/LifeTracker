@@ -395,6 +395,7 @@ model MaintenanceSchedule {
   assignedTo         User?            @relation("ScheduleAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([assetId, isActive])
+  @@index([assetId, isActive, nextDueAt])
   @@index([metricId])
   @@index([nextDueAt])
   @@index([assignedToId])
@@ -961,6 +962,7 @@ model ActivityLog {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([householdId, createdAt])
+  @@index([householdId, entityType])
   @@index([userId])
   @@index([entityType, entityId])
 }

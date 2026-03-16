@@ -3,8 +3,7 @@ import { AssetCostsTab } from "../../../../components/asset-costs-tab";
 import {
   getAssetCostForecast,
   getAssetCostPerUnit,
-  getAssetCostSummary,
-  getAssetDetail
+  getAssetCostSummary
 } from "../../../../lib/api";
 
 type AssetCostsPageProps = {
@@ -13,8 +12,6 @@ type AssetCostsPageProps = {
 
 export default async function AssetCostsPage({ params }: AssetCostsPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
-
-  await getAssetDetail(assetId);
 
   const [costSummary, costPerUnit, costForecast] = await Promise.all([
     getAssetCostSummary(assetId).catch(() => null),

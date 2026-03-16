@@ -78,9 +78,8 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
       );
     }
 
-    const hobby = await getHobbyDetail(household.id, hobbyId);
-
-    const [recipes, sessions, metrics, logs, assets, inventoryCatalog, projects] = await Promise.all([
+    const [hobby, recipes, sessions, metrics, logs, assets, inventoryCatalog, projects] = await Promise.all([
+      getHobbyDetail(household.id, hobbyId),
       getHobbyRecipes(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbyMetrics(household.id, hobbyId),

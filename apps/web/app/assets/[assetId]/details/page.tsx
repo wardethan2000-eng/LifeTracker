@@ -12,11 +12,11 @@ type AssetDetailsPageProps = {
 
 export default async function AssetDetailsPage({ params }: AssetDetailsPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
-  const detail = await getAssetDetail(assetId);
-  const [libraryPresets, customPresets] = await Promise.all([
-    getLibraryPresets(),
-    getHouseholdPresets(detail.asset.householdId)
+  const [detail, libraryPresets] = await Promise.all([
+    getAssetDetail(assetId),
+    getLibraryPresets()
   ]);
+  const customPresets = await getHouseholdPresets(detail.asset.householdId);
 
   return (
     <AssetDetailsTab

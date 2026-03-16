@@ -12,8 +12,8 @@ type AssetOverviewPageProps = {
 
 export default async function AssetOverviewPage({ params }: AssetOverviewPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
-  const detail = await getAssetDetail(assetId);
-  const [transferHistory, overviewTimeline] = await Promise.all([
+  const [detail, transferHistory, overviewTimeline] = await Promise.all([
+    getAssetDetail(assetId),
     getAssetTransferHistory(assetId),
     getAssetTimeline(assetId, { limit: 5 })
   ]);
