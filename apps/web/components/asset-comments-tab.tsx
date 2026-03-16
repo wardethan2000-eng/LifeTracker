@@ -13,6 +13,62 @@ type AssetCommentsTabProps = {
   comments: ThreadedComment[];
 };
 
+type CommentCardProps = {
+  assetId: string;
+  householdId: string;
+  comment: ThreadedComment | ThreadedComment["replies"][number];
+  allowReplies?: boolean;
+};
+
+function CommentCard({ assetId, householdId, comment, allowReplies = false }: CommentCardProps): JSX.Element {
+  return (
+    <article className="schedule-card">
+      <div className="schedule-card__summary">
+        <div>
+          <h3>{comment.author.displayName ?? "Household member"}</h3>
+          <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+            {formatDateTime(comment.createdAt)}
+            {comment.editedAt ? ` • edited ${formatDateTime(comment.editedAt)}` : ""}
+          </p>
+        </div>
+      </div>
+
+      <p style={{ margin: "0 0 16px 0", whiteSpace: "pre-wrap" }}>{comment.body}</p>
+
+      <form action={updateCommentAction} className="form-grid" style={{ marginBottom: "16px" }}>
+        <input type="hidden" name="assetId" value={assetId} />
+        <input type="hidden" name="householdId" value={householdId} />
+        <input type="hidden" name="commentId" value={comment.id} />
+        <label className="field field--full">
+          <span>Edit Comment</span>
+          <textarea name="body" rows={2} defaultValue={comment.body} required />
+        </label>
+        <button type="submit" className="button button--ghost">Save Edit</button>
+      </form>
+
+      {allowReplies ? (
+        <form action={createCommentAction} className="form-grid" style={{ marginBottom: "16px" }}>
+          <input type="hidden" name="assetId" value={assetId} />
+          <input type="hidden" name="householdId" value={householdId} />
+          <input type="hidden" name="parentCommentId" value={comment.id} />
+          <label className="field field--full">
+            <span>Reply</span>
+            <textarea name="body" rows={2} placeholder="Add a threaded reply" required />
+          </label>
+          <button type="submit" className="button button--primary">Reply</button>
+        </form>
+      ) : null}
+
+      <form action={deleteCommentAction} className="inline-actions inline-actions--end">
+        <input type="hidden" name="assetId" value={assetId} />
+        <input type="hidden" name="householdId" value={householdId} />
+        <input type="hidden" name="commentId" value={comment.id} />
+        <button type="submit" className="button button--danger button--sm">Delete Comment</button>
+      </form>
+    </article>
+  );
+}
+
 export async function AssetCommentsTab({ detail, assetId, comments }: AssetCommentsTabProps): Promise<JSX.Element> {
 
   return (
@@ -45,66 +101,26 @@ export async function AssetCommentsTab({ detail, assetId, comments }: AssetComme
           ) : (
             <div className="schedule-stack">
               {comments.map((comment) => (
-                <article key={comment.id} className="schedule-card">
-                  <div className="schedule-card__summary">
-                    <div>
-                      <h3>{comment.author.displayName ?? "Household member"}</h3>
-                      <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                        {formatDateTime(comment.createdAt)}
-                        {comment.editedAt ? ` • edited ${formatDateTime(comment.editedAt)}` : ""}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p style={{ margin: "0 0 16px 0", whiteSpace: "pre-wrap" }}>{comment.body}</p>
-
-                  <form action={updateCommentAction} className="form-grid" style={{ marginBottom: "16px" }}>
-                    <input type="hidden" name="assetId" value={detail.asset.id} />
-                    <input type="hidden" name="commentId" value={comment.id} />
-                    <label className="field field--full">
-                      <span>Edit Comment</span>
-                      <textarea name="body" rows={2} defaultValue={comment.body} required />
-                    </label>
-                    <button type="submit" className="button button--ghost">Save Edit</button>
-                  </form>
-
-                  <form action={createCommentAction} className="form-grid" style={{ marginBottom: "16px" }}>
-                    <input type="hidden" name="assetId" value={detail.asset.id} />
-                    <input type="hidden" name="householdId" value={detail.asset.householdId} />
-                    <input type="hidden" name="parentCommentId" value={comment.id} />
-                    <label className="field field--full">
-                      <span>Reply</span>
-                      <textarea name="body" rows={2} placeholder="Add a threaded reply" required />
-                    </label>
-                    <button type="submit" className="button button--primary">Reply</button>
-                  </form>
-
-                  <form action={deleteCommentAction} className="inline-actions inline-actions--end">
-                    <input type="hidden" name="assetId" value={detail.asset.id} />
-                    <input type="hidden" name="householdId" value={detail.asset.householdId} />
-                    <input type="hidden" name="commentId" value={comment.id} />
-                    <button type="submit" className="button button--danger button--sm">Delete Comment</button>
-                  </form>
-
+                <div key={comment.id}>
+                  <CommentCard
+                    assetId={assetId}
+                    householdId={detail.asset.householdId}
+                    comment={comment}
+                    allowReplies
+                  />
                   {comment.replies.length > 0 ? (
                     <div style={{ display: "grid", gap: "12px", marginTop: "18px", paddingLeft: "18px", borderLeft: "2px solid var(--border-color)" }}>
                       {comment.replies.map((reply) => (
-                        <div key={reply.id} className="schedule-card">
-                          <div className="schedule-card__summary">
-                            <div>
-                              <h3>{reply.author.displayName ?? "Household member"}</h3>
-                              <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                                {formatDateTime(reply.createdAt)}
-                                {reply.editedAt ? ` • edited ${formatDateTime(reply.editedAt)}` : ""}
-                              </p>
-                            </div>
-                          </div>
-                          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{reply.body}</p>
-                        </div>
+                        <CommentCard
+                          key={reply.id}
+                          assetId={assetId}
+                          householdId={detail.asset.householdId}
+                          comment={reply}
+                        />
                       ))}
                     </div>
                   ) : null}
-                </article>
+                </div>
               ))}
             </div>
           )}

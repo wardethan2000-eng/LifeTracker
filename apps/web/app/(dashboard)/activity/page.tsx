@@ -8,15 +8,66 @@ type ActivityPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const activityEntityOptions = ["all", "asset", "schedule", "log", "timeline_entry", "project", "comment", "inventory_item", "service_provider", "invitation", "hobby"] as const;
+const activityWindowOptions = ["all", "7", "30", "90"] as const;
+const activityLimitOptions = [25, 50, 100] as const;
+
 const formatActionLabel = (value: string): string => value
   .split(/[._]/g)
   .filter(Boolean)
   .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
   .join(" ");
 
+const formatMetadataLabel = (value: string): string => formatActionLabel(
+  value.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/\s+/g, "_")
+);
+
+const isIsoDateTime = (value: string): boolean => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value);
+
+const formatMetadataValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  if (typeof value === "string") {
+    return isIsoDateTime(value) ? formatDateTime(value) : value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => formatMetadataValue(item)).join(", ");
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+
+    if (entries.length === 0) {
+      return "—";
+    }
+
+    return entries
+      .map(([key, nestedValue]) => `${formatMetadataLabel(key)}: ${formatMetadataValue(nestedValue)}`)
+      .join("; ");
+  }
+
+  return String(value);
+};
+
 export default async function ActivityPage({ searchParams }: ActivityPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
+  const entityType = typeof params.entityType === "string" && activityEntityOptions.includes(params.entityType as (typeof activityEntityOptions)[number])
+    ? params.entityType
+    : "all";
+  const windowDays = typeof params.windowDays === "string" && activityWindowOptions.includes(params.windowDays as (typeof activityWindowOptions)[number])
+    ? params.windowDays
+    : "30";
+  const limit = typeof params.limit === "string" && activityLimitOptions.includes(Number(params.limit) as (typeof activityLimitOptions)[number])
+    ? Number(params.limit)
+    : 50;
 
   try {
     const me = await getMe();
@@ -33,7 +84,14 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
       );
     }
 
-    const activity = await getHouseholdActivity(household.id);
+    const since = windowDays === "all"
+      ? undefined
+      : new Date(Date.now() - Number(windowDays) * 24 * 60 * 60 * 1000).toISOString();
+    const activity = await getHouseholdActivity(household.id, {
+      ...(entityType !== "all" ? { entityType } : {}),
+      ...(since ? { since } : {}),
+      limit
+    });
 
     return (
       <>
@@ -48,7 +106,56 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
+              <h2>Filters</h2>
+            </div>
+            <div className="panel__body--padded">
+              <form method="GET" className="form-grid">
+                <input type="hidden" name="householdId" value={household.id} />
+                <label className="field">
+                  <span>Entity Type</span>
+                  <select name="entityType" defaultValue={entityType}>
+                    <option value="all">All entities</option>
+                    <option value="asset">Assets</option>
+                    <option value="schedule">Schedules</option>
+                    <option value="log">Maintenance Logs</option>
+                    <option value="timeline_entry">Timeline Entries</option>
+                    <option value="project">Projects</option>
+                    <option value="comment">Comments</option>
+                    <option value="inventory_item">Inventory</option>
+                    <option value="service_provider">Service Providers</option>
+                    <option value="invitation">Invitations</option>
+                    <option value="hobby">Hobbies</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Time Window</span>
+                  <select name="windowDays" defaultValue={windowDays}>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="all">All time</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Result Count</span>
+                  <select name="limit" defaultValue={String(limit)}>
+                    <option value="25">25 entries</option>
+                    <option value="50">50 entries</option>
+                    <option value="100">100 entries</option>
+                  </select>
+                </label>
+                <div className="inline-actions field field--full">
+                  <button type="submit" className="button button--ghost">Apply Filters</button>
+                  <Link href={`/activity?householdId=${household.id}`} className="button button--ghost">Reset</Link>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
               <h2>Recent Activity ({activity.length})</h2>
+              <span className="pill">Newest first</span>
             </div>
             <div className="panel__body">
               {activity.length === 0 ? (
@@ -67,9 +174,16 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
                         <span className="pill">{formatDateTime(entry.createdAt)}</span>
                       </div>
                       {entry.metadata ? (
-                        <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
-                          {JSON.stringify(entry.metadata, null, 2)}
-                        </pre>
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          {Object.entries(entry.metadata).map(([key, value]) => (
+                            <div key={key}>
+                              <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                {formatMetadataLabel(key)}
+                              </div>
+                              <div style={{ fontSize: "0.88rem" }}>{formatMetadataValue(value)}</div>
+                            </div>
+                          ))}
+                        </div>
                       ) : null}
                     </article>
                   ))}

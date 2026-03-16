@@ -3,7 +3,35 @@ import type { JSX } from "react";
 import { ApiError, getHouseholdDueWork, getMe } from "../../../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../../../lib/formatters";
 
-export default async function MaintenancePage(): Promise<JSX.Element> {
+type MaintenancePageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const sortOptions = ["priority", "asset", "category", "schedule"] as const;
+const statusOptions = ["all", "overdue", "due"] as const;
+
+const getSortRank = (status: string): number => {
+  if (status === "overdue") {
+    return 0;
+  }
+
+  if (status === "due") {
+    return 1;
+  }
+
+  return 2;
+};
+
+export default async function MaintenancePage({ searchParams }: MaintenancePageProps): Promise<JSX.Element> {
+  const params = searchParams ? await searchParams : {};
+  const statusFilter = typeof params.status === "string" && statusOptions.includes(params.status as (typeof statusOptions)[number])
+    ? params.status as (typeof statusOptions)[number]
+    : "all";
+  const categoryFilter = typeof params.category === "string" ? params.category : "all";
+  const sort = typeof params.sort === "string" && sortOptions.includes(params.sort as (typeof sortOptions)[number])
+    ? params.sort as (typeof sortOptions)[number]
+    : "priority";
+
   try {
     const me = await getMe();
     const household = me.households[0];
@@ -22,6 +50,29 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
     const dueWork = await getHouseholdDueWork(household.id);
     const overdueScheduleCount = dueWork.filter((item) => item.status === "overdue").length;
     const dueScheduleCount = dueWork.filter((item) => item.status === "due").length;
+    const categoryOptions = Array.from(new Set(dueWork.map((item) => item.assetCategory))).sort();
+    const filteredDueWork = dueWork
+      .filter((item) => statusFilter === "all" || item.status === statusFilter)
+      .filter((item) => categoryFilter === "all" || item.assetCategory === categoryFilter)
+      .sort((left, right) => {
+        if (sort === "asset") {
+          return left.assetName.localeCompare(right.assetName) || left.scheduleName.localeCompare(right.scheduleName);
+        }
+
+        if (sort === "category") {
+          return left.assetCategory.localeCompare(right.assetCategory)
+            || getSortRank(left.status) - getSortRank(right.status)
+            || left.assetName.localeCompare(right.assetName);
+        }
+
+        if (sort === "schedule") {
+          return left.scheduleName.localeCompare(right.scheduleName) || left.assetName.localeCompare(right.assetName);
+        }
+
+        return getSortRank(left.status) - getSortRank(right.status)
+          || left.assetName.localeCompare(right.assetName)
+          || left.scheduleName.localeCompare(right.scheduleName);
+      });
 
     return (
       <>
@@ -30,6 +81,46 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
         </header>
 
         <div className="page-body">
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Queue Controls</h2>
+            </div>
+            <div className="panel__body--padded">
+              <form method="GET" className="form-grid">
+                <label className="field">
+                  <span>Status</span>
+                  <select name="status" defaultValue={statusFilter}>
+                    <option value="all">All due work</option>
+                    <option value="overdue">Overdue only</option>
+                    <option value="due">Due now only</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Category</span>
+                  <select name="category" defaultValue={categoryFilter}>
+                    <option value="all">All categories</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category} value={category}>{formatCategoryLabel(category)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Sort By</span>
+                  <select name="sort" defaultValue={sort}>
+                    <option value="priority">Priority</option>
+                    <option value="asset">Asset</option>
+                    <option value="category">Category</option>
+                    <option value="schedule">Schedule</option>
+                  </select>
+                </label>
+                <div className="inline-actions field field--full">
+                  <button type="submit" className="button button--ghost">Apply</button>
+                  <Link href="/maintenance" className="button button--ghost">Reset</Link>
+                </div>
+              </form>
+            </div>
+          </section>
+
           {/* ── Stats Summary ── */}
           <section className="stats-row">
             <div className="stat-card stat-card--danger">
@@ -50,9 +141,10 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
           <section className="panel">
             <div className="panel__header">
               <h2>All Due & Overdue Work</h2>
+              <span className="pill">{filteredDueWork.length} visible</span>
             </div>
             <div className="panel__body">
-              {dueWork.length === 0 ? (
+              {filteredDueWork.length === 0 ? (
                 <p className="panel__empty">No maintenance is currently due or overdue. Everything is on track.</p>
               ) : (
                 <table className="data-table">
@@ -69,7 +161,7 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
                     </tr>
                   </thead>
                   <tbody>
-                    {dueWork.map((item) => (
+                    {filteredDueWork.map((item) => (
                       <tr key={item.scheduleId} className={`row--${item.status}`}>
                         <td>
                           <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>

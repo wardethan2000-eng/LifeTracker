@@ -9,7 +9,7 @@ import {
   deleteProjectPhaseSupplyAction,
   updateProjectPhaseSupplyAction
 } from "../app/actions";
-import { ExpandModal } from "./expand-modal";
+import { ExpandableCard } from "./expandable-card";
 
 type ProjectSupplyRollupActionsProps = {
   householdId: string;
@@ -34,6 +34,9 @@ export function ProjectSupplyRollupActions({
     : undefined;
   const quantityRemaining = Math.max(supply.quantityNeeded - supply.quantityOnHand, 0);
   const allocatableQuantity = Math.min(quantityRemaining, linkedInventoryItem?.quantityOnHand ?? 0);
+  const estimatedLineCost = supply.estimatedUnitCost !== null && supply.estimatedUnitCost !== undefined
+    ? supply.estimatedUnitCost * supply.quantityNeeded
+    : null;
 
   return (
     <>
@@ -41,8 +44,8 @@ export function ProjectSupplyRollupActions({
         <Link href={openPhaseHref} className="button button--ghost button--sm">
           Open Phase
         </Link>
-        <button type="button" className="button button--ghost button--sm" onClick={() => setIsEditing(true)}>
-          Edit
+        <button type="button" className="button button--ghost button--sm" onClick={() => setIsEditing((current) => !current)}>
+          {isEditing ? "Close Editor" : "Edit"}
         </button>
         <form action={updateProjectPhaseSupplyAction}>
           <input type="hidden" name="householdId" value={householdId} />
@@ -88,7 +91,26 @@ export function ProjectSupplyRollupActions({
       </div>
 
       {isEditing ? (
-        <ExpandModal title={`Edit Supply: ${supply.name}`} onClose={() => setIsEditing(false)}>
+        <div style={{ marginTop: 12 }}>
+          <ExpandableCard
+            title={`Edit ${supply.name}`}
+            modalTitle={`Edit ${supply.name}`}
+            open={isEditing}
+            onOpenChange={setIsEditing}
+            previewContent={(
+              <div className="compact-preview">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <span className="compact-preview__pill">{supply.quantityOnHand}/{supply.quantityNeeded} {supply.unit}</span>
+                  {estimatedLineCost !== null ? (
+                    <span className="compact-preview__pill">${estimatedLineCost.toFixed(2)} estimated</span>
+                  ) : null}
+                  <span className="compact-preview__pill">{supply.isProcured ? "Procured" : "Not procured"}</span>
+                  <span className="compact-preview__pill">{supply.isStaged ? "Staged" : "Not staged"}</span>
+                </div>
+                <p className="compact-preview__overflow">Adjust quantities, costs, supplier data, and inventory links inline.</p>
+              </div>
+            )}
+          >
           <form action={updateProjectPhaseSupplyAction} className="workbench-form">
             <input type="hidden" name="householdId" value={householdId} />
             <input type="hidden" name="projectId" value={projectId} />
@@ -164,7 +186,8 @@ export function ProjectSupplyRollupActions({
               </button>
             </div>
           </form>
-        </ExpandModal>
+          </ExpandableCard>
+        </div>
       ) : null}
     </>
   );

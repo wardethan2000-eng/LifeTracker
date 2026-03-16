@@ -27,6 +27,7 @@ import {
   updateTaskChecklistItemAction
 } from "../app/actions";
 import { formatCurrency } from "../lib/formatters";
+import { ConfirmActionForm } from "./confirm-action-form";
 import { ProjectChecklist } from "./project-checklist";
 import { ProjectSupplyCard } from "./project-supply-card";
 import { ProjectSupplyCreateForm } from "./project-supply-create-form";
@@ -130,12 +131,22 @@ export function ProjectPhaseDetail({
             </div>
           </form>
 
-          <form action={deleteProjectPhaseAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <input type="hidden" name="phaseId" value={phase.id} />
-            <button type="submit" className="button button--danger">Delete Phase</button>
-          </form>
+          <div style={{ marginTop: 12 }}>
+            <ConfirmActionForm
+              action={deleteProjectPhaseAction}
+              hiddenFields={[
+                { name: "householdId", value: householdId },
+                { name: "projectId", value: projectId },
+                { name: "phaseId", value: phase.id }
+              ]}
+              prompt="Delete this phase and everything attached to it?"
+              triggerLabel="Delete Phase"
+              confirmLabel="Yes, delete"
+              triggerClassName="button button--danger"
+              confirmClassName="button button--danger"
+              cancelClassName="button button--ghost"
+            />
+          </div>
         </div>
       </section>
 
@@ -456,12 +467,22 @@ function TaskCard({
         />
       </div>
 
-      <form action={deleteProjectTaskAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-        <input type="hidden" name="householdId" value={householdId} />
-        <input type="hidden" name="projectId" value={projectId} />
-        <input type="hidden" name="taskId" value={task.id} />
-        <button type="submit" className="button button--danger">Delete Task</button>
-      </form>
+      <div style={{ marginTop: 12 }}>
+        <ConfirmActionForm
+          action={deleteProjectTaskAction}
+          hiddenFields={[
+            { name: "householdId", value: householdId },
+            { name: "projectId", value: projectId },
+            { name: "taskId", value: task.id }
+          ]}
+          prompt="Delete this task?"
+          triggerLabel="Delete Task"
+          confirmLabel="Yes, delete"
+          triggerClassName="button button--danger"
+          confirmClassName="button button--danger"
+          cancelClassName="button button--ghost"
+        />
+      </div>
 
       <AttachmentSection
         householdId={householdId}
@@ -542,12 +563,22 @@ function ExpenseCard({
         </div>
       </form>
 
-      <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-        <input type="hidden" name="householdId" value={householdId} />
-        <input type="hidden" name="projectId" value={projectId} />
-        <input type="hidden" name="expenseId" value={expense.id} />
-        <button type="submit" className="button button--danger">Delete Expense</button>
-      </form>
+      <div style={{ marginTop: 12 }}>
+        <ConfirmActionForm
+          action={deleteProjectExpenseAction}
+          hiddenFields={[
+            { name: "householdId", value: householdId },
+            { name: "projectId", value: projectId },
+            { name: "expenseId", value: expense.id }
+          ]}
+          prompt="Delete this expense record?"
+          triggerLabel="Delete Expense"
+          confirmLabel="Yes, delete"
+          triggerClassName="button button--danger"
+          confirmClassName="button button--danger"
+          cancelClassName="button button--ghost"
+        />
+      </div>
     </div>
   );
 }

@@ -151,6 +151,19 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    await logActivity(app.prisma, {
+      householdId: asset.householdId,
+      userId: request.auth.userId,
+      action: "comment.updated",
+      entityType: "comment",
+      entityId: comment.id,
+      metadata: {
+        assetId: asset.id,
+        assetName: asset.name,
+        bodyPreview: comment.body.slice(0, 100)
+      }
+    });
+
     void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
 
     return toCommentResponse(comment);

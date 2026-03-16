@@ -29,6 +29,7 @@ import {
   updateProjectTaskAction
 } from "../../../actions";
 import { Card } from "../../../../components/card";
+import { ConfirmActionForm } from "../../../../components/confirm-action-form";
 import { CompactPhasePreview } from "../../../../components/compact-phase-preview";
 import { CompactTaskPreview } from "../../../../components/compact-task-preview";
 import { ExpandableCard } from "../../../../components/expandable-card";
@@ -382,11 +383,21 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       <button type="submit" className="button">Save Project</button>
                     </div>
                   </form>
-                  <form action={deleteProjectAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <button type="submit" className="button button--danger">Delete Project</button>
-                  </form>
+                  <div style={{ marginTop: 12 }}>
+                    <ConfirmActionForm
+                      action={deleteProjectAction}
+                      hiddenFields={[
+                        { name: "householdId", value: household.id },
+                        { name: "projectId", value: project.id }
+                      ]}
+                      prompt="Delete this project and all related records?"
+                      triggerLabel="Delete Project"
+                      confirmLabel="Yes, delete"
+                      triggerClassName="button button--danger"
+                      confirmClassName="button button--danger"
+                      cancelClassName="button button--ghost"
+                    />
+                  </div>
                 </div>
               </ExpandableCard>
 

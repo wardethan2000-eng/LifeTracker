@@ -11,6 +11,9 @@ type ExpandableCardProps = {
   actions?: ReactNode;
   headerContent?: ReactNode;
   badge?: { count: number; variant: "danger" | "warning" | "neutral" };
+  defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function ExpandableCard({
@@ -20,13 +23,26 @@ export function ExpandableCard({
   children,
   actions,
   headerContent,
-  badge
+  badge,
+  defaultOpen = false,
+  open,
+  onOpenChange
 }: ExpandableCardProps): JSX.Element {
-  const [open, setOpen] = useState(false);
-  const toggleOpen = () => setOpen((current) => !current);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isOpen = open ?? internalOpen;
+
+  const setOpen = (nextOpen: boolean): void => {
+    if (open === undefined) {
+      setInternalOpen(nextOpen);
+    }
+
+    onOpenChange?.(nextOpen);
+  };
+
+  const toggleOpen = () => setOpen(!isOpen);
 
   return (
-    <div className={`card card--expandable${open ? " card--open" : ""}`}>
+    <div className={`card card--expandable${isOpen ? " card--open" : ""}`}>
       <div className="card__header" onClick={toggleOpen}>
         <div className="card__header-left">
           <h3>{title}</h3>
@@ -41,17 +57,17 @@ export function ExpandableCard({
           <button
             type="button"
             className="card__expand-trigger"
-            title={`${open ? "Collapse" : "Expand"} ${title}`}
-            aria-label={`${open ? "Collapse" : "Expand"} ${title}`}
-            aria-expanded={open}
+            title={`${isOpen ? "Collapse" : "Expand"} ${title}`}
+            aria-label={`${isOpen ? "Collapse" : "Expand"} ${title}`}
+            aria-expanded={isOpen}
             onClick={toggleOpen}
           >
-            {open ? "▴" : "▾"}
+            {isOpen ? "▴" : "▾"}
           </button>
         </div>
       </div>
       {headerContent}
-      <div className={`card__body${open ? "" : " card__body--interactive"}`} onClick={open ? undefined : toggleOpen}>
+      <div className={`card__body${isOpen ? "" : " card__body--interactive"}`} onClick={isOpen ? undefined : toggleOpen}>
         {previewContent}
       </div>
       <div className="card__collapse-region">

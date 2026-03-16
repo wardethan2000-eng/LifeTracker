@@ -1,10 +1,101 @@
 import Link from "next/link";
+import type { Notification } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { markNotificationReadAction, enqueueNotificationScanAction } from "../../actions";
+import { markNotificationReadAction, markNotificationsReadAction, enqueueNotificationScanAction } from "../../actions";
 import { ApiError, getHouseholdNotifications, getMe } from "../../../lib/api";
 import { formatDateTime, formatNotificationTone } from "../../../lib/formatters";
 
-export default async function NotificationsPage(): Promise<JSX.Element> {
+type NotificationsPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const channelOptions = ["all", "push", "email", "digest"] as const;
+const statusOptions = ["all", "unread", "read"] as const;
+const typeOptions = ["all", "overdue", "due", "due_soon", "inventory_low_stock", "announcement", "digest"] as const;
+
+const getNotificationTypeLabel = (value: Notification["type"]): string => value
+  .replace(/_/g, " ")
+  .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const getNotificationBucket = (notification: Notification): "overdue" | "dueSoon" | "informational" => {
+  if (notification.type === "overdue") {
+    return "overdue";
+  }
+
+  if (notification.type === "due" || notification.type === "due_soon" || notification.type === "inventory_low_stock") {
+    return "dueSoon";
+  }
+
+  return "informational";
+};
+
+function NotificationTable({ notifications }: { notifications: Notification[] }): JSX.Element {
+  return (
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Type</th>
+          <th>Title</th>
+          <th>Message</th>
+          <th>Channel</th>
+          <th>Scheduled</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {notifications.map((notification) => {
+          const tone = formatNotificationTone(notification);
+
+          return (
+            <tr key={notification.id}>
+              <td>
+                <span className={`status-chip status-chip--${tone === "pending" ? "pending" : "read"}`}>
+                  {tone === "pending" ? "Unread" : "Read"}
+                </span>
+              </td>
+              <td><span className="pill">{getNotificationTypeLabel(notification.type)}</span></td>
+              <td>
+                <div className="data-table__primary">{notification.title}</div>
+              </td>
+              <td>
+                <div className="data-table__secondary" style={{ maxWidth: 320 }}>{notification.body}</div>
+              </td>
+              <td><span className="pill">{notification.channel}</span></td>
+              <td>{formatDateTime(notification.scheduledFor)}</td>
+              <td>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {notification.assetId && (
+                    <Link href={`/assets/${notification.assetId}`} className="data-table__link">View Asset</Link>
+                  )}
+                  {!notification.readAt && notification.status !== "read" && (
+                    <form action={markNotificationReadAction}>
+                      <input type="hidden" name="notificationId" value={notification.id} />
+                      <button type="submit" className="button button--ghost button--sm">Mark Read</button>
+                    </form>
+                  )}
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+export default async function NotificationsPage({ searchParams }: NotificationsPageProps): Promise<JSX.Element> {
+  const params = searchParams ? await searchParams : {};
+  const status = typeof params.status === "string" && statusOptions.includes(params.status as (typeof statusOptions)[number])
+    ? params.status as (typeof statusOptions)[number]
+    : "all";
+  const channel = typeof params.channel === "string" && channelOptions.includes(params.channel as (typeof channelOptions)[number])
+    ? params.channel as (typeof channelOptions)[number]
+    : "all";
+  const type = typeof params.type === "string" && typeOptions.includes(params.type as (typeof typeOptions)[number])
+    ? params.type as (typeof typeOptions)[number]
+    : "all";
+
   try {
     const me = await getMe();
     const household = me.households[0];
@@ -20,13 +111,28 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
       );
     }
 
-    const notificationList = await getHouseholdNotifications(household.id, { limit: 100 });
+    const notificationList = await getHouseholdNotifications(household.id, { limit: 100, status });
+    const filteredNotifications = notificationList.notifications
+      .filter((notification) => channel === "all" || notification.channel === channel)
+      .filter((notification) => type === "all" || notification.type === type);
+    const visibleUnreadNotifications = filteredNotifications.filter((notification) => !notification.readAt && notification.status !== "read");
+    const overdueNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "overdue");
+    const dueSoonNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "dueSoon");
+    const informationalNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "informational");
 
     return (
       <>
         <header className="page-header">
           <h1>Notifications</h1>
           <div className="page-header__actions">
+            {visibleUnreadNotifications.length > 0 ? (
+              <form action={markNotificationsReadAction}>
+                {visibleUnreadNotifications.map((notification) => (
+                  <input key={notification.id} type="hidden" name="notificationId" value={notification.id} />
+                ))}
+                <button type="submit" className="button button--primary">Mark Visible Read</button>
+              </form>
+            ) : null}
             <form action={enqueueNotificationScanAction}>
               <input type="hidden" name="householdId" value={household.id} />
               <button type="submit" className="button button--ghost">Run Notification Scan</button>
@@ -37,60 +143,109 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
-              <h2>All Notifications ({notificationList.notifications.length})</h2>
+              <h2>Filters</h2>
+            </div>
+            <div className="panel__body--padded">
+              <form method="GET" className="form-grid">
+                <label className="field">
+                  <span>Status</span>
+                  <select name="status" defaultValue={status}>
+                    <option value="all">All</option>
+                    <option value="unread">Unread</option>
+                    <option value="read">Read</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Channel</span>
+                  <select name="channel" defaultValue={channel}>
+                    <option value="all">All channels</option>
+                    <option value="push">Push</option>
+                    <option value="email">Email</option>
+                    <option value="digest">Digest</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Type</span>
+                  <select name="type" defaultValue={type}>
+                    <option value="all">All types</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="due">Due now</option>
+                    <option value="due_soon">Due soon</option>
+                    <option value="inventory_low_stock">Low stock</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="digest">Digest</option>
+                  </select>
+                </label>
+                <div className="inline-actions field field--full">
+                  <button type="submit" className="button button--ghost">Apply Filters</button>
+                  <Link href="/notifications" className="button button--ghost">Reset</Link>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Triage Overview</h2>
+              <span className="pill">{notificationList.unreadCount} unread total</span>
+            </div>
+            <div className="panel__body--padded">
+              <section className="stats-row">
+                <div className="stat-card stat-card--danger">
+                  <span className="stat-card__label">Overdue</span>
+                  <strong className="stat-card__value">{overdueNotifications.length}</strong>
+                </div>
+                <div className="stat-card stat-card--warning">
+                  <span className="stat-card__label">Due Soon</span>
+                  <strong className="stat-card__value">{dueSoonNotifications.length}</strong>
+                </div>
+                <div className="stat-card stat-card--accent">
+                  <span className="stat-card__label">Informational</span>
+                  <strong className="stat-card__value">{informationalNotifications.length}</strong>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-card__label">Visible</span>
+                  <strong className="stat-card__value">{filteredNotifications.length}</strong>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Overdue Alerts ({overdueNotifications.length})</h2>
             </div>
             <div className="panel__body">
-              {notificationList.notifications.length === 0 ? (
-                <p className="panel__empty">No notifications yet. Notifications are generated when maintenance schedules become due.</p>
+              {overdueNotifications.length === 0 ? (
+                <p className="panel__empty">No overdue alerts match the current filters.</p>
               ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Title</th>
-                      <th>Message</th>
-                      <th>Channel</th>
-                      <th>Scheduled</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {notificationList.notifications.map((notification) => {
-                      const tone = formatNotificationTone(notification);
+                <NotificationTable notifications={overdueNotifications} />
+              )}
+            </div>
+          </section>
 
-                      return (
-                        <tr key={notification.id}>
-                          <td>
-                            <span className={`status-chip status-chip--${tone === "pending" ? "pending" : "read"}`}>
-                              {tone === "pending" ? "Unread" : "Read"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="data-table__primary">{notification.title}</div>
-                          </td>
-                          <td>
-                            <div className="data-table__secondary" style={{ maxWidth: 320 }}>{notification.body}</div>
-                          </td>
-                          <td><span className="pill">{notification.channel}</span></td>
-                          <td>{formatDateTime(notification.scheduledFor)}</td>
-                          <td>
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                              {notification.assetId && (
-                                <Link href={`/assets/${notification.assetId}`} className="data-table__link">View Asset</Link>
-                              )}
-                              {!notification.readAt && notification.status !== "read" && (
-                                <form action={markNotificationReadAction}>
-                                  <input type="hidden" name="notificationId" value={notification.id} />
-                                  <button type="submit" className="button button--ghost button--sm">Mark Read</button>
-                                </form>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Due Soon & Action Items ({dueSoonNotifications.length})</h2>
+            </div>
+            <div className="panel__body">
+              {dueSoonNotifications.length === 0 ? (
+                <p className="panel__empty">No due-soon or low-stock notifications match the current filters.</p>
+              ) : (
+                <NotificationTable notifications={dueSoonNotifications} />
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Informational ({informationalNotifications.length})</h2>
+            </div>
+            <div className="panel__body">
+              {informationalNotifications.length === 0 ? (
+                <p className="panel__empty">No informational notifications match the current filters.</p>
+              ) : (
+                <NotificationTable notifications={informationalNotifications} />
               )}
             </div>
           </section>

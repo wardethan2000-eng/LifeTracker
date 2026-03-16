@@ -1061,6 +1061,16 @@ export async function markNotificationReadAction(formData: FormData): Promise<vo
   revalidatePath("/notifications");
 }
 
+export async function markNotificationsReadAction(formData: FormData): Promise<void> {
+  const notificationIds = formData
+    .getAll("notificationId")
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .filter(Boolean);
+
+  await Promise.all(notificationIds.map((notificationId) => markNotificationRead(notificationId)));
+  revalidatePath("/notifications");
+}
+
 export async function enqueueNotificationScanAction(formData: FormData): Promise<void> {
   await enqueueNotificationScan(getRequiredString(formData, "householdId"));
   revalidatePath("/notifications");
@@ -1276,12 +1286,17 @@ export async function createCommentAction(formData: FormData): Promise<void> {
 export async function updateCommentAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   const commentId = getRequiredString(formData, "commentId");
+  const householdId = getOptionalString(formData, "householdId");
   const input: UpdateCommentInput = {
     body: getRequiredString(formData, "body")
   };
 
   await updateComment(assetId, commentId, input);
   revalidateAssetPaths(assetId);
+
+  if (householdId) {
+    revalidateActivityPaths(householdId);
+  }
 }
 
 export async function deleteCommentAction(formData: FormData): Promise<void> {

@@ -8,7 +8,7 @@ import {
   allocateSupplyFromInventoryAction,
   updateProjectPhaseSupplyAction
 } from "../app/actions";
-import { ExpandModal } from "./expand-modal";
+import { ExpandableCard } from "./expandable-card";
 
 type ProjectShoppingListItemActionsProps = {
   householdId: string;
@@ -32,6 +32,9 @@ export function ProjectShoppingListItemActions({ householdId, item }: ProjectSho
     : 0;
   const nextQuantityOnHand = Math.min(item.quantityOnHand + safeReceivedQuantity, item.quantityNeeded);
   const willBeProcured = nextQuantityOnHand >= item.quantityNeeded;
+  const projectedLineCost = safeReceivedQuantity > 0 && actualUnitCost
+    ? safeReceivedQuantity * Number(actualUnitCost)
+    : null;
 
   return (
     <>
@@ -51,13 +54,31 @@ export function ProjectShoppingListItemActions({ householdId, item }: ProjectSho
             </button>
           </form>
         ) : null}
-        <button type="button" className="button button--ghost button--sm" onClick={() => setIsProcurementOpen(true)}>
-          Procure
+        <button type="button" className="button button--ghost button--sm" onClick={() => setIsProcurementOpen((current) => !current)}>
+          {isProcurementOpen ? "Close Procurement" : "Procure"}
         </button>
       </div>
 
       {isProcurementOpen ? (
-        <ExpandModal title={`Procure: ${item.name}`} onClose={() => setIsProcurementOpen(false)}>
+        <div style={{ marginTop: 12, minWidth: 340 }}>
+          <ExpandableCard
+            title={`Procure ${item.name}`}
+            modalTitle={`Procure ${item.name}`}
+            open={isProcurementOpen}
+            onOpenChange={setIsProcurementOpen}
+            previewContent={(
+              <div className="compact-preview">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <span className="compact-preview__pill">{item.quantityRemaining} {item.unit} remaining</span>
+                  <span className="compact-preview__pill">{item.quantityOnHand}/{item.quantityNeeded} on hand</span>
+                  {item.estimatedLineCost != null ? (
+                    <span className="compact-preview__pill">~${item.estimatedLineCost.toFixed(2)} estimated</span>
+                  ) : null}
+                </div>
+                <p className="compact-preview__overflow">Record partial receipts, actual pricing, and procurement notes inline.</p>
+              </div>
+            )}
+          >
           <form action={updateProjectPhaseSupplyAction} className="workbench-form">
             <input type="hidden" name="householdId" value={householdId} />
             <input type="hidden" name="projectId" value={item.projectId} />
@@ -95,8 +116,8 @@ export function ProjectShoppingListItemActions({ householdId, item }: ProjectSho
                   required
                 />
                 <small>
-                  {safeReceivedQuantity > 0 && actualUnitCost
-                    ? `Captured line cost: $${(safeReceivedQuantity * Number(actualUnitCost)).toFixed(2)}`
+                  {projectedLineCost !== null
+                    ? `Captured line cost: $${projectedLineCost.toFixed(2)}`
                     : "Enter the actual checkout price per unit."}
                 </small>
               </label>
@@ -120,7 +141,8 @@ export function ProjectShoppingListItemActions({ householdId, item }: ProjectSho
               </button>
             </div>
           </form>
-        </ExpandModal>
+          </ExpandableCard>
+        </div>
       ) : null}
     </>
   );

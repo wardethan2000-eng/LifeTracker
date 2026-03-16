@@ -53,7 +53,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     <div className="app-layout">
       <nav className="sidebar">
         <div className="sidebar__brand">
-          <h1>AssetKeeper</h1>
+          <h1>LifeKeeper</h1>
           <p>Maintenance Tracker</p>
         </div>
 

@@ -3,7 +3,7 @@ import type { JSX, ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AssetKeeper Dashboard",
+  title: "LifeKeeper Dashboard",
   description: "Household-first maintenance tracking for vehicles, homes, tools, and equipment."
 };
 

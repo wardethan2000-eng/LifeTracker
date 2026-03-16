@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { CopyTextButton } from "../../../components/copy-text-button";
 import {
   acceptInvitationAction,
   createInvitationAction,
@@ -100,7 +101,13 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
                         <span className="pill">{invitation.status}</span>
                       </div>
                       <dl className="data-list">
-                        <div><dt>Token</dt><dd style={{ wordBreak: "break-all" }}>{invitation.token}</dd></div>
+                        <div>
+                          <dt>Token</dt>
+                          <dd style={{ display: "grid", gap: 8 }}>
+                            <span style={{ wordBreak: "break-all" }}>{invitation.token}</span>
+                            <CopyTextButton value={invitation.token} label="Copy Token" copiedLabel="Token Copied" />
+                          </dd>
+                        </div>
                         <div><dt>Accepted At</dt><dd>{invitation.acceptedAt ? formatDateTime(invitation.acceptedAt) : "Not accepted"}</dd></div>
                       </dl>
                       {invitation.status === "pending" ? (

@@ -4179,104 +4179,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-  ═══ 49. Expand Modal
-  ═══════════════════════════════════════════════════════════════════ */
-
-.expand-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 200;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 40px 24px;
-  overflow-y: auto;
-}
-
-.expand-modal {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  width: 100%;
-  max-width: 960px;
-  max-height: calc(100vh - 80px);
-  display: grid;
-  grid-template-rows: auto 1fr;
-  overflow: hidden;
-  animation: expand-modal-in 200ms ease;
-}
-
-@keyframes expand-modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.expand-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.expand-modal__header h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0;
-  color: var(--ink);
-}
-
-.expand-modal__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--ink-muted);
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  transition: background 150ms, color 150ms;
-  flex-shrink: 0;
-}
-
-.expand-modal__close:hover {
-  background: var(--surface-alt);
-  color: var(--ink);
-}
-
-.expand-modal__body {
-  padding: 20px;
-  overflow-y: auto;
-}
-
-@media (max-width: 768px) {
-  .expand-modal-backdrop {
-    padding: 0;
-    align-items: flex-end;
-  }
-
-  .expand-modal {
-    max-width: 100%;
-    max-height: 92vh;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   ═══ 50. Compact Preview
+   ═══ 49. Compact Preview
    ═══════════════════════════════════════════════════════════════════ */
 
 .compact-preview {
@@ -4360,8 +4263,8 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ═══ 51. Link Preview Dialog
-   ═══════════════════════════════════════════════════════════════════ */
+  ═══ 50. Link Preview Dialog
+  ═══════════════════════════════════════════════════════════════════ */
 
 .link-preview--overlay {
   position: fixed;
