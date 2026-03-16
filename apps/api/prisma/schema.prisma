@@ -1,17 +1,29 @@
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PRISMA CONFIGURATION                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// Generates the Prisma Client consumed by the API and other TypeScript apps.
 generator client {
   provider = "prisma-client-js"
 }
 
+// Connects Prisma to the PostgreSQL database configured by DATABASE_URL.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ENUMS                                                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// Household membership role used for access control and ownership rules.
 enum HouseholdRole {
   owner
   member
 }
 
+// Broad asset taxonomy used for filtering, presets, and specialized UX.
 enum AssetCategory {
   vehicle
   home
@@ -25,24 +37,28 @@ enum AssetCategory {
   other
 }
 
+// Controls whether an asset is shared with the household or only its owner.
 enum AssetVisibility {
   shared
   personal
 }
 
+// Distinguishes direct reassignment from movement between households.
 enum AssetTransferType {
-  reassignment
-  household_transfer
+  reassignment      // Moves the asset between users in the same household
+  household_transfer // Moves the asset into another household context
 }
 
+// Defines how a maintenance schedule becomes due.
 enum TriggerType {
-  interval
-  usage
-  seasonal
-  compound
-  one_time
+  interval // Time-based recurrence after a fixed interval
+  usage    // Due after a tracked metric advances by N units
+  seasonal // Due during specific calendar windows or months
+  compound // Combines multiple due rules into one schedule
+  one_time // Single due event with no recurring trigger
 }
 
+// Classifies notification intent for maintenance and household messaging.
 enum NotificationType {
   due_soon
   due
@@ -51,12 +67,14 @@ enum NotificationType {
   announcement
 }
 
+// Delivery channel selected for a notification.
 enum NotificationChannel {
   push
   email
-  digest
+  digest // Holds items for batched summary delivery
 }
 
+// Tracks delivery lifecycle after a notification is generated.
 enum NotificationStatus {
   pending
   sent
@@ -64,6 +82,7 @@ enum NotificationStatus {
   read
 }
 
+// High-level lifecycle state for a project.
 enum ProjectStatus {
   planning
   active
@@ -72,6 +91,7 @@ enum ProjectStatus {
   cancelled
 }
 
+// Labels the purpose of a project note for filtering and context.
 enum NoteCategory {
   research
   reference
@@ -80,6 +100,7 @@ enum NoteCategory {
   general
 }
 
+// Lifecycle state of a household invitation token.
 enum InvitationStatus {
   pending
   accepted
@@ -87,13 +108,15 @@ enum InvitationStatus {
   revoked
 }
 
+// Describes how an asset participates in a project.
 enum ProjectAssetRelationship {
-  target
-  produces
-  consumes
-  supports
+  target   // Asset is the thing the project is acting on
+  produces // Project creates, installs, or yields this asset
+  consumes // Project uses the asset as an input or expendable
+  supports // Asset is supporting equipment, tooling, or infrastructure
 }
 
+// Polymorphic target type for uploaded file attachments.
 enum AttachmentEntityType {
   maintenance_log
   asset
@@ -104,28 +127,33 @@ enum AttachmentEntityType {
   inventory_item
 }
 
+// Distinguishes stock that gets consumed from durable gear.
 enum InventoryItemType {
   consumable
   equipment
 }
 
+// Lifecycle state for a hobby workspace.
 enum HobbyStatus {
   active
   paused
   archived
 }
 
+// Controls whether sessions use a simple status or a custom pipeline.
 enum HobbySessionLifecycleMode {
-  binary
-  pipeline
+  binary   // Sessions are simply active/completed without pipeline stages
+  pipeline // Sessions move through hobby-defined workflow steps
 }
 
+// Identifies whether a recipe came from the library, the user, or an import.
 enum HobbyRecipeSourceType {
-  preset
+  preset   // Seeded from the built-in preset library
   user
-  imported
+  imported // Brought in from an external source or file
 }
 
+// Categorizes journal entries recorded against hobbies or sessions.
 enum HobbyLogType {
   note
   tasting
@@ -133,6 +161,11 @@ enum HobbyLogType {
   issue
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CORE — USERS & HOUSEHOLDS                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A person with an account. Participates in households and authors user-scoped records.
 model User {
   id                      String                @id @default(cuid())
   clerkUserId             String                @unique
@@ -163,6 +196,7 @@ model User {
   createdHobbies          Hobby[]               @relation("HobbyCreator")
 }
 
+// A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
 model Household {
   id               String                @id @default(cuid())
   name             String
@@ -187,6 +221,7 @@ model Household {
   @@index([createdById])
 }
 
+// Join table linking a User to a Household with role-based membership.
 model HouseholdMember {
   id          String        @id @default(cuid())
   householdId String
@@ -202,12 +237,17 @@ model HouseholdMember {
   @@index([userId])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ASSETS                                                         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A tracked real-world object or property. Belongs to a Household and anchors maintenance history.
 model Asset {
   id                   String                @id @default(cuid())
   householdId          String
   createdById          String
   ownerId              String?
-  parentAssetId        String?
+  parentAssetId        String?               // Optional parent for nested asset hierarchies
   assetTag             String?               @unique
   name                 String
   category             AssetCategory
@@ -257,12 +297,13 @@ model Asset {
   @@index([parentAssetId])
 }
 
+// Audit record for moving an asset between users or households.
 model AssetTransfer {
   id              String            @id @default(cuid())
   assetId         String
   transferType    AssetTransferType
   fromHouseholdId String
-  toHouseholdId   String?
+  toHouseholdId   String?           // Target household for cross-household moves
   fromUserId      String
   toUserId        String
   initiatedById   String
@@ -282,6 +323,11 @@ model AssetTransfer {
   @@index([toHouseholdId, transferredAt])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  MAINTENANCE                                                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A numeric reading tracked on an Asset for usage-based maintenance logic.
 model UsageMetric {
   id             String                @id @default(cuid())
   assetId        String
@@ -298,6 +344,7 @@ model UsageMetric {
   @@index([assetId])
 }
 
+// A single recorded reading for a UsageMetric, preserving its measurement history.
 model UsageMetricEntry {
   id         String      @id @default(cuid())
   metricId   String
@@ -312,10 +359,11 @@ model UsageMetricEntry {
   @@index([metricId, recordedAt])
 }
 
+// A recurring or one-time maintenance rule on an Asset, optionally driven by a metric.
 model MaintenanceSchedule {
   id                 String           @id @default(cuid())
   assetId            String
-  metricId           String?
+  metricId           String?          // Metric used when the trigger depends on usage
   name               String
   description        String?
   triggerType        TriggerType
@@ -342,6 +390,11 @@ model MaintenanceSchedule {
   @@index([assignedToId])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PRESET PROFILES                                                ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A household-scoped asset template containing reusable custom fields, metrics, and schedules.
 model PresetProfile {
   id                   String        @id @default(cuid())
   householdId          String
@@ -364,6 +417,11 @@ model PresetProfile {
   @@index([createdById])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SERVICE PROVIDERS                                              ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A household-scoped business or person referenced by maintenance logs and project expenses.
 model ServiceProvider {
   id              String           @id @default(cuid())
   householdId     String
@@ -384,10 +442,15 @@ model ServiceProvider {
   @@index([householdId])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  MAINTENANCE RECORDS & NOTIFICATIONS                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A completed maintenance event on an Asset, optionally created from a schedule.
 model MaintenanceLog {
   id                String               @id @default(cuid())
   assetId           String
-  scheduleId        String?
+  scheduleId        String?              // Source schedule when this log completes planned work
   completedById     String
   serviceProviderId String?
   title             String
@@ -414,10 +477,11 @@ model MaintenanceLog {
   @@index([serviceProviderId])
 }
 
+// A part or material line item consumed during a MaintenanceLog entry.
 model MaintenanceLogPart {
   id         String         @id @default(cuid())
   logId      String
-  inventoryItemId String?
+  inventoryItemId String?   // Optional inventory source for stock deduction
   name       String
   partNumber String?
   quantity   Float          @default(1)
@@ -433,6 +497,7 @@ model MaintenanceLogPart {
   @@index([inventoryItemId])
 }
 
+// A generated alert for a user about asset or schedule activity within a household.
 model Notification {
   id              String               @id @default(cuid())
   userId          String
@@ -464,8 +529,11 @@ model Notification {
   @@index([scheduleId])
 }
 
-// ── Projects Domain ──────────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PROJECTS                                                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// A household-scoped work effort that organizes phases, tasks, budgets, and linked resources.
 model Project {
   id            String           @id @default(cuid())
   householdId   String
@@ -477,7 +545,7 @@ model Project {
   actualEndDate DateTime?
   budgetAmount    Float?
   notes           String?
-  parentProjectId String?
+  parentProjectId String?          // Parent for nested projects and rollup views
   depth           Int              @default(0)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -497,6 +565,11 @@ model Project {
   @@index([parentProjectId])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  INVENTORY                                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A household stock item or piece of equipment used across assets, projects, and hobbies.
 model InventoryItem {
   id                 String                  @id @default(cuid())
   householdId        String
@@ -534,6 +607,7 @@ model InventoryItem {
   @@index([householdId, itemType])
 }
 
+// Join table linking an Asset to the inventory items it uses or recommends.
 model AssetInventoryItem {
   id                String        @id @default(cuid())
   assetId           String
@@ -550,6 +624,7 @@ model AssetInventoryItem {
   @@index([inventoryItemId])
 }
 
+// Join table linking a Project to inventory with planned and allocated quantities.
 model ProjectInventoryItem {
   id                String        @id @default(cuid())
   projectId         String
@@ -568,6 +643,7 @@ model ProjectInventoryItem {
   @@index([inventoryItemId])
 }
 
+// A stock movement entry for an InventoryItem, including source reference context.
 model InventoryTransaction {
   id              String        @id @default(cuid())
   inventoryItemId String
@@ -588,6 +664,11 @@ model InventoryTransaction {
   @@index([userId])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PROJECTS                                                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// Join table linking a Project to an Asset with the asset's role in that work.
 model ProjectAsset {
   id           String                   @id @default(cuid())
   projectId    String
@@ -605,6 +686,7 @@ model ProjectAsset {
   @@index([assetId])
 }
 
+// An actionable work item within a Project, optionally tied to a phase or maintenance schedule.
 model ProjectTask {
   id            String               @id @default(cuid())
   projectId     String
@@ -620,7 +702,7 @@ model ProjectTask {
   estimatedCost Float?
   actualCost    Float?
   sortOrder     Int?
-  scheduleId    String?
+  scheduleId    String?              // Links task generation back to a maintenance schedule
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   project       Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -635,6 +717,7 @@ model ProjectTask {
   @@index([assignedToId])
 }
 
+// A free-form note attached to a Project, optionally scoped to a single phase.
 model ProjectNote {
   id             String        @id @default(cuid())
   projectId      String
@@ -659,6 +742,7 @@ model ProjectNote {
   @@index([createdById])
 }
 
+// A cost entry recorded against a Project, phase, budget bucket, or service provider.
 model ProjectExpense {
   id                String           @id @default(cuid())
   projectId         String
@@ -668,7 +752,7 @@ model ProjectExpense {
   amount            Float
   category          String?
   date              DateTime?
-  taskId            String?
+  taskId            String?          // Optional related task ID; stored without a Prisma relation
   serviceProviderId String?
   notes             String?
   createdAt         DateTime         @default(now())
@@ -683,6 +767,7 @@ model ProjectExpense {
   @@index([budgetCategoryId])
 }
 
+// A stage within a Project that groups tasks, checklist items, supplies, expenses, and notes.
 model ProjectPhase {
   id             String                      @id @default(cuid())
   projectId      String
@@ -708,6 +793,7 @@ model ProjectPhase {
   @@index([projectId, status])
 }
 
+// A phase-level checklist item used for milestone or acceptance tracking.
 model ProjectPhaseChecklistItem {
   id           String       @id @default(cuid())
   phaseId      String
@@ -722,6 +808,7 @@ model ProjectPhaseChecklistItem {
   @@index([phaseId, sortOrder])
 }
 
+// A checklist sub-item attached to a ProjectTask for fine-grained completion tracking.
 model ProjectTaskChecklistItem {
   id           String      @id @default(cuid())
   taskId       String
@@ -736,6 +823,7 @@ model ProjectTaskChecklistItem {
   @@index([taskId, sortOrder])
 }
 
+// A named budget bucket inside a Project that groups related expenses.
 model ProjectBudgetCategory {
   id           String           @id @default(cuid())
   projectId    String
@@ -751,6 +839,7 @@ model ProjectBudgetCategory {
   @@index([projectId, sortOrder])
 }
 
+// A supply requirement for a ProjectPhase, optionally backed by household inventory.
 model ProjectPhaseSupply {
   id                String         @id @default(cuid())
   phaseId           String
@@ -767,7 +856,7 @@ model ProjectPhaseSupply {
   procuredAt        DateTime?
   isStaged          Boolean        @default(false)
   stagedAt          DateTime?
-  inventoryItemId   String?
+  inventoryItemId   String?        // Optional inventory item backing this supply line
   notes             String?
   sortOrder         Int?
   createdAt         DateTime       @default(now())
@@ -780,12 +869,17 @@ model ProjectPhaseSupply {
   @@index([inventoryItemId])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SEARCH                                                         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// Search document row used to surface household content in the global search palette.
 model SearchIndex {
   id               String                 @id
   householdId      String
-  entityType       String
-  entityId         String
-  parentEntityId   String?
+  entityType       String                 // Indexed entity discriminator for search results
+  entityId         String                 // ID of the indexed record
+  parentEntityId   String?                // Parent asset or project used for grouped context
   parentEntityName String?
   title            String
   subtitle         String?
@@ -799,8 +893,11 @@ model SearchIndex {
   @@index([householdId, entityType])
 }
 
-// ── Activity Log ─────────────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ACTIVITY & AUDIT                                               ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// Append-only audit trail of actions performed within a household.
 model ActivityLog {
   id          String    @id @default(cuid())
   householdId String
@@ -818,8 +915,11 @@ model ActivityLog {
   @@index([entityType, entityId])
 }
 
-// ── Household Invitations ────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CORE — USERS & HOUSEHOLDS                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// An invitation token used to add a person to a Household by email.
 model HouseholdInvitation {
   id               String           @id @default(cuid())
   householdId      String
@@ -840,8 +940,11 @@ model HouseholdInvitation {
   @@index([email])
 }
 
-// ── Comments ─────────────────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  COMMENTS                                                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// A threaded comment attached to an Asset, with optional parent-child nesting.
 model Comment {
   id              String    @id @default(cuid())
   assetId         String
@@ -861,8 +964,11 @@ model Comment {
   @@index([parentCommentId])
 }
 
-// ── Barcode Lookup Cache ─────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  BARCODE                                                        ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// Cached barcode lookup response used to avoid repeated external API calls.
 model BarcodeLookup {
   id             String   @id @default(cuid())
   barcode        String   @unique
@@ -882,14 +988,17 @@ model BarcodeLookup {
   @@index([createdAt])
 }
 
-// ── File Attachments ─────────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  FILE ATTACHMENTS                                               ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// A polymorphic uploaded file record linked to household content through entityType and entityId.
 model Attachment {
   id               String               @id @default(cuid())
   householdId      String
   uploadedById     String
-  entityType       AttachmentEntityType
-  entityId         String
+  entityType       AttachmentEntityType // Discriminator for the attachment target type
+  entityId         String               // ID of the attached asset, log, project entity, or item
   storageKey       String               @unique
   originalFilename String
   mimeType         String
@@ -911,8 +1020,11 @@ model Attachment {
   @@index([status])
 }
 
-// ── Hobby Domain ────────────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  HOBBIES                                                        ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
+// A household-scoped hobby workspace containing recipes, sessions, logs, metrics, and linked resources.
 model Hobby {
   id               String                    @id @default(cuid())
   householdId      String
@@ -943,6 +1055,7 @@ model Hobby {
   @@index([createdById])
 }
 
+// Join table linking a Hobby to an Asset used as tracked equipment or context.
 model HobbyAsset {
   id          String   @id @default(cuid())
   hobbyId     String
@@ -959,6 +1072,7 @@ model HobbyAsset {
   @@index([assetId])
 }
 
+// Join table linking a Hobby to household inventory items it uses or tracks.
 model HobbyInventoryItem {
   id              String        @id @default(cuid())
   hobbyId         String
@@ -974,6 +1088,7 @@ model HobbyInventoryItem {
   @@index([inventoryItemId])
 }
 
+// Join table linking a Hobby to a related Project.
 model HobbyProject {
   id        String   @id @default(cuid())
   hobbyId   String
@@ -989,6 +1104,7 @@ model HobbyProject {
   @@index([projectId])
 }
 
+// An organizational inventory grouping defined within a Hobby.
 model HobbyInventoryCategory {
   id           String   @id @default(cuid())
   hobbyId      String
@@ -1002,6 +1118,7 @@ model HobbyInventoryCategory {
   @@index([hobbyId])
 }
 
+// A named step in a Hobby's custom session workflow pipeline.
 model HobbySessionStatusStep {
   id        String   @id @default(cuid())
   hobbyId   String
@@ -1016,6 +1133,7 @@ model HobbySessionStatusStep {
   @@index([hobbyId, sortOrder])
 }
 
+// A reusable recipe or procedure inside a Hobby, with ingredients and ordered steps.
 model HobbyRecipe {
   id                String                 @id @default(cuid())
   hobbyId           String
@@ -1040,10 +1158,11 @@ model HobbyRecipe {
   @@index([hobbyId, isArchived])
 }
 
+// A material line in a HobbyRecipe, optionally linked to household inventory.
 model HobbyRecipeIngredient {
   id              String         @id @default(cuid())
   recipeId        String
-  inventoryItemId String?
+  inventoryItemId String?        // Optional inventory item for stock and cost awareness
   name            String
   quantity        Float
   unit            String
@@ -1060,6 +1179,7 @@ model HobbyRecipeIngredient {
   @@index([inventoryItemId])
 }
 
+// An ordered procedural step within a HobbyRecipe.
 model HobbyRecipeStep {
   id              String      @id @default(cuid())
   recipeId        String
@@ -1076,6 +1196,7 @@ model HobbyRecipeStep {
   @@index([recipeId, sortOrder])
 }
 
+// A single execution of a Hobby, optionally derived from a recipe and workflow pipeline.
 model HobbySession {
   id              String       @id @default(cuid())
   hobbyId         String
@@ -1084,7 +1205,7 @@ model HobbySession {
   status          String       @default("active")
   startDate       DateTime?
   completedDate   DateTime?
-  pipelineStepId  String?
+  pipelineStepId  String?      // Current step in the hobby's custom session pipeline
   customFields    Json         @default("{}")
   totalCost       Float?
   rating          Int?
@@ -1103,11 +1224,12 @@ model HobbySession {
   @@index([recipeId])
 }
 
+// A material actually consumed during a HobbySession, optionally traced to recipe and inventory rows.
 model HobbySessionIngredient {
   id                   String                 @id @default(cuid())
   sessionId            String
-  recipeIngredientId   String?
-  inventoryItemId      String?
+  recipeIngredientId   String?                // Source recipe ingredient when copied from a recipe
+  inventoryItemId      String?                // Inventory item consumed by this session ingredient
   name                 String
   quantityUsed         Float
   unit                 String
@@ -1123,10 +1245,11 @@ model HobbySessionIngredient {
   @@index([inventoryItemId])
 }
 
+// A concrete step performed during a HobbySession, optionally derived from a recipe step.
 model HobbySessionStep {
   id              String           @id @default(cuid())
   sessionId       String
-  recipeStepId    String?
+  recipeStepId    String?          // Source recipe step when the session is recipe-based
   title           String
   description     String?
   sortOrder       Int              @default(0)
@@ -1142,6 +1265,7 @@ model HobbySessionStep {
   @@index([sessionId, sortOrder])
 }
 
+// A numeric metric definition tracked across sessions within a Hobby.
 model HobbyMetricDefinition {
   id          String               @id @default(cuid())
   hobbyId     String
@@ -1158,6 +1282,7 @@ model HobbyMetricDefinition {
   @@index([hobbyId])
 }
 
+// A recorded value for a Hobby metric, optionally tied to a specific session.
 model HobbyMetricReading {
   id                 String                @id @default(cuid())
   metricDefinitionId String
@@ -1173,6 +1298,7 @@ model HobbyMetricReading {
   @@index([sessionId])
 }
 
+// A dated journal entry for a Hobby, optionally attached to a particular session.
 model HobbyLog {
   id        String        @id @default(cuid())
   hobbyId   String
