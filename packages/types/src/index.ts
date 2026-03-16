@@ -1094,6 +1094,156 @@ export const lowStockInventoryItemSchema = z.object({
   deficit: z.number()
 });
 
+// ── Inventory Analytics ────────────────────────────────────────────
+
+export const inventoryItemCostTrendPointSchema = z.object({
+  month: z.string(),
+  averageCost: z.number(),
+  totalCost: z.number(),
+  quantity: z.number()
+});
+
+export const inventoryItemConsumptionSchema = z.object({
+  inventoryItemId: z.string(),
+  itemName: z.string(),
+  partNumber: z.string().nullable(),
+  category: z.string().nullable(),
+  unit: z.string(),
+  totalConsumed: z.number(),
+  totalPurchased: z.number(),
+  totalSpent: z.number(),
+  totalRestockSpent: z.number(),
+  transactionCount: z.number(),
+  consumeTransactionCount: z.number(),
+  restockTransactionCount: z.number(),
+  firstTransactionDate: z.string().nullable(),
+  lastTransactionDate: z.string().nullable(),
+  averageConsumptionPerMonth: z.number().nullable(),
+  averageUnitCost: z.number().nullable(),
+  costTrend: z.array(inventoryItemCostTrendPointSchema),
+  projectedDepletionDate: z.string().nullable(),
+  projectedReorderDate: z.string().nullable()
+});
+
+export const assetTopPartSchema = z.object({
+  partName: z.string(),
+  partNumber: z.string().nullable(),
+  totalQuantity: z.number(),
+  totalCost: z.number(),
+  occurrences: z.number(),
+  averageInterval: z.number().nullable()
+});
+
+export const assetMonthlyPartsCostSchema = z.object({
+  month: z.string(),
+  totalCost: z.number(),
+  partCount: z.number()
+});
+
+export const assetPartsConsumptionSchema = z.object({
+  assetId: z.string(),
+  assetName: z.string(),
+  assetCategory: z.string(),
+  totalPartsUsed: z.number(),
+  totalPartsCost: z.number(),
+  totalPartsQuantity: z.number(),
+  topParts: z.array(assetTopPartSchema),
+  monthlyPartsCost: z.array(assetMonthlyPartsCostSchema)
+});
+
+export const partCommonalityAssetSchema = z.object({
+  assetId: z.string(),
+  assetName: z.string(),
+  assetCategory: z.string(),
+  timesUsed: z.number(),
+  totalQuantity: z.number(),
+  lastUsedDate: z.string()
+});
+
+export const partCommonalitySchema = z.object({
+  partName: z.string(),
+  partNumber: z.string().nullable(),
+  assets: z.array(partCommonalityAssetSchema),
+  totalAssets: z.number(),
+  totalQuantityAcrossAssets: z.number(),
+  totalCostAcrossAssets: z.number()
+});
+
+export const inventoryTurnoverSchema = z.object({
+  inventoryItemId: z.string(),
+  itemName: z.string(),
+  partNumber: z.string().nullable(),
+  category: z.string().nullable(),
+  unit: z.string(),
+  quantityOnHand: z.number(),
+  unitCost: z.number().nullable(),
+  totalValue: z.number().nullable(),
+  daysSinceLastTransaction: z.number().nullable(),
+  daysSinceLastConsumption: z.number().nullable(),
+  turnoverRate: z.number().nullable(),
+  velocityCategory: z.enum(["fast", "moderate", "slow", "stale"])
+});
+
+export const householdInventoryTopConsumerSchema = z.object({
+  inventoryItemId: z.string(),
+  itemName: z.string(),
+  totalConsumed: z.number(),
+  totalSpent: z.number()
+});
+
+export const householdInventoryTopCostItemSchema = z.object({
+  inventoryItemId: z.string(),
+  itemName: z.string(),
+  totalSpent: z.number()
+});
+
+export const householdInventoryCategoryBreakdownSchema = z.object({
+  category: z.string(),
+  itemCount: z.number(),
+  totalValue: z.number(),
+  totalSpentLast12Months: z.number()
+});
+
+export const householdInventoryMonthlySpendingSchema = z.object({
+  month: z.string(),
+  totalSpent: z.number(),
+  transactionCount: z.number()
+});
+
+export const householdInventoryAnalyticsSchema = z.object({
+  totalItems: z.number(),
+  totalValue: z.number(),
+  totalSpentLast30Days: z.number(),
+  totalSpentLast90Days: z.number(),
+  totalSpentLast12Months: z.number(),
+  lowStockCount: z.number(),
+  outOfStockCount: z.number(),
+  staleItemCount: z.number(),
+  topConsumers: z.array(householdInventoryTopConsumerSchema),
+  topCostItems: z.array(householdInventoryTopCostItemSchema),
+  categoryBreakdown: z.array(householdInventoryCategoryBreakdownSchema),
+  monthlySpending: z.array(householdInventoryMonthlySpendingSchema)
+});
+
+export const inventoryReorderForecastSchema = z.object({
+  inventoryItemId: z.string(),
+  itemName: z.string(),
+  partNumber: z.string().nullable(),
+  quantityOnHand: z.number(),
+  reorderThreshold: z.number().nullable(),
+  reorderQuantity: z.number().nullable(),
+  unitCost: z.number().nullable(),
+  preferredSupplier: z.string().nullable(),
+  supplierUrl: z.string().nullable(),
+  averageConsumptionPerMonth: z.number(),
+  projectedReorderDate: z.string().nullable(),
+  projectedDepletionDate: z.string().nullable(),
+  daysUntilReorder: z.number().nullable(),
+  daysUntilDepletion: z.number().nullable(),
+  estimatedReorderCost: z.number().nullable(),
+  urgency: z.enum(["critical", "soon", "planned", "healthy"])
+});
+
 export const assetDetailResponseSchema = z.object({
   asset: assetSchema,
   metrics: z.array(usageMetricResponseSchema),
@@ -1956,6 +2106,12 @@ export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
 export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
 export type CreateInventoryTransactionInput = z.infer<typeof createInventoryTransactionSchema>;
+export type InventoryItemConsumption = z.infer<typeof inventoryItemConsumptionSchema>;
+export type AssetPartsConsumption = z.infer<typeof assetPartsConsumptionSchema>;
+export type PartCommonality = z.infer<typeof partCommonalitySchema>;
+export type InventoryTurnover = z.infer<typeof inventoryTurnoverSchema>;
+export type HouseholdInventoryAnalytics = z.infer<typeof householdInventoryAnalyticsSchema>;
+export type InventoryReorderForecast = z.infer<typeof inventoryReorderForecastSchema>;
 export type InventoryTransactionQuery = z.infer<typeof inventoryTransactionQuerySchema>;
 export type InventoryTransactionWithItem = z.infer<typeof inventoryTransactionWithItemSchema>;
 export type InventoryTransactionList = z.infer<typeof inventoryTransactionListSchema>;

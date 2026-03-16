@@ -12,6 +12,7 @@ import { assetTransferRoutes } from "./routes/assets/transfers.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { healthRoutes } from "./routes/health.js";
 import { householdRoutes } from "./routes/households/index.js";
+import { householdInventoryAnalyticsRoutes } from "./routes/households/inventory-analytics.js";
 import { householdInventoryItemRoutes } from "./routes/households/inventory-items.js";
 import { householdInventoryTransactionRoutes } from "./routes/households/inventory-transactions.js";
 import { householdLinkPreviewRoutes } from "./routes/households/link-preview.js";
@@ -57,6 +58,7 @@ export const buildApp = () => {
   app.register(healthRoutes);
   app.register(meRoutes);
   app.register(householdRoutes);
+  app.register(householdInventoryAnalyticsRoutes);
   app.register(householdInventoryItemRoutes);
   app.register(householdInventoryTransactionRoutes);
   app.register(householdLinkPreviewRoutes);

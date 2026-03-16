@@ -5874,6 +5874,264 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--accent);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 56. Inventory Analytics
+   ═══════════════════════════════════════════════════════════════════ */
+
+.analytics-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.analytics-tab-bar__tab {
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 150ms;
+}
+
+.analytics-tab-bar__tab:hover {
+  color: var(--ink);
+}
+
+.analytics-tab-bar__tab--active {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.analytics-chart-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-chart-bar:last-child {
+  border-bottom: 0;
+}
+
+.analytics-chart-bar__label {
+  flex: 0 0 180px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-chart-bar__track {
+  flex: 1;
+  height: 20px;
+  background: var(--surface-alt, var(--border));
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.analytics-chart-bar__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 300ms ease;
+  background: var(--accent);
+}
+
+.analytics-chart-bar__fill--warning {
+  background: var(--warning);
+}
+
+.analytics-chart-bar__fill--danger {
+  background: var(--danger);
+}
+
+.analytics-chart-bar__fill--success {
+  background: var(--success);
+}
+
+.analytics-chart-bar__value {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 70px;
+  text-align: right;
+}
+
+.velocity-badge,
+.urgency-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.velocity-badge--fast {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.velocity-badge--moderate {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.velocity-badge--slow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.velocity-badge--stale {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.urgency-badge--critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.urgency-badge--soon {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.urgency-badge--planned {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.urgency-badge--healthy {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.forecast-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+}
+
+.forecast-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.forecast-card__dates {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  flex-wrap: wrap;
+}
+
+.forecast-card__progress {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.commonality-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+
+.commonality-row:last-child {
+  border-bottom: 0;
+}
+
+.commonality-row__assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.commonality-row__asset-chip {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  background: var(--surface-alt, var(--surface));
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+}
+
+.analytics-inline-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analytics-inline-metric {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.analytics-inline-metric span {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.analytics-inline-metric strong {
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.analytics-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-grid,
+  .analytics-inline-metrics,
+  .analytics-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-chart-bar__label {
+    flex: 0 0 120px;
+  }
+}
+
 @media (max-width: 768px) {
   .timeline-controls {
     flex-direction: column;

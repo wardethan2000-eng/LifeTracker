@@ -1,6 +1,7 @@
 import { cache } from "react";
 import {
   activityLogSchema,
+  assetPartsConsumptionSchema,
   assetDetailResponseSchema,
   assetTransferListSchema,
   assetLabelDataSchema,
@@ -9,6 +10,7 @@ import {
   assetSchema,
   commentSchema,
   customPresetProfileSchema,
+  householdInventoryAnalyticsSchema,
   householdInvitationSchema,
   householdMemberSchema,
   maintenanceLogSchema,
@@ -22,11 +24,15 @@ import {
   inventoryTransactionListSchema,
   inventoryTransactionSchema,
   inventoryItemSummarySchema,
+  inventoryItemConsumptionSchema,
+  inventoryReorderForecastSchema,
+  inventoryTurnoverSchema,
   libraryPresetSchema,
   linkPreviewResponseSchema,
   lowStockInventoryItemSchema,
   meResponseSchema,
   notificationSchema,
+  partCommonalitySchema,
   projectAssetSchema,
   projectBudgetCategoryListSchema,
   projectBudgetCategorySchema,
@@ -90,19 +96,25 @@ import {
   type CreateMaintenanceLogInput,
   type CreateUsageMetricEntryInput,
   type CreateUsageMetricInput,
+  type HouseholdInventoryAnalytics,
   type CustomPresetProfile,
   type HouseholdDashboard,
   type HouseholdInvitation,
   type HouseholdMember,
   type HouseholdSummary,
+  type InventoryItemConsumption,
   type CreateInventoryItemInput,
+  type InventoryReorderForecast,
+  type InventoryTurnover,
   type BulkPartsReadiness,
   type CreateScheduleInventoryItemInput,
   type InventoryTransactionList,
   type InventoryTransactionQuery,
   type UpdateInventoryItemInput,
   type InventoryItemSummary,
+  type AssetPartsConsumption,
   type InventoryProjectLinkDetail,
+  type PartCommonality,
   type ScheduleInventoryLinkDetail,
   type SchedulePartsReadiness,
   type LibraryPreset,
@@ -293,6 +305,10 @@ const householdInventoryListSchema = {
   }
 };
 const householdLowStockListSchema = lowStockInventoryItemSchema.array();
+const assetPartsConsumptionListSchema = assetPartsConsumptionSchema.array();
+const inventoryTurnoverListSchema = inventoryTurnoverSchema.array();
+const inventoryReorderForecastListSchema = inventoryReorderForecastSchema.array();
+const partCommonalityListSchema = partCommonalitySchema.array();
 const importInventoryResultSchema: Schema<ImportInventoryResult> = {
   parse: (value: unknown) => {
     if (typeof value !== "object" || value === null) {
@@ -903,6 +919,39 @@ export const getHouseholdInventory = async (
 export const getHouseholdLowStockInventory = async (householdId: string): Promise<LowStockInventoryItem[]> => apiRequest({
   path: `/v1/households/${householdId}/inventory/low-stock`,
   schema: householdLowStockListSchema
+});
+
+export const getInventoryAnalyticsSummary = async (householdId: string): Promise<HouseholdInventoryAnalytics> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/analytics/summary`,
+  schema: householdInventoryAnalyticsSchema
+});
+
+export const getInventoryItemConsumption = async (
+  householdId: string,
+  inventoryItemId: string
+): Promise<InventoryItemConsumption> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/${inventoryItemId}/analytics/consumption`,
+  schema: inventoryItemConsumptionSchema
+});
+
+export const getInventoryTurnover = async (householdId: string): Promise<InventoryTurnover[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/analytics/turnover`,
+  schema: inventoryTurnoverListSchema
+});
+
+export const getInventoryReorderForecast = async (householdId: string): Promise<InventoryReorderForecast[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/analytics/reorder-forecast`,
+  schema: inventoryReorderForecastListSchema
+});
+
+export const getAssetPartsConsumption = async (householdId: string): Promise<AssetPartsConsumption[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/analytics/asset-consumption`,
+  schema: assetPartsConsumptionListSchema
+});
+
+export const getPartCommonality = async (householdId: string): Promise<PartCommonality[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/analytics/part-commonality`,
+  schema: partCommonalityListSchema
 });
 
 export const getHouseholdPartsReadiness = async (
