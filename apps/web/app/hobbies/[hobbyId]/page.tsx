@@ -1,6 +1,8 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
+import { HobbySessionAdvanceButton } from "../../../components/hobby-session-advance-button";
+import { HobbyShoppingListButton } from "../../../components/hobby-shopping-list-button";
 import {
   ApiError,
   getHobbyDetail,
@@ -12,12 +14,11 @@ import {
   getMe,
 } from "../../../lib/api";
 import type {
-  HobbyDetail,
-  HobbyRecipe,
-  HobbySessionSummary,
+  HobbyLog,
   HobbyMetricDefinition,
   HobbyMetricReading,
-  HobbyLog,
+  HobbyRecipe,
+  HobbySessionSummary,
 } from "@lifekeeper/types";
 
 type HobbyDetailPageProps = {
@@ -127,14 +128,14 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
                 <div className="panel__body--padded">
                   <div style={{ display: "grid", gap: "12px" }}>
                     {activeSessions.map((session) => (
-                      <Link
+                      <div
                         key={session.id}
-                        href={`/hobbies/${hobbyId}/sessions/${session.id}`}
                         className="hobby-session-card"
-                        style={{ textDecoration: "none", display: "block", padding: "12px", border: "1px solid var(--border)", borderRadius: "8px" }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <strong>{session.name}</strong>
+                          <Link href={`/hobbies/${hobbyId}/sessions/${session.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                            <strong>{session.name}</strong>
+                          </Link>
                           <span className={statusBadgeClass(session.status)}>{session.status}</span>
                         </div>
                         {session.recipeName ? (
@@ -142,32 +143,29 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
                             From: {session.recipeName}
                           </p>
                         ) : null}
-                        {isPipeline && session.status !== "planned" ? (
-                          <div className="hobby-pipeline-indicator" style={{ marginTop: "8px" }}>
-                            <div style={{ display: "flex", gap: "2px" }}>
-                              {pipelineSteps.map((step) => (
-                                <div
-                                  key={step.id}
-                                  style={{
-                                    flex: 1,
-                                    height: "6px",
-                                    borderRadius: "3px",
-                                    background: step.sortOrder <= (pipelineSteps.find((s) => s.id === (sessions.find((ss) => ss.id === session.id) as HobbySessionSummary & { pipelineStepId?: string })?.status)?.sortOrder ?? -1)
-                                      ? "var(--accent)"
-                                      : "var(--border)",
-                                  }}
-                                  title={step.label}
-                                />
-                              ))}
-                            </div>
-                          </div>
+                        {isPipeline ? (
+                          <HobbySessionAdvanceButton
+                            householdId={household.id}
+                            hobbyId={hobbyId}
+                            sessionId={session.id}
+                            sessionName={session.name}
+                            currentStatus={session.status}
+                            currentPipelineStepId={session.pipelineStepId}
+                            pipelineSteps={pipelineSteps.map((step) => ({
+                              id: step.id,
+                              label: step.label,
+                              sortOrder: step.sortOrder,
+                              isFinal: step.isFinal,
+                              color: step.color,
+                            }))}
+                          />
                         ) : null}
                         <div style={{ display: "flex", gap: "8px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
                           <span>{session.completedStepCount}/{session.stepCount} steps</span>
                           <span>·</span>
                           <span>Started {formatDate(session.startDate)}</span>
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -270,30 +268,39 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         ) : (
           <div style={{ display: "grid", gap: "12px" }}>
             {recipes.map((recipe) => (
-              <Link
+              <div
                 key={recipe.id}
-                href={`/hobbies/${hobbyId}/recipes/${recipe.id}`}
-                style={{ textDecoration: "none", display: "block", padding: "16px", border: "1px solid var(--border)", borderRadius: "8px" }}
+                className="hobby-recipe-card"
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <strong>{recipe.name}</strong>
-                    {recipe.styleCategory ? (
-                      <span className="pill" style={{ marginLeft: "8px" }}>{recipe.styleCategory}</span>
-                    ) : null}
+                <Link href={`/hobbies/${hobbyId}/recipes/${recipe.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <strong>{recipe.name}</strong>
+                      {recipe.styleCategory ? (
+                        <span className="pill" style={{ marginLeft: "8px" }}>{recipe.styleCategory}</span>
+                      ) : null}
+                    </div>
+                    <span className="pill">{recipe.sourceType}</span>
                   </div>
-                  <span className="pill">{recipe.sourceType}</span>
+                  {recipe.description ? (
+                    <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "8px" }}>
+                      {recipe.description.length > 120 ? recipe.description.slice(0, 120) + "..." : recipe.description}
+                    </p>
+                  ) : null}
+                  <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+                    {recipe.estimatedDuration != null ? <span>{recipe.estimatedDuration} min</span> : null}
+                    {recipe.estimatedCost != null ? <span>${recipe.estimatedCost.toFixed(2)}</span> : null}
+                  </div>
+                </Link>
+                <div className="recipe-card__actions">
+                  <HobbyShoppingListButton
+                    householdId={household.id}
+                    hobbyId={hobbyId}
+                    recipeId={recipe.id}
+                    recipeName={recipe.name}
+                  />
                 </div>
-                {recipe.description ? (
-                  <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "8px" }}>
-                    {recipe.description.length > 120 ? recipe.description.slice(0, 120) + "…" : recipe.description}
-                  </p>
-                ) : null}
-                <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
-                  {recipe.estimatedDuration != null ? <span>{recipe.estimatedDuration} min</span> : null}
-                  {recipe.estimatedCost != null ? <span>${recipe.estimatedCost.toFixed(2)}</span> : null}
-                </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

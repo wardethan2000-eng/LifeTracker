@@ -254,6 +254,7 @@ export const toSessionStepResponse = (step: {
   isCompleted: boolean;
   completedAt: Date | null;
   durationMinutes: number | null;
+  stepType?: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -267,6 +268,7 @@ export const toSessionStepResponse = (step: {
   isCompleted: step.isCompleted,
   completedAt: step.completedAt?.toISOString() ?? null,
   durationMinutes: step.durationMinutes,
+  stepType: step.stepType ?? "generic",
   notes: step.notes,
   createdAt: step.createdAt.toISOString(),
   updatedAt: step.updatedAt.toISOString()

@@ -2460,6 +2460,7 @@ export const hobbySessionStepSchema = z.object({
   isCompleted: z.boolean(),
   completedAt: z.string().datetime().nullable(),
   durationMinutes: z.number().nullable(),
+  stepType: z.string(),
   notes: z.string().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

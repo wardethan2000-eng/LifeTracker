@@ -242,7 +242,12 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
             inventoryItem: { select: { id: true, name: true, unit: true, quantityOnHand: true } }
           }
         },
-        steps: { orderBy: { sortOrder: "asc" } },
+        steps: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            recipeStep: { select: { stepType: true } }
+          }
+        },
         metricReadings: {
           orderBy: { readingDate: "desc" },
           include: {
@@ -264,7 +269,10 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
         ...toSessionIngredientResponse(ing),
         inventoryItem: ing.inventoryItem,
       })),
-      steps: session.steps.map(toSessionStepResponse),
+      steps: session.steps.map((step) => toSessionStepResponse({
+        ...step,
+        stepType: step.recipeStep?.stepType ?? "generic",
+      })),
       metricReadings: session.metricReadings.map((r) => ({
         id: r.id,
         metricDefinitionId: r.metricDefinitionId,
@@ -336,6 +344,11 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
         }
       } else {
         data.status = input.status;
+        if (input.status === "completed") {
+          data.completedDate = new Date();
+        } else if (input.completedDate === undefined) {
+          data.completedDate = null;
+        }
       }
     }
 

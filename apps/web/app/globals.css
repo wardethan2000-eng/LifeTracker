@@ -4362,7 +4362,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
   height: 6px;
   border-radius: 3px;
   background: var(--border);
-  transition: background 0.2s;
+  transition: background-color 0.2s;
 }
 
 .hobby-pipeline-step--completed {
@@ -4375,6 +4375,15 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .hobby-pipeline-step--upcoming {
   background: var(--border);
+}
+
+.hobby-pipeline-label {
+  font-size: 0.65rem;
+  color: var(--ink-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Hobby tab bar */
@@ -4424,6 +4433,285 @@ html[data-ui-density="compact"] .resource-layout__aside {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+.session-detail-stack,
+.session-aside-stack,
+.session-flow-stack,
+.session-step-stack,
+.session-section-stack,
+.session-log-list {
+  display: grid;
+  gap: 16px;
+}
+
+.session-pipeline-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+}
+
+.session-pipeline-segment {
+  display: grid;
+  gap: 8px;
+}
+
+.session-pipeline-label {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.session-pipeline-label--active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.session-flow-caption {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.session-status-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.session-step-list {
+  display: grid;
+  gap: 10px;
+}
+
+.session-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+.session-step--clickable {
+  cursor: pointer;
+}
+
+.session-step--clickable:hover {
+  background: var(--surface-alt);
+  border-color: var(--border-strong);
+}
+
+.session-step--pending {
+  opacity: 0.6;
+}
+
+.session-step__checkbox {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--success);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.session-step__checkbox.is-complete {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.session-step__content,
+.session-rating-block {
+  display: grid;
+  gap: 8px;
+}
+
+.session-step__header,
+.session-step__title-group,
+.session-inline-actions,
+.session-log-entry__topline,
+.session-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.session-step__title-group {
+  justify-content: flex-start;
+}
+
+.session-step__title.is-complete {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+
+.session-step__description,
+.session-step__notes,
+.session-log-entry__content {
+  white-space: pre-wrap;
+}
+
+.session-step__notes {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.session-progress-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.session-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.session-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+
+.session-inline-form {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease, margin 180ms ease;
+}
+
+.session-inline-form--open {
+  max-height: 640px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.session-inline-form .form-grid {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.session-metric-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.session-metric-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.session-metric-card__header p {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+.session-metric-form-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.session-metric-form-submit {
+  align-self: end;
+}
+
+.session-total-row {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.session-rating {
+  display: flex;
+  gap: 6px;
+}
+
+.session-rating__star {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--border-strong);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.session-rating__star.is-filled {
+  color: var(--accent);
+}
+
+.session-saved-indicator {
+  color: var(--success);
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.session-saved-indicator.is-visible {
+  opacity: 1;
+}
+
+.session-log-entry {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-left: 3px solid var(--ink-muted);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.session-log-entry--note {
+  border-left-color: var(--ink-muted);
+}
+
+.session-log-entry--tasting {
+  border-left-color: var(--accent);
+}
+
+.session-log-entry--progress {
+  border-left-color: var(--success);
+}
+
+.session-log-entry--issue {
+  border-left-color: var(--warning);
+}
+
+@media (max-width: 960px) {
+  .session-metric-form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .session-pipeline-track,
+  .session-metric-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .session-step {
+    grid-template-columns: 1fr;
+  }
+
+  .session-step__checkbox {
+    width: 32px;
+    height: 32px;
+  }
+}
+
 /* Recipe card */
 .hobby-recipe-card {
   display: block;
@@ -4438,6 +4726,50 @@ html[data-ui-density="compact"] .resource-layout__aside {
 .hobby-recipe-card:hover {
   border-color: var(--accent);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.recipe-card__actions {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.shopping-list-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.shopping-list-row--deficit {
+  background-color: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.shopping-list-footer {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+.shopping-list-footer__value {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.advance-error {
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin-top: 4px;
+  transition: opacity 0.2s ease;
 }
 
 /* Journal entry card */

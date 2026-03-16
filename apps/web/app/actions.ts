@@ -68,6 +68,7 @@ import {
   addProjectAsset,
   updateProjectAsset,
   allocateProjectInventory,
+  advanceHobbySession,
   allocateSupplyFromInventory,
   applyPreset,
   archiveAsset,
@@ -98,6 +99,7 @@ import {
   createServiceProvider,
   deleteComment,
   deleteMetric,
+  deleteHobbySession,
   deleteProject,
   deleteProjectBudgetCategory,
   deleteProjectExpense,
@@ -725,6 +727,16 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
   if (projectId) {
     revalidatePath(`/projects/${projectId}?householdId=${householdId}`);
     revalidatePath(`/projects/${projectId}`);
+  }
+};
+
+const revalidateHobbySessionPaths = (hobbyId: string, sessionId?: string): void => {
+  revalidatePath("/");
+  revalidatePath("/hobbies");
+  revalidatePath(`/hobbies/${hobbyId}`);
+
+  if (sessionId) {
+    revalidatePath(`/hobbies/${hobbyId}/sessions/${sessionId}`);
   }
 };
 
@@ -2325,4 +2337,23 @@ export async function createHobbyAction(formData: FormData): Promise<void> {
 
   const hobby = await createHobby(householdId, input);
   redirect(`/hobbies/${hobby.id}`);
+}
+
+export async function advanceHobbySessionAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const sessionId = getRequiredString(formData, "sessionId");
+
+  await advanceHobbySession(householdId, hobbyId, sessionId);
+  revalidateHobbySessionPaths(hobbyId, sessionId);
+}
+
+export async function deleteHobbySessionAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const sessionId = getRequiredString(formData, "sessionId");
+
+  await deleteHobbySession(householdId, hobbyId, sessionId);
+  revalidateHobbySessionPaths(hobbyId);
+  redirect(`/hobbies/${hobbyId}?tab=sessions`);
 }
