@@ -1,35 +1,28 @@
 import { createInventoryTransactionSchema } from "@lifekeeper/types";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 import {
   applyInventoryTransaction,
   getHouseholdInventoryItem,
-  InventoryError,
+  InventoryError
+} from "../../lib/inventory.js";
+import {
   toInventoryItemSummaryResponse,
   toInventoryTransactionResponse
-} from "../../lib/inventory.js";
+} from "../../lib/serializers/index.js";
 
 const inventoryTransactionParamsSchema = z.object({
   householdId: z.string().cuid(),
   inventoryItemId: z.string().cuid()
 });
 
-const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/households/:householdId/inventory/:inventoryItemId/transactions", async (request, reply) => {
     const params = inventoryTransactionParamsSchema.parse(request.params);
     const input = createInventoryTransactionSchema.parse(request.body);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 

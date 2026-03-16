@@ -4,9 +4,9 @@ import {
   updateHobbyInputSchema,
   hobbyStatusSchema
 } from "@lifekeeper/types";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { syncHobbyToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { findHobbyPreset, hobbyPresetToDefinition, applyHobbyPreset } from "../../lib/hobby-presets.js";
@@ -27,15 +27,6 @@ const listHobbiesQuerySchema = z.object({
   cursor: z.string().optional()
 });
 
-const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/hobbies
   app.get("/v1/households/:householdId/hobbies", async (request, reply) => {
@@ -43,7 +34,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const query = listHobbiesQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -91,7 +82,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -136,7 +127,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -262,7 +253,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -306,7 +297,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -334,3 +325,4 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(204).send();
   });
 };
+

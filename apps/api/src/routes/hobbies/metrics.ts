@@ -3,9 +3,9 @@ import {
   updateHobbyMetricDefinitionInputSchema,
   createHobbyMetricReadingInputSchema
 } from "@lifekeeper/types";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -28,15 +28,6 @@ const listReadingsQuerySchema = z.object({
   cursor: z.string().optional()
 });
 
-const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/metrics";
 
@@ -45,7 +36,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -72,7 +63,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyMetricDefinitionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -111,7 +102,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyMetricDefinitionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -149,7 +140,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, metricId } = metricParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -171,7 +162,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const query = listReadingsQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -218,7 +209,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyMetricReadingInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -255,7 +246,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, metricId, readingId } = readingParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -275,3 +266,4 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(204).send();
   });
 };
+

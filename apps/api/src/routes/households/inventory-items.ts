@@ -5,14 +5,16 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 import {
   applyInventoryTransaction,
-  getHouseholdInventoryItem,
+  getHouseholdInventoryItem
+} from "../../lib/inventory.js";
+import {
   toInventoryItemDetailResponse,
   toInventoryItemSummaryResponse,
   toLowStockInventoryItemResponse
-} from "../../lib/inventory.js";
+} from "../../lib/serializers/index.js";
 import { calculateInventoryDeficit, isInventoryLowStock } from "@lifekeeper/utils";
 import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
@@ -37,21 +39,12 @@ const inventoryDetailQuerySchema = z.object({
   transactionLimit: z.coerce.number().int().min(1).max(100).default(20)
 });
 
-const ensureMembership = async (app: Parameters<FastifyPluginAsync>[0], householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/households/:householdId/inventory", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
     const input = createInventoryItemSchema.parse(request.body);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -107,7 +100,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const query = listInventoryQuerySchema.parse(request.query);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -154,7 +147,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/inventory/low-stock", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -178,7 +171,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const query = inventoryDetailQuerySchema.parse(request.query);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -230,7 +223,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const input = updateInventoryItemSchema.parse(request.body);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -260,7 +253,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           ...(input.supplierUrl !== undefined ? { supplierUrl: input.supplierUrl ?? null } : {}),
           ...(input.storageLocation !== undefined ? { storageLocation: input.storageLocation ?? null } : {}),
           ...(input.notes !== undefined ? { notes: input.notes ?? null } : {}),
-          ...(!quantityChanged && input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {})
+          ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {})
         }
       });
 
@@ -294,7 +287,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/inventory/:inventoryItemId", async (request, reply) => {
     const params = inventoryItemParamsSchema.parse(request.params);
 
-    if (!await ensureMembership(app, params.householdId, request.auth.userId)) {
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 

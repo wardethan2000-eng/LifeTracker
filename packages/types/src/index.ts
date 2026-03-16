@@ -981,27 +981,11 @@ export const inventoryProjectLinkDetailSchema = projectInventoryItemSchema.exten
 
 export const inventoryItemDetailSchema = inventoryItemSummarySchema.extend({
   transactions: z.array(inventoryTransactionSchema),
-  assets: z.array(z.object({
-    id: z.string().cuid(),
-    assetId: z.string().cuid(),
-    inventoryItemId: z.string().cuid(),
-    notes: z.string().nullable(),
-    recommendedQuantity: z.number().nullable(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
+  assets: z.array(assetInventoryItemSchema.extend({
     asset: shallowAssetSchema
   })),
-  projects: z.array(z.object({
-    id: z.string().cuid(),
-    projectId: z.string().cuid(),
-    inventoryItemId: z.string().cuid(),
-    quantityNeeded: z.number(),
-    quantityAllocated: z.number(),
-    budgetedUnitCost: z.number().nullable(),
-    notes: z.string().nullable(),
+  projects: z.array(projectInventoryItemSchema.extend({
     quantityRemaining: z.number(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
     project: z.object({
       id: z.string().cuid(),
       name: z.string()

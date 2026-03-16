@@ -3,9 +3,9 @@ import {
   updateHobbyLogInputSchema,
   hobbyLogTypeSchema
 } from "@lifekeeper/types";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 import { toLogResponse } from "../../lib/serializers/index.js";
 
 const hobbyParamsSchema = z.object({
@@ -26,15 +26,6 @@ const listLogsQuerySchema = z.object({
   cursor: z.string().optional()
 });
 
-const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/logs";
 
@@ -44,7 +35,7 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const query = listLogsQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -84,7 +75,7 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyLogInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -115,7 +106,7 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyLogInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -145,7 +136,7 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, logId } = logParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -161,3 +152,4 @@ export const hobbyLogRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(204).send();
   });
 };
+

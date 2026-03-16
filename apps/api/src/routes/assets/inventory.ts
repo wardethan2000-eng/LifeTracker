@@ -3,9 +3,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import {
-  getHouseholdInventoryItem,
-  toAssetInventoryLinkDetailResponse
+  getHouseholdInventoryItem
 } from "../../lib/inventory.js";
+import { toAssetInventoryLinkDetailResponse } from "../../lib/serializers/index.js";
 import { isInventoryLowStock } from "@lifekeeper/utils";
 
 const assetParamsSchema = z.object({

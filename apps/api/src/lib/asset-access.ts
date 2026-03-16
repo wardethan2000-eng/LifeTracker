@@ -52,6 +52,19 @@ export const assertMembership = async (
   }
 };
 
+export const checkMembership = async (
+  prisma: PrismaClient,
+  householdId: string,
+  userId: string
+): Promise<boolean> => {
+  try {
+    await assertMembership(prisma, householdId, userId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const getMembership = async (
   prisma: PrismaClient,
   householdId: string,

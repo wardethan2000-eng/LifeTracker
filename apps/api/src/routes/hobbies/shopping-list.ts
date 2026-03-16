@@ -1,21 +1,12 @@
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 
 const recipeParamsSchema = z.object({
   householdId: z.string().cuid(),
   hobbyId: z.string().cuid(),
   recipeId: z.string().cuid()
 });
-
-const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
   // GET .../recipes/:recipeId/shopping-list
@@ -25,7 +16,7 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
       const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
       const userId = request.auth.userId;
 
-      if (!await ensureMembership(app, householdId, userId)) {
+      if (!await checkMembership(app.prisma, householdId, userId)) {
         return reply.code(403).send({ message: "You do not have access to this household." });
       }
 
@@ -77,3 +68,4 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 };
+

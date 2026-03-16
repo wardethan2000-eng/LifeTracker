@@ -7,9 +7,9 @@ import {
   createHobbySessionStepInputSchema,
   updateHobbySessionStepInputSchema
 } from "@lifekeeper/types";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { applyInventoryTransaction } from "../../lib/inventory.js";
 import {
@@ -47,15 +47,6 @@ const reorderStepsBodySchema = z.object({
   stepIds: z.array(z.string().cuid())
 });
 
-const ensureMembership = async (app: FastifyInstance, householdId: string, userId: string) => {
-  try {
-    await assertMembership(app.prisma, householdId, userId);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/sessions";
 
@@ -65,7 +56,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const query = listSessionsQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -113,7 +104,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbySessionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -228,7 +219,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -304,7 +295,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbySessionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -376,7 +367,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -429,7 +420,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -460,7 +451,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbySessionIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -513,7 +504,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbySessionIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -567,7 +558,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, sessionId, ingredientId } = sessionIngredientParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -578,25 +569,28 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Ingredient not found" });
     }
 
-    await app.prisma.$transaction(async (tx) => {
-      await tx.hobbySessionIngredient.delete({ where: { id: ingredientId } });
+    if (existing.inventoryItemId) {
+      const inventoryItemId = existing.inventoryItemId;
 
-      // Return consumed quantity to inventory
-      if (existing.inventoryItemId) {
+      await app.prisma.$transaction(async (tx) => {
         await applyInventoryTransaction(tx, {
-          inventoryItemId: existing.inventoryItemId,
+          inventoryItemId,
           userId,
           input: {
-            type: "return",
+            type: "adjust",
             quantity: existing.quantityUsed,
             referenceType: "hobby_session",
             referenceId: sessionId,
-            notes: `Returned consumed quantity for removed hobby session ingredient`,
+            notes: "Session ingredient removed",
           },
           clampToZero: false,
         });
-      }
-    });
+
+        await tx.hobbySessionIngredient.delete({ where: { id: ingredientId } });
+      });
+    } else {
+      await app.prisma.hobbySessionIngredient.delete({ where: { id: ingredientId } });
+    }
 
     return reply.code(204).send();
   });
@@ -607,7 +601,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbySessionStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -644,7 +638,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbySessionStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -685,7 +679,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const { stepIds } = reorderStepsBodySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await ensureMembership(app, householdId, userId)) {
+    if (!await checkMembership(app.prisma, householdId, userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -708,3 +702,4 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     return reply.send({ success: true });
   });
 };
+

@@ -3,6 +3,7 @@ export * from "./attachments.js";
 export * from "./comments.js";
 export * from "./hobbies.js";
 export * from "./invitations.js";
+export * from "./inventory.js";
 export * from "./maintenance-logs.js";
 export * from "./notifications.js";
 export * from "./projects.js";

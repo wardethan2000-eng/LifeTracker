@@ -6,11 +6,14 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import {
+  applyInventoryTransaction,
   createMaintenanceLogPartWithInventory,
-  InventoryError,
-  toMaintenanceLogPartWithInventoryResponse
+  InventoryError
 } from "../../lib/inventory.js";
-import { toMaintenanceLogPartResponse } from "../../lib/serializers/index.js";
+import {
+  toMaintenanceLogPartResponse,
+  toMaintenanceLogPartWithInventoryResponse
+} from "../../lib/serializers/index.js";
 
 const logParamsSchema = z.object({
   assetId: z.string().cuid(),
@@ -126,20 +129,108 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const part = await app.prisma.maintenanceLogPart.update({
-      where: { id: existing.id },
-      data: {
-        ...(input.inventoryItemId !== undefined ? { inventoryItemId: input.inventoryItemId ?? null } : {}),
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.partNumber !== undefined ? { partNumber: input.partNumber ?? null } : {}),
-        ...(input.quantity !== undefined ? { quantity: input.quantity } : {}),
-        ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {}),
-        ...(input.supplier !== undefined ? { supplier: input.supplier ?? null } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes ?? null } : {})
-      }
-    });
+    const nextInventoryItemId = input.inventoryItemId !== undefined ? input.inventoryItemId ?? null : existing.inventoryItemId;
+    const nextQuantity = input.quantity ?? existing.quantity;
 
-    return toMaintenanceLogPartResponse(part);
+    try {
+      const part = await app.prisma.$transaction(async (tx) => {
+        const updated = await tx.maintenanceLogPart.update({
+          where: { id: existing.id },
+          data: {
+            ...(input.inventoryItemId !== undefined ? { inventoryItemId: input.inventoryItemId ?? null } : {}),
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.partNumber !== undefined ? { partNumber: input.partNumber ?? null } : {}),
+            ...(input.quantity !== undefined ? { quantity: input.quantity } : {}),
+            ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {}),
+            ...(input.supplier !== undefined ? { supplier: input.supplier ?? null } : {}),
+            ...(input.notes !== undefined ? { notes: input.notes ?? null } : {})
+          }
+        });
+
+        if (existing.inventoryItemId && nextInventoryItemId && existing.inventoryItemId !== nextInventoryItemId) {
+          await applyInventoryTransaction(tx, {
+            inventoryItemId: existing.inventoryItemId,
+            userId: request.auth.userId,
+            input: {
+              type: "adjust",
+              quantity: existing.quantity,
+              referenceType: "maintenance_log",
+              referenceId: params.logId,
+              notes: "Part reassigned to different inventory item"
+            },
+            clampToZero: false,
+          });
+
+          await applyInventoryTransaction(tx, {
+            inventoryItemId: nextInventoryItemId,
+            userId: request.auth.userId,
+            input: {
+              type: "consume",
+              quantity: -nextQuantity,
+              referenceType: "maintenance_log",
+              referenceId: params.logId,
+              notes: "Part linked from maintenance log"
+            },
+            preventNegative: false,
+            clampToZero: true,
+          });
+        } else if (existing.inventoryItemId && nextInventoryItemId === null) {
+          await applyInventoryTransaction(tx, {
+            inventoryItemId: existing.inventoryItemId,
+            userId: request.auth.userId,
+            input: {
+              type: "adjust",
+              quantity: existing.quantity,
+              referenceType: "maintenance_log",
+              referenceId: params.logId,
+              notes: "Part reassigned to different inventory item"
+            },
+            clampToZero: false,
+          });
+        } else if (!existing.inventoryItemId && nextInventoryItemId) {
+          await applyInventoryTransaction(tx, {
+            inventoryItemId: nextInventoryItemId,
+            userId: request.auth.userId,
+            input: {
+              type: "consume",
+              quantity: -nextQuantity,
+              referenceType: "maintenance_log",
+              referenceId: params.logId,
+              notes: "Part linked from maintenance log"
+            },
+            preventNegative: false,
+            clampToZero: true,
+          });
+        } else {
+          const delta = existing.quantity - nextQuantity;
+
+          if (delta !== 0 && nextInventoryItemId) {
+            await applyInventoryTransaction(tx, {
+              inventoryItemId: nextInventoryItemId,
+              userId: request.auth.userId,
+              input: {
+                type: "adjust",
+                quantity: delta,
+                referenceType: "maintenance_log",
+                referenceId: params.logId,
+                notes: "Part quantity adjustment"
+              },
+              clampToZero: true,
+            });
+          }
+        }
+
+        return updated;
+      });
+
+      return toMaintenanceLogPartResponse(part);
+    } catch (error) {
+      if (error instanceof InventoryError && error.code === "INVENTORY_ITEM_NOT_FOUND") {
+        return reply.code(400).send({ message: error.message });
+      }
+
+      throw error;
+    }
   });
 
   app.delete("/v1/assets/:assetId/logs/:logId/parts/:partId", async (request, reply) => {
@@ -167,7 +258,36 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Part not found." });
     }
 
-    await app.prisma.maintenanceLogPart.delete({ where: { id: part.id } });
+    try {
+      if (part.inventoryItemId) {
+        const inventoryItemId = part.inventoryItemId;
+
+        await app.prisma.$transaction(async (tx) => {
+          await applyInventoryTransaction(tx, {
+            inventoryItemId,
+            userId: request.auth.userId,
+            input: {
+              type: "adjust",
+              quantity: part.quantity,
+              referenceType: "maintenance_log",
+              referenceId: params.logId,
+              notes: "Part removed from maintenance log"
+            },
+            clampToZero: false,
+          });
+
+          await tx.maintenanceLogPart.delete({ where: { id: part.id } });
+        });
+      } else {
+        await app.prisma.maintenanceLogPart.delete({ where: { id: part.id } });
+      }
+    } catch (error) {
+      if (error instanceof InventoryError && error.code === "INVENTORY_ITEM_NOT_FOUND") {
+        return reply.code(400).send({ message: error.message });
+      }
+
+      throw error;
+    }
 
     return reply.code(204).send();
   });
