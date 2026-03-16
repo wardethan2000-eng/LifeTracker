@@ -113,6 +113,12 @@ const isCountableCycle = (cycle: CompletionCycleRecord): cycle is CompletionCycl
   deltaInDays: number;
 } => cycle.dueDate !== null && cycle.completedAt !== null && cycle.deltaInDays !== null;
 
+const isLateCycle = (cycle: CompletionCycleRecord): cycle is CompletionCycleRecord & {
+  dueDate: string;
+  completedAt: string;
+  deltaInDays: number;
+} => isCountableCycle(cycle) && cycle.deltaInDays > 0;
+
 const summarizeCycles = (cycles: CompletionCycleRecord[]): ComplianceSummary => {
   const eligibleCycles = cycles.filter(isCountableCycle);
   const onTimeCount = eligibleCycles.filter((cycle) => cycle.deltaInDays <= 0).length;
@@ -157,7 +163,7 @@ const filterReportCyclesInRange = (
   return (!startDate || effectiveDate >= startDate) && (!endDate || effectiveDate <= endDate);
 });
 
-const getAccessibleScheduleWhere = (query: { householdId: string; assetId?: string }, userId: string): Prisma.MaintenanceScheduleWhereInput => ({
+const getAccessibleScheduleWhere = (query: { householdId: string; assetId?: string | undefined }, userId: string): Prisma.MaintenanceScheduleWhereInput => ({
   isActive: true,
   ...(query.assetId ? { assetId: query.assetId } : {}),
   asset: {
@@ -358,7 +364,7 @@ export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       end
     );
     const monthKeys = getMonthRange(start, end);
-    const lateCycles = cycles.filter((cycle) => isCountableCycle(cycle) && cycle.deltaInDays > 0);
+    const lateCycles = cycles.filter(isLateCycle);
     const allCompletedByMonth = cycles.reduce<Map<string, number>>((map, cycle) => {
       if (!cycle.completedAt) {
         return map;

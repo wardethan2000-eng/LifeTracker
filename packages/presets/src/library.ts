@@ -31,12 +31,13 @@ const notification = (overrides: Partial<NotificationConfig> = {}): Notification
 });
 
 const schedule = (
-  input: Omit<PresetScheduleTemplate, "notificationConfig" | "tags"> & Partial<Pick<PresetScheduleTemplate, "notificationConfig" | "tags">>
+  input: Omit<PresetScheduleTemplate, "notificationConfig" | "tags" | "isRegulatory"> & Partial<Pick<PresetScheduleTemplate, "notificationConfig" | "tags" | "isRegulatory">>
 ): PresetScheduleTemplate => {
   const notificationConfig = input.notificationConfig ? notification(input.notificationConfig) : notification();
   const tags = input.tags ? [...input.tags] : [];
 
   return {
+    isRegulatory: false,
     ...input,
     notificationConfig,
     tags

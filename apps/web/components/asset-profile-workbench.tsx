@@ -794,6 +794,7 @@ const createScheduleDraft = (existingKeys: string[]): ScheduleTemplateDraft => (
   name: "New Schedule",
   description: undefined,
   triggerTemplate: createTriggerTemplate("interval"),
+  isRegulatory: false,
   notificationConfig: {
     channels: ["push"],
     sendAtDue: true,
@@ -860,6 +861,7 @@ const toPresetScheduleTemplate = (draft: ScheduleTemplateDraft): PresetScheduleT
   name: draft.name,
   description: draft.description,
   triggerTemplate: draft.triggerTemplate,
+  isRegulatory: draft.isRegulatory,
   notificationConfig: draft.notificationConfig,
   tags: draft.tags,
   quickLogLabel: draft.quickLogLabel
