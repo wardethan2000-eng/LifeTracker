@@ -57,7 +57,7 @@ import {
   getMe,
   getProjectDetail,
   getProjectNotes,
-  getProjectPhaseDetail,
+  getProjectPhaseDetails,
   getProjectShoppingList
 } from "../../../lib/api";
 import { formatCurrency, formatDate } from "../../../lib/formatters";
@@ -143,7 +143,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       getProjectBudgetAnalysis(household.id, routeParams.projectId).catch(() => null)
     ]);
 
-    const phaseDetails = await Promise.all(project.phases.map((phase) => getProjectPhaseDetail(household.id, project.id, phase.id)));
+    const phaseDetails = await getProjectPhaseDetails(household.id, project.id);
     const shoppingList = await getProjectShoppingList(household.id, project.id);
     const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
     const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));

@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
 import { ProjectProgressBar } from "../../components/project-progress-bar";
-import { ApiError, getHouseholdProjects, getMe, getProjectInventory } from "../../lib/api";
+import { ApiError, getHouseholdProjects, getMe, getProjectInventoryRollups } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/formatters";
 
 type ProjectsPageProps = {
@@ -238,24 +238,16 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       ? statusScopedProjects
       : statusScopedProjects.filter((project) => project.depth === 0);
     const filteredProjects = depthFilteredProjects.filter((project) => matchesProjectSearch(project, searchQuery));
-    const inventoryEntries = await Promise.all(
-      filteredProjects.map(async (project) => ({
-        projectId: project.id,
-        inventory: await getProjectInventory(household.id, project.id)
-      }))
-    );
-
-    const inventoryByProject = new Map(inventoryEntries.map((entry) => [entry.projectId, entry.inventory]));
+    const inventoryRollups = await getProjectInventoryRollups(household.id);
+    const inventoryByProject = new Map(inventoryRollups.map((rollup) => [rollup.projectId, rollup]));
     const now = Date.now();
     const portfolioProjects = sortProjects(filteredProjects.map((project) => {
-      const inventoryItems = inventoryByProject.get(project.id) ?? [];
-      const totalInventoryNeeded = inventoryItems.reduce((sum, item) => sum + item.quantityNeeded, 0);
-      const totalInventoryAllocated = inventoryItems.reduce((sum, item) => sum + item.quantityAllocated, 0);
-      const totalInventoryRemaining = inventoryItems.reduce((sum, item) => sum + item.quantityRemaining, 0);
-      const plannedInventoryCost = inventoryItems.reduce((sum, item) => {
-        const unitCost = item.budgetedUnitCost ?? item.inventoryItem.unitCost ?? 0;
-        return sum + (unitCost * item.quantityNeeded);
-      }, 0);
+      const inventoryRollup = inventoryByProject.get(project.id);
+      const inventoryLineCount = inventoryRollup?.inventoryLineCount ?? 0;
+      const totalInventoryNeeded = inventoryRollup?.totalInventoryNeeded ?? 0;
+      const totalInventoryAllocated = inventoryRollup?.totalInventoryAllocated ?? 0;
+      const totalInventoryRemaining = inventoryRollup?.totalInventoryRemaining ?? 0;
+      const plannedInventoryCost = inventoryRollup?.plannedInventoryCost ?? 0;
       const committedCost = project.totalSpent + plannedInventoryCost;
       const budgetRatio = project.totalBudgeted && project.totalBudgeted > 0
         ? committedCost / project.totalBudgeted
@@ -275,7 +267,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
 
       return {
         ...project,
-        inventoryLineCount: inventoryItems.length,
+        inventoryLineCount,
         totalInventoryNeeded,
         totalInventoryAllocated,
         totalInventoryRemaining,

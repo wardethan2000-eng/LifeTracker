@@ -2,14 +2,17 @@
 
 import type { ReactElement } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { chartColors } from "../../lib/chart-theme";
+import { chartColors, formatCurrencyTick, formatDateTick, formatMonthTick, formatPercentTick } from "../../lib/chart-theme";
+
+type ChartStringFormatterKey = "date" | "month";
+type ChartNumberFormatterKey = "currency" | "percent";
 
 export type LkBarChartProps = {
   data: Array<Record<string, unknown>>;
   xKey: string;
   bars: Array<{ dataKey: string; label: string; color?: string; stackId?: string; colorKey?: string }>;
-  xTickFormatter?: (value: string) => string;
-  yTickFormatter?: (value: number) => string;
+  xTickFormatter?: ((value: string) => string) | ChartStringFormatterKey;
+  yTickFormatter?: ((value: number) => string) | ChartNumberFormatterKey;
   height?: number;
   layout?: "horizontal" | "vertical";
   emptyMessage?: string;
@@ -17,6 +20,29 @@ export type LkBarChartProps = {
 
 const toNumber = (value: unknown): number => typeof value === "number" ? value : Number(value ?? 0);
 const getSeriesColor = (index: number): string => chartColors.series[index % chartColors.series.length] ?? chartColors.primary;
+const resolveStringFormatter = (formatter: LkBarChartProps["xTickFormatter"]): ((value: string) => string) | undefined => {
+  if (!formatter) {
+    return undefined;
+  }
+
+  if (typeof formatter === "function") {
+    return formatter;
+  }
+
+  return formatter === "month" ? formatMonthTick : formatDateTick;
+};
+
+const resolveNumberFormatter = (formatter: LkBarChartProps["yTickFormatter"]): ((value: number) => string) | undefined => {
+  if (!formatter) {
+    return undefined;
+  }
+
+  if (typeof formatter === "function") {
+    return formatter;
+  }
+
+  return formatter === "percent" ? formatPercentTick : formatCurrencyTick;
+};
 
 export function LkBarChart({
   data,
@@ -28,6 +54,9 @@ export function LkBarChart({
   layout = "horizontal",
   emptyMessage = "No data available"
 }: LkBarChartProps): ReactElement {
+  const resolvedXTickFormatter = resolveStringFormatter(xTickFormatter);
+  const resolvedYTickFormatter = resolveNumberFormatter(yTickFormatter);
+
   if (data.length === 0) {
     return (
       <div className="lk-chart-container lk-chart-container--empty">
@@ -43,16 +72,16 @@ export function LkBarChart({
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
           {layout === "vertical" ? (
             <>
-              <XAxis type="number" {...(yTickFormatter ? { tickFormatter: yTickFormatter } : {})} tick={{ fill: chartColors.muted, fontSize: 12 }} />
-              <YAxis type="category" dataKey={xKey} {...(xTickFormatter ? { tickFormatter: xTickFormatter } : {})} width={160} tick={{ fill: chartColors.muted, fontSize: 12 }} />
+              <XAxis type="number" {...(resolvedYTickFormatter ? { tickFormatter: resolvedYTickFormatter } : {})} tick={{ fill: chartColors.muted, fontSize: 12 }} />
+              <YAxis type="category" dataKey={xKey} {...(resolvedXTickFormatter ? { tickFormatter: resolvedXTickFormatter } : {})} width={160} tick={{ fill: chartColors.muted, fontSize: 12 }} />
             </>
           ) : (
             <>
-              <XAxis dataKey={xKey} {...(xTickFormatter ? { tickFormatter: xTickFormatter } : {})} tick={{ fill: chartColors.muted, fontSize: 12 }} />
-              <YAxis {...(yTickFormatter ? { tickFormatter: yTickFormatter } : {})} tick={{ fill: chartColors.muted, fontSize: 12 }} />
+              <XAxis dataKey={xKey} {...(resolvedXTickFormatter ? { tickFormatter: resolvedXTickFormatter } : {})} tick={{ fill: chartColors.muted, fontSize: 12 }} />
+              <YAxis {...(resolvedYTickFormatter ? { tickFormatter: resolvedYTickFormatter } : {})} tick={{ fill: chartColors.muted, fontSize: 12 }} />
             </>
           )}
-          <Tooltip {...(yTickFormatter ? { formatter: (value: unknown) => yTickFormatter(toNumber(value)) } : {})} />
+          <Tooltip {...(resolvedYTickFormatter ? { formatter: (value: unknown) => resolvedYTickFormatter(toNumber(value)) } : {})} />
           <Legend verticalAlign="bottom" />
           {bars.map((bar, index) => {
             const defaultColor = bar.color ?? getSeriesColor(index);

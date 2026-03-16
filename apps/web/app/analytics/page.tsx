@@ -6,7 +6,7 @@ import { InventoryAnalyticsCommonality } from "../../components/inventory-analyt
 import { InventoryAnalyticsReorder } from "../../components/inventory-analytics-reorder";
 import { InventoryAnalyticsSummary } from "../../components/inventory-analytics-summary";
 import { InventoryAnalyticsTurnover } from "../../components/inventory-analytics-turnover";
-import { LkBarChart, LkDonutChart, LkLineChart, formatCurrencyTick, formatMonthTick } from "../../components/charts";
+import { LkBarChart, LkDonutChart, LkLineChart } from "../../components/charts";
 import {
   getAssetDetail,
   getEnhancedProjections,
@@ -253,8 +253,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               <LkLineChart
                 data={(costDashboard?.spendByMonth ?? []).map((entry) => ({ month: entry.month, totalCost: entry.totalCost }))}
                 xKey="month"
-                xTickFormatter={formatMonthTick}
-                yTickFormatter={formatCurrencyTick}
+                xTickFormatter="month"
+                yTickFormatter="currency"
                 lines={[{ dataKey: "totalCost", label: "Spend" }]}
                 emptyMessage="No monthly spend trend is available yet."
               />
@@ -275,7 +275,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 }))}
                 xKey="assetName"
                 bars={[{ dataKey: "totalCost", label: "Spend" }]}
-                yTickFormatter={formatCurrencyTick}
+                yTickFormatter="currency"
                 emptyMessage="No asset spend data is available yet."
                 height={280}
               />
@@ -294,7 +294,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 }))}
                 xKey="providerName"
                 bars={[{ dataKey: "totalCombinedCost", label: "Spend" }]}
-                yTickFormatter={formatCurrencyTick}
+                yTickFormatter="currency"
                 emptyMessage="No service provider spend data is available yet."
                 height={280}
               />
@@ -314,7 +314,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               }))}
               xKey="assetName"
               bars={[{ dataKey: "cost12m", label: "12-Month Forecast" }]}
-              yTickFormatter={formatCurrencyTick}
+              yTickFormatter="currency"
               emptyMessage="No forecast data is available yet."
               height={280}
             />
@@ -428,8 +428,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               <LkLineChart
                 data={trendData}
                 xKey="month"
-                xTickFormatter={formatMonthTick}
-                yTickFormatter={(value) => `${value}%`}
+                xTickFormatter="month"
+                yTickFormatter="percent"
                 lines={[{ dataKey: "onTimeRatePercent", label: "On-Time Rate" }]}
                 emptyMessage="No compliance history is available yet."
               />
@@ -448,7 +448,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   { dataKey: "lateCompletions", label: "Late Completions" },
                   { dataKey: "overdueAtEndOfMonth", label: "Overdue at Month End", color: "#c84d4d" }
                 ]}
-                xTickFormatter={formatMonthTick}
+                xTickFormatter="month"
                 emptyMessage="No late-completion data is available yet."
               />
             </div>
@@ -465,7 +465,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 data={categoryData}
                 xKey="categoryLabel"
                 bars={[{ dataKey: "onTimeRatePercent", label: "On-Time Rate", colorKey: "fill" }]}
-                yTickFormatter={(value) => `${value}%`}
+                yTickFormatter="percent"
                 emptyMessage="No category compliance data is available yet."
                 height={280}
               />
@@ -484,7 +484,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 }))}
                 xKey="displayName"
                 bars={[{ dataKey: "onTimeRatePercent", label: "On-Time Rate" }]}
-                yTickFormatter={(value) => `${value}%`}
+                yTickFormatter="percent"
                 emptyMessage="No member compliance data is available yet."
                 height={280}
               />

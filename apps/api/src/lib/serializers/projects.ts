@@ -2,8 +2,10 @@ import {
   projectAssetSchema,
   projectBudgetCategorySummarySchema,
   projectExpenseSchema,
+  projectInventoryRollupSchema,
   projectNoteSchema,
   projectPhaseChecklistItemSchema,
+  projectPhaseDetailSchema,
   projectPhaseSchema,
   projectPhaseSummarySchema,
   projectPhaseSupplySchema,
@@ -269,6 +271,121 @@ export const toProjectPhaseSummaryResponse = (phase: {
   procuredSupplyCount: phase.supplies.filter((supply) => supply.isProcured).length,
   expenseTotal: phase.expenses.reduce((sum, expense) => sum + expense.amount, 0)
 });
+
+export const toProjectPhaseDetailResponse = (phase: {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  sortOrder: number | null;
+  startDate: Date | null;
+  targetEndDate: Date | null;
+  actualEndDate: Date | null;
+  budgetAmount: number | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  tasks: Array<{
+    id: string;
+    projectId: string;
+    phaseId: string | null;
+    title: string;
+    description: string | null;
+    status: string;
+    taskType?: string | null;
+    isCompleted?: boolean | null;
+    assignedToId: string | null;
+    dueDate: Date | null;
+    completedAt: Date | null;
+    estimatedCost: number | null;
+    actualCost: number | null;
+    sortOrder: number | null;
+    scheduleId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    assignedTo?: { id: string; displayName: string | null } | null;
+    checklistItems?: Array<{
+      id: string;
+      taskId: string;
+      title: string;
+      isCompleted: boolean;
+      completedAt: Date | null;
+      sortOrder: number | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+  }>;
+  checklistItems: Array<{
+    id: string;
+    phaseId: string;
+    title: string;
+    isCompleted: boolean;
+    completedAt: Date | null;
+    sortOrder: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  supplies: Array<{
+    id: string;
+    phaseId: string;
+    name: string;
+    description: string | null;
+    quantityNeeded: number;
+    quantityOnHand: number;
+    unit: string;
+    estimatedUnitCost: number | null;
+    actualUnitCost: number | null;
+    supplier: string | null;
+    supplierUrl: string | null;
+    isProcured: boolean;
+    procuredAt: Date | null;
+    isStaged: boolean;
+    stagedAt: Date | null;
+    inventoryItemId: string | null;
+    notes: string | null;
+    sortOrder: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+    inventoryItem?: {
+      id: string;
+      name: string;
+      quantityOnHand: number;
+      unit: string;
+      unitCost: number | null;
+    } | null;
+  }>;
+  expenses: Array<{
+    id: string;
+    projectId: string;
+    phaseId: string | null;
+    budgetCategoryId: string | null;
+    description: string;
+    amount: number;
+    category: string | null;
+    date: Date | null;
+    taskId: string | null;
+    serviceProviderId: string | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+}) => projectPhaseDetailSchema.parse({
+  ...toProjectPhaseSummaryResponse(phase),
+  tasks: phase.tasks.map(toProjectTaskResponse),
+  checklistItems: phase.checklistItems.map(toProjectPhaseChecklistItemResponse),
+  supplies: phase.supplies.map(toProjectPhaseSupplyResponse),
+  expenses: phase.expenses.map(toProjectExpenseResponse)
+});
+
+export const toProjectInventoryRollupResponse = (rollup: {
+  projectId: string;
+  inventoryLineCount: number;
+  totalInventoryNeeded: number;
+  totalInventoryAllocated: number;
+  totalInventoryRemaining: number;
+  plannedInventoryCost: number;
+}) => projectInventoryRollupSchema.parse(rollup);
 
 export const toProjectPhaseSupplyResponse = (supply: {
   id: string;

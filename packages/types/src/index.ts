@@ -1976,6 +1976,15 @@ export const projectPhaseDetailSchema = projectPhaseSummarySchema.extend({
   expenses: z.array(projectExpenseSchema)
 });
 
+export const projectInventoryRollupSchema = z.object({
+  projectId: z.string().cuid(),
+  inventoryLineCount: z.number().int().min(0),
+  totalInventoryNeeded: z.number().min(0),
+  totalInventoryAllocated: z.number().min(0),
+  totalInventoryRemaining: z.number().min(0),
+  plannedInventoryCost: z.number().min(0)
+});
+
 export const projectSummarySchema = projectSchema.extend({
   totalBudgeted: z.number().nullable(),
   totalSpent: z.number(),
@@ -2000,10 +2009,12 @@ export const projectDetailSchema = projectSchema.extend({
 });
 
 export const projectPhaseListSchema = z.array(projectPhaseSummarySchema);
+export const projectPhaseDetailListSchema = z.array(projectPhaseDetailSchema);
 export const projectPhaseChecklistItemListSchema = z.array(projectPhaseChecklistItemSchema);
 export const projectTaskChecklistItemListSchema = z.array(projectTaskChecklistItemSchema);
 export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySummarySchema);
 export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
+export const projectInventoryRollupListSchema = z.array(projectInventoryRollupSchema);
 
 export const projectShoppingListItemSchema = z.object({
   id: z.string().cuid(),
@@ -2569,6 +2580,7 @@ export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
 export type ProjectPhaseSummary = z.infer<typeof projectPhaseSummarySchema>;
 export type ProjectPhaseProgress = z.infer<typeof projectPhaseProgressSchema>;
 export type ProjectPhaseDetail = z.infer<typeof projectPhaseDetailSchema>;
+export type ProjectInventoryRollup = z.infer<typeof projectInventoryRollupSchema>;
 export type CreateProjectPhaseInput = z.infer<typeof createProjectPhaseSchema>;
 export type UpdateProjectPhaseInput = z.infer<typeof updateProjectPhaseSchema>;
 export type ReorderProjectPhasesInput = z.infer<typeof reorderProjectPhasesSchema>;

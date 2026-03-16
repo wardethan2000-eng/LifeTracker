@@ -57,9 +57,11 @@ import {
   projectNoteListSchema,
   projectPhaseChecklistItemSchema,
   projectPhaseDetailSchema,
+  projectPhaseDetailListSchema,
   projectPhaseListSchema,
   projectPhaseSupplyListSchema,
   projectPhaseSupplySchema,
+  projectInventoryRollupListSchema,
   projectShoppingListSchema,
   projectSchema,
   reorderProjectPhasesSchema,
@@ -160,6 +162,7 @@ import {
   type Project,
   type ProjectDetail,
   type ProjectExpense,
+  type ProjectInventoryRollup,
   type ProjectPhaseDetail,
   type ProjectPhaseSupply,
   type ProjectPhaseSummary,
@@ -1018,6 +1021,15 @@ export const getProjectPhaseDetail = async (
   schema: projectPhaseDetailSchema
 });
 
+export const getProjectPhaseDetails = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectPhaseDetail[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/details`,
+  schema: projectPhaseDetailListSchema,
+  cachePolicy: { next: { revalidate: 15 } }
+});
+
 export const getProjectBudgetCategories = async (
   householdId: string,
   projectId: string
@@ -1041,6 +1053,14 @@ export const getProjectInventory = async (
 ): Promise<InventoryProjectLinkDetail[]> => apiRequest({
   path: `/v1/households/${householdId}/projects/${projectId}/inventory`,
   schema: projectInventoryListSchema
+});
+
+export const getProjectInventoryRollups = async (
+  householdId: string
+): Promise<ProjectInventoryRollup[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/inventory-rollups`,
+  schema: projectInventoryRollupListSchema,
+  cachePolicy: { next: { revalidate: 30 } }
 });
 
 export const getProjectShoppingList = async (

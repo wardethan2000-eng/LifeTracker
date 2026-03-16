@@ -15,7 +15,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { assertMembership, checkMembership, ForbiddenError } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
@@ -27,6 +27,7 @@ import {
   toInventoryTransactionResponse,
   toProjectBudgetCategoryResponse,
   toProjectExpenseResponse,
+  toProjectPhaseDetailResponse,
   toProjectPhaseChecklistItemResponse,
   toProjectPhaseSummaryResponse,
   toProjectPhaseSupplyResponse,
@@ -82,6 +83,26 @@ const getNextSortOrder = async (
   const result = await getMax();
   return (result._max.sortOrder ?? -1) + 1;
 };
+
+const projectPhaseDetailInclude = {
+  tasks: {
+    include: {
+      assignedTo: { select: { id: true, displayName: true } },
+      checklistItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }
+    },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+  },
+  checklistItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+  supplies: {
+    include: {
+      inventoryItem: {
+        select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
+      }
+    },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+  },
+  expenses: { orderBy: { createdAt: "desc" } }
+} satisfies Prisma.ProjectPhaseInclude;
 
 export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/phases", async (request, reply) => {
@@ -179,38 +200,42 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
 
     const phase = await app.prisma.projectPhase.findFirst({
       where: { id: params.phaseId, projectId: project.id },
-      include: {
-        tasks: {
-          include: {
-            assignedTo: { select: { id: true, displayName: true } },
-            checklistItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }
-          },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-        },
-        checklistItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-        supplies: {
-          include: {
-            inventoryItem: {
-              select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-            }
-          },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-        },
-        expenses: { orderBy: { createdAt: "desc" } }
-      }
+      include: projectPhaseDetailInclude
     });
 
     if (!phase) {
       return reply.code(404).send({ message: "Project phase not found." });
     }
 
-    return {
-      ...toProjectPhaseSummaryResponse(phase),
-      tasks: phase.tasks.map(toProjectTaskResponse),
-      checklistItems: phase.checklistItems.map(toProjectPhaseChecklistItemResponse),
-      supplies: phase.supplies.map(toProjectPhaseSupplyResponse),
-      expenses: phase.expenses.map(toProjectExpenseResponse)
-    };
+    return toProjectPhaseDetailResponse(phase);
+  });
+
+  app.get("/v1/households/:householdId/projects/:projectId/phases/details", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch (error) {
+      if (error instanceof ForbiddenError) {
+        return reply.code(403).send({ message: "You do not have access to this household." });
+      }
+
+      throw error;
+    }
+
+    const project = await getProject(app, params.householdId, params.projectId);
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    const phases = await app.prisma.projectPhase.findMany({
+      where: { projectId: project.id },
+      include: projectPhaseDetailInclude,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    });
+
+    return phases.map(toProjectPhaseDetailResponse);
   });
 
   app.patch("/v1/households/:householdId/projects/:projectId/phases/:phaseId", async (request, reply) => {

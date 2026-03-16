@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { LkBarChart, LkDonutChart, LkLineChart, formatCurrencyTick, formatMonthTick } from "./charts";
+import { LkBarChart, LkDonutChart, LkLineChart } from "./charts";
 import { getInventoryAnalyticsSummary } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 
@@ -85,8 +85,8 @@ export async function InventoryAnalyticsSummary({ householdId }: InventoryAnalyt
               transactionCount: entry.transactionCount
             }))}
             xKey="month"
-            xTickFormatter={formatMonthTick}
-            yTickFormatter={formatCurrencyTick}
+            xTickFormatter="month"
+            yTickFormatter="currency"
             lines={[{ dataKey: "totalSpent", label: "Monthly Spend" }]}
             emptyMessage="No monthly inventory spending is available yet."
           />

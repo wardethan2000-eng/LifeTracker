@@ -62,7 +62,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
                       <th>Asset</th>
                       <th>Category</th>
                       <th>Visibility</th>
-                      <th>State</th>
+                      <th>Status</th>
                       <th>Manufacturer</th>
                       <th>Model</th>
                       <th>Created</th>
@@ -79,7 +79,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
                         </td>
                         <td><span className="pill">{formatCategoryLabel(item.category)}</span></td>
                         <td><span className="pill">{formatVisibilityLabel(item.visibility)}</span></td>
-                        <td>{item.state}</td>
+                        <td>{item.isArchived ? "Archived" : "Active"}</td>
                         <td>{item.manufacturer ?? "—"}</td>
                         <td>{item.model ?? "—"}</td>
                         <td>{formatDate(item.createdAt)}</td>
