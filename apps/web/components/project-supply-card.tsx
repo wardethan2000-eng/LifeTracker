@@ -1,3 +1,5 @@
+"use client";
+
 import type { InventoryItemSummary, ProjectPhaseSupply } from "@lifekeeper/types";
 import {
   allocateSupplyFromInventoryAction,

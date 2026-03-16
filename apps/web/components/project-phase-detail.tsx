@@ -1,3 +1,5 @@
+"use client";
+
 import type {
   HouseholdMember,
   InventoryItemSummary,
@@ -29,6 +31,12 @@ import { ProjectChecklist } from "./project-checklist";
 import { ProjectSupplyCard } from "./project-supply-card";
 import { ProjectSupplyCreateForm } from "./project-supply-create-form";
 import { AttachmentSection } from "./attachment-section";
+import {
+  SectionFilterBar,
+  SectionFilterChildren,
+  SectionFilterProvider,
+  SectionFilterToggle
+} from "./section-filter";
 
 const taskStatusOptions = ["pending", "in_progress", "completed", "skipped"] as const;
 const taskStatusLabels: Record<(typeof taskStatusOptions)[number], string> = {
@@ -151,102 +159,128 @@ export function ProjectPhaseDetail({
         </div>
       </section>
 
-      <section className="panel detail-tile">
-        <div className="panel__header">
-          <h2>Phase Tasks ({phase.tasks.length})</h2>
-        </div>
-        <div className="panel__body">
-          {phase.tasks.length === 0 ? <p className="panel__empty">No tasks assigned to this phase yet.</p> : null}
-          <div className="schedule-stack">
-            {phase.tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                householdId={householdId}
-                projectId={projectId}
-                phaseId={phase.id}
-                task={task}
-                householdMembers={householdMembers}
-              />
-            ))}
+      <SectionFilterProvider items={phase.tasks} keys={["title", "description"]} placeholder="Filter phase tasks by title or description">
+        <section className="panel detail-tile">
+          <div className="panel__header">
+            <h2>Phase Tasks ({phase.tasks.length})</h2>
+            <div className="panel__header-actions">
+              <SectionFilterToggle />
+            </div>
           </div>
-
-          <div className="panel__body--padded">
-            <form action={createProjectTaskAction}>
-              <input type="hidden" name="householdId" value={householdId} />
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name="phaseId" value={phase.id} />
-              <div className="form-grid">
-                <label className="field field--full">
-                  <span>Task Title</span>
-                  <input name="title" placeholder="Add task to this phase" required />
-                </label>
-                <label className="field field--full">
-                  <span>Description</span>
-                  <textarea name="description" rows={2} placeholder="Scope, definition of done, or sequencing notes" />
-                </label>
-                <label className="field">
-                  <span>Status</span>
-                  <select name="status" defaultValue="pending">
-                    {taskStatusOptions.map((status) => (
-                      <option key={status} value={status}>{taskStatusLabels[status]}</option>
+          <SectionFilterBar />
+          <div className="panel__body">
+            <SectionFilterChildren<ProjectTask>>
+              {(filteredTasks) => (
+                <>
+                  {phase.tasks.length === 0 ? <p className="panel__empty">No tasks assigned to this phase yet.</p> : null}
+                  {phase.tasks.length > 0 && filteredTasks.length === 0 ? <p className="panel__empty">No phase tasks match that search.</p> : null}
+                  <div className="schedule-stack">
+                    {filteredTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        householdId={householdId}
+                        projectId={projectId}
+                        phaseId={phase.id}
+                        task={task}
+                        householdMembers={householdMembers}
+                      />
                     ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Assignee</span>
-                  <select name="assignedToId" defaultValue="">
-                    <option value="">Unassigned</option>
-                    {householdMembers.map((member) => (
-                      <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
+                  </div>
+                </>
+              )}
+            </SectionFilterChildren>
+
+            <div className="panel__body--padded">
+              <form action={createProjectTaskAction}>
+                <input type="hidden" name="householdId" value={householdId} />
+                <input type="hidden" name="projectId" value={projectId} />
+                <input type="hidden" name="phaseId" value={phase.id} />
+                <div className="form-grid">
+                  <label className="field field--full">
+                    <span>Task Title</span>
+                    <input name="title" placeholder="Add task to this phase" required />
+                  </label>
+                  <label className="field field--full">
+                    <span>Description</span>
+                    <textarea name="description" rows={2} placeholder="Scope, definition of done, or sequencing notes" />
+                  </label>
+                  <label className="field">
+                    <span>Status</span>
+                    <select name="status" defaultValue="pending">
+                      {taskStatusOptions.map((status) => (
+                        <option key={status} value={status}>{taskStatusLabels[status]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Assignee</span>
+                    <select name="assignedToId" defaultValue="">
+                      <option value="">Unassigned</option>
+                      {householdMembers.map((member) => (
+                        <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Due Date</span>
+                    <input name="dueDate" type="date" />
+                  </label>
+                  <label className="field">
+                    <span>Estimated Cost</span>
+                    <input name="estimatedCost" type="number" min="0" step="0.01" />
+                  </label>
+                </div>
+                <div className="inline-actions" style={{ marginTop: 16 }}>
+                  <button type="submit" className="button">Add Task to Phase</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </SectionFilterProvider>
+
+      <SectionFilterProvider items={phase.supplies} keys={["name", "notes"]} placeholder="Filter phase supplies by name or notes">
+        <section className="panel detail-tile">
+          <div className="panel__header">
+            <h2>Phase Supplies ({phase.supplies.length})</h2>
+            <div className="panel__header-actions">
+              <SectionFilterToggle />
+            </div>
+          </div>
+          <SectionFilterBar />
+          <div className="panel__body">
+            <SectionFilterChildren<ProjectPhaseDetail["supplies"][number]>>
+              {(filteredSupplies) => (
+                <>
+                  {phase.supplies.length === 0 ? <p className="panel__empty">No supplies planned for this phase yet.</p> : null}
+                  {phase.supplies.length > 0 && filteredSupplies.length === 0 ? <p className="panel__empty">No phase supplies match that search.</p> : null}
+                  <div className="schedule-stack">
+                    {filteredSupplies.map((supply) => (
+                      <ProjectSupplyCard
+                        key={supply.id}
+                        householdId={householdId}
+                        projectId={projectId}
+                        phaseId={phase.id}
+                        supply={supply}
+                        {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
+                          ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
+                          : {})}
+                      />
                     ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Due Date</span>
-                  <input name="dueDate" type="date" />
-                </label>
-                <label className="field">
-                  <span>Estimated Cost</span>
-                  <input name="estimatedCost" type="number" min="0" step="0.01" />
-                </label>
-              </div>
-              <div className="inline-actions" style={{ marginTop: 16 }}>
-                <button type="submit" className="button">Add Task to Phase</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </section>
+                  </div>
+                </>
+              )}
+            </SectionFilterChildren>
 
-      <section className="panel detail-tile">
-        <div className="panel__header">
-          <h2>Phase Supplies ({phase.supplies.length})</h2>
-        </div>
-        <div className="panel__body">
-          {phase.supplies.length === 0 ? <p className="panel__empty">No supplies planned for this phase yet.</p> : null}
-          <div className="schedule-stack">
-            {phase.supplies.map((supply) => (
-                <ProjectSupplyCard
-                  key={supply.id}
-                  householdId={householdId}
-                  projectId={projectId}
-                  phaseId={phase.id}
-                  supply={supply}
-                  {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
-                    ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
-                    : {})}
-                />
-            ))}
+            <ProjectSupplyCreateForm
+              householdId={householdId}
+              projectId={projectId}
+              phaseId={phase.id}
+              inventoryItems={inventoryItems}
+            />
           </div>
-
-          <ProjectSupplyCreateForm
-            householdId={householdId}
-            projectId={projectId}
-            phaseId={phase.id}
-            inventoryItems={inventoryItems}
-          />
-        </div>
-      </section>
+        </section>
+      </SectionFilterProvider>
 
       <section className="panel detail-tile">
         <div className="panel__header">

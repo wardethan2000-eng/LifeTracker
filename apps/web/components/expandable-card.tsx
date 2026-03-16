@@ -9,6 +9,7 @@ type ExpandableCardProps = {
   previewContent: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
+  headerContent?: ReactNode;
   badge?: { count: number; variant: "danger" | "warning" | "neutral" };
 };
 
@@ -18,6 +19,7 @@ export function ExpandableCard({
   previewContent,
   children,
   actions,
+  headerContent,
   badge
 }: ExpandableCardProps): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -48,6 +50,7 @@ export function ExpandableCard({
           </button>
         </div>
       </div>
+      {headerContent}
       <div className={`card__body${open ? "" : " card__body--interactive"}`} onClick={open ? undefined : toggleOpen}>
         {previewContent}
       </div>

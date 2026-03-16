@@ -9,6 +9,12 @@ import {
   deleteHobbyMetricReading,
   updateHobbyMetric,
 } from "../lib/api";
+import {
+  SectionFilterBar,
+  SectionFilterChildren,
+  SectionFilterProvider,
+  SectionFilterToggle
+} from "./section-filter";
 
 type HobbyMetricsManagerProps = {
   householdId: string;
@@ -196,9 +202,16 @@ export function HobbyMetricsManager({
   };
 
   return (
-    <div className="hobby-manager-stack">
-      <section className="panel">
-        <div className="panel__header"><h2>Metric Definitions</h2></div>
+    <SectionFilterProvider items={metrics} keys={["name"]} placeholder="Filter metric definitions by name">
+      <div className="hobby-manager-stack">
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Metric Definitions</h2>
+            <div className="panel__header-actions">
+              <SectionFilterToggle />
+            </div>
+          </div>
+          <SectionFilterBar />
         <div className="panel__body--padded hobby-manager-stack">
           <p className="hobby-manager-note">Track measurements over time so the hobby keeps a real operational history, not just a snapshot.</p>
           <form className="form-grid" onSubmit={handleCreateMetric}>
@@ -226,15 +239,26 @@ export function HobbyMetricsManager({
           </form>
           {error ? <p className="workbench-error">{error}</p> : null}
         </div>
-      </section>
-
-      {metrics.length === 0 ? (
-        <section className="panel">
-          <div className="panel__body--padded">
-            <p className="panel__empty">No metrics configured yet.</p>
-          </div>
         </section>
-      ) : metrics.map((metric) => {
+
+        <SectionFilterChildren<HobbyMetricDefinition>>
+          {(filteredMetrics) => (
+            <>
+              {metrics.length === 0 ? (
+                <section className="panel">
+                  <div className="panel__body--padded">
+                    <p className="panel__empty">No metrics configured yet.</p>
+                  </div>
+                </section>
+              ) : null}
+              {metrics.length > 0 && filteredMetrics.length === 0 ? (
+                <section className="panel">
+                  <div className="panel__body--padded">
+                    <p className="panel__empty">No metrics match that search.</p>
+                  </div>
+                </section>
+              ) : null}
+              {filteredMetrics.map((metric) => {
         const readings = readingsMap[metric.id] ?? [];
         const readingDraft = getReadingDraft(metric.id);
 
@@ -336,7 +360,11 @@ export function HobbyMetricsManager({
             </div>
           </section>
         );
-      })}
-    </div>
+              })}
+            </>
+          )}
+        </SectionFilterChildren>
+      </div>
+    </SectionFilterProvider>
   );
 }

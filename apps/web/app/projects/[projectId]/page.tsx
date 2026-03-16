@@ -40,8 +40,7 @@ import { ProjectProgressBar } from "../../../components/project-progress-bar";
 import { ProjectShoppingListItemActions } from "../../../components/project-shopping-list-item-actions";
 import { ProjectSupplyRollupActions } from "../../../components/project-supply-rollup-actions";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
-import { ProjectPhaseCard } from "../../../components/project-phase-card";
-import { ProjectPhaseDetail } from "../../../components/project-phase-detail";
+import { ProjectPhaseTimeline } from "../../../components/project-phase-timeline";
 import { AttachmentSection } from "../../../components/attachment-section";
 import {
   createTaskChecklistItemAction,
@@ -144,7 +143,6 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
     const phaseDetails = await Promise.all(project.phases.map((phase) => getProjectPhaseDetail(household.id, project.id, phase.id)));
     const shoppingList = await getProjectShoppingList(household.id, project.id);
-    const phaseDetailsById = new Map(phaseDetails.map((phase) => [phase.id, phase]));
     const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
     const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));
     const inventoryItemLookup = new Map(householdInventory.items.map((item) => [item.id, item]));
@@ -308,81 +306,53 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
           <div className="resource-layout">
             <div className="resource-layout__primary">
-              <ExpandableCard
-                title="Phase Timeline"
-                modalTitle="Phase Timeline"
-                previewContent={<CompactPhasePreview phases={project.phases} />}
-              >
-                <div>
-                  <div className="project-phase-stack" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    {project.phases.map((phase) => {
-                      const phaseDetail = phaseDetailsById.get(phase.id);
-                      if (!phaseDetail) { return null; }
-                      return (
-                        <details
-                          key={phase.id}
-                          id={`phase-${phase.id}`}
-                          className="project-phase-details"
-                          open={focusedPhaseId === phase.id}
-                          style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px" }}
-                        >
-                          <summary style={{ listStyle: "none", cursor: "pointer", padding: 0 }}>
-                            <ProjectPhaseCard phase={phase} />
-                          </summary>
-                          <div className="project-phase-details__content" style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
-                            <ProjectPhaseDetail
-                              householdId={household.id}
-                              projectId={project.id}
-                              phase={phaseDetail}
-                              householdMembers={householdMembers}
-                              serviceProviders={serviceProviders}
-                              budgetCategories={project.budgetCategories}
-                              inventoryItems={householdInventory.items}
-                            />
-                          </div>
-                        </details>
-                      );
-                    })}
-                  </div>
-                  {project.phases.length === 0 ? <p className="panel__empty">No phases defined yet. Add one below to sequence the work.</p> : null}
-                  <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                    <form action={createProjectPhaseAction}>
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <div className="form-grid">
-                        <label className="field field--full">
-                          <span>New Phase Name</span>
-                          <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
-                        </label>
-                        <label className="field field--full">
-                          <span>Description</span>
-                          <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
-                        </label>
-                        <label className="field">
-                          <span>Status</span>
-                          <select name="status" defaultValue="pending">
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="skipped">Skipped</option>
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>Budget Amount</span>
-                          <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                        </label>
-                        <label className="field">
-                          <span>Target End Date</span>
-                          <input name="targetEndDate" type="date" />
-                        </label>
-                      </div>
-                      <div className="inline-actions" style={{ marginTop: 16 }}>
-                        <button type="submit" className="button">Add Phase</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </ExpandableCard>
+              <ProjectPhaseTimeline
+                householdId={household.id}
+                projectId={project.id}
+                focusedPhaseId={focusedPhaseId}
+                phases={project.phases}
+                phaseDetails={phaseDetails}
+                householdMembers={householdMembers}
+                serviceProviders={serviceProviders}
+                budgetCategories={project.budgetCategories}
+                inventoryItems={householdInventory.items}
+                addPhaseForm={(
+                  <form action={createProjectPhaseAction}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <div className="form-grid">
+                      <label className="field field--full">
+                        <span>New Phase Name</span>
+                        <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
+                      </label>
+                      <label className="field field--full">
+                        <span>Description</span>
+                        <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
+                      </label>
+                      <label className="field">
+                        <span>Status</span>
+                        <select name="status" defaultValue="pending">
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="skipped">Skipped</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Budget Amount</span>
+                        <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                      </label>
+                      <label className="field">
+                        <span>Target End Date</span>
+                        <input name="targetEndDate" type="date" />
+                      </label>
+                    </div>
+                    <div className="inline-actions" style={{ marginTop: 16 }}>
+                      <button type="submit" className="button">Add Phase</button>
+                    </div>
+                  </form>
+                )}
+              />
 
               <ExpandableCard
                 title="Project Settings"

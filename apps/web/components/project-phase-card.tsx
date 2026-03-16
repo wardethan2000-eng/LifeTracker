@@ -1,3 +1,5 @@
+"use client";
+
 import type { ProjectPhaseSummary } from "@lifekeeper/types";
 import { formatCurrency, formatDate } from "../lib/formatters";
 import { ProjectProgressBar } from "./project-progress-bar";

@@ -3,6 +3,12 @@
 import type { HobbyLog, HobbyLogType } from "@lifekeeper/types";
 import { useState, type FormEvent, type JSX } from "react";
 import { createHobbyLog, deleteHobbyLog, updateHobbyLog } from "../lib/api";
+import {
+  SectionFilterBar,
+  SectionFilterChildren,
+  SectionFilterProvider,
+  SectionFilterToggle
+} from "./section-filter";
 
 type HobbyJournalManagerProps = {
   householdId: string;
@@ -126,9 +132,16 @@ export function HobbyJournalManager({ householdId, hobbyId, initialLogs }: Hobby
   };
 
   return (
-    <div className="hobby-manager-stack">
-      <section className="panel">
-        <div className="panel__header"><h2>History & Journal</h2></div>
+    <SectionFilterProvider items={logs} keys={["title", "content"]} placeholder="Filter journal entries by title or details">
+      <div className="hobby-manager-stack">
+        <section className="panel">
+          <div className="panel__header">
+            <h2>History & Journal</h2>
+            <div className="panel__header-actions">
+              <SectionFilterToggle />
+            </div>
+          </div>
+          <SectionFilterBar />
         <div className="panel__body--padded hobby-manager-stack">
           <div className="hobby-history-intro">
             <strong>Detailed history matters.</strong>
@@ -163,15 +176,26 @@ export function HobbyJournalManager({ householdId, hobbyId, initialLogs }: Hobby
           </form>
           {error ? <p className="workbench-error">{error}</p> : null}
         </div>
-      </section>
-
-      {logs.length === 0 ? (
-        <section className="panel">
-          <div className="panel__body--padded">
-            <p className="panel__empty">No journal entries yet.</p>
-          </div>
         </section>
-      ) : logs.map((log) => (
+
+        <SectionFilterChildren<HobbyLog>>
+          {(filteredLogs) => (
+            <>
+              {logs.length === 0 ? (
+                <section className="panel">
+                  <div className="panel__body--padded">
+                    <p className="panel__empty">No journal entries yet.</p>
+                  </div>
+                </section>
+              ) : null}
+              {logs.length > 0 && filteredLogs.length === 0 ? (
+                <section className="panel">
+                  <div className="panel__body--padded">
+                    <p className="panel__empty">No journal entries match that search.</p>
+                  </div>
+                </section>
+              ) : null}
+              {filteredLogs.map((log) => (
         <article key={log.id} className={`session-log-entry session-log-entry--${log.logType}`}>
           {editingLogId === log.id ? (
             <div className="hobby-manager-card">
@@ -229,7 +253,11 @@ export function HobbyJournalManager({ householdId, hobbyId, initialLogs }: Hobby
             </>
           )}
         </article>
-      ))}
-    </div>
+              ))}
+            </>
+          )}
+        </SectionFilterChildren>
+      </div>
+    </SectionFilterProvider>
   );
 }

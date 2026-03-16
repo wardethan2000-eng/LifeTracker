@@ -17,6 +17,12 @@ import {
   unlinkHobbyInventory,
   unlinkHobbyProject,
 } from "../lib/api";
+import {
+  SectionFilterBar,
+  SectionFilterChildren,
+  SectionFilterProvider,
+  SectionFilterToggle
+} from "./section-filter";
 
 type AssetOption = {
   id: string;
@@ -27,6 +33,7 @@ type AssetOption = {
 type InventoryOption = {
   id: string;
   name: string;
+  category: string | null;
   unit: string;
   quantityOnHand: number;
 };
@@ -79,6 +86,7 @@ export function HobbyLinksManager({
   const availableInventoryOptions = availableInventoryItems.filter((item) => !inventoryLinks.some((link) => link.inventoryItemId === item.id));
   const availableProjectOptions = availableProjects.filter((project) => !projectLinks.some((link) => link.projectId === project.id));
   const sortedCategories = [...categories].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+  const inventoryCategoryLookup = new Map(availableInventoryItems.map((item) => [item.id, item.category ?? ""]));
 
   const handleAssetSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -261,31 +269,52 @@ export function HobbyLinksManager({
 
   return (
     <div className="hobby-manager-stack">
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Linked Equipment</h2>
-          <span className="pill">{assetLinks.length}</span>
-        </div>
-        <div className="panel__body--padded hobby-manager-stack">
-          {assetLinks.length === 0 ? <p className="panel__empty">No equipment linked yet.</p> : (
-            <div className="hobby-link-list">
-              {assetLinks.map((link) => (
-                <div key={link.id} className="hobby-link-item">
-                  <div className="hobby-link-meta">
-                    <strong>{link.asset.name}</strong>
-                    <span>{link.asset.category}</span>
-                    {link.role ? <span>Role: {link.role}</span> : null}
-                    {link.notes ? <span>{link.notes}</span> : null}
-                  </div>
-                  <button type="button" className="button button--ghost button--sm" onClick={() => void handleAssetRemove(link.id)} disabled={pendingKey !== null}>
-                    Remove
-                  </button>
-                </div>
-              ))}
+      <SectionFilterProvider
+        items={assetLinks.map((link) => ({
+          ...link,
+          assetName: link.asset.name,
+          assetCategory: link.asset.category
+        }))}
+        keys={["assetName", "assetCategory", "role", "notes"]}
+        placeholder="Filter equipment by asset, category, role, or notes"
+      >
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Linked Equipment</h2>
+            <div className="panel__header-actions">
+              <span className="pill">{assetLinks.length}</span>
+              <SectionFilterToggle />
             </div>
-          )}
+          </div>
+          <SectionFilterBar />
+          <div className="panel__body--padded hobby-manager-stack">
+            <SectionFilterChildren<Array<HobbyDetailAssetLink & { assetName: string; assetCategory: string }>[number]>>
+              {(filteredAssetLinks) => (
+                <>
+                  {assetLinks.length === 0 ? <p className="panel__empty">No equipment linked yet.</p> : null}
+                  {assetLinks.length > 0 && filteredAssetLinks.length === 0 ? <p className="panel__empty">No linked equipment matches that search.</p> : null}
+                  {filteredAssetLinks.length > 0 ? (
+                    <div className="hobby-link-list">
+                      {filteredAssetLinks.map((link) => (
+                        <div key={link.id} className="hobby-link-item">
+                          <div className="hobby-link-meta">
+                            <strong>{link.asset.name}</strong>
+                            <span>{link.asset.category}</span>
+                            {link.role ? <span>Role: {link.role}</span> : null}
+                            {link.notes ? <span>{link.notes}</span> : null}
+                          </div>
+                          <button type="button" className="button button--ghost button--sm" onClick={() => void handleAssetRemove(link.id)} disabled={pendingKey !== null}>
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </SectionFilterChildren>
 
-          <form className="form-grid" onSubmit={handleAssetSubmit}>
+            <form className="form-grid" onSubmit={handleAssetSubmit}>
             <label className="field">
               <span>Asset</span>
               <select value={assetId} onChange={(event) => setAssetId(event.target.value)} disabled={pendingKey !== null || availableAssetOptions.length === 0}>
@@ -308,34 +337,59 @@ export function HobbyLinksManager({
                 {pendingKey === "asset-add" ? "Linking…" : "Link Equipment"}
               </button>
             </div>
-          </form>
-        </div>
-      </section>
+            </form>
+          </div>
+        </section>
+      </SectionFilterProvider>
 
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Linked Supplies</h2>
-          <span className="pill">{inventoryLinks.length}</span>
-        </div>
-        <div className="panel__body--padded hobby-manager-stack">
-          {inventoryLinks.length === 0 ? <p className="panel__empty">No inventory items linked yet.</p> : (
-            <div className="hobby-link-list">
-              {inventoryLinks.map((link) => (
-                <div key={link.id} className="hobby-link-item">
-                  <div className="hobby-link-meta">
-                    <strong>{link.inventoryItem.name}</strong>
-                    <span>{link.inventoryItem.quantityOnHand} {link.inventoryItem.unit} on hand</span>
-                    {link.notes ? <span>{link.notes}</span> : null}
-                  </div>
-                  <button type="button" className="button button--ghost button--sm" onClick={() => void handleInventoryRemove(link.id)} disabled={pendingKey !== null}>
-                    Remove
-                  </button>
-                </div>
-              ))}
+      <SectionFilterProvider
+        items={inventoryLinks.map((link) => ({
+          ...link,
+          itemName: link.inventoryItem.name,
+          categoryName: inventoryCategoryLookup.get(link.inventoryItemId) ?? ""
+        }))}
+        keys={["itemName", "categoryName"]}
+        placeholder="Filter supplies by item or category"
+      >
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Linked Supplies</h2>
+            <div className="panel__header-actions">
+              <span className="pill">{inventoryLinks.length}</span>
+              <SectionFilterToggle />
             </div>
-          )}
+          </div>
+          <SectionFilterBar />
+          <div className="panel__body--padded hobby-manager-stack">
+            <SectionFilterChildren<Array<HobbyDetailInventoryLink & { itemName: string; categoryName: string }>[number]>>
+              {(filteredInventoryLinks) => (
+                <>
+                  {inventoryLinks.length === 0 ? <p className="panel__empty">No inventory items linked yet.</p> : null}
+                  {inventoryLinks.length > 0 && filteredInventoryLinks.length === 0 ? <p className="panel__empty">No linked supplies match this filter.</p> : null}
+                  {filteredInventoryLinks.length > 0 ? (
+                    <div className="hobby-link-list">
+                      {filteredInventoryLinks.map((link) => (
+                        <div key={link.id} className="hobby-link-item">
+                          <div className="hobby-link-meta">
+                            <strong>{link.inventoryItem.name}</strong>
+                            <span>
+                              {link.categoryName ? `${link.categoryName} · ` : ""}
+                              {link.inventoryItem.quantityOnHand} {link.inventoryItem.unit} on hand
+                            </span>
+                            {link.notes ? <span>{link.notes}</span> : null}
+                          </div>
+                          <button type="button" className="button button--ghost button--sm" onClick={() => void handleInventoryRemove(link.id)} disabled={pendingKey !== null}>
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </SectionFilterChildren>
 
-          <form className="form-grid" onSubmit={handleInventorySubmit}>
+            <form className="form-grid" onSubmit={handleInventorySubmit}>
             <label className="field">
               <span>Inventory Item</span>
               <select value={inventoryItemId} onChange={(event) => setInventoryItemId(event.target.value)} disabled={pendingKey !== null || availableInventoryOptions.length === 0}>
@@ -354,9 +408,10 @@ export function HobbyLinksManager({
                 {pendingKey === "inventory-add" ? "Linking…" : "Link Supply"}
               </button>
             </div>
-          </form>
-        </div>
-      </section>
+            </form>
+          </div>
+        </section>
+      </SectionFilterProvider>
 
       <section className="panel">
         <div className="panel__header">

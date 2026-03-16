@@ -1,4 +1,11 @@
-import type { AssetDetailResponse, MaintenanceLog, UsageMetricEntry, UsageProjection } from "@lifekeeper/types";
+import type {
+  AssetDetailResponse,
+  AssetTimelineItem,
+  AssetTimelineQuery,
+  MaintenanceLog,
+  UsageMetricEntry,
+  UsageProjection
+} from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,8 +17,10 @@ import {
   createLogAction,
   createMetricAction,
   createMetricEntryAction,
+  createTimelineEntryAction,
   createScheduleAction,
   deleteCommentAction,
+  deleteTimelineEntryAction,
   deleteMetricAction,
   deleteScheduleAction,
   recordConditionAssessmentAction,
@@ -21,25 +30,25 @@ import {
   unarchiveAssetAction,
   updateAssetAction,
   updateCommentAction,
+  updateTimelineEntryAction,
   updateMetricAction
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
 import { AssetLabelActions } from "../../../components/asset-label-actions";
+import { AssetMaintenanceSections } from "../../../components/asset-maintenance-sections";
+import { AssetMetricList } from "../../../components/asset-metric-list";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
 import { AttachmentSection } from "../../../components/attachment-section";
 import { Card } from "../../../components/card";
-import { CompactMaintenanceSchedulePreview } from "../../../components/compact-maintenance-schedule-preview";
-import { ExpandableCard } from "../../../components/expandable-card";
-import { LogMaintenanceForm } from "../../../components/log-maintenance-form";
-import { ScheduleCardActions } from "../../../components/schedule-card-actions";
-import { ScheduleForm } from "../../../components/schedule-form";
-import { ScheduleInventoryLinks } from "../../../components/schedule-inventory-links";
-import { SchedulePartsReadiness } from "../../../components/schedule-parts-readiness";
+import { TimelineEntryForm } from "../../../components/timeline-entry-form";
+import { TimelineFilters } from "../../../components/timeline-filters";
+import { TimelineItem } from "../../../components/timeline-item";
 import {
   ApiError,
   getAssetComments,
   getAssetDetail,
+  getAssetTimeline,
   getAssetTransferHistory,
   getHouseholdAssets,
   getHouseholdMembers,
@@ -59,9 +68,20 @@ import {
   formatVisibilityLabel
 } from "../../../lib/formatters";
 
+type AssetDetailPageSearchParams = {
+  tab?: string | string[];
+  sourceType?: string | string[];
+  category?: string | string[];
+  search?: string | string[];
+  since?: string | string[];
+  until?: string | string[];
+  cursor?: string | string[];
+  showAddForm?: string | string[];
+};
+
 type AssetDetailPageProps = {
   params: Promise<{ assetId: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<AssetDetailPageSearchParams>;
 };
 
 type MetricInsight = {
@@ -75,9 +95,51 @@ const tabs = [
   { id: "details", label: "Structured Details" },
   { id: "metrics", label: "Usage Metrics" },
   { id: "maintenance", label: "Maintenance" },
+  { id: "history", label: "History" },
   { id: "comments", label: "Comments" },
   { id: "settings", label: "Settings" }
 ] as const;
+
+const getSearchParamValue = (value: string | string[] | undefined): string | undefined => Array.isArray(value)
+  ? value[0]
+  : value;
+
+const toDateBoundaryIso = (value: string | undefined, boundary: "start" | "end"): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = new Date(`${value}T${boundary === "start" ? "00:00:00.000" : "23:59:59.999"}`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  return parsed.toISOString();
+};
+
+const formatTimelineSourceLabel = (sourceType: AssetTimelineItem["sourceType"]): string => {
+  switch (sourceType) {
+    case "maintenance_log":
+      return "Maintenance";
+    case "timeline_entry":
+      return "Manual Entry";
+    case "project_event":
+      return "Project";
+    case "inventory_transaction":
+      return "Inventory";
+    case "schedule_change":
+      return "Schedule";
+    case "comment":
+      return "Comment";
+    case "condition_assessment":
+      return "Condition";
+    case "usage_reading":
+      return "Usage";
+    default:
+      return "Activity";
+  }
+};
 
 const renderMetaRow = (label: string, value: string | null | undefined): JSX.Element => (
   <div>
@@ -163,19 +225,63 @@ async function loadMetricInsights(assetId: string, detail: AssetDetailResponse):
 
 export default async function AssetDetailPage({ params, searchParams }: AssetDetailPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
-  const { tab = "overview" } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const tab = getSearchParamValue(resolvedSearchParams.tab) ?? "overview";
+  const sourceType = getSearchParamValue(resolvedSearchParams.sourceType);
+  const category = getSearchParamValue(resolvedSearchParams.category);
+  const search = getSearchParamValue(resolvedSearchParams.search);
+  const since = getSearchParamValue(resolvedSearchParams.since);
+  const until = getSearchParamValue(resolvedSearchParams.until);
+  const cursor = getSearchParamValue(resolvedSearchParams.cursor);
+  const showAddForm = getSearchParamValue(resolvedSearchParams.showAddForm) === "true";
+  const timelineQuery: Partial<AssetTimelineQuery> = {
+    ...(sourceType ? { sourceType: sourceType as AssetTimelineQuery["sourceType"] } : {}),
+    ...(category ? { category } : {}),
+    ...(search ? { search } : {}),
+    ...(toDateBoundaryIso(since, "start") ? { since: toDateBoundaryIso(since, "start") } : {}),
+    ...(toDateBoundaryIso(until, "end") ? { until: toDateBoundaryIso(until, "end") } : {}),
+    ...(cursor ? { cursor } : {})
+  };
 
   try {
     const detail = await getAssetDetail(assetId);
-    const [libraryPresets, customPresets, householdAssets, householdMembers, metricInsights, comments, transferHistory] = await Promise.all([
+    const [libraryPresets, customPresets, householdAssets, householdMembers, metricInsights, comments, transferHistory, historyTimeline, overviewTimeline] = await Promise.all([
       getLibraryPresets(),
       getHouseholdPresets(detail.asset.householdId),
       getHouseholdAssets(detail.asset.householdId),
       getHouseholdMembers(detail.asset.householdId),
       loadMetricInsights(assetId, detail),
       getAssetComments(assetId),
-      getAssetTransferHistory(assetId)
+      getAssetTransferHistory(assetId),
+      tab === "history" ? getAssetTimeline(assetId, timelineQuery) : Promise.resolve(null),
+      tab === "overview" ? getAssetTimeline(assetId, { limit: 5 }) : Promise.resolve(null)
     ]);
+    const buildAssetDetailHref = (
+      overrides: Record<string, string | undefined>,
+      keysToDelete: string[] = []
+    ): string => {
+      const params = new URLSearchParams();
+
+      Object.entries(resolvedSearchParams).forEach(([key, value]) => {
+        const normalized = getSearchParamValue(value);
+
+        if (normalized) {
+          params.set(key, normalized);
+        }
+      });
+
+      keysToDelete.forEach((key) => params.delete(key));
+      Object.entries(overrides).forEach(([key, value]) => {
+        if (value === undefined || value.length === 0) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+
+      const query = params.toString();
+      return `/assets/${detail.asset.id}${query ? `?${query}` : ""}`;
+    };
 
     const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
     const visiblePresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
@@ -236,53 +342,6 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                 assetName={detail.asset.name}
                 assetTag={detail.asset.assetTag}
               />
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Hierarchy</h2>
-            </div>
-            <div className="panel__body--padded">
-              <dl className="data-list">
-                <div>
-                  <dt>Parent Asset</dt>
-                  <dd>
-                    {detail.asset.parentAsset ? (
-                      <Link href={`/assets/${detail.asset.parentAsset.id}`} className="text-link">
-                        {detail.asset.parentAsset.name}
-                      </Link>
-                    ) : "Top-level asset"}
-                  </dd>
-                </div>
-              </dl>
-              {detail.asset.childAssets.length === 0 ? (
-                <p className="panel__empty" style={{ marginTop: "16px" }}>No direct child assets linked.</p>
-              ) : (
-                <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>
-                  {detail.asset.childAssets.map((child) => (
-                    <Link key={child.id} href={`/assets/${child.id}`} className="data-table__link">
-                      {child.name} · {formatCategoryLabel(child.category)}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Structured Records</h2>
-            </div>
-            <div className="panel__body--padded">
-              <dl className="data-list">
-                {renderMoneyMetaRow("Purchase Price", detail.asset.purchaseDetails?.price ?? null)}
-                {renderMetaRow("Purchase Vendor", detail.asset.purchaseDetails?.vendor)}
-                {renderMetaRow("Warranty Ends", formatDate(detail.asset.warrantyDetails?.endDate, "Not set"))}
-                {renderMetaRow("Location", detail.asset.locationDetails?.room ?? detail.asset.locationDetails?.propertyName ?? null)}
-                {renderMetaRow("Insurance Provider", detail.asset.insuranceDetails?.provider)}
-                {renderMetaRow("Disposition", detail.asset.dispositionDetails?.method ?? null)}
-              </dl>
             </div>
           </section>
 
@@ -423,6 +482,35 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                   </article>
                 ))}
               </div>
+            )}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Recent Timeline</h2>
+            <Link href={`/assets/${detail.asset.id}?tab=history`} className="text-link">View All</Link>
+          </div>
+          <div className="panel__body">
+            {overviewTimeline && overviewTimeline.items.length > 0 ? (
+              <div className="log-list">
+                {overviewTimeline.items.map((item) => (
+                  <article key={item.id} className="log-card">
+                    <div style={{ display: "grid", gap: "8px" }}>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                        <span className={`timeline-item__source-badge timeline-item__source-badge--${item.sourceType}`}>
+                          {formatTimelineSourceLabel(item.sourceType)}
+                        </span>
+                        <strong>{item.title}</strong>
+                      </div>
+                      <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{formatDateTime(item.eventDate)}</span>
+                    </div>
+                    {item.cost !== null ? <strong>{formatCurrency(item.cost)}</strong> : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="panel__empty">No recent timeline activity yet.</p>
             )}
           </div>
         </section>
@@ -741,101 +829,14 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       return (
         <div className="resource-layout">
           <div className="resource-layout__primary">
-            <ExpandableCard
-              title="Maintenance Schedules"
-              modalTitle="Maintenance Schedules"
-              {...(detail.schedules.length > 0 ? { badge: { count: detail.schedules.length, variant: overdueCount > 0 ? "danger" as const : dueCount > 0 ? "warning" as const : "neutral" as const } } : {})}
-              previewContent={
-                <CompactMaintenanceSchedulePreview schedules={detail.schedules} />
-              }
-            >
-              {detail.schedules.length === 0 ? (
-                <p className="panel__empty">No maintenance schedules active yet.</p>
-              ) : (
-                <div className="schedule-stack">
-                  {detail.schedules.map((schedule) => (
-                    <article key={schedule.id} className={`schedule-card schedule-card--${schedule.status}`}>
-                      <div className="schedule-card__summary">
-                        <div>
-                          <p className="eyebrow">{formatTriggerSummary(schedule.triggerConfig)}</p>
-                          <h3>{schedule.name}</h3>
-                          <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                            {schedule.description ?? "No description."}
-                          </p>
-                        </div>
-                        <div className="schedule-card__badges">
-                          <span className={`status-chip status-chip--${schedule.status}`}>
-                            {formatScheduleStatus(schedule.status)}
-                          </span>
-                          {!schedule.isActive ? <span className="status-chip status-chip--paused">Paused</span> : null}
-                        </div>
-                      </div>
-                      <dl className="schedule-meta">
-                        <div><dt>Next due</dt><dd>{formatDueLabel(schedule.nextDueAt, schedule.nextDueMetricValue, null)}</dd></div>
-                        <div><dt>Last completed</dt><dd>{formatDateTime(schedule.lastCompletedAt, "Never")}</dd></div>
-                        <div><dt>Assignee</dt><dd>{schedule.assignee?.displayName ?? "Unassigned"}</dd></div>
-                        <div><dt>Trigger</dt><dd>{schedule.triggerConfig.type}</dd></div>
-                      </dl>
-                      <ScheduleInventoryLinks
-                        assetId={detail.asset.id}
-                        scheduleId={schedule.id}
-                        householdId={detail.asset.householdId}
-                      />
-                      <SchedulePartsReadiness
-                        assetId={detail.asset.id}
-                        scheduleId={schedule.id}
-                      />
-                      <ScheduleCardActions
-                        assetId={detail.asset.id}
-                        scheduleId={schedule.id}
-                        scheduleName={schedule.name}
-                        isActive={schedule.isActive}
-                        completeAction={completeScheduleAction}
-                        toggleAction={toggleScheduleActiveAction}
-                        deleteAction={deleteScheduleAction}
-                      />
-                    </article>
-                  ))}
-                </div>
-              )}
-            </ExpandableCard>
-
-            <Card title="Add Schedule">
-              <ScheduleForm
-                assetId={detail.asset.id}
-                metrics={detail.metrics.map((metric) => ({ id: metric.id, name: metric.name, unit: metric.unit }))}
-                action={createScheduleAction}
-              />
-            </Card>
-
-            <Card title="Maintenance Log">
-              {detail.recentLogs.length === 0 ? (
-                <p className="panel__empty">No maintenance history logged yet.</p>
-              ) : (
-                <div className="log-list">
-                  {detail.recentLogs.map((log) => (
-                    <div key={log.id}>
-                      {renderLogSummary(log)}
-                      <AttachmentSection
-                        householdId={detail.asset.householdId}
-                        entityType="maintenance_log"
-                        entityId={log.id}
-                        compact
-                        label=""
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card title="Log Maintenance">
-              <LogMaintenanceForm
-                assetId={detail.asset.id}
-                schedules={detail.schedules.map((s) => ({ id: s.id, name: s.name }))}
-                createLogAction={createLogAction}
-              />
-            </Card>
+            <AssetMaintenanceSections
+              detail={detail}
+              createScheduleAction={createScheduleAction}
+              completeScheduleAction={completeScheduleAction}
+              toggleScheduleActiveAction={toggleScheduleActiveAction}
+              deleteScheduleAction={deleteScheduleAction}
+              createLogAction={createLogAction}
+            />
           </div>
 
           <div className="resource-layout__aside">
@@ -989,6 +990,93 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         </section>
       </div>
     );
+
+    const renderHistoryTab = (): JSX.Element => {
+      const items = historyTimeline?.items ?? [];
+      const maintenanceLogCount = items.filter((item) => item.sourceType === "maintenance_log").length;
+      const manualEntryCount = items.filter((item) => item.sourceType === "timeline_entry").length;
+      const totalCost = items.reduce((sum, item) => sum + (item.cost ?? 0), 0);
+
+      return (
+        <div style={{ display: "grid", gap: "24px" }}>
+          <section className="stats-row">
+            <div className="stat-card stat-card--accent">
+              <span className="stat-card__label">Total Events</span>
+              <strong className="stat-card__value">{items.length}</strong>
+              <span className="stat-card__sub">Events in the current result set</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-card__label">Maintenance Logs</span>
+              <strong className="stat-card__value">{maintenanceLogCount}</strong>
+              <span className="stat-card__sub">Logged service history entries</span>
+            </div>
+            <div className="stat-card stat-card--warning">
+              <span className="stat-card__label">Manual Entries</span>
+              <strong className="stat-card__value">{manualEntryCount}</strong>
+              <span className="stat-card__sub">User-authored asset notes</span>
+            </div>
+            <div className="stat-card stat-card--danger">
+              <span className="stat-card__label">Total Cost</span>
+              <strong className="stat-card__value">{formatCurrency(totalCost, "$0.00")}</strong>
+              <span className="stat-card__sub">Visible spend across these events</span>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__body--padded" style={{ display: "grid", gap: "16px" }}>
+              <TimelineFilters
+                assetId={detail.asset.id}
+                currentFilters={{
+                  ...(sourceType ? { sourceType } : {}),
+                  ...(category ? { category } : {}),
+                  ...(search ? { search } : {}),
+                  ...(since ? { since } : {}),
+                  ...(until ? { until } : {})
+                }}
+              />
+
+              {showAddForm ? (
+                <TimelineEntryForm
+                  assetId={detail.asset.id}
+                  householdId={detail.asset.householdId}
+                  createAction={createTimelineEntryAction}
+                />
+              ) : null}
+
+              {items.length === 0 ? (
+                <div className="timeline-empty">
+                  No history recorded yet. Use the + Add Entry button to start building this asset&apos;s timeline, or log maintenance on the Maintenance tab.
+                </div>
+              ) : (
+                <div className="timeline-feed">
+                  {items.map((item) => (
+                    <TimelineItem
+                      key={item.id}
+                      item={item}
+                      assetId={detail.asset.id}
+                      householdId={detail.asset.householdId}
+                      updateAction={updateTimelineEntryAction}
+                      deleteAction={deleteTimelineEntryAction}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {historyTimeline?.nextCursor ? (
+                <div className="timeline-load-more">
+                  <Link
+                    href={buildAssetDetailHref({ tab: "history", cursor: historyTimeline.nextCursor })}
+                    className="button button--ghost"
+                  >
+                    Load older events
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      );
+    };
 
     const renderSettingsTab = (): JSX.Element => (
       <div style={{ display: "grid", gap: "24px" }}>
@@ -1166,6 +1254,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             {tab === "details" ? renderDetailsTab() : null}
             {tab === "metrics" ? renderMetricsTab() : null}
             {tab === "maintenance" ? renderMaintenanceTab() : null}
+            {tab === "history" ? renderHistoryTab() : null}
             {tab === "comments" ? renderCommentsTab() : null}
             {tab === "settings" ? renderSettingsTab() : null}
           </main>

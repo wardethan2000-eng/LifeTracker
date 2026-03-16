@@ -11,6 +11,8 @@ import { HobbyDangerActions } from "../../../components/hobby-danger-actions";
 import { HobbyJournalManager } from "../../../components/hobby-journal-manager";
 import { HobbyLinksManager } from "../../../components/hobby-links-manager";
 import { HobbyMetricsManager } from "../../../components/hobby-metrics-manager";
+import { HobbyRecipeList } from "../../../components/hobby-recipe-list";
+import { HobbySessionList } from "../../../components/hobby-session-list";
 import { HobbySessionAdvanceButton } from "../../../components/hobby-session-advance-button";
 import { HobbyShoppingListButton } from "../../../components/hobby-shopping-list-button";
 import {
@@ -272,115 +274,11 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
     );
 
     const renderRecipesTab = (): JSX.Element => (
-      <div style={{ display: "grid", gap: "16px" }}>
-        <div className="inline-actions inline-actions--end">
-          <Link href={`/hobbies/${hobbyId}/recipes/new`} className="button button--primary button--sm">New Recipe</Link>
-        </div>
-        {recipes.length === 0 ? (
-          <div className="panel">
-            <div className="panel__body--padded">
-              <p className="panel__empty">No recipes yet. Create your first recipe to get started.</p>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: "12px" }}>
-            {recipes.map((recipe) => (
-              <div
-                key={recipe.id}
-                className="hobby-recipe-card"
-              >
-                <Link href={`/hobbies/${hobbyId}/recipes/${recipe.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <strong>{recipe.name}</strong>
-                      {recipe.styleCategory ? (
-                        <span className="pill" style={{ marginLeft: "8px" }}>{recipe.styleCategory}</span>
-                      ) : null}
-                    </div>
-                    <span className="pill">{recipe.sourceType}</span>
-                  </div>
-                  {recipe.description ? (
-                    <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "8px" }}>
-                      {recipe.description.length > 120 ? recipe.description.slice(0, 120) + "..." : recipe.description}
-                    </p>
-                  ) : null}
-                  <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
-                    {recipe.estimatedDuration != null ? <span>{recipe.estimatedDuration} min</span> : null}
-                    {recipe.estimatedCost != null ? <span>${recipe.estimatedCost.toFixed(2)}</span> : null}
-                  </div>
-                </Link>
-                <div className="recipe-card__actions">
-                  <Link href={`/hobbies/${hobbyId}/recipes/${recipe.id}`} className="button button--ghost button--sm">
-                    View Recipe
-                  </Link>
-                  <Link href={`/hobbies/${hobbyId}/recipes/${recipe.id}/edit`} className="button button--secondary button--sm">
-                    Edit
-                  </Link>
-                  <form action={createSessionFromRecipeAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="hobbyId" value={hobbyId} />
-                    <input type="hidden" name="recipeId" value={recipe.id} />
-                    <input type="hidden" name="recipeName" value={recipe.name} />
-                    <button type="submit" className="button button--primary button--sm">
-                      Start Session
-                    </button>
-                  </form>
-                  <HobbyShoppingListButton
-                    householdId={household.id}
-                    hobbyId={hobbyId}
-                    recipeId={recipe.id}
-                    recipeName={recipe.name}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <HobbyRecipeList householdId={household.id} hobbyId={hobbyId} recipes={recipes} />
     );
 
     const renderSessionsTab = (): JSX.Element => (
-      <div style={{ display: "grid", gap: "16px" }}>
-        <div className="inline-actions inline-actions--end">
-          <Link href={`/hobbies/${hobbyId}/sessions/new`} className="button button--primary button--sm">New Session</Link>
-        </div>
-        {sessions.length === 0 ? (
-          <div className="panel">
-            <div className="panel__body--padded">
-              <p className="panel__empty">No sessions yet. Start your first session to begin tracking.</p>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: "12px" }}>
-            {sessions.map((session) => (
-              <Link
-                key={session.id}
-                href={`/hobbies/${hobbyId}/sessions/${session.id}`}
-                style={{ textDecoration: "none", display: "block", padding: "16px", border: "1px solid var(--border)", borderRadius: "8px" }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <strong>{session.name}</strong>
-                    {session.recipeName ? (
-                      <span style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginLeft: "8px" }}>
-                        from {session.recipeName}
-                      </span>
-                    ) : null}
-                  </div>
-                  <span className={statusBadgeClass(session.status)}>{session.status}</span>
-                </div>
-                <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
-                  <span>{session.completedStepCount}/{session.stepCount} steps</span>
-                  <span>{session.ingredientCount} ingredients</span>
-                  {session.rating != null ? <span>{"★".repeat(session.rating)}</span> : null}
-                  <span>Started {formatDate(session.startDate)}</span>
-                  {session.completedDate ? <span>Completed {formatDate(session.completedDate)}</span> : null}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      <HobbySessionList hobbyId={hobbyId} sessions={sessions} />
     );
 
     const renderInventoryTab = (): JSX.Element => {
@@ -393,7 +291,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           initialProjectLinks={hobby.projectLinks}
           initialCategories={hobby.inventoryCategories}
           availableAssets={assets.map((asset) => ({ id: asset.id, name: asset.name, category: asset.category }))}
-          availableInventoryItems={inventoryCatalog.items.map((item) => ({ id: item.id, name: item.name, unit: item.unit, quantityOnHand: item.quantityOnHand }))}
+          availableInventoryItems={inventoryCatalog.items.map((item) => ({ id: item.id, name: item.name, category: item.category, unit: item.unit, quantityOnHand: item.quantityOnHand }))}
           availableProjects={projects.map((project) => ({ id: project.id, name: project.name, status: project.status }))}
         />
       );

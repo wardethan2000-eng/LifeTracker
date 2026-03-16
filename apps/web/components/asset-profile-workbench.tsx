@@ -28,6 +28,7 @@ import { CompactFieldPreview } from "./compact-field-preview";
 import { CompactMetricPreview } from "./compact-metric-preview";
 import { CompactSchedulePreview } from "./compact-schedule-preview";
 import { ExpandableCard } from "./expandable-card";
+import { SectionFilterBar, SectionFilterChildren, SectionFilterProvider, SectionFilterToggle } from "./section-filter";
 
 type AssetProfileWorkbenchProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -1105,6 +1106,13 @@ export function AssetProfileWorkbench({
   const unsectionedFieldDefinitions = fieldDefinitions
     .map((field, index) => ({ field, index }))
     .filter(({ field }) => !field.group?.trim());
+  const customFieldSearchItems = fieldDefinitions.map((field, index) => ({
+    index,
+    key: field.key,
+    label: field.label,
+    group: field.group?.trim() ?? "",
+    type: getFieldTypeLabel(field.type)
+  }));
 
   const handleBlueprintChange = (nextId: string): void => {
     setSelectedBlueprintId(nextId);
@@ -1554,12 +1562,28 @@ export function AssetProfileWorkbench({
           </Card>
 
           {/* Card 2: Custom Fields (expandable) */}
-          <ExpandableCard
-            title="Custom Fields"
-            modalTitle="Custom Field Definitions"
-            previewContent={<CompactFieldPreview fieldDefinitions={fieldDefinitions} />}
-          >
-            <div>
+          <SectionFilterProvider items={customFieldSearchItems} keys={["label", "group", "type"]} placeholder="Filter custom fields by label, section, or type">
+            <ExpandableCard
+              title="Custom Fields"
+              modalTitle="Custom Field Definitions"
+              actions={<SectionFilterToggle />}
+              headerContent={<SectionFilterBar />}
+              previewContent={<CompactFieldPreview fieldDefinitions={fieldDefinitions} />}
+            >
+              <SectionFilterChildren<(typeof customFieldSearchItems)[number]>>
+                {(filteredFieldItems) => {
+                  const filteredIndexes = new Set(filteredFieldItems.map((item) => item.index));
+                  const filteredUnsectionedFieldDefinitions = unsectionedFieldDefinitions.filter(({ index }) => filteredIndexes.has(index));
+                  const filteredGroupedFieldDefinitions = detailSections
+                    .filter((sectionName) => !LIFECYCLE_SECTION_NAMES.includes(sectionName))
+                    .map((sectionName) => ({
+                      sectionName,
+                      fields: (groupedFieldDefinitions[sectionName] ?? []).filter(({ index }) => filteredIndexes.has(index))
+                    }))
+                    .filter(({ fields }) => fields.length > 0);
+
+                  return (
+                    <div>
               {/* Field picker toolbar */}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '12px' }}>
                 <label className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
@@ -1612,7 +1636,13 @@ export function AssetProfileWorkbench({
                     </tr>
                   ) : null}
 
-                  {unsectionedFieldDefinitions.map(({ field, index }) => {
+                  {fieldDefinitions.length > 0 && filteredFieldItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="workbench-table__empty">No custom fields match that search.</td>
+                    </tr>
+                  ) : null}
+
+                  {filteredUnsectionedFieldDefinitions.map(({ field, index }) => {
                     const isExpanded = expandedFieldEditors.includes(index);
                     const optionsValue = field.options.map((opt) => opt.value).join(", ");
                     return (
@@ -1655,9 +1685,7 @@ export function AssetProfileWorkbench({
                     );
                   })}
 
-                  {detailSections.filter((s) => !LIFECYCLE_SECTION_NAMES.includes(s)).map((groupLabel) => {
-                    const fields = groupedFieldDefinitions[groupLabel] ?? [];
-                    if (fields.length === 0) return null;
+                  {filteredGroupedFieldDefinitions.map(({ sectionName: groupLabel, fields }) => {
                     return (
                       <Fragment key={`section-${groupLabel}`}>
                         <tr className="workbench-table__section-head">
@@ -1713,8 +1741,12 @@ export function AssetProfileWorkbench({
                   })}
                 </tbody>
               </table>
-            </div>
-          </ExpandableCard>
+                    </div>
+                  );
+                }}
+              </SectionFilterChildren>
+            </ExpandableCard>
+          </SectionFilterProvider>
 
           {/* Card 3: Usage Metrics (expandable) */}
           <ExpandableCard

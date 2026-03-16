@@ -10,6 +10,12 @@ import {
   getScheduleInventoryItems,
   updateScheduleInventoryItem
 } from "../lib/api";
+import {
+  SectionFilterBar,
+  SectionFilterChildren,
+  SectionFilterProvider,
+  SectionFilterToggle
+} from "./section-filter";
 
 type ScheduleInventoryLinksProps = {
   assetId: string;
@@ -83,6 +89,12 @@ export function ScheduleInventoryLinks({
   const availableInventoryItems = inventoryItems.filter(
     (item) => !links.some((link) => link.inventoryItemId === item.id)
   );
+  const searchableLinks = links.map((link) => ({
+    id: link.id,
+    name: link.inventoryItem.name,
+    partNumber: link.inventoryItem.partNumber ?? "",
+    link
+  }));
 
   useEffect(() => {
     if (availableInventoryItems.length === 0) {
@@ -180,126 +192,138 @@ export function ScheduleInventoryLinks({
 
   return (
     <section className="schedule-inventory-links" aria-label="Required parts">
-      <div className="schedule-inventory-links__header">
-        <div>
-          <h4>Required Parts</h4>
-          <p>Link inventory items this schedule consumes each time it is completed.</p>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <p className="schedule-inventory-links__empty">Loading required parts…</p>
-      ) : (
-        <>
-          {links.length === 0 ? (
-            <p className="schedule-inventory-links__empty">No required parts linked yet.</p>
-          ) : (
-            <div className="schedule-inventory-links__table-wrap">
-              <table className="data-table schedule-inventory-links__table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Quantity per Service</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {links.map((link) => {
-                    const isUpdating = updatingInventoryItemId === link.inventoryItemId;
-                    const isRemoving = removingInventoryItemId === link.inventoryItemId;
-
-                    return (
-                      <tr key={link.id}>
-                        <td>
-                          <div className="data-table__primary">{link.inventoryItem.name}</div>
-                          <div className="data-table__secondary">{link.inventoryItem.partNumber ?? "No part number"}</div>
-                        </td>
-                        <td>
-                          <label className="schedule-inventory-links__quantity-field">
-                            <input
-                              type="number"
-                              min="0.1"
-                              step="0.1"
-                              value={draftQuantities[link.inventoryItemId] ?? toQuantityInput(link.quantityPerService)}
-                              disabled={isUpdating || isRemoving}
-                              onChange={(event) => setDraftQuantities((current) => ({
-                                ...current,
-                                [link.inventoryItemId]: event.target.value
-                              }))}
-                              onBlur={() => void handleQuantityCommit(link)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  void handleQuantityCommit(link);
-                                }
-                              }}
-                            />
-                            <span>{link.inventoryItem.unit}</span>
-                          </label>
-                        </td>
-                        <td className="schedule-inventory-links__actions-cell">
-                          <button
-                            type="button"
-                            className="button button--secondary button--sm"
-                            disabled={isRemoving || isUpdating}
-                            onClick={() => void handleRemove(link.inventoryItemId)}
-                          >
-                            {isRemoving ? "Removing…" : "Remove"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="schedule-inventory-links__controls">
-            <label className="field">
-              <span>Add Part</span>
-              <select
-                value={selectedInventoryItemId}
-                disabled={availableInventoryItems.length === 0 || isAdding}
-                onChange={(event) => setSelectedInventoryItemId(event.target.value)}
-              >
-                {availableInventoryItems.length === 0 ? (
-                  <option value="">All household inventory items are already linked</option>
-                ) : (
-                  availableInventoryItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}{item.partNumber ? ` (${item.partNumber})` : ""}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-            <label className="field schedule-inventory-links__add-quantity">
-              <span>Quantity per Service</span>
-              <input
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={newQuantity}
-                disabled={isAdding || availableInventoryItems.length === 0}
-                onChange={(event) => setNewQuantity(event.target.value)}
-              />
-            </label>
-            <div className="schedule-inventory-links__add-action">
-              <button
-                type="button"
-                className="button button--secondary"
-                disabled={isAdding || availableInventoryItems.length === 0}
-                onClick={() => void handleAdd()}
-              >
-                {isAdding ? "Adding…" : "Add Part"}
-              </button>
-            </div>
+      <SectionFilterProvider items={searchableLinks} keys={["name", "partNumber"]} placeholder="Filter required parts by item or part number">
+        <div className="schedule-inventory-links__header">
+          <div>
+            <h4>Required Parts</h4>
+            <p>Link inventory items this schedule consumes each time it is completed.</p>
           </div>
+          <SectionFilterToggle />
+        </div>
+        <SectionFilterBar />
 
-          {errorMessage ? <p className="schedule-inventory-links__error">{errorMessage}</p> : null}
-        </>
-      )}
+        {isLoading ? (
+          <p className="schedule-inventory-links__empty">Loading required parts…</p>
+        ) : (
+          <>
+            <SectionFilterChildren<typeof searchableLinks[number]>>
+              {(filteredLinks) => (
+                <>
+                  {links.length === 0 ? (
+                    <p className="schedule-inventory-links__empty">No required parts linked yet.</p>
+                  ) : filteredLinks.length === 0 ? (
+                    <p className="schedule-inventory-links__empty">No required parts match that search.</p>
+                  ) : (
+                    <div className="schedule-inventory-links__table-wrap">
+                      <table className="data-table schedule-inventory-links__table">
+                        <thead>
+                          <tr>
+                            <th>Item</th>
+                            <th>Quantity per Service</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredLinks.map(({ link }) => {
+                            const isUpdating = updatingInventoryItemId === link.inventoryItemId;
+                            const isRemoving = removingInventoryItemId === link.inventoryItemId;
+
+                            return (
+                              <tr key={link.id}>
+                                <td>
+                                  <div className="data-table__primary">{link.inventoryItem.name}</div>
+                                  <div className="data-table__secondary">{link.inventoryItem.partNumber ?? "No part number"}</div>
+                                </td>
+                                <td>
+                                  <label className="schedule-inventory-links__quantity-field">
+                                    <input
+                                      type="number"
+                                      min="0.1"
+                                      step="0.1"
+                                      value={draftQuantities[link.inventoryItemId] ?? toQuantityInput(link.quantityPerService)}
+                                      disabled={isUpdating || isRemoving}
+                                      onChange={(event) => setDraftQuantities((current) => ({
+                                        ...current,
+                                        [link.inventoryItemId]: event.target.value
+                                      }))}
+                                      onBlur={() => void handleQuantityCommit(link)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          void handleQuantityCommit(link);
+                                        }
+                                      }}
+                                    />
+                                    <span>{link.inventoryItem.unit}</span>
+                                  </label>
+                                </td>
+                                <td className="schedule-inventory-links__actions-cell">
+                                  <button
+                                    type="button"
+                                    className="button button--secondary button--sm"
+                                    disabled={isRemoving || isUpdating}
+                                    onClick={() => void handleRemove(link.inventoryItemId)}
+                                  >
+                                    {isRemoving ? "Removing…" : "Remove"}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </SectionFilterChildren>
+
+            <div className="schedule-inventory-links__controls">
+              <label className="field">
+                <span>Add Part</span>
+                <select
+                  value={selectedInventoryItemId}
+                  disabled={availableInventoryItems.length === 0 || isAdding}
+                  onChange={(event) => setSelectedInventoryItemId(event.target.value)}
+                >
+                  {availableInventoryItems.length === 0 ? (
+                    <option value="">All household inventory items are already linked</option>
+                  ) : (
+                    availableInventoryItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}{item.partNumber ? ` (${item.partNumber})` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <label className="field schedule-inventory-links__add-quantity">
+                <span>Quantity per Service</span>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={newQuantity}
+                  disabled={isAdding || availableInventoryItems.length === 0}
+                  onChange={(event) => setNewQuantity(event.target.value)}
+                />
+              </label>
+              <div className="schedule-inventory-links__add-action">
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  disabled={isAdding || availableInventoryItems.length === 0}
+                  onClick={() => void handleAdd()}
+                >
+                  {isAdding ? "Adding…" : "Add Part"}
+                </button>
+              </div>
+            </div>
+
+            {errorMessage ? <p className="schedule-inventory-links__error">{errorMessage}</p> : null}
+          </>
+        )}
+      </SectionFilterProvider>
     </section>
   );
 }

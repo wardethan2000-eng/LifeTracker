@@ -2042,7 +2042,7 @@ textarea { resize: vertical; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .project-phase-drafts__row .field {
@@ -2416,7 +2416,7 @@ textarea { resize: vertical; }
   display: grid;
   grid-template-columns: minmax(220px, 2fr) minmax(140px, 1fr) auto;
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .schedule-inventory-links__add-quantity input {
@@ -2425,7 +2425,7 @@ textarea { resize: vertical; }
 
 .schedule-inventory-links__add-action {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .schedule-inventory-links__empty,
@@ -5093,11 +5093,11 @@ html[data-ui-density="compact"] .resource-layout__aside {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .session-metric-form-submit {
-  align-self: end;
+  align-self: flex-end;
 }
 
 .session-total-row {
@@ -5132,6 +5132,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 32px;
   height: 32px;
   border: 1px solid var(--border);
@@ -5165,6 +5166,14 @@ html[data-ui-density="compact"] .resource-layout__aside {
   border-bottom: 1px solid var(--border);
 }
 
+.panel > .section-filter__bar {
+  padding-inline: 20px;
+}
+
+.card > .section-filter__bar {
+  padding-inline: 16px;
+}
+
 .section-filter__bar-inner {
   display: flex;
   align-items: center;
@@ -5182,6 +5191,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
   background: transparent;
   color: var(--ink);
   font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .section-filter__input::placeholder {
@@ -5210,6 +5220,44 @@ html[data-ui-density="compact"] .resource-layout__aside {
   padding: 10px 16px 0;
   color: var(--ink-muted);
   font-size: 0.82rem;
+}
+
+.panel .section-filter__count {
+  padding-inline: 20px;
+}
+
+.card .section-filter__count {
+  padding-inline: 16px;
+}
+
+.panel > .section-filter__bar + .panel__body--padded {
+  padding-top: 16px;
+}
+
+.card > .section-filter__bar + .card__body {
+  padding-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .panel__header,
+  .card__header {
+    align-items: flex-start;
+  }
+
+  .panel__header-actions,
+  .card__header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .section-filter__bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .section-filter__clear {
+    margin-left: auto;
+  }
 }
 
 .session-saved-indicator {
