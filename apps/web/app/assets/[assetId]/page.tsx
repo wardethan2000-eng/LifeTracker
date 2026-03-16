@@ -1,10 +1,14 @@
 import type {
   AssetDetailResponse,
+  AssetMetricCorrelationMatrix,
+  EnhancedUsageProjection,
   AssetTimelineItem,
   AssetTimelineQuery,
   MaintenanceLog,
   UsageMetricEntry,
+  UsageCostNormalization,
   UsageProjection
+  ,UsageRateAnalytics
 } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
@@ -53,9 +57,13 @@ import {
   getHouseholdAssets,
   getHouseholdMembers,
   getHouseholdPresets,
+  getAssetMetricCorrelations,
   getLibraryPresets,
+  getEnhancedProjections,
   getMetricEntries,
-  getMetricProjection
+  getMetricProjection,
+  getMetricRateAnalytics,
+  getMetricCostNormalization
 } from "../../../lib/api";
 import {
   formatCategoryLabel,
@@ -88,7 +96,12 @@ type MetricInsight = {
   metricId: string;
   entries: UsageMetricEntry[];
   projection: UsageProjection | null;
+  rateAnalytics: UsageRateAnalytics | null;
+  costNormalization: UsageCostNormalization | null;
+  enhancedProjection: EnhancedUsageProjection | null;
 };
+
+const METRIC_ANALYTICS_LOOKBACK_DAYS = 365;
 
 const tabs = [
   { id: "overview", label: "Overview" },
@@ -204,18 +217,89 @@ const hobbyStatusBadgeClass = (status: string): string => {
   }
 };
 
+const getUsageRateStatusClass = (
+  insufficientData: boolean,
+  isAnomaly: boolean,
+  deviationFactor: number
+): string => {
+  if (insufficientData) {
+    return "pill";
+  }
+
+  if (!isAnomaly) {
+    return "pill pill--success";
+  }
+
+  return Math.abs(deviationFactor) > 2.5 ? "pill pill--danger" : "pill pill--warning";
+};
+
+const getUsageRateStatusLabel = (
+  insufficientData: boolean,
+  isAnomaly: boolean,
+  deviationFactor: number
+): string => {
+  if (insufficientData) {
+    return "Insufficient data";
+  }
+
+  if (!isAnomaly) {
+    return "Normal";
+  }
+
+  return Math.abs(deviationFactor) > 2.5 ? "Anomaly" : "Unusual";
+};
+
+const getCorrelationStrengthLabel = (correlation: number): string => {
+  if (correlation > 0.8) {
+    return "Strong positive";
+  }
+
+  if (correlation > 0.5) {
+    return "Moderate positive";
+  }
+
+  if (correlation >= -0.5) {
+    return "Weak";
+  }
+
+  if (correlation >= -0.8) {
+    return "Moderate negative";
+  }
+
+  return "Strong negative";
+};
+
+const getDivergencePillClass = (trend: string): string => {
+  switch (trend) {
+    case "stable":
+      return "pill pill--success";
+    case "diverging":
+      return "pill pill--warning";
+    case "converging":
+      return "pill pill--accent";
+    default:
+      return "pill";
+  }
+};
+
 async function loadMetricInsights(assetId: string, detail: AssetDetailResponse): Promise<Record<string, MetricInsight>> {
   const metricPayloads = await Promise.all(
     detail.metrics.map(async (metric) => {
-      const [entries, projection] = await Promise.all([
+      const [entries, projection, rateAnalytics, costNormalization, enhancedProjection] = await Promise.all([
         getMetricEntries(assetId, metric.id),
-        getMetricProjection(assetId, metric.id).catch(() => null)
+        getMetricProjection(assetId, metric.id).catch(() => null),
+        getMetricRateAnalytics(assetId, metric.id).catch(() => null),
+        getMetricCostNormalization(assetId, metric.id).catch(() => null),
+        getEnhancedProjections(assetId, metric.id).catch(() => null)
       ]);
 
       return {
         metricId: metric.id,
         entries,
-        projection
+        projection,
+        rateAnalytics,
+        costNormalization,
+        enhancedProjection
       } satisfies MetricInsight;
     })
   );
@@ -245,12 +329,13 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
   try {
     const detail = await getAssetDetail(assetId);
-    const [libraryPresets, customPresets, householdAssets, householdMembers, metricInsights, comments, transferHistory, historyTimeline, overviewTimeline] = await Promise.all([
+    const [libraryPresets, customPresets, householdAssets, householdMembers, metricInsights, metricCorrelations, comments, transferHistory, historyTimeline, overviewTimeline] = await Promise.all([
       getLibraryPresets(),
       getHouseholdPresets(detail.asset.householdId),
       getHouseholdAssets(detail.asset.householdId),
       getHouseholdMembers(detail.asset.householdId),
       loadMetricInsights(assetId, detail),
+      getAssetMetricCorrelations(assetId).catch(() => null),
       getAssetComments(assetId),
       getAssetTransferHistory(assetId),
       tab === "history" ? getAssetTimeline(assetId, timelineQuery) : Promise.resolve(null),
@@ -700,6 +785,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
           <div style={{ display: "grid", gap: "24px" }}>
             {detail.metrics.map((metric) => {
               const insight = metricInsights[metric.id];
+              const enhancedProjection = insight?.enhancedProjection ?? null;
 
               return (
                 <section key={metric.id} className="panel">
@@ -757,8 +843,36 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
                     <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
                       <section>
-                        <div className="eyebrow">Projection</div>
-                        {insight?.projection ? (
+                        <div className="eyebrow">Enhanced Projections</div>
+                        {enhancedProjection ? (
+                          <div style={{ display: "grid", gap: "12px", marginTop: "10px" }}>
+                            <div className="pill">Rate {enhancedProjection.currentRate.toFixed(2)} {enhancedProjection.rateUnit}</div>
+                            {enhancedProjection.scheduleProjections.length === 0 ? (
+                              <p className="panel__empty">No active schedules with usage thresholds are linked to this metric.</p>
+                            ) : (
+                              <div className="schedule-stack">
+                                {enhancedProjection.scheduleProjections.map((projection) => (
+                                  <article key={projection.scheduleId} className="schedule-card">
+                                    <div className="schedule-card__summary">
+                                      <div>
+                                        <h3>{projection.scheduleName}</h3>
+                                        <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                                          {projection.humanLabel}
+                                        </p>
+                                        <p style={{ color: "var(--ink-muted)", fontSize: "0.8rem", marginTop: "4px" }}>
+                                          Rate used: {enhancedProjection.currentRate.toFixed(2)} {enhancedProjection.rateUnit}
+                                        </p>
+                                      </div>
+                                      <span className="pill">
+                                        {projection.projectedDate ? formatDate(projection.projectedDate) : projection.humanLabel}
+                                      </span>
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : insight?.projection ? (
                           <div style={{ display: "grid", gap: "12px", marginTop: "10px" }}>
                             <div className="pill">Rate {insight.projection.currentRate.toFixed(2)} {insight.projection.rateUnit}</div>
                             {insight.projection.projectedValues.length === 0 ? (
@@ -809,10 +923,125 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                         )}
                       </section>
                     </div>
+
+                    <section>
+                      <div className="eyebrow">Usage Rate Trend</div>
+                      {insight?.rateAnalytics ? (
+                        <div style={{ display: "grid", gap: "12px", marginTop: "10px" }}>
+                          <p>
+                            Averaging {insight.rateAnalytics.mean.toFixed(2)} {metric.unit}/day over the last {METRIC_ANALYTICS_LOOKBACK_DAYS} days
+                          </p>
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Period</th>
+                                <th>Usage Delta</th>
+                                <th>Rate ({metric.unit}/day)</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {insight.rateAnalytics.buckets.map((bucket) => (
+                                <tr key={bucket.bucketStart}>
+                                  <td>{formatDate(bucket.bucketStart)} - {formatDate(bucket.bucketEnd)}</td>
+                                  <td>{bucket.deltaValue.toFixed(1)}</td>
+                                  <td>{bucket.rate.toFixed(2)}</td>
+                                  <td>
+                                    <span className={getUsageRateStatusClass(bucket.insufficientData, bucket.isAnomaly, bucket.deviationFactor)}>
+                                      {getUsageRateStatusLabel(bucket.insufficientData, bucket.isAnomaly, bucket.deviationFactor)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="panel__empty" style={{ marginTop: "10px" }}>
+                          Usage rate analytics are unavailable for this metric right now.
+                        </p>
+                      )}
+                    </section>
+
+                    {insight?.costNormalization && insight.costNormalization.entries.length > 0 ? (
+                      <section>
+                        <div className="eyebrow">Cost per {metric.unit}</div>
+                        <div style={{ display: "grid", gap: "12px", marginTop: "10px" }}>
+                          <p>
+                            Average cost: {formatCurrency(insight.costNormalization.averageCostPerUnit)} per {metric.unit} across {insight.costNormalization.totalUsage.toFixed(0)} {metric.unit} of tracked usage
+                          </p>
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Maintenance</th>
+                                <th>Usage Increment</th>
+                                <th>Cost</th>
+                                <th>Cost/{metric.unit}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {insight.costNormalization.entries.map((entry) => (
+                                <tr key={`${entry.completedAt}-${entry.logTitle}`}>
+                                  <td>{formatDate(entry.completedAt)}</td>
+                                  <td>{entry.logTitle}</td>
+                                  <td>{entry.incrementalUsage.toFixed(1)}</td>
+                                  <td>{formatCurrency(entry.cost)}</td>
+                                  <td>{formatCurrency(entry.costPerUnit)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+                    ) : null}
                   </div>
                 </section>
               );
             })}
+
+            {detail.metrics.length >= 2 && metricCorrelations ? (
+              <section className="panel">
+                <div className="panel__header">
+                  <h2>Metric Correlations</h2>
+                  <span className="pill">{metricCorrelations.pairs.length}</span>
+                </div>
+                <div className="panel__body--padded">
+                  {metricCorrelations.pairs.length === 0 ? (
+                    <p className="panel__empty">Not enough metric history is available to compare usage patterns yet.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+                      {metricCorrelations.pairs.map((pair) => (
+                        <article key={`${pair.metricA.id}-${pair.metricB.id}`} className="schedule-card">
+                          <div style={{ display: "grid", gap: "12px" }}>
+                            <div>
+                              <h3>{pair.metricA.name} vs {pair.metricB.name}</h3>
+                              <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem", marginTop: "4px" }}>
+                                {pair.correlation.toFixed(2)} • {getCorrelationStrengthLabel(pair.correlation)}
+                              </p>
+                            </div>
+                            <dl className="data-list">
+                              <div>
+                                <dt>Mean ratio</dt>
+                                <dd>{pair.meanRatio.toFixed(2)}x</dd>
+                              </div>
+                              <div>
+                                <dt>Divergence</dt>
+                                <dd><span className={getDivergencePillClass(pair.divergenceTrend)}>{pair.divergenceTrend}</span></dd>
+                              </div>
+                              <div>
+                                <dt>Samples</dt>
+                                <dd>{pair.ratioSeries.length}</dd>
+                              </div>
+                            </dl>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
           </div>
         )}
       </div>

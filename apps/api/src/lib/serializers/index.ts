@@ -1,6 +1,7 @@
 export * from "./assets.js";
 export * from "./attachments.js";
 export * from "./comments.js";
+export * from "./cost-analytics.js";
 export * from "./hobbies.js";
 export * from "./invitations.js";
 export * from "./inventory.js";
@@ -9,5 +10,6 @@ export * from "./notifications.js";
 export * from "./projects.js";
 export * from "./service-providers.js";
 export * from "./timeline.js";
+export * from "./usage-analytics.js";
 export * from "./usage-metrics.js";
 export * from "./users.js";

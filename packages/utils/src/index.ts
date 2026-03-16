@@ -244,6 +244,668 @@ export const projectNextDueValue = (
   return projected;
 };
 
+export interface UsageRateBucket {
+  bucketStart: string;
+  bucketEnd: string;
+  deltaValue: number;
+  rate: number;
+  entryCount: number;
+  insufficientData: boolean;
+}
+
+export interface UsageAnomalyBucket extends UsageRateBucket {
+  isAnomaly: boolean;
+  deviationFactor: number;
+}
+
+export interface UsageAnomalyResult {
+  mean: number;
+  stddev: number;
+  buckets: UsageAnomalyBucket[];
+}
+
+export interface CostPerUnitEntry {
+  cost: number;
+  incrementalUsage: number;
+  costPerUnit: number;
+  completedAt: Date;
+}
+
+export interface CostPerUnitResult {
+  totalCost: number;
+  totalUsage: number;
+  averageCostPerUnit: number;
+  entries: CostPerUnitEntry[];
+}
+
+export interface LogCostBreakdown {
+  directCost: number;
+  laborCost: number;
+  partsCost: number;
+  totalCost: number;
+}
+
+export interface PeriodCostAggregate {
+  period: string;
+  totalCost: number;
+  logCount: number;
+}
+
+export interface PeriodCostAggregateResult {
+  periods: PeriodCostAggregate[];
+  rolling12MonthAverage: number;
+}
+
+export interface ScheduleForecastEntry {
+  scheduleId: string;
+  scheduleName: string;
+  costPerOccurrence: number;
+  occurrences3m: number;
+  occurrences6m: number;
+  occurrences12m: number;
+  cost3m: number;
+  cost6m: number;
+  cost12m: number;
+}
+
+export interface ScheduleForecastResult {
+  schedules: ScheduleForecastEntry[];
+  totals: {
+    total3m: number;
+    total6m: number;
+    total12m: number;
+  };
+}
+
+export interface MultiScheduleProjection {
+  scheduleId: string;
+  scheduleName: string;
+  nextDueMetricValue: number;
+  projectedDate: string | null;
+  daysUntil: number | null;
+  humanLabel: string;
+}
+
+export interface MetricCorrelationRatioPoint {
+  date: string;
+  ratio: number;
+}
+
+export interface MetricCorrelationResult {
+  correlation: number;
+  ratioSeries: MetricCorrelationRatioPoint[];
+  divergenceTrend: "stable" | "diverging" | "converging";
+  meanRatio: number;
+}
+
+export const computeLogTotalCost = (log: {
+  cost: number | null;
+  laborHours: number | null;
+  laborRate: number | null;
+  parts: Array<{ quantity: number; unitCost: number | null }>;
+}): LogCostBreakdown => {
+  const directCost = log.cost ?? 0;
+  const laborCost = typeof log.laborHours === "number" && typeof log.laborRate === "number"
+    ? log.laborHours * log.laborRate
+    : 0;
+  const partsCost = log.parts.reduce((sum, part) => sum + (part.quantity * (part.unitCost ?? 0)), 0);
+
+  return {
+    directCost,
+    laborCost,
+    partsCost,
+    totalCost: directCost + laborCost + partsCost
+  };
+};
+
+const formatCostPeriod = (date: Date, granularity: "month" | "year"): string => {
+  const year = date.getUTCFullYear();
+
+  if (granularity === "year") {
+    return `${year}`;
+  }
+
+  return `${year}-${`${date.getUTCMonth() + 1}`.padStart(2, "0")}`;
+};
+
+export const aggregateCostsByPeriod = (
+  entries: Array<{ totalCost: number; completedAt: Date }>,
+  granularity: "month" | "year"
+): PeriodCostAggregateResult => {
+  const buckets = new Map<string, PeriodCostAggregate>();
+
+  for (const entry of entries) {
+    const period = formatCostPeriod(entry.completedAt, granularity);
+    const existing = buckets.get(period);
+
+    if (existing) {
+      existing.totalCost += entry.totalCost;
+      existing.logCount += 1;
+      continue;
+    }
+
+    buckets.set(period, {
+      period,
+      totalCost: entry.totalCost,
+      logCount: 1
+    });
+  }
+
+  const periods = Array.from(buckets.values()).sort((left, right) => left.period.localeCompare(right.period));
+  const monthlyPeriods = granularity === "month" ? periods.slice(-12) : [];
+  const rolling12MonthAverage = monthlyPeriods.length > 0
+    ? monthlyPeriods.reduce((sum, item) => sum + item.totalCost, 0) / monthlyPeriods.length
+    : 0;
+
+  return {
+    periods,
+    rolling12MonthAverage
+  };
+};
+
+const clampOccurrenceCount = (value: number): number => Number.isFinite(value) && value > 0
+  ? Math.floor(value)
+  : 0;
+
+const countDateWithinHorizon = (nextDueAt: Date | null, horizonDays: number, now: Date): number => {
+  if (!nextDueAt) {
+    return 0;
+  }
+
+  const horizonAt = new Date(now.getTime() + horizonDays * MS_PER_DAY);
+  return nextDueAt <= horizonAt ? 1 : 0;
+};
+
+export const computeScheduleForecast = (schedules: Array<{
+  scheduleId: string;
+  scheduleName: string;
+  estimatedCost: number | null;
+  historicalAverageCost: number | null;
+  nextDueAt: Date | null;
+  nextDueMetricValue: number | null;
+  ratePerDay: number | null;
+  triggerType: string;
+  intervalDays: number | null;
+}>): ScheduleForecastResult => {
+  const now = new Date();
+  const scheduleForecasts: ScheduleForecastEntry[] = [];
+
+  for (const schedule of schedules) {
+    const costPerOccurrence = schedule.estimatedCost ?? schedule.historicalAverageCost;
+
+    if (costPerOccurrence === null) {
+      continue;
+    }
+
+    let occurrences3m = 0;
+    let occurrences6m = 0;
+    let occurrences12m = 0;
+
+    if (schedule.triggerType === "seasonal" || schedule.triggerType === "one_time") {
+      occurrences3m = countDateWithinHorizon(schedule.nextDueAt, 90, now);
+      occurrences6m = countDateWithinHorizon(schedule.nextDueAt, 180, now);
+      occurrences12m = countDateWithinHorizon(schedule.nextDueAt, 365, now);
+    } else {
+      let effectiveIntervalDays = schedule.intervalDays;
+
+      if ((schedule.triggerType === "usage" || schedule.triggerType === "compound") && schedule.intervalDays === null) {
+        effectiveIntervalDays = schedule.ratePerDay && schedule.ratePerDay > 0
+          ? (schedule.nextDueMetricValue ?? 0) / schedule.ratePerDay
+          : null;
+      }
+
+      if (effectiveIntervalDays && effectiveIntervalDays > 0) {
+        occurrences3m = clampOccurrenceCount(90 / effectiveIntervalDays);
+        occurrences6m = clampOccurrenceCount(180 / effectiveIntervalDays);
+        occurrences12m = clampOccurrenceCount(365 / effectiveIntervalDays);
+      }
+    }
+
+    scheduleForecasts.push({
+      scheduleId: schedule.scheduleId,
+      scheduleName: schedule.scheduleName,
+      costPerOccurrence,
+      occurrences3m,
+      occurrences6m,
+      occurrences12m,
+      cost3m: occurrences3m * costPerOccurrence,
+      cost6m: occurrences6m * costPerOccurrence,
+      cost12m: occurrences12m * costPerOccurrence
+    });
+  }
+
+  return {
+    schedules: scheduleForecasts,
+    totals: {
+      total3m: scheduleForecasts.reduce((sum, item) => sum + item.cost3m, 0),
+      total6m: scheduleForecasts.reduce((sum, item) => sum + item.cost6m, 0),
+      total12m: scheduleForecasts.reduce((sum, item) => sum + item.cost12m, 0)
+    }
+  };
+};
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
+
+const startOfUtcDay = (date: Date): Date => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth(),
+  date.getUTCDate()
+));
+
+const endOfUtcDay = (date: Date): Date => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth(),
+  date.getUTCDate(),
+  23,
+  59,
+  59,
+  999
+));
+
+const startOfUtcWeek = (date: Date): Date => {
+  const start = startOfUtcDay(date);
+  const day = start.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  start.setUTCDate(start.getUTCDate() + offset);
+  return start;
+};
+
+const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth(),
+  1
+));
+
+const endOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth() + 1,
+  0,
+  23,
+  59,
+  59,
+  999
+));
+
+const differenceInDays = (start: Date, end: Date): number => Math.max(
+  1,
+  Math.round((startOfUtcDay(end).getTime() - startOfUtcDay(start).getTime()) / MS_PER_DAY) + 1
+);
+
+const calculateMean = (values: number[]): number => {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const calculateStddev = (values: number[], mean = calculateMean(values)): number => {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+};
+
+const getBucketBounds = (date: Date, bucketSize: "week" | "month"): { start: Date; end: Date; days: number } => {
+  if (bucketSize === "week") {
+    const start = startOfUtcWeek(date);
+    const end = endOfUtcDay(new Date(start.getTime() + 6 * MS_PER_DAY));
+    return { start, end, days: 7 };
+  }
+
+  const start = startOfUtcMonth(date);
+  const end = endOfUtcMonth(date);
+  return {
+    start,
+    end,
+    days: differenceInDays(start, end)
+  };
+};
+
+const formatProjectionDistance = (daysUntil: number): string => {
+  if (daysUntil <= 0) {
+    return "today";
+  }
+
+  if (daysUntil < 45) {
+    const roundedDays = Math.max(1, Math.round(daysUntil));
+    return `about ${roundedDays} day${roundedDays === 1 ? "" : "s"}`;
+  }
+
+  const months = Math.max(1, Math.round(daysUntil / 30));
+  return `about ${months} month${months === 1 ? "" : "s"}`;
+};
+
+const projectionDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric"
+});
+
+const findClosestEntry = (entries: ValueDatePair[], targetDate: Date): ValueDatePair | null => {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return entries.reduce<ValueDatePair>((closest, candidate) => {
+    const closestDistance = Math.abs(closest.date.getTime() - targetDate.getTime());
+    const candidateDistance = Math.abs(candidate.date.getTime() - targetDate.getTime());
+    return candidateDistance < closestDistance ? candidate : closest;
+  }, entries[0]!);
+};
+
+const interpolateValueAt = (entries: ValueDatePair[], targetTime: number): number | null => {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  if (entries.length === 1) {
+    return entries[0]!.value;
+  }
+
+  for (let index = 0; index < entries.length; index += 1) {
+    const current = entries[index]!;
+    const currentTime = current.date.getTime();
+
+    if (currentTime === targetTime) {
+      return current.value;
+    }
+
+    const next = entries[index + 1];
+
+    if (!next) {
+      break;
+    }
+
+    const nextTime = next.date.getTime();
+    if (currentTime <= targetTime && targetTime <= nextTime) {
+      const range = nextTime - currentTime;
+      if (range === 0) {
+        return next.value;
+      }
+
+      const progress = (targetTime - currentTime) / range;
+      return current.value + (next.value - current.value) * progress;
+    }
+  }
+
+  return null;
+};
+
+const calculatePearsonCorrelation = (left: number[], right: number[]): number => {
+  if (left.length < 2 || right.length < 2 || left.length !== right.length) {
+    return 0;
+  }
+
+  const leftMean = calculateMean(left);
+  const rightMean = calculateMean(right);
+  const numerator = left.reduce((sum, value, index) => sum + (value - leftMean) * (right[index]! - rightMean), 0);
+  const leftVariance = left.reduce((sum, value) => sum + (value - leftMean) ** 2, 0);
+  const rightVariance = right.reduce((sum, value) => sum + (value - rightMean) ** 2, 0);
+  const denominator = Math.sqrt(leftVariance * rightVariance);
+
+  if (denominator === 0) {
+    return 0;
+  }
+
+  return numerator / denominator;
+};
+
+export const bucketUsageRates = (
+  entries: ValueDatePair[],
+  bucketSize: "week" | "month"
+): UsageRateBucket[] => {
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const buckets = new Map<string, { start: Date; end: Date; days: number; entries: ValueDatePair[] }>();
+
+  for (const entry of sorted) {
+    const bounds = getBucketBounds(entry.date, bucketSize);
+    const key = bounds.start.toISOString();
+    const bucket = buckets.get(key);
+
+    if (bucket) {
+      bucket.entries.push(entry);
+    } else {
+      buckets.set(key, {
+        ...bounds,
+        entries: [entry]
+      });
+    }
+  }
+
+  return [...buckets.values()]
+    .sort((left, right) => left.start.getTime() - right.start.getTime())
+    .map((bucket) => {
+      const first = bucket.entries[0]!;
+      const last = bucket.entries[bucket.entries.length - 1]!;
+      const sufficientData = bucket.entries.length >= 2;
+      const deltaValue = sufficientData ? last.value - first.value : 0;
+      const rate = sufficientData ? deltaValue / bucket.days : 0;
+
+      return {
+        bucketStart: bucket.start.toISOString(),
+        bucketEnd: bucket.end.toISOString(),
+        deltaValue,
+        rate,
+        entryCount: bucket.entries.length,
+        insufficientData: !sufficientData
+      } satisfies UsageRateBucket;
+    });
+};
+
+export const detectUsageAnomaly = (
+  buckets: UsageRateBucket[],
+  sensitivity = 1.5
+): UsageAnomalyResult => {
+  const sufficientBuckets = buckets.filter((bucket) => !bucket.insufficientData);
+  const rates = sufficientBuckets.map((bucket) => bucket.rate);
+  const mean = calculateMean(rates);
+  const stddev = calculateStddev(rates, mean);
+
+  return {
+    mean,
+    stddev,
+    buckets: buckets.map((bucket) => {
+      if (bucket.insufficientData || stddev === 0) {
+        return {
+          ...bucket,
+          isAnomaly: false,
+          deviationFactor: 0
+        };
+      }
+
+      const deviationFactor = (bucket.rate - mean) / stddev;
+
+      return {
+        ...bucket,
+        isAnomaly: Math.abs(deviationFactor) > sensitivity,
+        deviationFactor
+      };
+    })
+  };
+};
+
+export const computeCostPerUnit = (
+  entries: Array<{ cost: number; usageValueAtCompletion: number; completedAt: Date }>,
+  previousBaselineUsageValue: number
+): CostPerUnitResult => {
+  const sorted = [...entries].sort((a, b) => a.completedAt.getTime() - b.completedAt.getTime());
+  let previousUsageValue = previousBaselineUsageValue;
+
+  const normalizedEntries = sorted.reduce<CostPerUnitEntry[]>((accumulator, entry) => {
+    const incrementalUsage = entry.usageValueAtCompletion - previousUsageValue;
+    previousUsageValue = entry.usageValueAtCompletion;
+
+    if (incrementalUsage <= 0) {
+      return accumulator;
+    }
+
+    accumulator.push({
+      cost: entry.cost,
+      incrementalUsage,
+      costPerUnit: entry.cost / incrementalUsage,
+      completedAt: entry.completedAt
+    });
+
+    return accumulator;
+  }, []);
+
+  const totalCost = normalizedEntries.reduce((sum, entry) => sum + entry.cost, 0);
+  const totalUsage = normalizedEntries.reduce((sum, entry) => sum + entry.incrementalUsage, 0);
+
+  return {
+    totalCost,
+    totalUsage,
+    averageCostPerUnit: totalUsage > 0 ? totalCost / totalUsage : 0,
+    entries: normalizedEntries
+  };
+};
+
+export const projectMultipleSchedules = (
+  currentValue: number,
+  ratePerDay: number,
+  schedules: Array<{ scheduleId: string; scheduleName: string; nextDueMetricValue: number }>
+): MultiScheduleProjection[] => schedules.map((schedule) => {
+  if (currentValue >= schedule.nextDueMetricValue) {
+    return {
+      scheduleId: schedule.scheduleId,
+      scheduleName: schedule.scheduleName,
+      nextDueMetricValue: schedule.nextDueMetricValue,
+      projectedDate: null,
+      daysUntil: 0,
+      humanLabel: "Already due"
+    } satisfies MultiScheduleProjection;
+  }
+
+  const projectedDate = projectNextDueValue(currentValue, ratePerDay, schedule.nextDueMetricValue);
+
+  if (!projectedDate) {
+    return {
+      scheduleId: schedule.scheduleId,
+      scheduleName: schedule.scheduleName,
+      nextDueMetricValue: schedule.nextDueMetricValue,
+      projectedDate: null,
+      daysUntil: null,
+      humanLabel: "Unable to project"
+    } satisfies MultiScheduleProjection;
+  }
+
+  const daysUntil = Math.max(0, Math.round((projectedDate.getTime() - Date.now()) / MS_PER_DAY));
+
+  return {
+    scheduleId: schedule.scheduleId,
+    scheduleName: schedule.scheduleName,
+    nextDueMetricValue: schedule.nextDueMetricValue,
+    projectedDate: projectedDate.toISOString(),
+    daysUntil,
+    humanLabel: `~${projectionDateFormatter.format(projectedDate)} (${formatProjectionDistance(daysUntil)})`
+  } satisfies MultiScheduleProjection;
+});
+
+export const correlateMetrics = (
+  metricAEntries: ValueDatePair[],
+  metricBEntries: ValueDatePair[]
+): MetricCorrelationResult => {
+  const metricA = [...metricAEntries].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const metricB = [...metricBEntries].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const overlapStart = Math.max(
+    metricA[0]?.date.getTime() ?? Number.POSITIVE_INFINITY,
+    metricB[0]?.date.getTime() ?? Number.POSITIVE_INFINITY
+  );
+  const overlapEnd = Math.min(
+    metricA[metricA.length - 1]?.date.getTime() ?? Number.NEGATIVE_INFINITY,
+    metricB[metricB.length - 1]?.date.getTime() ?? Number.NEGATIVE_INFINITY
+  );
+
+  const weeklySampleTimes: number[] = [];
+  if (Number.isFinite(overlapStart) && Number.isFinite(overlapEnd) && overlapStart <= overlapEnd) {
+    let cursor = startOfUtcWeek(new Date(overlapStart)).getTime();
+    while (cursor <= overlapEnd) {
+      if (cursor >= overlapStart) {
+        weeklySampleTimes.push(cursor);
+      }
+      cursor += MS_PER_WEEK;
+    }
+
+    if (weeklySampleTimes.length === 0) {
+      weeklySampleTimes.push(overlapStart);
+    }
+  }
+
+  const interpolatedLeft: number[] = [];
+  const interpolatedRight: number[] = [];
+
+  for (const sampleTime of weeklySampleTimes) {
+    const leftValue = interpolateValueAt(metricA, sampleTime);
+    const rightValue = interpolateValueAt(metricB, sampleTime);
+
+    if (leftValue === null || rightValue === null) {
+      continue;
+    }
+
+    interpolatedLeft.push(leftValue);
+    interpolatedRight.push(rightValue);
+  }
+
+  const correlation = calculatePearsonCorrelation(interpolatedLeft, interpolatedRight);
+
+  const ratioAnchorEntries = metricA.length <= metricB.length ? metricA : metricB;
+  const ratioSeries = ratioAnchorEntries.reduce<MetricCorrelationRatioPoint[]>((accumulator, entry) => {
+    const paired = metricA.length <= metricB.length
+      ? findClosestEntry(metricB, entry.date)
+      : findClosestEntry(metricA, entry.date);
+
+    if (!paired) {
+      return accumulator;
+    }
+
+    const metricAValue = metricA.length <= metricB.length ? entry.value : paired.value;
+    const metricBValue = metricA.length <= metricB.length ? paired.value : entry.value;
+
+    if (metricBValue === 0) {
+      return accumulator;
+    }
+
+    accumulator.push({
+      date: entry.date.toISOString(),
+      ratio: metricAValue / metricBValue
+    });
+
+    return accumulator;
+  }, []);
+
+  const ratioValues = ratioSeries.map((point) => point.ratio);
+  const meanRatio = calculateMean(ratioValues);
+  const ratioStddev = calculateStddev(ratioValues, meanRatio);
+
+  let divergenceTrend: MetricCorrelationResult["divergenceTrend"] = "stable";
+  if (ratioValues.length >= 2) {
+    const stableThreshold = Math.abs(meanRatio) * 0.1;
+    if (ratioStddev < stableThreshold) {
+      divergenceTrend = "stable";
+    } else {
+      const initialDistance = Math.abs(ratioValues[0]! - 1);
+      const finalDistance = Math.abs(ratioValues[ratioValues.length - 1]! - 1);
+      divergenceTrend = finalDistance > initialDistance ? "diverging" : "converging";
+    }
+  }
+
+  return {
+    correlation,
+    ratioSeries,
+    divergenceTrend,
+    meanRatio
+  };
+};
+
 /**
  * Calculates the current extended value of an inventory item when a unit cost is known.
  */

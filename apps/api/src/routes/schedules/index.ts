@@ -119,6 +119,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       triggerConfig: input.triggerConfig,
       notificationConfig: toInputJsonValue(input.notificationConfig),
       metricId,
+      estimatedCost: input.estimatedCost,
+      estimatedMinutes: input.estimatedMinutes,
       nextDueAt: recalculated.nextDueAt,
       nextDueMetricValue: recalculated.nextDueMetricValue
     };
@@ -444,6 +446,14 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.presetKey !== undefined) {
       data.presetKey = input.presetKey;
+    }
+
+    if (input.estimatedCost !== undefined) {
+      data.estimatedCost = input.estimatedCost;
+    }
+
+    if (input.estimatedMinutes !== undefined) {
+      data.estimatedMinutes = input.estimatedMinutes;
     }
 
     if (input.isActive !== undefined) {

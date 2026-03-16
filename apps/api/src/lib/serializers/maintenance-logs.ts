@@ -3,6 +3,7 @@ import {
   maintenanceLogPartSchema,
   maintenanceLogSchema
 } from "@lifekeeper/types";
+import { computeLogTotalCost } from "@lifekeeper/utils";
 
 export const toMaintenanceLogPartResponse = (
   part: Pick<MaintenanceLogPart, "id" | "logId" | "inventoryItemId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">
@@ -18,12 +19,17 @@ export const toMaintenanceLogResponse = (
   parts: Pick<MaintenanceLogPart, "id" | "logId" | "inventoryItemId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">[] = []
 ) => {
   const partResponses = parts.map(toMaintenanceLogPartResponse);
-  const totalPartsCost = parts.reduce(
-    (sum, part) => sum + (part.quantity ?? 1) * (part.unitCost ?? 0),
-    0
-  );
+  const costBreakdown = computeLogTotalCost({
+    cost: log.cost,
+    laborHours: log.laborHours,
+    laborRate: log.laborRate,
+    parts: parts.map((part) => ({
+      quantity: part.quantity ?? 1,
+      unitCost: part.unitCost
+    }))
+  });
   const totalLaborCost = typeof log.laborHours === "number" && typeof log.laborRate === "number"
-    ? log.laborHours * log.laborRate
+    ? costBreakdown.laborCost
     : null;
 
   return maintenanceLogSchema.parse({
@@ -43,7 +49,7 @@ export const toMaintenanceLogResponse = (
     performedBy: log.performedBy,
     metadata: log.metadata,
     parts: partResponses,
-    totalPartsCost,
+    totalPartsCost: costBreakdown.partsCost,
     totalLaborCost,
     createdAt: log.createdAt.toISOString(),
     updatedAt: log.updatedAt.toISOString()

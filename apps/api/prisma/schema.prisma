@@ -373,6 +373,8 @@ model MaintenanceSchedule {
   triggerConfig      Json
   notificationConfig Json             @default("{}")
   presetKey          String?
+  estimatedCost      Float?
+  estimatedMinutes   Int?
   isActive           Boolean          @default(true)
   lastCompletedAt    DateTime?
   nextDueAt          DateTime?

@@ -9,9 +9,11 @@ import {
   assetTimelineItemSchema,
   assetSchema,
   commentSchema,
+  costForecastSchema,
   customPresetProfileSchema,
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
+  householdCostDashboardSchema,
   householdMemberSchema,
   maintenanceLogSchema,
   maintenanceScheduleSchema,
@@ -35,6 +37,7 @@ import {
   partCommonalitySchema,
   projectAssetSchema,
   projectBudgetCategoryListSchema,
+  projectBudgetAnalysisSchema,
   projectBudgetCategorySchema,
   projectDetailSchema,
   projectBreadcrumbSchema,
@@ -56,8 +59,11 @@ import {
   projectTaskChecklistItemSchema,
   searchResponseSchema,
   serviceProviderSchema,
+  serviceProviderSpendSchema,
   threadedCommentSchema,
   type Asset,
+  type AssetCostPerUnit,
+  type AssetCostSummary,
   type AssetTransferList,
   type AssetDetailResponse,
   type AssetLabelData,
@@ -78,6 +84,8 @@ import {
   type UpdateProjectAssetInput,
   type CreateProjectBudgetCategoryInput,
   type CreateProjectExpenseInput,
+    type CostForecast,
+    type HouseholdCostDashboard,
   type CreateProjectPhaseChecklistItemInput,
   type CreateProjectPhaseInput,
   type CreateProjectPhaseSupplyInput,
@@ -126,6 +134,7 @@ import {
   type Notification,
   type ProjectAsset,
   type ProjectBudgetCategory,
+  type ProjectBudgetAnalysis,
   type ProjectBudgetCategorySummary,
   type Project,
   type ProjectDetail,
@@ -145,6 +154,7 @@ import {
   type ProjectStatus,
   type ReorderProjectPhasesInput,
   type ServiceProvider,
+  type ServiceProviderSpend,
   type ThreadedComment,
   type UpdateAssetTimelineEntryInput,
   type UpdateCommentInput,
@@ -165,8 +175,18 @@ import {
   type UsageMetric,
   type UsageMetricEntry,
   type UsageProjection,
+  type UsageRateAnalytics,
+  type UsageCostNormalization,
+  type EnhancedUsageProjection,
+  type AssetMetricCorrelationMatrix,
   usageMetricEntrySchema,
+  assetCostPerUnitSchema,
+  assetCostSummarySchema,
   usageProjectionSchema,
+  usageRateAnalyticsSchema,
+  usageCostNormalizationSchema,
+  enhancedUsageProjectionSchema,
+  assetMetricCorrelationMatrixSchema,
   usageMetricResponseSchema,
   barcodeLookupResultSchema,
   type BarcodeLookupResult,
@@ -1167,6 +1187,50 @@ export const getMetricProjection = async (assetId: string, metricId: string): Pr
   schema: usageProjectionSchema
 });
 
+export const getMetricRateAnalytics = async (
+  assetId: string,
+  metricId: string,
+  options?: { bucketSize?: string; lookback?: number }
+): Promise<UsageRateAnalytics> => {
+  const params = new URLSearchParams();
+
+  if (options?.bucketSize) {
+    params.set("bucketSize", options.bucketSize);
+  }
+
+  if (options?.lookback !== undefined) {
+    params.set("lookback", String(options.lookback));
+  }
+
+  const query = params.toString();
+
+  return apiRequest({
+    path: `/v1/assets/${assetId}/metrics/${metricId}/analytics/rates${query ? `?${query}` : ""}`,
+    schema: usageRateAnalyticsSchema
+  });
+};
+
+export const getMetricCostNormalization = async (
+  assetId: string,
+  metricId: string
+): Promise<UsageCostNormalization> => apiRequest({
+  path: `/v1/assets/${assetId}/metrics/${metricId}/analytics/cost-normalization`,
+  schema: usageCostNormalizationSchema
+});
+
+export const getEnhancedProjections = async (
+  assetId: string,
+  metricId: string
+): Promise<EnhancedUsageProjection> => apiRequest({
+  path: `/v1/assets/${assetId}/metrics/${metricId}/analytics/projections`,
+  schema: enhancedUsageProjectionSchema
+});
+
+export const getAssetMetricCorrelations = async (assetId: string): Promise<AssetMetricCorrelationMatrix> => apiRequest({
+  path: `/v1/assets/${assetId}/metrics/analytics/correlations`,
+  schema: assetMetricCorrelationMatrixSchema
+});
+
 export const recordConditionAssessment = async (
   assetId: string,
   input: CreateConditionAssessmentInput
@@ -1804,6 +1868,57 @@ export const getSchedulePartsReadiness = async (
 ): Promise<SchedulePartsReadiness> => apiRequest({
   path: `/v1/assets/${assetId}/schedules/${scheduleId}/inventory/readiness`,
   schema: schedulePartsReadinessSchema
+});
+
+export const getHouseholdCostDashboard = async (
+  householdId: string,
+  options?: { periodMonths?: number }
+): Promise<HouseholdCostDashboard> => {
+  const query = new URLSearchParams();
+
+  if (options?.periodMonths !== undefined) {
+    query.set("periodMonths", String(options.periodMonths));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/cost-analytics/dashboard${suffix}`,
+    schema: householdCostDashboardSchema
+  });
+};
+
+export const getServiceProviderSpend = async (householdId: string): Promise<ServiceProviderSpend> => apiRequest({
+  path: `/v1/households/${householdId}/cost-analytics/service-providers`,
+  schema: serviceProviderSpendSchema
+});
+
+export const getHouseholdCostForecast = async (householdId: string): Promise<CostForecast> => apiRequest({
+  path: `/v1/households/${householdId}/cost-analytics/forecast`,
+  schema: costForecastSchema
+});
+
+export const getAssetCostSummary = async (assetId: string): Promise<AssetCostSummary> => apiRequest({
+  path: `/v1/assets/${assetId}/cost-analytics/summary`,
+  schema: assetCostSummarySchema
+});
+
+export const getAssetCostPerUnit = async (assetId: string): Promise<AssetCostPerUnit> => apiRequest({
+  path: `/v1/assets/${assetId}/cost-analytics/cost-per-unit`,
+  schema: assetCostPerUnitSchema
+});
+
+export const getAssetCostForecast = async (assetId: string): Promise<CostForecast> => apiRequest({
+  path: `/v1/assets/${assetId}/cost-analytics/forecast`,
+  schema: costForecastSchema
+});
+
+export const getProjectBudgetAnalysis = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectBudgetAnalysis> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/cost-analytics/budget-analysis`,
+  schema: projectBudgetAnalysisSchema
 });
 
 export const createScheduleInventoryItem = async (

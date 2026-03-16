@@ -144,7 +144,7 @@ export const recalculateAssetSchedules = async (
   }));
 };
 
-export const toMaintenanceScheduleResponse = (schedule: Pick<MaintenanceSchedule, "id" | "assetId" | "metricId" | "name" | "description" | "triggerType" | "triggerConfig" | "notificationConfig" | "presetKey" | "isActive" | "lastCompletedAt" | "nextDueAt" | "nextDueMetricValue" | "assignedToId" | "createdAt" | "updatedAt"> & { metric?: Pick<UsageMetric, "currentValue"> | null; assignedTo?: { id: string; displayName: string | null } | null }) => {
+export const toMaintenanceScheduleResponse = (schedule: Pick<MaintenanceSchedule, "id" | "assetId" | "metricId" | "name" | "description" | "triggerType" | "triggerConfig" | "notificationConfig" | "presetKey" | "estimatedCost" | "estimatedMinutes" | "isActive" | "lastCompletedAt" | "nextDueAt" | "nextDueMetricValue" | "assignedToId" | "createdAt" | "updatedAt"> & { metric?: Pick<UsageMetric, "currentValue"> | null; assignedTo?: { id: string; displayName: string | null } | null }) => {
   const trigger = maintenanceTriggerSchema.parse(schedule.triggerConfig);
   const notificationConfig = notificationConfigSchema.parse(schedule.notificationConfig);
   const statusOptions: {
@@ -170,6 +170,8 @@ export const toMaintenanceScheduleResponse = (schedule: Pick<MaintenanceSchedule
     triggerConfig: trigger,
     notificationConfig,
     presetKey: schedule.presetKey,
+    estimatedCost: schedule.estimatedCost,
+    estimatedMinutes: schedule.estimatedMinutes,
     isActive: schedule.isActive,
     lastCompletedAt: schedule.lastCompletedAt?.toISOString() ?? null,
     nextDueAt: schedule.nextDueAt?.toISOString() ?? null,

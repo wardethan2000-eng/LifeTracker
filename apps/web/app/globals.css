@@ -1148,6 +1148,30 @@ p { margin: 0; color: var(--ink-light); }
   border: 1px solid var(--border);
 }
 
+.pill--success {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.pill--warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning-border);
+}
+
+.pill--danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+.pill--accent {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 16. Dashboard Layout
    ═══════════════════════════════════════════════════════════════════ */

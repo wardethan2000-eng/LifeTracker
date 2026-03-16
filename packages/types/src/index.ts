@@ -419,6 +419,83 @@ export const usageProjectionSchema = z.object({
   }))
 });
 
+export const usageRateAnalyticsSchema = z.object({
+  metricId: z.string().cuid(),
+  bucketSize: z.string(),
+  mean: z.number(),
+  stddev: z.number(),
+  buckets: z.array(z.object({
+    bucketStart: z.string().datetime(),
+    bucketEnd: z.string().datetime(),
+    deltaValue: z.number(),
+    rate: z.number(),
+    entryCount: z.number(),
+    insufficientData: z.boolean(),
+    isAnomaly: z.boolean(),
+    deviationFactor: z.number()
+  }))
+});
+
+export const usageCostNormalizationSchema = z.object({
+  metricId: z.string().cuid(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  totalCost: z.number(),
+  totalUsage: z.number(),
+  averageCostPerUnit: z.number(),
+  entries: z.array(z.object({
+    cost: z.number(),
+    incrementalUsage: z.number(),
+    costPerUnit: z.number(),
+    completedAt: z.string().datetime(),
+    logTitle: z.string()
+  }))
+});
+
+export const enhancedUsageProjectionSchema = z.object({
+  metricId: z.string().cuid(),
+  currentValue: z.number(),
+  currentRate: z.number(),
+  rateUnit: z.string(),
+  scheduleProjections: z.array(z.object({
+    scheduleId: z.string().cuid(),
+    scheduleName: z.string(),
+    nextDueMetricValue: z.number(),
+    projectedDate: z.string().datetime().nullable(),
+    daysUntil: z.number().nullable(),
+    humanLabel: z.string()
+  }))
+});
+
+export const metricCorrelationSchema = z.object({
+  metricA: z.object({
+    id: z.string().cuid(),
+    name: z.string()
+  }),
+  metricB: z.object({
+    id: z.string().cuid(),
+    name: z.string()
+  }),
+  correlation: z.number(),
+  meanRatio: z.number(),
+  divergenceTrend: z.string(),
+  ratioSeries: z.array(z.object({
+    date: z.string().datetime(),
+    ratio: z.number()
+  }))
+});
+
+export const assetMetricCorrelationMatrixSchema = z.object({
+  assetId: z.string().cuid(),
+  pairs: z.array(metricCorrelationSchema)
+});
+
+export const usageRateAnalyticsListSchema = z.array(usageRateAnalyticsSchema);
+export const usageCostNormalizationListSchema = z.array(usageCostNormalizationSchema);
+export const enhancedUsageProjectionListSchema = z.array(enhancedUsageProjectionSchema);
+export const metricCorrelationListSchema = z.array(metricCorrelationSchema);
+export const assetMetricCorrelationMatrixListSchema = z.array(assetMetricCorrelationMatrixSchema);
+
 // ── Service Provider Schemas ─────────────────────────────────────────
 
 export const serviceProviderSchema = z.object({
@@ -710,6 +787,8 @@ export const createMaintenanceScheduleSchema = z.object({
   }),
   metricId: z.string().cuid().optional(),
   presetKey: z.string().max(160).optional(),
+  estimatedCost: z.number().min(0).optional(),
+  estimatedMinutes: z.number().int().min(0).optional(),
   assignedToId: z.string().cuid().optional()
 });
 
@@ -720,6 +799,8 @@ export const updateMaintenanceScheduleSchema = z.object({
   notificationConfig: notificationConfigSchema.optional(),
   metricId: z.string().cuid().optional(),
   presetKey: z.string().max(160).optional(),
+  estimatedCost: z.number().min(0).optional(),
+  estimatedMinutes: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
   lastCompletedAt: z.string().datetime().optional(),
   assignedToId: z.string().cuid().nullable().optional()
@@ -779,6 +860,8 @@ export const maintenanceScheduleSchema = z.object({
   triggerConfig: maintenanceTriggerSchema,
   notificationConfig: notificationConfigSchema,
   presetKey: z.string().nullable(),
+  estimatedCost: z.number().nullable().default(null),
+  estimatedMinutes: z.number().int().nullable().default(null),
   isActive: z.boolean(),
   lastCompletedAt: z.string().datetime().nullable(),
   nextDueAt: z.string().datetime().nullable(),
@@ -853,6 +936,172 @@ export const maintenanceLogSchema = z.object({
   totalLaborCost: z.number().nullable().default(null),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
+});
+
+// ── Cost Analytics Schemas ───────────────────────────────────────
+
+export const costByYearEntrySchema = z.object({
+  year: z.string(),
+  totalCost: z.number(),
+  logCount: z.number().int().min(0)
+});
+
+export const costByMonthEntrySchema = z.object({
+  month: z.string(),
+  totalCost: z.number(),
+  logCount: z.number().int().min(0)
+});
+
+export const topScheduleCostSchema = z.object({
+  scheduleId: z.string().cuid(),
+  scheduleName: z.string(),
+  totalCost: z.number(),
+  occurrences: z.number().int().min(0),
+  averageCost: z.number()
+});
+
+export const assetCostSummarySchema = z.object({
+  assetId: z.string().cuid(),
+  assetName: z.string(),
+  category: z.string(),
+  lifetimeCost: z.number(),
+  yearToDateCost: z.number(),
+  rolling12MonthAverage: z.number(),
+  costByYear: z.array(costByYearEntrySchema),
+  costByMonth: z.array(costByMonthEntrySchema),
+  topSchedulesByCost: z.array(topScheduleCostSchema).max(10)
+});
+
+export const assetCostPerUnitMetricSchema = z.object({
+  metricId: z.string().cuid(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  totalCost: z.number(),
+  totalUsage: z.number(),
+  costPerUnit: z.number().nullable()
+});
+
+export const assetCostPerUnitSchema = z.object({
+  assetId: z.string().cuid(),
+  metrics: z.array(assetCostPerUnitMetricSchema)
+});
+
+export const householdCategorySpendSchema = z.object({
+  category: z.string(),
+  categoryLabel: z.string(),
+  totalCost: z.number(),
+  assetCount: z.number().int().min(0),
+  logCount: z.number().int().min(0)
+});
+
+export const householdAssetSpendSchema = z.object({
+  assetId: z.string().cuid(),
+  assetName: z.string(),
+  category: z.string(),
+  totalCost: z.number(),
+  logCount: z.number().int().min(0)
+});
+
+export const householdTopScheduleTypeSchema = z.object({
+  scheduleName: z.string(),
+  totalCost: z.number(),
+  occurrences: z.number().int().min(0)
+});
+
+export const householdCostDashboardSchema = z.object({
+  householdId: z.string().cuid(),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+  totalSpend: z.number(),
+  spendByCategory: z.array(householdCategorySpendSchema),
+  spendByAsset: z.array(householdAssetSpendSchema),
+  spendByMonth: z.array(costByMonthEntrySchema),
+  topScheduleTypes: z.array(householdTopScheduleTypeSchema).max(15)
+});
+
+export const serviceProviderSpendByMonthSchema = z.object({
+  month: z.string(),
+  cost: z.number()
+});
+
+export const serviceProviderSpendProviderSchema = z.object({
+  providerId: z.string().cuid(),
+  providerName: z.string(),
+  specialty: z.string().nullable(),
+  totalMaintenanceCost: z.number(),
+  maintenanceLogCount: z.number().int().min(0),
+  totalProjectCost: z.number(),
+  projectExpenseCount: z.number().int().min(0),
+  totalCombinedCost: z.number(),
+  firstUsed: z.string().datetime().nullable(),
+  lastUsed: z.string().datetime().nullable(),
+  spendByMonth: z.array(serviceProviderSpendByMonthSchema)
+});
+
+export const serviceProviderSpendSchema = z.object({
+  householdId: z.string().cuid(),
+  providers: z.array(serviceProviderSpendProviderSchema)
+});
+
+export const costForecastScheduleSchema = z.object({
+  scheduleId: z.string().cuid(),
+  scheduleName: z.string(),
+  assetId: z.string().cuid(),
+  assetName: z.string(),
+  costPerOccurrence: z.number().nullable(),
+  occurrences3m: z.number().int().min(0),
+  occurrences6m: z.number().int().min(0),
+  occurrences12m: z.number().int().min(0),
+  cost3m: z.number(),
+  cost6m: z.number(),
+  cost12m: z.number()
+});
+
+export const costForecastByAssetSchema = z.object({
+  assetId: z.string().cuid(),
+  assetName: z.string(),
+  cost3m: z.number(),
+  cost6m: z.number(),
+  cost12m: z.number()
+});
+
+export const costForecastSchema = z.object({
+  householdId: z.string().cuid().nullable(),
+  assetId: z.string().cuid().nullable(),
+  total3m: z.number(),
+  total6m: z.number(),
+  total12m: z.number(),
+  schedules: z.array(costForecastScheduleSchema),
+  byAsset: z.array(costForecastByAssetSchema)
+});
+
+export const projectBudgetAnalysisPhaseSchema = z.object({
+  phaseId: z.string().cuid(),
+  phaseName: z.string(),
+  budgetAmount: z.number().nullable(),
+  actualSpend: z.number(),
+  variance: z.number()
+});
+
+export const projectBudgetAnalysisCategorySchema = z.object({
+  categoryId: z.string().cuid(),
+  categoryName: z.string(),
+  budgetAmount: z.number().nullable(),
+  actualSpend: z.number(),
+  variance: z.number()
+});
+
+export const projectBudgetAnalysisSchema = z.object({
+  projectId: z.string().cuid(),
+  projectName: z.string(),
+  totalBudget: z.number().nullable(),
+  totalSpent: z.number(),
+  variance: z.number(),
+  variancePercent: z.number().nullable(),
+  byPhase: z.array(projectBudgetAnalysisPhaseSchema),
+  byCategory: z.array(projectBudgetAnalysisCategorySchema),
+  burnRate: z.number().nullable(),
+  projectedTotalAtBurnRate: z.number().nullable()
 });
 
 // ── Inventory Schemas ───────────────────────────────────────────────
@@ -2079,6 +2328,22 @@ export type CreateMaintenanceLogInput = z.infer<typeof createMaintenanceLogSchem
 export type UpdateMaintenanceLogInput = z.infer<typeof updateMaintenanceLogSchema>;
 export type CompleteMaintenanceScheduleInput = z.infer<typeof completeMaintenanceScheduleSchema>;
 export type MaintenanceLog = z.infer<typeof maintenanceLogSchema>;
+export type AssetCostSummary = z.infer<typeof assetCostSummarySchema>;
+export type AssetCostPerUnitMetric = z.infer<typeof assetCostPerUnitMetricSchema>;
+export type AssetCostPerUnit = z.infer<typeof assetCostPerUnitSchema>;
+export type HouseholdCategorySpend = z.infer<typeof householdCategorySpendSchema>;
+export type HouseholdAssetSpend = z.infer<typeof householdAssetSpendSchema>;
+export type HouseholdTopScheduleType = z.infer<typeof householdTopScheduleTypeSchema>;
+export type HouseholdCostDashboard = z.infer<typeof householdCostDashboardSchema>;
+export type ServiceProviderSpendByMonth = z.infer<typeof serviceProviderSpendByMonthSchema>;
+export type ServiceProviderSpendProvider = z.infer<typeof serviceProviderSpendProviderSchema>;
+export type ServiceProviderSpend = z.infer<typeof serviceProviderSpendSchema>;
+export type CostForecastSchedule = z.infer<typeof costForecastScheduleSchema>;
+export type CostForecastByAsset = z.infer<typeof costForecastByAssetSchema>;
+export type CostForecast = z.infer<typeof costForecastSchema>;
+export type ProjectBudgetAnalysisPhase = z.infer<typeof projectBudgetAnalysisPhaseSchema>;
+export type ProjectBudgetAnalysisCategory = z.infer<typeof projectBudgetAnalysisCategorySchema>;
+export type ProjectBudgetAnalysis = z.infer<typeof projectBudgetAnalysisSchema>;
 
 export type ShallowAsset = z.infer<typeof shallowAssetSchema>;
 export type PurchaseDetails = z.infer<typeof purchaseDetailsSchema>;
@@ -2091,6 +2356,11 @@ export type CreateConditionAssessmentInput = z.infer<typeof createConditionAsses
 export type UsageMetricEntry = z.infer<typeof usageMetricEntrySchema>;
 export type CreateUsageMetricEntryInput = z.infer<typeof createUsageMetricEntrySchema>;
 export type UsageProjection = z.infer<typeof usageProjectionSchema>;
+export type UsageRateAnalytics = z.infer<typeof usageRateAnalyticsSchema>;
+export type UsageCostNormalization = z.infer<typeof usageCostNormalizationSchema>;
+export type EnhancedUsageProjection = z.infer<typeof enhancedUsageProjectionSchema>;
+export type MetricCorrelation = z.infer<typeof metricCorrelationSchema>;
+export type AssetMetricCorrelationMatrix = z.infer<typeof assetMetricCorrelationMatrixSchema>;
 export type ServiceProvider = z.infer<typeof serviceProviderSchema>;
 export type CreateServiceProviderInput = z.infer<typeof createServiceProviderSchema>;
 export type UpdateServiceProviderInput = z.infer<typeof updateServiceProviderSchema>;
