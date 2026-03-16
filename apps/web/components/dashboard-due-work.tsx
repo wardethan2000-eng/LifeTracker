@@ -1,0 +1,91 @@
+import Link from "next/link";
+import type { HouseholdDashboard } from "@lifekeeper/types";
+import type { JSX } from "react";
+import { getHouseholdPartsReadiness } from "../lib/api";
+import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
+
+type DashboardDueWorkProps = {
+  householdId: string;
+  dashboard: HouseholdDashboard;
+};
+
+export async function DashboardDueWork({ householdId, dashboard }: DashboardDueWorkProps): Promise<JSX.Element> {
+  const readiness = dashboard.dueWork.length > 0
+    ? await getHouseholdPartsReadiness(householdId, dashboard.dueWork.map((item) => item.scheduleId))
+    : null;
+  const readinessByScheduleId = new Map((readiness?.schedules ?? []).map((item) => [item.scheduleId, item]));
+
+  return (
+    <section className="panel">
+      <div className="panel__header">
+        <h2>Upcoming Maintenance</h2>
+      </div>
+      <div className="panel__body">
+        {dashboard.dueWork.length === 0 ? (
+          <p className="panel__empty">No due or overdue maintenance right now.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Asset</th>
+                <th>Task</th>
+                <th>Next Due</th>
+                <th>Priority</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboard.dueWork.map((item) => {
+                const partsReadiness = readinessByScheduleId.get(item.scheduleId);
+                const deficitItems = partsReadiness?.items.filter((entry) => entry.deficit > 0) ?? [];
+
+                return (
+                  <tr key={item.scheduleId} className={`row--${item.status}`}>
+                    <td>
+                      <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
+                    </td>
+                    <td>
+                      <div className="data-table__primary">{item.assetName}</div>
+                      <div className="data-table__secondary">{formatCategoryLabel(item.assetCategory)}</div>
+                    </td>
+                    <td>
+                      <div className="data-table__primary dashboard-schedule-name">
+                        <span>{item.scheduleName}</span>
+                        {partsReadiness && !partsReadiness.allReady && deficitItems.length > 0 ? (
+                          <details className="parts-readiness-badge">
+                            <summary>Missing parts</summary>
+                            <div className="parts-readiness-badge__popover">
+                              {deficitItems.map((entry) => (
+                                <div key={entry.inventoryItemId} className="parts-readiness-badge__row">
+                                  <strong>{entry.itemName}</strong>
+                                  <span>Short {entry.deficit} {entry.unit}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        ) : null}
+                      </div>
+                      <div className="data-table__secondary">{item.summary}</div>
+                    </td>
+                    <td>
+                      <strong>{formatDueLabel(item.nextDueAt, item.nextDueMetricValue, item.metricUnit)}</strong>
+                    </td>
+                    <td>
+                      <span className={`status-chip status-chip--${item.status}`}>
+                        {item.status === "overdue" ? "High" : item.status === "due" ? "Medium" : "Low"}
+                      </span>
+                    </td>
+                    <td>
+                      <Link href={`/assets/${item.assetId}`} className="data-table__link">View</Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
+  );
+}

@@ -1,4 +1,4 @@
-import type { AssetDetailResponse } from "@lifekeeper/types";
+import type { AssetDetailResponse, HouseholdMember } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   completeScheduleAction,
@@ -9,16 +9,14 @@ import {
 } from "../app/actions";
 import { AssetMaintenanceSections } from "./asset-maintenance-sections";
 import { Card } from "./card";
-import { getHouseholdMembers } from "../lib/api";
 import { formatDueLabel } from "../lib/formatters";
 
 type AssetMaintenanceTabProps = {
   detail: AssetDetailResponse;
-  householdId: string;
+  householdMembers: HouseholdMember[];
 };
 
-export async function AssetMaintenanceTab({ detail, householdId }: AssetMaintenanceTabProps): Promise<JSX.Element> {
-  const householdMembers = await getHouseholdMembers(householdId);
+export async function AssetMaintenanceTab({ detail, householdMembers }: AssetMaintenanceTabProps): Promise<JSX.Element> {
   const overdueCount = detail.schedules.filter((schedule) => schedule.status === "overdue").length;
   const dueCount = detail.schedules.filter((schedule) => schedule.status === "due").length;
   const upcomingCount = detail.schedules.filter((schedule) => schedule.status === "upcoming").length;

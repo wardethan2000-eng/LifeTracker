@@ -1,20 +1,19 @@
-import type { AssetDetailResponse } from "@lifekeeper/types";
+import type { AssetDetailResponse, ThreadedComment } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   createCommentAction,
   deleteCommentAction,
   updateCommentAction
 } from "../app/actions";
-import { getAssetComments } from "../lib/api";
 import { formatDateTime } from "../lib/formatters";
 
 type AssetCommentsTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
+  comments: ThreadedComment[];
 };
 
-export async function AssetCommentsTab({ detail, assetId }: AssetCommentsTabProps): Promise<JSX.Element> {
-  const comments = await getAssetComments(assetId);
+export async function AssetCommentsTab({ detail, assetId, comments }: AssetCommentsTabProps): Promise<JSX.Element> {
 
   return (
     <div style={{ display: "grid", gap: "24px" }}>

@@ -1,4 +1,11 @@
-import type { AssetDetailResponse } from "@lifekeeper/types";
+import type {
+  Asset,
+  AssetDetailResponse,
+  AssetTransferList,
+  CustomPresetProfile,
+  HouseholdMember,
+  LibraryPreset
+} from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   archiveAssetAction,
@@ -11,32 +18,30 @@ import { AssetDangerActions } from "./asset-danger-actions";
 import { AssetLabelActions } from "./asset-label-actions";
 import { AssetProfileWorkbench } from "./asset-profile-workbench";
 import {
-  getAssetTransferHistory,
-  getHouseholdAssets,
-  getHouseholdMembers,
-  getHouseholdPresets,
-  getLibraryPresets
-} from "../lib/api";
-import {
   formatCategoryLabel,
   formatDateTime
 } from "../lib/formatters";
-import { formatTransferTypeLabel } from "../lib/asset-detail-helpers";
+import { formatTransferTypeLabel } from "../app/assets/[assetId]/shared";
 
 type AssetSettingsTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
-  householdId: string;
+  libraryPresets: LibraryPreset[];
+  customPresets: CustomPresetProfile[];
+  householdAssets: Asset[];
+  householdMembers: HouseholdMember[];
+  transferHistory: AssetTransferList;
 };
 
-export async function AssetSettingsTab({ detail, assetId, householdId }: AssetSettingsTabProps): Promise<JSX.Element> {
-  const [libraryPresets, customPresets, householdAssets, householdMembers, transferHistory] = await Promise.all([
-    getLibraryPresets(),
-    getHouseholdPresets(householdId),
-    getHouseholdAssets(householdId),
-    getHouseholdMembers(householdId),
-    getAssetTransferHistory(assetId)
-  ]);
+export async function AssetSettingsTab({
+  detail,
+  assetId,
+  libraryPresets,
+  customPresets,
+  householdAssets,
+  householdMembers,
+  transferHistory
+}: AssetSettingsTabProps): Promise<JSX.Element> {
   const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
   const visiblePresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
   const latestTransfer = transferHistory.items[0] ?? null;

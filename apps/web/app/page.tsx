@@ -1,9 +1,12 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { createHouseholdAction, enqueueNotificationScanAction, markNotificationReadAction } from "./actions";
+import { Suspense } from "react";
+import { createHouseholdAction, enqueueNotificationScanAction } from "./actions";
 import { AppShell } from "../components/app-shell";
-import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getHouseholdPartsReadiness, getMe } from "../lib/api";
-import { formatCategoryLabel, formatDateTime, formatDueLabel, formatNotificationTone } from "../lib/formatters";
+import { DashboardDueWork } from "../components/dashboard-due-work";
+import { DashboardNotificationsAside } from "../components/dashboard-notifications-aside";
+import { ApiError, getApiBaseUrl, getDevUserId, getHouseholdDashboard, getMe } from "../lib/api";
+import { formatCategoryLabel, formatDateTime } from "../lib/formatters";
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -55,6 +58,46 @@ const EmptyHouseholds = (): JSX.Element => (
   </main>
 );
 
+const DueWorkSkeleton = (): JSX.Element => (
+  <section className="panel">
+    <div className="panel__header">
+      <h2>Upcoming Maintenance</h2>
+    </div>
+    <div className="panel__body">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Asset</th>
+            <th>Task</th>
+            <th>Next Due</th>
+            <th>Priority</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {[1, 2, 3, 4].map((row) => (
+            <tr key={row}>
+              <td><div className="skeleton-bar" style={{ width: 56, height: 22 }} /></td>
+              <td>
+                <div className="skeleton-bar" style={{ width: 120, height: 14, marginBottom: 6 }} />
+                <div className="skeleton-bar" style={{ width: 90, height: 12 }} />
+              </td>
+              <td>
+                <div className="skeleton-bar" style={{ width: 180, height: 14, marginBottom: 6 }} />
+                <div className="skeleton-bar" style={{ width: 140, height: 12 }} />
+              </td>
+              <td><div className="skeleton-bar" style={{ width: 110, height: 14 }} /></td>
+              <td><div className="skeleton-bar" style={{ width: 64, height: 22 }} /></td>
+              <td><div className="skeleton-bar" style={{ width: 34, height: 14 }} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+);
+
 export default async function HomePage({ searchParams }: HomePageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
 
@@ -67,10 +110,6 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
     const dashboard = await getHouseholdDashboard(selectedHousehold.id);
-    const readiness = dashboard.dueWork.length > 0
-      ? await getHouseholdPartsReadiness(selectedHousehold.id, dashboard.dueWork.map((item) => item.scheduleId))
-      : null;
-    const readinessByScheduleId = new Map((readiness?.schedules ?? []).map((item) => [item.scheduleId, item]));
 
     const sortedAssets = [...dashboard.assets].sort(
       (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -131,76 +170,9 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
           <div className="dashboard-grid">
             <div className="dashboard-main">
               {/* ── Upcoming Maintenance ── */}
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Upcoming Maintenance</h2>
-                </div>
-                <div className="panel__body">
-                  {dashboard.dueWork.length === 0 ? (
-                    <p className="panel__empty">No due or overdue maintenance right now.</p>
-                  ) : (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Status</th>
-                          <th>Asset</th>
-                          <th>Task</th>
-                          <th>Next Due</th>
-                          <th>Priority</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dashboard.dueWork.map((item) => {
-                          const partsReadiness = readinessByScheduleId.get(item.scheduleId);
-                          const deficitItems = partsReadiness?.items.filter((entry) => entry.deficit > 0) ?? [];
-
-                          return (
-                          <tr key={item.scheduleId} className={`row--${item.status}`}>
-                            <td>
-                              <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
-                            </td>
-                            <td>
-                              <div className="data-table__primary">{item.assetName}</div>
-                              <div className="data-table__secondary">{formatCategoryLabel(item.assetCategory)}</div>
-                            </td>
-                            <td>
-                              <div className="data-table__primary dashboard-schedule-name">
-                                <span>{item.scheduleName}</span>
-                                {partsReadiness && !partsReadiness.allReady && deficitItems.length > 0 ? (
-                                  <details className="parts-readiness-badge">
-                                    <summary>Missing parts</summary>
-                                    <div className="parts-readiness-badge__popover">
-                                      {deficitItems.map((entry) => (
-                                        <div key={entry.inventoryItemId} className="parts-readiness-badge__row">
-                                          <strong>{entry.itemName}</strong>
-                                          <span>Short {entry.deficit} {entry.unit}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </details>
-                                ) : null}
-                              </div>
-                              <div className="data-table__secondary">{item.summary}</div>
-                            </td>
-                            <td>
-                              <strong>{formatDueLabel(item.nextDueAt, item.nextDueMetricValue, item.metricUnit)}</strong>
-                            </td>
-                            <td>
-                              <span className={`status-chip status-chip--${item.status}`}>
-                                {item.status === "overdue" ? "High" : item.status === "due" ? "Medium" : "Low"}
-                              </span>
-                            </td>
-                            <td>
-                              <Link href={`/assets/${item.assetId}`} className="data-table__link">View</Link>
-                            </td>
-                          </tr>
-                        );})}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </section>
+              <Suspense fallback={<DueWorkSkeleton />}>
+                <DashboardDueWork householdId={selectedHousehold.id} dashboard={dashboard} />
+              </Suspense>
 
               {/* ── Asset Registry ── */}
               <section className="panel">
@@ -285,46 +257,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
               </section>
 
               {/* ── Notifications ── */}
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Recent Notifications</h2>
-                  {dashboard.notifications.length > 5 && (
-                    <Link href="/notifications" className="text-link" style={{ fontSize: "0.85rem" }}>View all</Link>
-                  )}
-                </div>
-                <div className="panel__body">
-                  {dashboard.notifications.length === 0 ? (
-                    <p className="panel__empty">No notifications yet.</p>
-                  ) : (
-                    <div className="notification-feed">
-                      {dashboard.notifications.slice(0, 5).map((notification) => {
-                        const tone = formatNotificationTone(notification);
-
-                        return (
-                          <div key={notification.id} className={`notification-item${tone === "pending" ? " notification-item--unread" : ""}`}>
-                            <div className="notification-item__body">
-                              <h4>{notification.title}</h4>
-                              <p>{notification.body}</p>
-                            </div>
-                            <div className="notification-item__actions">
-                              <span className="notification-item__meta">{formatDateTime(notification.scheduledFor)}</span>
-                              {notification.assetId && (
-                                <Link href={`/assets/${notification.assetId}`} className="text-link" style={{ fontSize: "0.8rem" }}>View</Link>
-                              )}
-                              {!notification.readAt && notification.status !== "read" && (
-                                <form action={markNotificationReadAction}>
-                                  <input type="hidden" name="notificationId" value={notification.id} />
-                                  <button type="submit" className="button button--ghost button--sm">Read</button>
-                                </form>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </section>
+              <DashboardNotificationsAside notifications={dashboard.notifications} />
             </div>
           </div>
         </div>

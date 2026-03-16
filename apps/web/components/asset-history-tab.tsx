@@ -1,6 +1,5 @@
 import type {
   AssetDetailResponse,
-  AssetTimelineQuery
 } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
@@ -13,17 +12,17 @@ import { AssetExportActions } from "./asset-export-actions";
 import { TimelineEntryForm } from "./timeline-entry-form";
 import { TimelineFilters } from "./timeline-filters";
 import { TimelineItem } from "./timeline-item";
-import { getAssetTimeline } from "../lib/api";
-import { buildAssetDetailHref, getSearchParamValue, toDateBoundaryIso, type AssetDetailPageSearchParams } from "../lib/asset-detail-helpers";
+import { buildAssetHistoryHref, getSearchParamValue, type AssetHistoryPageSearchParams, type AssetTimelineFeed } from "../app/assets/[assetId]/shared";
 import { formatCurrency } from "../lib/formatters";
 
 type AssetHistoryTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
-  searchParams: AssetDetailPageSearchParams;
+  searchParams: AssetHistoryPageSearchParams;
+  historyTimeline: AssetTimelineFeed;
 };
 
-export async function AssetHistoryTab({ detail, assetId, searchParams }: AssetHistoryTabProps): Promise<JSX.Element> {
+export async function AssetHistoryTab({ detail, assetId, searchParams, historyTimeline }: AssetHistoryTabProps): Promise<JSX.Element> {
   const sourceType = getSearchParamValue(searchParams.sourceType);
   const category = getSearchParamValue(searchParams.category);
   const search = getSearchParamValue(searchParams.search);
@@ -31,17 +30,6 @@ export async function AssetHistoryTab({ detail, assetId, searchParams }: AssetHi
   const until = getSearchParamValue(searchParams.until);
   const cursor = getSearchParamValue(searchParams.cursor);
   const showAddForm = getSearchParamValue(searchParams.showAddForm) === "true";
-  const sinceIso = toDateBoundaryIso(since, "start");
-  const untilIso = toDateBoundaryIso(until, "end");
-  const timelineQuery: Partial<AssetTimelineQuery> = {
-    ...(sourceType ? { sourceType: sourceType as AssetTimelineQuery["sourceType"] } : {}),
-    ...(category ? { category } : {}),
-    ...(search ? { search } : {}),
-    ...(sinceIso ? { since: sinceIso } : {}),
-    ...(untilIso ? { until: untilIso } : {}),
-    ...(cursor ? { cursor } : {})
-  };
-  const historyTimeline = await getAssetTimeline(assetId, timelineQuery);
   const items = historyTimeline.items;
   const maintenanceLogCount = items.filter((item) => item.sourceType === "maintenance_log").length;
   const manualEntryCount = items.filter((item) => item.sourceType === "timeline_entry").length;
@@ -122,7 +110,7 @@ export async function AssetHistoryTab({ detail, assetId, searchParams }: AssetHi
           {historyTimeline.nextCursor ? (
             <div className="timeline-load-more">
               <Link
-                href={buildAssetDetailHref(detail.asset.id, searchParams, { tab: "history", cursor: historyTimeline.nextCursor })}
+                href={buildAssetHistoryHref(detail.asset.id, searchParams, { cursor: historyTimeline.nextCursor })}
                 className="button button--ghost"
               >
                 Load older events

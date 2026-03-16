@@ -313,6 +313,7 @@ type RequestOptions<T> = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   schema?: Schema<T>;
+  revalidate?: number | false;
   cachePolicy?: RequestCache | { next: { revalidate: number } } | { next: { tags: string[] } };
 };
 
@@ -537,15 +538,18 @@ export const apiRequest = async <T>({
   method = "GET",
   body,
   schema,
+  revalidate,
   cachePolicy
 }: RequestOptions<T>): Promise<T> => {
   let response: Response;
 
-  const cacheOptions = cachePolicy === undefined
-    ? { cache: "no-store" as const }
-    : typeof cachePolicy === "string"
-      ? { cache: cachePolicy }
-      : { next: cachePolicy.next };
+  const cacheOptions = method === "GET" && typeof revalidate === "number"
+    ? { next: { revalidate } }
+    : cachePolicy === undefined
+      ? { cache: "no-store" as const }
+      : typeof cachePolicy === "string"
+        ? { cache: cachePolicy }
+        : { next: cachePolicy.next };
 
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {
@@ -590,7 +594,7 @@ export const getMe = cache(async (): Promise<MeResponse> => apiRequest({
 export const getHouseholdDashboard = async (householdId: string): Promise<HouseholdDashboard> => apiRequest({
   path: `/v1/households/${householdId}/dashboard`,
   schema: householdDashboardSchema,
-  cachePolicy: { next: { revalidate: 15 } }
+  revalidate: 15
 });
 
 export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkItem[]> => apiRequest({
@@ -602,12 +606,13 @@ export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkI
 export const getAssetDetail = async (assetId: string): Promise<AssetDetailResponse> => apiRequest({
   path: `/v1/assets/${assetId}/detail`,
   schema: assetDetailResponseSchema,
-  cachePolicy: { next: { revalidate: 15 } }
+  revalidate: 15
 });
 
 export const getAssetTransferHistory = async (assetId: string): Promise<AssetTransferList> => apiRequest({
   path: `/v1/assets/${assetId}/transfers`,
-  schema: assetTransferListSchema
+  schema: assetTransferListSchema,
+  revalidate: 15
 });
 
 export const getHouseholdTransfers = async (
@@ -653,7 +658,7 @@ export const getAssetLabelData = async (assetId: string): Promise<AssetLabelData
 export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => apiRequest({
   path: "/v1/presets/library",
   schema: libraryPresetListSchema,
-  cachePolicy: { next: { revalidate: 3600 } }
+  revalidate: 60
 }));
 
 export const getHouseholdProjects = async (
@@ -677,7 +682,8 @@ export const getHouseholdProjects = async (
 
   return apiRequest({
     path: `/v1/households/${householdId}/projects${suffix}`,
-    schema: projectSummaryListSchema
+    schema: projectSummaryListSchema,
+    revalidate: 15
   });
 };
 
@@ -707,7 +713,8 @@ export const searchHousehold = async (
 
 export const getHouseholdActivity = async (householdId: string): Promise<ActivityLog[]> => apiRequest({
   path: `/v1/households/${householdId}/activity`,
-  schema: activityLogListSchema
+  schema: activityLogListSchema,
+  revalidate: 15
 });
 
 export const downloadAssetPdf = async (
@@ -850,7 +857,8 @@ export const acceptInvitation = async (input: AcceptInvitationInput): Promise<Ho
 
 export const getAssetComments = async (assetId: string): Promise<ThreadedComment[]> => apiRequest({
   path: `/v1/assets/${assetId}/comments`,
-  schema: threadedCommentListSchema
+  schema: threadedCommentListSchema,
+  revalidate: 15
 });
 
 export const createComment = async (
@@ -919,7 +927,8 @@ export const getAssetTimeline = async (
 
   return apiRequest({
     path: `/v1/assets/${assetId}/timeline${suffix}`,
-    schema: assetTimelineResponseSchema
+    schema: assetTimelineResponseSchema,
+    revalidate: 15
   });
 };
 
@@ -1105,8 +1114,7 @@ export const getNotifications = async (options?: {
 
   return apiRequest({
     path: `/v1/notifications${suffix}`,
-    schema: notificationListSchema,
-    cachePolicy: { next: { revalidate: 15 } }
+    schema: notificationListSchema
   });
 };
 
@@ -1298,12 +1306,14 @@ export const getRegulatoryAssets = async (householdId: string): Promise<Regulato
 
 export const getHouseholdMembers = async (householdId: string): Promise<HouseholdMember[]> => apiRequest({
   path: `/v1/households/${householdId}/members`,
-  schema: householdMemberListSchema
+  schema: householdMemberListSchema,
+  revalidate: 15
 });
 
 export const getHouseholdServiceProviders = async (householdId: string): Promise<ServiceProvider[]> => apiRequest({
   path: `/v1/households/${householdId}/service-providers`,
-  schema: serviceProviderListSchema
+  schema: serviceProviderListSchema,
+  revalidate: 15
 });
 
 export const getHouseholdInventory = async (
@@ -1347,7 +1357,8 @@ export const getHouseholdInventory = async (
 
   return apiRequest({
     path: `/v1/households/${householdId}/inventory${suffix}`,
-    schema: householdInventoryListSchema
+    schema: householdInventoryListSchema,
+    revalidate: 15
   });
 };
 
@@ -2112,7 +2123,8 @@ export const createAssetTransfer = async (
 
 export const getHouseholdPresets = async (householdId: string): Promise<CustomPresetProfile[]> => apiRequest({
   path: `/v1/households/${householdId}/presets`,
-  schema: customPresetProfileListSchema
+  schema: customPresetProfileListSchema,
+  revalidate: 60
 });
 
 export const createPresetProfile = async (

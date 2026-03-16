@@ -1,12 +1,8 @@
-import type { AssetDetailResponse } from "@lifekeeper/types";
+import type { AssetDetailResponse, AssetTransferList } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { AssetLabelActions } from "./asset-label-actions";
 import { AttachmentSection } from "./attachment-section";
-import {
-  getAssetTimeline,
-  getAssetTransferHistory
-} from "../lib/api";
 import {
   formatCategoryLabel,
   formatCurrency,
@@ -19,19 +15,18 @@ import {
   formatTimelineSourceLabel,
   formatTransferTypeLabel,
   hobbyStatusBadgeClass,
-  renderLogSummary
-} from "../lib/asset-detail-helpers";
+  renderLogSummary,
+  type AssetTimelineFeed
+} from "../app/assets/[assetId]/shared";
 
 type AssetOverviewTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
+  transferHistory: AssetTransferList;
+  overviewTimeline: AssetTimelineFeed;
 };
 
-export async function AssetOverviewTab({ detail, assetId }: AssetOverviewTabProps): Promise<JSX.Element> {
-  const [overviewTimeline, transferHistory] = await Promise.all([
-    getAssetTimeline(assetId, { limit: 5 }),
-    getAssetTransferHistory(assetId)
-  ]);
+export async function AssetOverviewTab({ detail, assetId, transferHistory, overviewTimeline }: AssetOverviewTabProps): Promise<JSX.Element> {
   const dueNow = detail.schedules.filter((schedule) => schedule.status === "due" || schedule.status === "overdue");
 
   return (
@@ -233,7 +228,7 @@ export async function AssetOverviewTab({ detail, assetId }: AssetOverviewTabProp
       <section className="panel">
         <div className="panel__header">
           <h2>Recent Timeline</h2>
-          <Link href={`/assets/${detail.asset.id}?tab=history`} className="text-link">View All</Link>
+          <Link href={`/assets/${detail.asset.id}/history`} className="text-link">View All</Link>
         </div>
         <div className="panel__body">
           {overviewTimeline.items.length > 0 ? (

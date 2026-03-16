@@ -1,10 +1,12 @@
 import type { ProjectStatus, ProjectSummary } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
-import { ProjectProgressBar } from "../../components/project-progress-bar";
-import { ApiError, getHouseholdProjects, getMe, getProjectInventoryRollups } from "../../lib/api";
-import { formatCurrency, formatDate } from "../../lib/formatters";
+import { ProjectPortfolioAside } from "../../components/project-portfolio-aside";
+import { ProjectPortfolioStats } from "../../components/project-portfolio-stats";
+import { ProjectPortfolioTable } from "../../components/project-portfolio-table";
+import { ApiError, getHouseholdProjects, getMe } from "../../lib/api";
 
 type ProjectsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -29,21 +31,6 @@ type ProjectsPageHref = {
   status?: ProjectStatus | undefined;
   query?: string | undefined;
   sort?: ProjectSort | undefined;
-};
-
-type PortfolioProject = ProjectSummary & {
-  inventoryLineCount: number;
-  totalInventoryNeeded: number;
-  totalInventoryAllocated: number;
-  totalInventoryRemaining: number;
-  plannedInventoryCost: number;
-  committedCost: number;
-  budgetRatio: number | null;
-  materialCoverage: number | null;
-  daysToTarget: number | null;
-  isLate: boolean;
-  isAtRisk: boolean;
-  riskScore: number;
 };
 
 const projectSortLabels: Record<ProjectSort, string> = {
@@ -101,106 +88,74 @@ const matchesProjectSearch = (project: ProjectSummary, query: string): boolean =
   return haystack.includes(query);
 };
 
-const getTargetDays = (targetEndDate: string | null, now: number): number | null => {
-  if (!targetEndDate) {
-    return null;
-  }
+const ProjectStatsSkeleton = (): JSX.Element => (
+  <section className="stats-row">
+    {[1, 2, 3, 4, 5].map((index) => (
+      <div key={index} className="stat-card">
+        <div className="skeleton-bar" style={{ width: 110, height: 12, marginBottom: 10 }} />
+        <div className="skeleton-bar" style={{ width: 80, height: 28, marginBottom: 8 }} />
+        <div className="skeleton-bar" style={{ width: 160, height: 12 }} />
+      </div>
+    ))}
+  </section>
+);
 
-  const distance = new Date(targetEndDate).getTime() - now;
-  return Math.ceil(distance / 86_400_000);
-};
+const ProjectTableSkeleton = (): JSX.Element => (
+  <>
+    <section className="panel">
+      <div className="panel__header">
+        <h2>Project Portfolio</h2>
+      </div>
+      <div className="panel__body">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Status</th>
+              <th>Progress</th>
+              <th>Target</th>
+              <th>Budget</th>
+              <th>Material Plan</th>
+              <th>Updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {[1, 2, 3, 4, 5].map((row) => (
+              <tr key={row}>
+                <td><div className="skeleton-bar" style={{ width: 180, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 72, height: 22 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 140, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 90, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 110, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 120, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 80, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 34, height: 14 }} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </>
+);
 
-const compareNullableNumbersAsc = (left: number | null, right: number | null): number => {
-  if (left === null && right === null) return 0;
-  if (left === null) return 1;
-  if (right === null) return -1;
-  return left - right;
-};
-
-const sortProjects = (projects: PortfolioProject[], sort: ProjectSort): PortfolioProject[] => {
-  const ranked = [...projects];
-
-  ranked.sort((left, right) => {
-    if (sort === "target") {
-      const targetComparison = compareNullableNumbersAsc(left.daysToTarget, right.daysToTarget);
-      if (targetComparison !== 0) return targetComparison;
-      return right.riskScore - left.riskScore;
-    }
-
-    if (sort === "budget") {
-      const leftBudget = left.budgetRatio ?? -1;
-      const rightBudget = right.budgetRatio ?? -1;
-      if (rightBudget !== leftBudget) return rightBudget - leftBudget;
-      return right.committedCost - left.committedCost;
-    }
-
-    if (sort === "progress") {
-      if (left.percentComplete !== right.percentComplete) {
-        return left.percentComplete - right.percentComplete;
-      }
-      return right.riskScore - left.riskScore;
-    }
-
-    if (left.riskScore !== right.riskScore) {
-      return right.riskScore - left.riskScore;
-    }
-
-    const targetComparison = compareNullableNumbersAsc(left.daysToTarget, right.daysToTarget);
-    if (targetComparison !== 0) return targetComparison;
-    return right.updatedAt.localeCompare(left.updatedAt);
-  });
-
-  return ranked;
-};
-
-const getRiskTone = (project: PortfolioProject): "danger" | "warning" | "accent" | "neutral" => {
-  if (project.riskScore >= 4) return "danger";
-  if (project.riskScore >= 2) return "warning";
-  if (project.status === "completed") return "accent";
-  return "neutral";
-};
-
-const getRiskLabel = (project: PortfolioProject): string => {
-  if (project.isLate) return "Late against target";
-  if (project.budgetRatio !== null && project.budgetRatio >= 1) return "Over budget";
-  if (project.budgetRatio !== null && project.budgetRatio >= 0.9) return "Budget pressure";
-  if (project.materialCoverage !== null && project.materialCoverage < 0.5) return "Material gap";
-  if (project.materialCoverage !== null && project.materialCoverage < 1) return "Awaiting stock";
-  if (project.status === "completed") return "Closed out";
-  return "On track";
-};
-
-const getTargetLabel = (project: PortfolioProject): string => {
-  if (project.status === "completed") {
-    return formatDate(project.actualEndDate, "Completed");
-  }
-
-  if (project.daysToTarget === null) {
-    return "No target date";
-  }
-
-  if (project.daysToTarget < 0) {
-    return `${Math.abs(project.daysToTarget)}d overdue`;
-  }
-
-  if (project.daysToTarget === 0) {
-    return "Due today";
-  }
-
-  return `${project.daysToTarget}d remaining`;
-};
-
-const getCoverageLabel = (project: PortfolioProject): string => {
-  if (project.inventoryLineCount === 0) {
-    return "No material plan";
-  }
-
-  if (project.materialCoverage === null) {
-    return "No allocation data";
-  }
-
-  return `${Math.round(project.materialCoverage * 100)}% allocated`;
-};
+const ProjectAsideSkeleton = (): JSX.Element => (
+  <>
+    {[1, 2, 3].map((panel) => (
+      <section key={panel} className="panel">
+        <div className="panel__header">
+          <div className="skeleton-bar" style={{ width: 120, height: 20 }} />
+        </div>
+        <div className="panel__body--padded" style={{ display: "grid", gap: "12px" }}>
+          {[1, 2, 3].map((row) => (
+            <div key={row} className="skeleton-bar" style={{ width: "100%", height: 28, borderRadius: 8 }} />
+          ))}
+        </div>
+      </section>
+    ))}
+  </>
+);
 
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
@@ -238,68 +193,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       ? statusScopedProjects
       : statusScopedProjects.filter((project) => project.depth === 0);
     const filteredProjects = depthFilteredProjects.filter((project) => matchesProjectSearch(project, searchQuery));
-    const inventoryRollups = await getProjectInventoryRollups(household.id);
-    const inventoryByProject = new Map(inventoryRollups.map((rollup) => [rollup.projectId, rollup]));
-    const now = Date.now();
-    const portfolioProjects = sortProjects(filteredProjects.map((project) => {
-      const inventoryRollup = inventoryByProject.get(project.id);
-      const inventoryLineCount = inventoryRollup?.inventoryLineCount ?? 0;
-      const totalInventoryNeeded = inventoryRollup?.totalInventoryNeeded ?? 0;
-      const totalInventoryAllocated = inventoryRollup?.totalInventoryAllocated ?? 0;
-      const totalInventoryRemaining = inventoryRollup?.totalInventoryRemaining ?? 0;
-      const plannedInventoryCost = inventoryRollup?.plannedInventoryCost ?? 0;
-      const committedCost = project.totalSpent + plannedInventoryCost;
-      const budgetRatio = project.totalBudgeted && project.totalBudgeted > 0
-        ? committedCost / project.totalBudgeted
-        : null;
-      const materialCoverage = totalInventoryNeeded > 0
-        ? totalInventoryAllocated / totalInventoryNeeded
-        : null;
-      const daysToTarget = getTargetDays(project.targetEndDate, now);
-      const isLate = daysToTarget !== null
-        && daysToTarget < 0
-        && project.status !== "completed"
-        && project.status !== "cancelled";
-      const riskScore = (isLate ? 3 : 0)
-        + (budgetRatio !== null && budgetRatio >= 1 ? 3 : budgetRatio !== null && budgetRatio >= 0.9 ? 2 : 0)
-        + (materialCoverage !== null && materialCoverage < 0.5 ? 2 : materialCoverage !== null && materialCoverage < 1 ? 1 : 0)
-        + (project.percentComplete < 50 && daysToTarget !== null && daysToTarget <= 14 ? 1 : 0);
-
-      return {
-        ...project,
-        inventoryLineCount,
-        totalInventoryNeeded,
-        totalInventoryAllocated,
-        totalInventoryRemaining,
-        plannedInventoryCost,
-        committedCost,
-        budgetRatio,
-        materialCoverage,
-        daysToTarget,
-        isLate,
-        isAtRisk: riskScore >= 2,
-        riskScore
-      };
-    }), selectedSort);
-
     const statusCounts = projectStatusValues.map((status) => ({
       status,
       count: allProjects.filter((project) => project.status === status).length
     }));
-    const visibleBudget = portfolioProjects.reduce((sum, project) => sum + (project.totalBudgeted ?? 0), 0);
-    const visibleSpent = portfolioProjects.reduce((sum, project) => sum + project.totalSpent, 0);
-    const visibleCommitted = portfolioProjects.reduce((sum, project) => sum + project.committedCost, 0);
-    const visibleMaterialPlan = portfolioProjects.reduce((sum, project) => sum + project.plannedInventoryCost, 0);
-    const totalInventoryNeeded = portfolioProjects.reduce((sum, project) => sum + project.totalInventoryNeeded, 0);
-    const totalInventoryAllocated = portfolioProjects.reduce((sum, project) => sum + project.totalInventoryAllocated, 0);
-    const portfolioCoverage = totalInventoryNeeded > 0 ? totalInventoryAllocated / totalInventoryNeeded : null;
-    const atRiskProjects = portfolioProjects.filter((project) => project.isAtRisk);
-    const lateProjects = atRiskProjects.filter((project) => project.isLate);
-    const budgetPressureProjects = portfolioProjects.filter((project) => project.budgetRatio !== null && project.budgetRatio >= 0.9);
-    const materialGapProjects = portfolioProjects
-      .filter((project) => project.totalInventoryRemaining > 0)
-      .sort((left, right) => right.totalInventoryRemaining - left.totalInventoryRemaining)
-      .slice(0, 5);
+    const selectedStatusLabel = selectedStatus
+      ? `${projectStatusLabels[selectedStatus]} scope`
+      : "Across the current portfolio view";
 
     return (
       <AppShell activePath="/projects">
@@ -397,232 +297,34 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
             </div>
           </section>
 
-          <section className="stats-row">
-            <div className="stat-card stat-card--accent">
-              <span className="stat-card__label">Visible Projects</span>
-              <strong className="stat-card__value">{portfolioProjects.length}</strong>
-              <span className="stat-card__sub">{selectedStatus ? `${projectStatusLabels[selectedStatus]} scope` : "Across the current portfolio view"}</span>
-            </div>
-            <div className="stat-card stat-card--danger">
-              <span className="stat-card__label">Delivery Risk</span>
-              <strong className="stat-card__value">{atRiskProjects.length}</strong>
-              <span className="stat-card__sub">{lateProjects.length} late, {budgetPressureProjects.length} under funding pressure</span>
-            </div>
-            <div className="stat-card stat-card--warning">
-              <span className="stat-card__label">Budget Exposure</span>
-              <strong className="stat-card__value">{formatCurrency(visibleCommitted, "$0.00")}</strong>
-              <span className="stat-card__sub">
-                {visibleBudget > 0
-                  ? `${Math.round((visibleCommitted / visibleBudget) * 100)}% of ${formatCurrency(visibleBudget, "$0.00")}`
-                  : "No funded scope on visible projects"}
-              </span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__label">Material Readiness</span>
-              <strong className="stat-card__value">
-                {portfolioCoverage === null ? "No plan" : `${Math.round(portfolioCoverage * 100)}%`}
-              </strong>
-              <span className="stat-card__sub">
-                {formatCurrency(visibleMaterialPlan, "$0.00")} planned, {totalInventoryAllocated} of {totalInventoryNeeded} units allocated
-              </span>
-            </div>
-          </section>
+          <Suspense fallback={<ProjectStatsSkeleton />}>
+            <ProjectPortfolioStats
+              householdId={household.id}
+              projects={filteredProjects}
+              selectedStatusLabel={selectedStatusLabel}
+              selectedSort={selectedSort}
+            />
+          </Suspense>
 
           <div className="dashboard-grid">
             <div className="dashboard-main">
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Project Portfolio ({portfolioProjects.length})</h2>
-                </div>
-                <div className="panel__body">
-                  {portfolioProjects.length === 0 ? (
-                    <div className="panel__body--padded">
-                      <p className="panel__empty">No projects match the current filters. Adjust the scope or create a new project to populate the portfolio view.</p>
-                    </div>
-                  ) : (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Project</th>
-                          <th>Status</th>
-                          <th>Progress</th>
-                          <th>Target</th>
-                          <th>Budget</th>
-                          <th>Material Plan</th>
-                          <th>Updated</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {portfolioProjects.map((project) => {
-                          const tone = getRiskTone(project);
-                          const subtitle = project.description && project.description.length > 50 ? `${project.description.slice(0, 50)}...` : project.description;
-
-                          return (
-                            <tr key={project.id} className={`row--${tone === 'neutral' ? 'default' : tone}`}>
-                              <td>
-                                <div className="data-table__primary">
-                                  <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">{project.name}</Link>
-                                </div>
-                                <div className="data-table__secondary">
-                                  {project.depth > 0 && (
-                                    <span style={{ marginRight: 6, opacity: 0.7 }}>Sub-project ·</span>
-                                  )}
-                                  {tone !== 'neutral' && tone !== 'accent' ? (
-                                    <strong style={{ color: `var(--${tone}-text, var(--${tone}))` }}>{getRiskLabel(project)}</strong>
-                                  ) : (
-                                    subtitle || getRiskLabel(project)
-                                  )}
-                                </div>
-                              </td>
-                              <td><span className={`status-chip status-chip--${tone === 'neutral' ? 'default' : tone}`}>{projectStatusLabels[project.status]}</span></td>
-                              <td>
-                                <ProjectProgressBar
-                                  phases={project.phaseProgress ?? []}
-                                  totalTaskCount={project.taskCount}
-                                  completedTaskCount={project.completedTaskCount}
-                                  showLabel={true}
-                                />
-                              </td>
-                              <td>
-                                <strong>{getTargetLabel(project)}</strong>
-                                <div className="data-table__secondary">{project.completedPhaseCount} of {project.phaseCount} phases</div>
-                              </td>
-                              <td>
-                                <strong>{formatCurrency(project.committedCost, "$0.00")}</strong>
-                                {project.totalBudgeted && project.totalBudgeted > 0 ? (
-                                  <div className="data-table__secondary">{Math.round((project.committedCost / project.totalBudgeted) * 100)}% of {formatCurrency(project.totalBudgeted, "$0")}</div>
-                                ) : (
-                                  <div className="data-table__secondary">Unbudgeted</div>
-                                )}
-                              </td>
-                              <td>
-                                <strong>{getCoverageLabel(project)}</strong>
-                                <div className="data-table__secondary">{project.inventoryLineCount} lines</div>
-                              </td>
-                              <td>
-                                {formatDate(project.updatedAt, "Recently")}
-                              </td>
-                              <td>
-                                <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">Open</Link>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </section>
-
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Material Rollups</h2>
-                </div>
-                <div className="panel__body">
-                  {portfolioProjects.filter((project) => project.inventoryLineCount > 0).length === 0 ? (
-                    <p className="panel__empty">No inventory-linked requirements on the visible projects yet.</p>
-                  ) : (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Project</th>
-                          <th>Inventory Lines</th>
-                          <th>Allocated</th>
-                          <th>Gap</th>
-                          <th>Planned Cost</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {portfolioProjects.filter((project) => project.inventoryLineCount > 0).map((project) => (
-                          <tr key={project.id}>
-                            <td>
-                              <div className="data-table__primary">{project.name}</div>
-                              <div className="data-table__secondary">{getCoverageLabel(project)}</div>
-                            </td>
-                            <td>{project.inventoryLineCount}</td>
-                            <td>{project.totalInventoryAllocated} / {project.totalInventoryNeeded}</td>
-                            <td>{project.totalInventoryRemaining}</td>
-                            <td>{formatCurrency(project.plannedInventoryCost, "$0.00")}</td>
-                            <td>
-                              <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">Review</Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </section>
+              <Suspense fallback={<ProjectTableSkeleton />}>
+                <ProjectPortfolioTable
+                  householdId={household.id}
+                  projects={filteredProjects}
+                  selectedSort={selectedSort}
+                />
+              </Suspense>
             </div>
 
             <div className="dashboard-aside">
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Risk Watch</h2>
-                </div>
-                <div className="panel__body project-insight-list">
-                  {atRiskProjects.length === 0 ? (
-                    <p className="panel__empty">No visible projects are currently flagged as late, underfunded, or materially blocked.</p>
-                  ) : (
-                    atRiskProjects.slice(0, 5).map((project) => (
-                      <div key={project.id} className="project-insight-item">
-                        <div>
-                          <strong>{project.name}</strong>
-                          <p>{getRiskLabel(project)}</p>
-                        </div>
-                        <Link href={`/projects/${project.id}?householdId=${household.id}`} className="data-table__link">Open</Link>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Material Gaps</h2>
-                </div>
-                <div className="panel__body project-insight-list">
-                  {materialGapProjects.length === 0 ? (
-                    <p className="panel__empty">All visible inventory plans are fully allocated or not yet defined.</p>
-                  ) : (
-                    materialGapProjects.map((project) => (
-                      <div key={project.id} className="project-insight-item">
-                        <div>
-                          <strong>{project.name}</strong>
-                          <p>{project.totalInventoryRemaining} units still unallocated across {project.inventoryLineCount} line items</p>
-                        </div>
-                        <span className="pill">{project.totalInventoryAllocated}/{project.totalInventoryNeeded}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <section className="panel">
-                <div className="panel__header">
-                  <h2>Funding Snapshot</h2>
-                </div>
-                <div className="panel__body--padded project-funding-stack">
-                  <div className="project-funding-row">
-                    <span>Actual spend</span>
-                    <strong>{formatCurrency(visibleSpent, "$0.00")}</strong>
-                  </div>
-                  <div className="project-funding-row">
-                    <span>Planned materials</span>
-                    <strong>{formatCurrency(visibleMaterialPlan, "$0.00")}</strong>
-                  </div>
-                  <div className="project-funding-row">
-                    <span>Budgeted scope</span>
-                    <strong>{formatCurrency(visibleBudget, "$0.00")}</strong>
-                  </div>
-                  <div className="project-funding-row project-funding-row--emphasis">
-                    <span>Total commitment</span>
-                    <strong>{formatCurrency(visibleCommitted, "$0.00")}</strong>
-                  </div>
-                </div>
-              </section>
+              <Suspense fallback={<ProjectAsideSkeleton />}>
+                <ProjectPortfolioAside
+                  householdId={household.id}
+                  projects={filteredProjects}
+                  selectedSort={selectedSort}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

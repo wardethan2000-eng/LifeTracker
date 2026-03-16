@@ -1,4 +1,5 @@
 import type {
+  AssetMetricCorrelationMatrix,
   AssetTimelineItem,
   MaintenanceLog,
   UsageCostNormalization,
@@ -12,10 +13,9 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime
-} from "./formatters";
+} from "../../../lib/formatters";
 
-export type AssetDetailPageSearchParams = {
-  tab?: string | string[];
+export type AssetHistoryPageSearchParams = {
   sourceType?: string | string[];
   category?: string | string[];
   search?: string | string[];
@@ -23,6 +23,12 @@ export type AssetDetailPageSearchParams = {
   until?: string | string[];
   cursor?: string | string[];
   showAddForm?: string | string[];
+};
+
+export type AssetTimelineFeed = {
+  items: AssetTimelineItem[];
+  nextCursor: string | null;
+  totalSources: number;
 };
 
 export type MetricInsight = {
@@ -34,16 +40,7 @@ export type MetricInsight = {
   enhancedProjection: EnhancedUsageProjection | null;
 };
 
-export const assetDetailTabs = [
-  { id: "overview", label: "Overview" },
-  { id: "details", label: "Structured Details" },
-  { id: "metrics", label: "Usage Metrics" },
-  { id: "costs", label: "Costs" },
-  { id: "maintenance", label: "Maintenance" },
-  { id: "history", label: "History" },
-  { id: "comments", label: "Comments" },
-  { id: "settings", label: "Settings" }
-] as const;
+export type AssetMetricCorrelationData = AssetMetricCorrelationMatrix | null;
 
 export const getSearchParamValue = (value: string | string[] | undefined): string | undefined => Array.isArray(value)
   ? value[0]
@@ -63,9 +60,9 @@ export const toDateBoundaryIso = (value: string | undefined, boundary: "start" |
   return parsed.toISOString();
 };
 
-export const buildAssetDetailHref = (
+export const buildAssetHistoryHref = (
   assetId: string,
-  searchParams: AssetDetailPageSearchParams,
+  searchParams: AssetHistoryPageSearchParams,
   overrides: Record<string, string | undefined>,
   keysToDelete: string[] = []
 ): string => {
@@ -89,7 +86,7 @@ export const buildAssetDetailHref = (
   });
 
   const query = params.toString();
-  return `/assets/${assetId}${query ? `?${query}` : ""}`;
+  return `/assets/${assetId}/history${query ? `?${query}` : ""}`;
 };
 
 export const formatTimelineSourceLabel = (sourceType: AssetTimelineItem["sourceType"]): string => {

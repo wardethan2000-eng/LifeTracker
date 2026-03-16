@@ -1,10 +1,6 @@
 import type {
+  AssetMetricCorrelationMatrix,
   AssetDetailResponse,
-  EnhancedUsageProjection,
-  UsageCostNormalization,
-  UsageProjection,
-  UsageRateAnalytics,
-  UsageMetricEntry
 } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
@@ -14,14 +10,6 @@ import {
   updateMetricAction
 } from "../app/actions";
 import { AssetMetricCharts } from "./asset-metric-charts";
-import {
-  getAssetMetricCorrelations,
-  getEnhancedProjections,
-  getMetricCostNormalization,
-  getMetricEntries,
-  getMetricProjection,
-  getMetricRateAnalytics
-} from "../lib/api";
 import {
   formatCurrency,
   formatDate,
@@ -33,45 +21,18 @@ import {
   getUsageRateStatusClass,
   getUsageRateStatusLabel,
   type MetricInsight
-} from "../lib/asset-detail-helpers";
+} from "../app/assets/[assetId]/shared";
 
 type AssetMetricsTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
+  metricInsights: Record<string, MetricInsight>;
+  metricCorrelations: AssetMetricCorrelationMatrix | null;
 };
 
 const METRIC_ANALYTICS_LOOKBACK_DAYS = 365;
 
-async function loadMetricInsights(assetId: string, detail: AssetDetailResponse): Promise<Record<string, MetricInsight>> {
-  const metricPayloads = await Promise.all(
-    detail.metrics.map(async (metric) => {
-      const [entries, projection, rateAnalytics, costNormalization, enhancedProjection] = await Promise.all([
-        getMetricEntries(assetId, metric.id),
-        getMetricProjection(assetId, metric.id).catch(() => null),
-        getMetricRateAnalytics(assetId, metric.id).catch(() => null),
-        getMetricCostNormalization(assetId, metric.id).catch(() => null),
-        getEnhancedProjections(assetId, metric.id).catch(() => null)
-      ]);
-
-      return {
-        metricId: metric.id,
-        entries,
-        projection,
-        rateAnalytics,
-        costNormalization,
-        enhancedProjection
-      } satisfies MetricInsight;
-    })
-  );
-
-  return Object.fromEntries(metricPayloads.map((item) => [item.metricId, item]));
-}
-
-export async function AssetMetricsTab({ detail, assetId }: AssetMetricsTabProps): Promise<JSX.Element> {
-  const [metricInsights, metricCorrelations] = await Promise.all([
-    loadMetricInsights(assetId, detail),
-    getAssetMetricCorrelations(assetId).catch(() => null)
-  ]);
+export async function AssetMetricsTab({ detail, assetId, metricInsights, metricCorrelations }: AssetMetricsTabProps): Promise<JSX.Element> {
 
   return (
     <div style={{ display: "grid", gap: "24px" }}>

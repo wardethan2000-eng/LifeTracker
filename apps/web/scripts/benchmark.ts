@@ -273,13 +273,13 @@ async function main(): Promise<void> {
 
   if (assetId) {
     pages.splice(3, 0,
-      { label: "Asset detail (overview tab)", path: `/assets/${assetId}?tab=overview` },
-      { label: "Asset detail (maintenance tab)", path: `/assets/${assetId}?tab=maintenance` },
-      { label: "Asset detail (costs tab)", path: `/assets/${assetId}?tab=costs` },
-      { label: "Asset detail (settings tab)", path: `/assets/${assetId}?tab=settings` },
-      { label: "Asset detail (metrics tab)", path: `/assets/${assetId}?tab=metrics` },
-      { label: "Asset detail (comments tab)", path: `/assets/${assetId}?tab=comments` },
-      { label: "Asset detail (history tab)", path: `/assets/${assetId}?tab=history` }
+      { label: "Asset detail (overview tab)", path: `/assets/${assetId}` },
+      { label: "Asset detail (maintenance tab)", path: `/assets/${assetId}/maintenance` },
+      { label: "Asset detail (costs tab)", path: `/assets/${assetId}/costs` },
+      { label: "Asset detail (settings tab)", path: `/assets/${assetId}/settings` },
+      { label: "Asset detail (metrics tab)", path: `/assets/${assetId}/metrics` },
+      { label: "Asset detail (comments tab)", path: `/assets/${assetId}/comments` },
+      { label: "Asset detail (history tab)", path: `/assets/${assetId}/history` }
     );
   } else {
     console.warn("Warning: no asset found for the seeded household. Skipping asset detail benchmarks.");

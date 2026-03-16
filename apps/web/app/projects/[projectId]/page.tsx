@@ -6,6 +6,7 @@ import type {
   ProjectPhaseSupply
 } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import {
   addProjectAssetAction,
   createProjectNoteAction,
@@ -29,18 +30,16 @@ import {
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { Card } from "../../../components/card";
-import { CompactBudgetPreview } from "../../../components/compact-budget-preview";
 import { CompactPhasePreview } from "../../../components/compact-phase-preview";
-import { CompactSupplyPreview } from "../../../components/compact-supply-preview";
 import { CompactTaskPreview } from "../../../components/compact-task-preview";
 import { ExpandableCard } from "../../../components/expandable-card";
-import { ProjectBudgetBreakdown } from "../../../components/project-budget-breakdown";
 import { ProjectChecklist } from "../../../components/project-checklist";
+import { ProjectLinkedInventoryCard } from "../../../components/project-linked-inventory-card";
+import { ProjectPhaseDetailsSection } from "../../../components/project-phase-details-section";
 import { ProjectProgressBar } from "../../../components/project-progress-bar";
-import { ProjectShoppingListItemActions } from "../../../components/project-shopping-list-item-actions";
-import { ProjectSupplyRollupActions } from "../../../components/project-supply-rollup-actions";
+import { ProjectShoppingListSection } from "../../../components/project-shopping-list-section";
 import { ProjectCoreFormFields } from "../../../components/project-core-form-fields";
-import { ProjectPhaseTimeline } from "../../../components/project-phase-timeline";
+import { ProjectSupplyStatCards } from "../../../components/project-supply-stat-cards";
 import { AttachmentSection } from "../../../components/attachment-section";
 import {
   createTaskChecklistItemAction,
@@ -57,8 +56,7 @@ import {
   getMe,
   getProjectDetail,
   getProjectNotes,
-  getProjectPhaseDetails,
-  getProjectShoppingList
+  getProjectNotes
 } from "../../../lib/api";
 import { formatCurrency, formatDate } from "../../../lib/formatters";
 
@@ -112,6 +110,80 @@ const hobbyStatusBadgeClass = (status: string): string => {
   }
 };
 
+const ProjectSupplyStatCardsSkeleton = (): JSX.Element => (
+  <>
+    <div className="stat-card">
+      <div className="skeleton-bar" style={{ width: 80, height: 12, marginBottom: 10 }} />
+      <div className="skeleton-bar" style={{ width: 90, height: 28, marginBottom: 8 }} />
+      <div className="skeleton-bar" style={{ width: 180, height: 12 }} />
+    </div>
+    <div className="stat-card stat-card--danger">
+      <div className="skeleton-bar" style={{ width: 120, height: 12, marginBottom: 10 }} />
+      <div className="skeleton-bar" style={{ width: 110, height: 28, marginBottom: 8 }} />
+      <div className="skeleton-bar" style={{ width: 220, height: 12 }} />
+    </div>
+  </>
+);
+
+const PhaseDetailsSkeleton = (): JSX.Element => (
+  <div style={{ display: "grid", gap: "24px" }}>
+    {[1, 2, 3].map((card) => (
+      <section key={card} className="panel">
+        <div className="panel__header">
+          <div className="skeleton-bar" style={{ width: 180, height: 20 }} />
+        </div>
+        <div className="panel__body--padded" style={{ display: "grid", gap: "14px" }}>
+          <div className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 10 }} />
+          <div className="skeleton-bar" style={{ width: "100%", height: 88, borderRadius: 12 }} />
+          <div className="skeleton-bar" style={{ width: "100%", height: 88, borderRadius: 12 }} />
+        </div>
+      </section>
+    ))}
+  </div>
+);
+
+const ShoppingListSkeleton = (): JSX.Element => (
+  <section className="panel">
+    <div className="panel__header">
+      <h2>Shopping List</h2>
+    </div>
+    <div className="panel__body">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Supply</th>
+            <th>Qty Remaining</th>
+            <th>Unit Cost</th>
+            <th>Line Cost</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[1, 2, 3].map((row) => (
+            <tr key={row}>
+              <td><div className="skeleton-bar" style={{ width: 180, height: 14 }} /></td>
+              <td><div className="skeleton-bar" style={{ width: 90, height: 14 }} /></td>
+              <td><div className="skeleton-bar" style={{ width: 80, height: 14 }} /></td>
+              <td><div className="skeleton-bar" style={{ width: 80, height: 14 }} /></td>
+              <td><div className="skeleton-bar" style={{ width: 72, height: 22 }} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+);
+
+const LinkedInventorySkeleton = (): JSX.Element => (
+  <Card title="Linked Inventory">
+    <dl className="schedule-meta">
+      {[1, 2, 3, 4, 5, 6, 7].map((row) => (
+        <div key={row}><dt><div className="skeleton-bar" style={{ width: 100, height: 12 }} /></dt><dd><div className="skeleton-bar" style={{ width: 110, height: 14 }} /></dd></div>
+      ))}
+    </dl>
+  </Card>
+);
+
 export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps): Promise<JSX.Element> {
   const routeParams = await params;
   const query = searchParams ? await searchParams : {};
@@ -143,11 +215,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       getProjectBudgetAnalysis(household.id, routeParams.projectId).catch(() => null)
     ]);
 
-    const phaseDetails = await getProjectPhaseDetails(household.id, project.id);
-    const shoppingList = await getProjectShoppingList(household.id, project.id);
     const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
-    const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));
-    const inventoryItemLookup = new Map(householdInventory.items.map((item) => [item.id, item]));
     const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
     const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
     const quickTodos = project.tasks.filter((task) => task.taskType === "quick");
@@ -177,25 +245,6 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         completedTaskCount: unphasedTasks.filter((task) => task.status === "completed").length
       });
     }
-
-    const allSupplies = phaseDetails.flatMap((phase) => phase.supplies);
-    const totalSupplyLines = allSupplies.length;
-    const totalSuppliesProcured = allSupplies.filter((supply) => supply.isProcured).length;
-    const totalSuppliesStaged = allSupplies.filter((supply) => supply.isStaged).length;
-    const estimatedProcurementCost = allSupplies.reduce((sum, supply) => sum + ((supply.estimatedUnitCost ?? 0) * supply.quantityNeeded), 0);
-    const actualProcurementCost = allSupplies.reduce((sum, supply) => {
-      const basis = supply.isProcured ? Math.max(supply.quantityOnHand, supply.quantityNeeded) : supply.quantityOnHand;
-      return sum + ((supply.actualUnitCost ?? 0) * basis);
-    }, 0);
-    const remainingProcurementCost = allSupplies.reduce((sum, supply) => {
-      const quantityRemaining = Math.max(supply.quantityNeeded - supply.quantityOnHand, 0);
-      return sum + ((supply.estimatedUnitCost ?? 0) * quantityRemaining);
-    }, 0);
-    const inventoryLinkedSupplyCount = allSupplies.filter((supply) => supply.inventoryItemId !== null).length;
-    const inventoryCoveredSupplyCount = allSupplies.filter((supply) => (
-      supply.inventoryItemId !== null
-      && (householdInventory.items.find((item) => item.id === supply.inventoryItemId)?.quantityOnHand ?? 0) >= Math.max(supply.quantityNeeded - supply.quantityOnHand, 0)
-    )).length;
 
     return (
       <AppShell activePath="/projects">
@@ -254,16 +303,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               <strong className="stat-card__value">{completedPhaseCount} / {phaseCount}</strong>
               <span className="stat-card__sub">{activePhase ? `Active: ${activePhase.name}` : "No active phase."}</span>
             </div>
-            <div className="stat-card">
-              <span className="stat-card__label">Supplies</span>
-              <strong className="stat-card__value">{totalSuppliesProcured} / {totalSupplyLines}</strong>
-              <span className="stat-card__sub">{formatCurrency(remainingProcurementCost, "$0.00")} estimated remaining procurement cost</span>
-            </div>
-            <div className="stat-card stat-card--danger">
-              <span className="stat-card__label">Supplies Overview</span>
-              <strong className="stat-card__value">{formatCurrency(estimatedProcurementCost, "$0.00")}</strong>
-              <span className="stat-card__sub">{inventoryLinkedSupplyCount} linked to inventory, {inventoryCoveredSupplyCount} fully coverable from stock</span>
-            </div>
+            <Suspense fallback={<ProjectSupplyStatCardsSkeleton />}>
+              <ProjectSupplyStatCards householdId={household.id} projectId={project.id} />
+            </Suspense>
           </section>
 
           {project.childProjects && project.childProjects.length > 0 && (
@@ -308,53 +350,17 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
           <div className="resource-layout">
             <div className="resource-layout__primary">
-              <ProjectPhaseTimeline
-                householdId={household.id}
-                projectId={project.id}
-                focusedPhaseId={focusedPhaseId}
-                phases={project.phases}
-                phaseDetails={phaseDetails}
-                householdMembers={householdMembers}
-                serviceProviders={serviceProviders}
-                budgetCategories={project.budgetCategories}
-                inventoryItems={householdInventory.items}
-                addPhaseForm={(
-                  <form action={createProjectPhaseAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <div className="form-grid">
-                      <label className="field field--full">
-                        <span>New Phase Name</span>
-                        <input name="name" placeholder="Demo & Prep, Rough-In, Finish Work" required />
-                      </label>
-                      <label className="field field--full">
-                        <span>Description</span>
-                        <textarea name="description" rows={2} placeholder="Define what belongs in this stage, what must be true before it starts, and how you know it is done." />
-                      </label>
-                      <label className="field">
-                        <span>Status</span>
-                        <select name="status" defaultValue="pending">
-                          <option value="pending">Pending</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                          <option value="skipped">Skipped</option>
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>Budget Amount</span>
-                        <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                      </label>
-                      <label className="field">
-                        <span>Target End Date</span>
-                        <input name="targetEndDate" type="date" />
-                      </label>
-                    </div>
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Add Phase</button>
-                    </div>
-                  </form>
-                )}
-              />
+              <Suspense fallback={<PhaseDetailsSkeleton />}>
+                <ProjectPhaseDetailsSection
+                  householdId={household.id}
+                  project={project}
+                  focusedPhaseId={focusedPhaseId}
+                  householdMembers={householdMembers}
+                  serviceProviders={serviceProviders}
+                  inventoryItems={householdInventory.items}
+                  projectBudgetAnalysis={projectBudgetAnalysis}
+                />
+              </Suspense>
 
               <ExpandableCard
                 title="Project Settings"
@@ -662,326 +668,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 </div>
               </ExpandableCard>
 
-              <ExpandableCard
-                title="Budget & Expenses"
-                modalTitle="Budget & Expenses"
-                previewContent={
-                  <CompactBudgetPreview
-                    budgetAmount={project.budgetAmount}
-                    totalSpent={totalSpent}
-                    categories={project.budgetCategories}
-                    expenses={project.expenses}
-                  />
-                }
-              >
-                <div>
-                  <ProjectBudgetBreakdown
-                    householdId={household.id}
-                    projectId={project.id}
-                    projectBudgetAmount={project.budgetAmount}
-                    categories={project.budgetCategories}
-                    expenses={project.expenses}
-                    phaseDetails={phaseDetails}
-                  />
-                  {projectBudgetAnalysis ? (
-                    <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16, display: "grid", gap: 16 }}>
-                      <div>
-                        <h3>Variance Analysis</h3>
-                        <p style={{ marginTop: 8 }}>
-                          Variance: {formatCurrency(projectBudgetAnalysis.variance, "$0.00")}
-                          {projectBudgetAnalysis.variancePercent !== null ? ` (${projectBudgetAnalysis.variancePercent.toFixed(1)}% ${projectBudgetAnalysis.variance >= 0 ? "under" : "over"} budget)` : ""}
-                        </p>
-                        {projectBudgetAnalysis.burnRate !== null ? (
-                          <p style={{ marginTop: 8, color: "var(--ink-muted)" }}>
-                            Current burn rate: {formatCurrency(projectBudgetAnalysis.burnRate, "$0.00")}/day
-                          </p>
-                        ) : null}
-                        {projectBudgetAnalysis.projectedTotalAtBurnRate !== null && project.targetEndDate ? (
-                          <p style={{ marginTop: 8, color: "var(--ink-muted)" }}>
-                            At current pace, projected total spend: {formatCurrency(projectBudgetAnalysis.projectedTotalAtBurnRate, "$0.00")} by {formatDate(project.targetEndDate)}
-                            {project.budgetAmount !== null && projectBudgetAnalysis.projectedTotalAtBurnRate > project.budgetAmount ? (
-                              <span className="concentration-pill" style={{ marginLeft: 8 }}>Tracking over budget</span>
-                            ) : null}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Phase Name</th>
-                            <th>Budget</th>
-                            <th>Actual</th>
-                            <th>Variance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {projectBudgetAnalysis.byPhase.map((phase) => (
-                            <tr key={phase.phaseId}>
-                              <td>{phase.phaseName}</td>
-                              <td>{formatCurrency(phase.budgetAmount, "No budget")}</td>
-                              <td>{formatCurrency(phase.actualSpend, "$0.00")}</td>
-                              <td style={{ color: phase.variance >= 0 ? "var(--success)" : "var(--danger)" }}>
-                                {formatCurrency(phase.variance, "$0.00")}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Category Name</th>
-                            <th>Budget</th>
-                            <th>Actual</th>
-                            <th>Variance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {projectBudgetAnalysis.byCategory.map((category) => (
-                            <tr key={category.categoryId}>
-                              <td>{category.categoryName}</td>
-                              <td>{formatCurrency(category.budgetAmount, "No budget")}</td>
-                              <td>{formatCurrency(category.actualSpend, "$0.00")}</td>
-                              <td style={{ color: category.variance >= 0 ? "var(--success)" : "var(--danger)" }}>
-                                {formatCurrency(category.variance, "$0.00")}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                  <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                    <div className="schedule-stack">
-                      {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
-                      {project.expenses.map((expense) => (
-                        <div key={expense.id} className="schedule-card">
-                          <form action={updateProjectExpenseAction}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="expenseId" value={expense.id} />
-                            <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
-                              <div>
-                                <div className="data-table__primary">{expense.description}</div>
-                                <div className="data-table__secondary">
-                                  Phase: {expense.phaseId ? (phaseNameLookup.get(expense.phaseId) ?? "Unknown phase") : "Unphased"}
-                                  {" · "}
-                                  Budget category: {expense.budgetCategoryId ? (budgetCategoryLookup.get(expense.budgetCategoryId) ?? "Unknown category") : "Uncategorized"}
-                                </div>
-                              </div>
-                              <span className="pill">{formatCurrency(expense.amount, "$0.00")}</span>
-                            </div>
-                            <div className="form-grid">
-                              <label className="field field--full"><span>Description</span><input name="description" defaultValue={expense.description} required /></label>
-                              <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" defaultValue={expense.amount} required /></label>
-                              <label className="field"><span>Freeform Category</span><input name="category" defaultValue={expense.category ?? ""} /></label>
-                              <label className="field">
-                                <span>Phase</span>
-                                <select name="phaseId" defaultValue={expense.phaseId ?? ""}>
-                                  <option value="">Unphased</option>
-                                  {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
-                                </select>
-                              </label>
-                              <label className="field">
-                                <span>Budget Category</span>
-                                <select name="budgetCategoryId" defaultValue={expense.budgetCategoryId ?? ""}>
-                                  <option value="">None</option>
-                                  {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
-                                </select>
-                              </label>
-                              <label className="field">
-                                <span>Service Provider</span>
-                                <select name="serviceProviderId" defaultValue={expense.serviceProviderId ?? ""}>
-                                  <option value="">None</option>
-                                  {serviceProviders.map((provider) => (<option key={provider.id} value={provider.id}>{provider.name}</option>))}
-                                </select>
-                              </label>
-                              <label className="field"><span>Date</span><input name="date" type="date" defaultValue={toDateInputValue(expense.date)} /></label>
-                              <label className="field field--full"><span>Notes</span><textarea name="notes" rows={2} defaultValue={expense.notes ?? ""} /></label>
-                            </div>
-                            <div className="inline-actions" style={{ marginTop: 16 }}>
-                              <button type="submit" className="button button--ghost">Save Expense</button>
-                            </div>
-                          </form>
-                          <form action={deleteProjectExpenseAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="expenseId" value={expense.id} />
-                            <button type="submit" className="button button--danger">Delete Expense</button>
-                          </form>
-                          <AttachmentSection
-                            householdId={household.id}
-                            entityType="project_expense"
-                            entityId={expense.id}
-                            compact
-                            label="Receipts"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <form action={createProjectExpenseAction} style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <div className="form-grid">
-                        <label className="field field--full"><span>Description</span><input name="description" placeholder="Project-wide expense" required /></label>
-                        <label className="field"><span>Amount</span><input name="amount" type="number" min="0" step="0.01" required /></label>
-                        <label className="field">
-                          <span>Phase</span>
-                          <select name="phaseId" defaultValue="">
-                            <option value="">Unphased</option>
-                            {project.phases.map((phase) => (<option key={phase.id} value={phase.id}>{phase.name}</option>))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>Budget Category</span>
-                          <select name="budgetCategoryId" defaultValue="">
-                            <option value="">None</option>
-                            {project.budgetCategories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
-                          </select>
-                        </label>
-                      </div>
-                      <div className="inline-actions" style={{ marginTop: 16 }}>
-                        <button type="submit" className="button">Add Expense</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </ExpandableCard>
-
-              <ExpandableCard
-                title="Supplies"
-                modalTitle="Supplies"
-                previewContent={
-                  <CompactSupplyPreview
-                    supplies={allSupplies}
-                    estimatedCost={estimatedProcurementCost}
-                    remainingCost={remainingProcurementCost}
-                  />
-                }
-              >
-                <div>
-                  {project.phases.length > 0 ? (
-                    <ProjectSupplyQuickAddForm
-                      householdId={household.id}
-                      projectId={project.id}
-                      phases={project.phases}
-                      inventoryItems={householdInventory.items}
-                    />
-                  ) : null}
-                  {allSupplies.length === 0 ? (
-                    <p className="panel__empty">No supplies added yet. Expand a phase in the Phase Timeline to add supplies per phase.</p>
-                  ) : (
-                    <table className="workbench-table">
-                      <thead>
-                        <tr>
-                          <th>Supply</th>
-                          <th>Phase</th>
-                          <th>Qty</th>
-                          <th>Est. Cost</th>
-                          <th>Procured</th>
-                          <th>Staged</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allSupplies.map((supply) => {
-                          const phaseName = phaseNameLookup.get(supply.phaseId) ?? "—";
-                          return (
-                            <tr key={supply.id}>
-                              <td>
-                                <div className="data-table__primary">{supply.name}</div>
-                                {supply.supplier ? <div className="data-table__secondary">{supply.supplier}</div> : null}
-                              </td>
-                              <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{phaseName}</td>
-                              <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{supply.quantityOnHand}/{supply.quantityNeeded} {supply.unit}</td>
-                              <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>
-                                {supply.estimatedUnitCost != null ? formatCurrency(supply.estimatedUnitCost * supply.quantityNeeded, "$0.00") : "—"}
-                              </td>
-                              <td>
-                                {supply.isProcured
-                                  ? <span className="status-chip status-chip--upcoming">Yes</span>
-                                  : <span className="status-chip status-chip--overdue">No</span>}
-                              </td>
-                              <td>
-                                {supply.isStaged
-                                  ? <span className="status-chip status-chip--upcoming">Yes</span>
-                                  : <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>No</span>}
-                              </td>
-                              <td>
-                                <ProjectSupplyActions
-                                  householdId={household.id}
-                                  projectId={project.id}
-                                  phaseId={supply.phaseId}
-                                  supply={supply}
-                                  inventoryItems={householdInventory.items}
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </ExpandableCard>
-
-              <Card title="Shopping List">
-                {shoppingList.lineCount === 0 ? (
-                  <p className="panel__empty">All supplies have been procured. Nothing on the shopping list.</p>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", color: "var(--ink-muted)", padding: "0 0 12px" }}>
-                      <span>{shoppingList.lineCount} item{shoppingList.lineCount === 1 ? "" : "s"}</span>
-                      <span>·</span>
-                      <span>{shoppingList.supplierCount} supplier{shoppingList.supplierCount === 1 ? "" : "s"}</span>
-                      <span>·</span>
-                      <span>~{formatCurrency(shoppingList.totalEstimatedCost, "$0.00")} estimated</span>
-                    </div>
-                    {shoppingList.groupedBySupplier.map((group) => (
-                      <div key={group.supplierName} style={{ marginBottom: "16px" }}>
-                        <div style={{ background: "var(--surface-alt)", padding: "8px 12px", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <strong style={{ fontSize: "0.92rem" }}>{group.supplierName}</strong>
-                            {group.supplierUrl ? (
-                              <a href={group.supplierUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: "0.78rem" }}>↗ website</a>
-                            ) : null}
-                          </div>
-                          <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Subtotal: {formatCurrency(group.subtotal, "$0.00")}</span>
-                        </div>
-                        <table className="data-table" style={{ width: "100%" }}>
-                          <thead>
-                            <tr>
-                              <th>Supply</th>
-                              <th>Qty Remaining</th>
-                              <th>Unit Cost</th>
-                              <th>Line Cost</th>
-                              <th>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {group.items.map((item) => (
-                              <tr key={item.id}>
-                                <td>
-                                  <div className="data-table__primary">{item.name}</div>
-                                  <div className="data-table__secondary">{item.projectName} › {item.phaseName}</div>
-                                </td>
-                                <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{item.quantityRemaining} {item.unit}</td>
-                                <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{item.estimatedUnitCost != null ? formatCurrency(item.estimatedUnitCost, "$0.00") : "—"}</td>
-                                <td style={{ fontSize: "0.82rem" }}>{item.estimatedLineCost != null ? formatCurrency(item.estimatedLineCost, "$0.00") : "—"}</td>
-                                <td>
-                                  <ProjectShoppingListItemActions householdId={household.id} item={item} />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </Card>
+              <Suspense fallback={<ShoppingListSkeleton />}>
+                <ProjectShoppingListSection householdId={household.id} projectId={project.id} />
+              </Suspense>
             </div>
 
             <div className="resource-layout__aside">
@@ -1078,17 +767,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 })()}
               </Card>
 
-              <Card title="Linked Inventory">
-                <dl className="schedule-meta">
-                  <div><dt>Supply lines</dt><dd>{totalSupplyLines}</dd></div>
-                  <div><dt>Procured</dt><dd>{totalSuppliesProcured} / {totalSupplyLines}</dd></div>
-                  <div><dt>Staged</dt><dd>{totalSuppliesStaged} / {totalSupplyLines}</dd></div>
-                  <div><dt>Inventory-linked</dt><dd>{inventoryLinkedSupplyCount} lines</dd></div>
-                  <div><dt>Covered from stock</dt><dd>{inventoryCoveredSupplyCount} fully covered</dd></div>
-                  <div><dt>Est. procurement</dt><dd>{formatCurrency(estimatedProcurementCost, "$0.00")}</dd></div>
-                  <div><dt>Remaining cost</dt><dd>{formatCurrency(remainingProcurementCost, "$0.00")}</dd></div>
-                </dl>
-              </Card>
+              <Suspense fallback={<LinkedInventorySkeleton />}>
+                <ProjectLinkedInventoryCard householdId={household.id} projectId={project.id} />
+              </Suspense>
 
               {project.hobbyLinks.length > 0 ? (
                 <Card title="Linked Hobbies">

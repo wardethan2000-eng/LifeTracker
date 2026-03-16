@@ -1,22 +1,19 @@
+import type {
+  AssetCostPerUnit,
+  AssetCostSummary,
+  CostForecast
+} from "@lifekeeper/types";
 import type { JSX } from "react";
 import { AssetCostCharts } from "./asset-cost-charts";
-import {
-  getAssetCostForecast,
-  getAssetCostPerUnit,
-  getAssetCostSummary
-} from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 
 type AssetCostsTabProps = {
-  assetId: string;
+  costSummary: AssetCostSummary | null;
+  costPerUnit: AssetCostPerUnit | null;
+  costForecast: CostForecast | null;
 };
 
-export async function AssetCostsTab({ assetId }: AssetCostsTabProps): Promise<JSX.Element> {
-  const [costSummary, costPerUnit, costForecast] = await Promise.all([
-    getAssetCostSummary(assetId).catch(() => null),
-    getAssetCostPerUnit(assetId).catch(() => null),
-    getAssetCostForecast(assetId).catch(() => null)
-  ]);
+export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: AssetCostsTabProps): Promise<JSX.Element> {
   const totalLogs = costSummary?.costByMonth.reduce((sum, entry) => sum + entry.logCount, 0) ?? 0;
   const normalizedMetrics = costPerUnit?.metrics.filter((metric) => metric.costPerUnit !== null) ?? [];
 

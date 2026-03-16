@@ -50,12 +50,11 @@ export function TimelineFilters({ assetId, currentFilters, onAddEntry }: Timelin
   const pushParams = useCallback((mutate: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(searchParams.toString());
 
-    params.set("tab", "history");
     params.delete("cursor");
     mutate(params);
 
     const query = params.toString();
-    router.push(`/assets/${assetId}${query ? `?${query}` : ""}`);
+    router.push(`/assets/${assetId}/history${query ? `?${query}` : ""}`);
   }, [assetId, router, searchParams]);
 
   useEffect(() => {
@@ -204,7 +203,7 @@ export function TimelineFilters({ assetId, currentFilters, onAddEntry }: Timelin
           <button
             type="button"
             className="text-link"
-            onClick={() => router.push(`/assets/${assetId}?tab=history`)}
+            onClick={() => router.push(`/assets/${assetId}/history`)}
           >
             Clear Filters
           </button>

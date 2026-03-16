@@ -1,13 +1,9 @@
-import type { AssetDetailResponse } from "@lifekeeper/types";
+import type { AssetDetailResponse, CustomPresetProfile, LibraryPreset } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   applyPresetToAssetAction,
   recordConditionAssessmentAction
 } from "../app/actions";
-import {
-  getHouseholdPresets,
-  getLibraryPresets
-} from "../lib/api";
 import {
   formatCategoryLabel,
   formatDate,
@@ -16,19 +12,16 @@ import {
 import {
   renderMetaRow,
   renderMoneyMetaRow
-} from "../lib/asset-detail-helpers";
+} from "../app/assets/[assetId]/shared";
 
 type AssetDetailsTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
-  householdId: string;
+  libraryPresets: LibraryPreset[];
+  customPresets: CustomPresetProfile[];
 };
 
-export async function AssetDetailsTab({ detail, assetId, householdId }: AssetDetailsTabProps): Promise<JSX.Element> {
-  const [libraryPresets, customPresets] = await Promise.all([
-    getLibraryPresets(),
-    getHouseholdPresets(householdId)
-  ]);
+export async function AssetDetailsTab({ detail, assetId, libraryPresets, customPresets }: AssetDetailsTabProps): Promise<JSX.Element> {
   const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
   const visibleLibraryPresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
   const visiblePresets = [

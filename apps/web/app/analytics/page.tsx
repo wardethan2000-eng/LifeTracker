@@ -510,7 +510,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               <tbody>
                 {complianceDashboard?.byAsset.length ? complianceDashboard.byAsset.slice(0, 12).map((asset) => (
                   <tr key={asset.assetId}>
-                    <td><Link href={`/assets/${asset.assetId}?tab=maintenance`} className="data-table__link">{asset.assetName}</Link></td>
+                    <td><Link href={`/assets/${asset.assetId}/maintenance`} className="data-table__link">{asset.assetName}</Link></td>
                     <td>{asset.category}</td>
                     <td className={getComplianceRateClass(asset.onTimeRate)}>{formatPercent(asset.onTimeRate)}</td>
                     <td>{asset.averageDaysOverdue === null ? "—" : Math.round(asset.averageDaysOverdue)}</td>
@@ -600,7 +600,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 {usageHighlights.length ? usageHighlights.map((asset) => (
                   <tr key={asset.assetId}>
                     <td>
-                      <Link href={`/assets/${asset.assetId}?tab=metrics`} className="data-table__link">{asset.assetName}</Link>
+                      <Link href={`/assets/${asset.assetId}/metrics`} className="data-table__link">{asset.assetName}</Link>
                       <div className="data-table__secondary">{asset.metricNames.join(", ")}</div>
                     </td>
                     <td>{asset.metricCount}</td>
