@@ -5039,6 +5039,83 @@ html[data-ui-density="compact"] .resource-layout__aside {
   gap: 16px;
 }
 
+.session-brew-summary,
+.session-brew-grid,
+.session-brew-checklist {
+  display: grid;
+  gap: 14px;
+}
+
+.session-brew-summary {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.session-brew-summary__topline,
+.session-brew-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-brew-summary__caption {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.84rem;
+}
+
+.session-brew-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.session-brew-details-grid > div {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.session-brew-details-grid dt {
+  margin-bottom: 4px;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.session-brew-details-grid dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.session-brew-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.session-brew-checklist {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.session-brew-checklist__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.session-brew-checklist__item input {
+  width: 16px;
+  height: 16px;
+}
+
 .session-metric-card {
   display: grid;
   gap: 14px;
@@ -5261,12 +5338,15 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 @media (max-width: 960px) {
+  .session-brew-grid,
+  .session-brew-details-grid,
   .session-metric-form-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
+  .session-brew-checklist,
   .session-pipeline-track,
   .session-metric-form-row {
     grid-template-columns: 1fr;

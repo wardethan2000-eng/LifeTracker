@@ -27,6 +27,13 @@ import {
   getHobbyLogs,
   getMe,
 } from "../../../../lib/api";
+import {
+  getBrewDayHighlights,
+  getBrewDayMissingItems,
+  getBrewDayReadinessLabel,
+  isBeerBrewingHobby,
+  resolveBrewDayData,
+} from "../../../../lib/hobby-brewing";
 import type {
   HobbyMetricReading,
 } from "@lifekeeper/types";
@@ -102,6 +109,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
     const completedSessions = sessions.filter((s) => s.status === "completed");
     const suggestedSession = activeSessions[0] ?? sessions[0] ?? null;
     const isPipeline = hobby.lifecycleMode === "pipeline";
+    const isBrewingHobby = isBeerBrewingHobby(hobby);
     const pipelineSteps = hobby.statusPipeline.sort((a, b) => a.sortOrder - b.sortOrder);
 
     const renderOverviewTab = (): JSX.Element => (
@@ -142,10 +150,67 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
                 <div className="panel__body--padded">
                   <div style={{ display: "grid", gap: "12px" }}>
                     {activeSessions.map((session) => (
-                      <div
-                        key={session.id}
-                        className="hobby-session-card"
-                      >
+                      <div key={session.id} className="hobby-session-card">
+                        {isBrewingHobby ? (() => {
+                          const brewDay = resolveBrewDayData(session.customFields, hobby);
+                          const highlights = getBrewDayHighlights(brewDay);
+                          const missingItems = getBrewDayMissingItems(brewDay);
+                          const readinessLabel = getBrewDayReadinessLabel(brewDay);
+
+                          return (
+                            <>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <Link href={`/hobbies/${hobbyId}/sessions/${session.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                                  <strong>{session.name}</strong>
+                                </Link>
+                                <span className={statusBadgeClass(session.status)}>{session.status}</span>
+                              </div>
+                              {session.recipeName ? (
+                                <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                                  From: {session.recipeName}
+                                </p>
+                              ) : null}
+                              <div style={{ display: "grid", gap: "8px", marginTop: "10px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                  <span className="pill pill--success">{readinessLabel}</span>
+                                  {missingItems.length > 0 ? (
+                                    <span className="pill pill--warning">Missing {missingItems.length}</span>
+                                  ) : null}
+                                </div>
+                                {highlights.length > 0 ? (
+                                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                    {highlights.map((item) => (
+                                      <span key={item} className="pill pill--muted">{item}</span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: "0.82rem" }}>
+                                    Brew-day execution details have not been captured yet.
+                                  </p>
+                                )}
+                                {missingItems.length > 0 ? (
+                                  <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: "0.8rem" }}>
+                                    Missing: {missingItems.slice(0, 3).join(", ")}{missingItems.length > 3 ? ", ..." : ""}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                                <Link href={`/hobbies/${hobbyId}/sessions/${session.id}`} className="button button--secondary button--sm">
+                                  Open Session
+                                </Link>
+                                <Link href={`/hobbies/${hobbyId}/sessions/${session.id}#brew-day-workspace`} className="button button--ghost button--sm">
+                                  Edit Brew Day
+                                </Link>
+                              </div>
+                              <div style={{ display: "flex", gap: "8px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+                                <span>{session.completedStepCount}/{session.stepCount} steps</span>
+                                <span>·</span>
+                                <span>Started {formatDate(session.startDate)}</span>
+                              </div>
+                            </>
+                          );
+                        })() : (
+                          <>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <Link href={`/hobbies/${hobbyId}/sessions/${session.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                             <strong>{session.name}</strong>
@@ -179,6 +244,13 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
                           <span>·</span>
                           <span>Started {formatDate(session.startDate)}</span>
                         </div>
+                        <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                          <Link href={`/hobbies/${hobbyId}/sessions/${session.id}`} className="button button--secondary button--sm">
+                            Open Session
+                          </Link>
+                        </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>

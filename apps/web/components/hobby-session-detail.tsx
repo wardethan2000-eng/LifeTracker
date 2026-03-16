@@ -13,6 +13,17 @@ import type {
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition, type FormEvent, type JSX } from "react";
 import {
+  type BrewDayChecklist,
+  type BrewDayData,
+  getBrewDayHighlights,
+  getBrewDayMissingItems,
+  getBrewDayReadinessLabel,
+  getRecommendedPitchTemperature,
+  isBeerBrewingHobby,
+  mergeBrewDayCustomFields,
+  resolveBrewDayData,
+} from "../lib/hobby-brewing";
+import {
   createHobbyLog,
   createHobbyMetricReading,
   createHobbySessionIngredient,
@@ -80,6 +91,51 @@ const defaultLogForm = (): LogFormState => ({
   logType: "note",
 });
 
+const brewDayNumericFields: Array<{ key: keyof BrewDayData; label: string; step?: string; min?: number }> = [
+  { key: "batchVolumeTargetGallons", label: "Target batch volume (gal)", step: "0.1", min: 0 },
+  { key: "volumeIntoFermenterGallons", label: "Volume into fermenter (gal)", step: "0.1", min: 0 },
+  { key: "strikeWaterGallons", label: "Strike water (gal)", step: "0.1", min: 0 },
+  { key: "spargeWaterGallons", label: "Sparge water (gal)", step: "0.1", min: 0 },
+  { key: "strikeTempTargetF", label: "Strike temp target (F)", step: "0.1" },
+  { key: "strikeTempActualF", label: "Strike temp actual (F)", step: "0.1" },
+  { key: "mashTempTargetF", label: "Mash temp target (F)", step: "0.1" },
+  { key: "mashTempActualF", label: "Mash temp actual (F)", step: "0.1" },
+  { key: "mashPh", label: "Mash pH", step: "0.01", min: 0 },
+  { key: "preBoilVolumeTargetGallons", label: "Pre-boil volume target (gal)", step: "0.1", min: 0 },
+  { key: "preBoilVolumeActualGallons", label: "Pre-boil volume actual (gal)", step: "0.1", min: 0 },
+  { key: "preBoilGravityTarget", label: "Pre-boil gravity target", step: "0.001", min: 0 },
+  { key: "preBoilGravityActual", label: "Pre-boil gravity actual", step: "0.001", min: 0 },
+  { key: "boilMinutesPlanned", label: "Boil minutes planned", step: "1", min: 0 },
+  { key: "boilMinutesActual", label: "Boil minutes actual", step: "1", min: 0 },
+  { key: "whirlpoolMinutes", label: "Whirlpool minutes", step: "1", min: 0 },
+  { key: "chillMinutes", label: "Chill minutes", step: "1", min: 0 },
+  { key: "originalGravityTarget", label: "Target OG", step: "0.001", min: 0 },
+  { key: "originalGravityActual", label: "Actual OG", step: "0.001", min: 0 },
+  { key: "pitchTempF", label: "Pitch temp (F)", step: "0.1" },
+  { key: "fermentationTempLowF", label: "Fermentation low (F)", step: "0.1" },
+  { key: "fermentationTempHighF", label: "Fermentation high (F)", step: "0.1" },
+];
+
+const brewDayTextFields: Array<{ key: keyof BrewDayData; label: string; placeholder?: string }> = [
+  { key: "brewingMethod", label: "Brewing method", placeholder: "All grain, extract, BIAB, no-sparge" },
+  { key: "brewhouse", label: "Brewhouse", placeholder: "System, kettle, or setup used" },
+  { key: "waterSource", label: "Water source", placeholder: "Filtered tap, RO, spring" },
+  { key: "waterProfile", label: "Water profile", placeholder: "Target salts or profile notes" },
+  { key: "yeastName", label: "Yeast", placeholder: "Strain or lot used" },
+  { key: "yeastStarter", label: "Starter and oxygenation", placeholder: "Starter size, rehydration, O2 notes" },
+];
+
+const brewDayChecklistFields: Array<{ key: keyof BrewDayChecklist; label: string }> = [
+  { key: "equipmentReady", label: "Equipment staged" },
+  { key: "waterAdjusted", label: "Water adjusted" },
+  { key: "fermenterSanitized", label: "Fermenter sanitized" },
+  { key: "mashComplete", label: "Mash complete" },
+  { key: "boilComplete", label: "Boil complete" },
+  { key: "wortChilled", label: "Wort chilled" },
+  { key: "yeastPitched", label: "Yeast pitched" },
+  { key: "cleanupComplete", label: "Cleanup complete" },
+];
+
 function formatDate(value: string | null | undefined, fallback = "-"): string {
   if (!value) {
     return fallback;
@@ -140,6 +196,14 @@ function titleCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function formatGravity(value: number | undefined): string {
+  if (value == null) {
+    return "-";
+  }
+
+  return value.toFixed(3);
+}
+
 function mergeSessionSummary(previous: HobbySessionDetail, updated: HobbySession): HobbySessionDetail {
   return {
     ...previous,
@@ -165,6 +229,9 @@ export function HobbySessionDetail({
   const [metricForms, setMetricForms] = useState<Record<string, MetricFormState>>({});
   const [pendingMetricIds, setPendingMetricIds] = useState<string[]>([]);
   const [deletingReadingId, setDeletingReadingId] = useState<string | null>(null);
+  const [brewDayDraft, setBrewDayDraft] = useState<BrewDayData>(() => resolveBrewDayData(session.customFields, hobby));
+  const [brewDaySaving, setBrewDaySaving] = useState(false);
+  const [brewDaySaved, setBrewDaySaved] = useState(false);
   const [notesDraft, setNotesDraft] = useState(session.notes ?? "");
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
@@ -182,8 +249,9 @@ export function HobbySessionDetail({
 
   useEffect(() => {
     setSessionState(session);
+    setBrewDayDraft(resolveBrewDayData(session.customFields, hobby));
     setNotesDraft(session.notes ?? "");
-  }, [session]);
+  }, [hobby, session]);
 
   useEffect(() => {
     if (!notesSaved) {
@@ -194,10 +262,32 @@ export function HobbySessionDetail({
     return () => window.clearTimeout(timeoutId);
   }, [notesSaved]);
 
+  useEffect(() => {
+    if (!brewDaySaved) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setBrewDaySaved(false), 1800);
+    return () => window.clearTimeout(timeoutId);
+  }, [brewDaySaved]);
+
   const pipelineSteps = useMemo(
     () => [...hobby.statusPipeline].sort((left, right) => left.sortOrder - right.sortOrder),
     [hobby.statusPipeline],
   );
+  const isBrewingSession = useMemo(() => isBeerBrewingHobby(hobby), [hobby]);
+  const persistedBrewDay = useMemo(
+    () => resolveBrewDayData(sessionState.customFields, hobby),
+    [hobby, sessionState.customFields],
+  );
+  const brewDayHighlights = useMemo(() => getBrewDayHighlights(brewDayDraft), [brewDayDraft]);
+  const brewDayMissingItems = useMemo(() => getBrewDayMissingItems(brewDayDraft), [brewDayDraft]);
+  const brewDayReadinessLabel = useMemo(() => getBrewDayReadinessLabel(brewDayDraft), [brewDayDraft]);
+  const recommendedPitchTemp = useMemo(() => getRecommendedPitchTemperature(brewDayDraft), [brewDayDraft]);
+  const brewDayHasChanges = useMemo(() => {
+    const nextCustomFields = mergeBrewDayCustomFields(sessionState.customFields, brewDayDraft);
+    return JSON.stringify(nextCustomFields) !== JSON.stringify(sessionState.customFields);
+  }, [brewDayDraft, sessionState.customFields]);
   const currentPipelineIndex = pipelineSteps.findIndex((step) => step.id === sessionState.pipelineStepId);
   const currentPipelineStep = currentPipelineIndex >= 0 ? pipelineSteps[currentPipelineIndex] : null;
   const sortedSteps = useMemo(
@@ -462,6 +552,52 @@ export function HobbySessionDetail({
     }
   };
 
+  const handleBrewDayTextChange = (key: keyof BrewDayData, value: string) => {
+    setBrewDayDraft((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+  };
+
+  const handleBrewDayNumberChange = (key: keyof BrewDayData, value: string) => {
+    setBrewDayDraft((previous) => ({
+      ...previous,
+      [key]: value === "" ? undefined : Number(value),
+    }));
+  };
+
+  const handleBrewDayChecklistChange = (key: keyof BrewDayChecklist, checked: boolean) => {
+    setBrewDayDraft((previous) => ({
+      ...previous,
+      checklist: {
+        ...previous.checklist,
+        [key]: checked,
+      },
+    }));
+  };
+
+  const saveBrewDay = async () => {
+    if (!brewDayHasChanges || brewDaySaving) {
+      return;
+    }
+
+    setBrewDaySaving(true);
+    setErrorMessage(null);
+
+    try {
+      const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, {
+        customFields: mergeBrewDayCustomFields(sessionState.customFields, brewDayDraft),
+      });
+      updateSessionSummary(updated);
+      setBrewDayDraft(resolveBrewDayData(updated.customFields, hobby));
+      setBrewDaySaved(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save brew day details.");
+    } finally {
+      setBrewDaySaving(false);
+    }
+  };
+
   const handleRating = async (rating: number) => {
     if (ratingPending === rating) {
       return;
@@ -654,6 +790,129 @@ export function HobbySessionDetail({
             )}
           </div>
         </Card>
+
+        {isBrewingSession ? (
+          <div id="brew-day-workspace">
+            <Card
+              title="Brew Day Workspace"
+              actions={<span className={`session-saved-indicator${brewDaySaved ? " is-visible" : ""}`}>Saved</span>}
+            >
+              <div className="session-section-stack">
+                <div className="session-brew-summary">
+                  <div className="session-brew-summary__topline">
+                    <strong>{brewDayReadinessLabel}</strong>
+                    {brewDayMissingItems.length > 0 ? (
+                      <span className="pill pill--warning">Missing {brewDayMissingItems.length}</span>
+                    ) : (
+                      <span className="pill pill--success">All core brew-day checks captured</span>
+                    )}
+                  </div>
+
+                  {brewDayHighlights.length > 0 ? (
+                    <div className="session-brew-pill-row">
+                      {brewDayHighlights.map((item) => (
+                        <span key={item} className="pill pill--muted">{item}</span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {brewDayMissingItems.length > 0 ? (
+                    <p className="session-brew-summary__caption">
+                      Missing: {brewDayMissingItems.join(", ")}.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="session-brew-details-grid">
+                  <div>
+                    <dt>Target OG</dt>
+                    <dd>{formatGravity(brewDayDraft.originalGravityTarget ?? persistedBrewDay.originalGravityTarget)}</dd>
+                  </div>
+                  <div>
+                    <dt>Actual OG</dt>
+                    <dd>{formatGravity(brewDayDraft.originalGravityActual)}</dd>
+                  </div>
+                  <div>
+                    <dt>Pitch temp target</dt>
+                    <dd>{recommendedPitchTemp != null ? `${recommendedPitchTemp.toFixed(1)}F` : "-"}</dd>
+                  </div>
+                  <div>
+                    <dt>Fermentation range</dt>
+                    <dd>
+                      {brewDayDraft.fermentationTempLowF != null || brewDayDraft.fermentationTempHighF != null
+                        ? `${brewDayDraft.fermentationTempLowF ?? "-"}F to ${brewDayDraft.fermentationTempHighF ?? "-"}F`
+                        : "-"}
+                    </dd>
+                  </div>
+                </div>
+
+                <div className="session-brew-grid">
+                  {brewDayTextFields.map((field) => (
+                    <label key={String(field.key)} className="field">
+                      <span>{field.label}</span>
+                      <input
+                        type="text"
+                        value={typeof brewDayDraft[field.key] === "string" ? (brewDayDraft[field.key] as string) : ""}
+                        onChange={(event) => handleBrewDayTextChange(field.key, event.target.value)}
+                        onBlur={() => void saveBrewDay()}
+                        placeholder={field.placeholder}
+                      />
+                    </label>
+                  ))}
+
+                  {brewDayNumericFields.map((field) => (
+                    <label key={String(field.key)} className="field">
+                      <span>{field.label}</span>
+                      <input
+                        type="number"
+                        min={field.min}
+                        step={field.step}
+                        value={typeof brewDayDraft[field.key] === "number" ? String(brewDayDraft[field.key]) : ""}
+                        onChange={(event) => handleBrewDayNumberChange(field.key, event.target.value)}
+                        onBlur={() => void saveBrewDay()}
+                      />
+                    </label>
+                  ))}
+
+                  <label className="field field--full">
+                    <span>Brew Day Notes</span>
+                    <textarea
+                      rows={5}
+                      value={brewDayDraft.notes ?? ""}
+                      onChange={(event) => handleBrewDayTextChange("notes", event.target.value)}
+                      onBlur={() => void saveBrewDay()}
+                      placeholder="Record water adjustments, hop timing changes, runoff issues, oxygenation, cleanup, and anything worth repeating next brew day."
+                    />
+                  </label>
+                </div>
+
+                <div className="session-brew-checklist">
+                  {brewDayChecklistFields.map((item) => (
+                    <label key={item.key} className="session-brew-checklist__item">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(brewDayDraft.checklist?.[item.key])}
+                        onChange={(event) => {
+                          handleBrewDayChecklistChange(item.key, event.target.checked);
+                          window.setTimeout(() => {
+                            void saveBrewDay();
+                          }, 0);
+                        }}
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="session-inline-actions">
+                  <button type="button" className="button button--secondary" onClick={() => void saveBrewDay()} disabled={brewDaySaving || !brewDayHasChanges}>
+                    {brewDaySaving ? "Saving..." : "Save Brew Day"}
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        ) : null}
 
         <Card
           title="Steps"
