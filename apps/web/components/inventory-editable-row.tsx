@@ -2,7 +2,7 @@
 
 import type { InventoryItemConsumption, InventoryItemSummary } from "@lifekeeper/types";
 import Link from "next/link";
-import type { JSX, ReactNode } from "react";
+import type { JSX, MouseEvent, ReactNode } from "react";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExpandableCard } from "./expandable-card";
@@ -43,7 +43,13 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
   const [editing, setEditing] = useState(defaultOpen);
   const router = useRouter();
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((event: MouseEvent<HTMLTableRowElement>) => {
+    const target = event.target as HTMLElement;
+
+    if (target.closest("a, button, input, select, textarea, label")) {
+      return;
+    }
+
     setEditing((current) => !current);
   }, []);
 

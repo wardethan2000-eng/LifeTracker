@@ -26,6 +26,7 @@ const ALLOWED_MIME_SET = new Set([
   "image/heif",
   "application/pdf",
 ]);
+const ALLOWED_FILE_TYPE_LABEL = "JPEG, PNG, WebP, HEIC, HEIF, or PDF";
 
 type UploadProgress = {
   filename: string;
@@ -54,7 +55,7 @@ export function AttachmentUploader({
 
   const uploadFile = useCallback(async (file: File) => {
     if (!ALLOWED_MIME_SET.has(file.type)) {
-      const msg = `"${file.name}" has an unsupported file type.`;
+      const msg = `"${file.name}" has an unsupported file type. Accepted types: ${ALLOWED_FILE_TYPE_LABEL}.`;
       setError(msg);
       onError?.(msg);
       return;
@@ -163,7 +164,7 @@ export function AttachmentUploader({
             {label ?? <><strong>Click to upload</strong> or drag and drop</>}
           </div>
           <div className="attachment-upload__hint">
-            JPEG, PNG, WebP, HEIC, or PDF — up to {maxFileSizeMb} MB
+            {ALLOWED_FILE_TYPE_LABEL} up to {maxFileSizeMb} MB
           </div>
         </>
       )}

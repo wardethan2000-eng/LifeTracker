@@ -75,6 +75,8 @@ const buildInventoryHref = (householdId: string, params?: Record<string, string 
   return `/inventory?${query.toString()}`;
 };
 
+const buildInventoryItemHref = (householdId: string, inventoryItemId: string): string => `/inventory/${inventoryItemId}?householdId=${householdId}`;
+
 export default async function InventoryPage({ searchParams }: InventoryPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
@@ -213,7 +215,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                     {lowStockItems.map((item) => (
                       <tr key={item.id} className={["row--due", item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ")}>
                         <td>
-                          <div className="data-table__primary">{item.name}</div>
+                          <div className="data-table__primary">
+                            <Link href={buildInventoryItemHref(household.id, item.id)} className="data-table__link">{item.name}</Link>
+                          </div>
                           <div className="data-table__secondary">
                             {item.partNumber ?? "No part number"}
                             {item.reorderQuantity !== null ? ` • ${formatRestockPlan(item.reorderQuantity, item.unit)}` : ""}
@@ -276,7 +280,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                             analytics={item.id === highlightId ? highlightedAnalytics : null}
                           >
                             <td>
-                              <div className="data-table__primary">{item.name}</div>
+                              <div className="data-table__primary">
+                                <Link href={buildInventoryItemHref(household.id, item.id)} className="data-table__link">{item.name}</Link>
+                              </div>
                               <div className="data-table__secondary">
                                 {[item.partNumber, item.manufacturer].filter(Boolean).join(" • ") || "No part number or maker recorded"}
                               </div>

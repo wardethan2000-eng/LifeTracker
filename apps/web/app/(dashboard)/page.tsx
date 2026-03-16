@@ -195,14 +195,23 @@ async function DashboardStatsRow({ householdId }: { householdId: string }): Prom
 
 async function DashboardAssetRegistry({ householdId }: { householdId: string }): Promise<JSX.Element> {
   const dashboard = await getDashboardData(householdId);
+  const assetPreviewLimit = 10;
   const sortedAssets = [...dashboard.assets].sort(
     (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
   );
+  const visibleAssets = sortedAssets.slice(0, assetPreviewLimit);
 
   return (
     <section className="panel">
       <div className="panel__header">
-        <h2>Asset Registry</h2>
+        <div>
+          <h2>Asset Registry</h2>
+          <div className="data-table__secondary">
+            {sortedAssets.length > assetPreviewLimit
+              ? `Showing ${visibleAssets.length} of ${sortedAssets.length} assets by urgency`
+              : `${sortedAssets.length} tracked assets`}
+          </div>
+        </div>
         <div className="panel__header-actions">
           <Link href="/assets/new" className="button button--primary button--sm">+ Add Asset</Link>
           <Link href="/assets" className="button button--ghost button--sm">View All</Link>
@@ -225,7 +234,7 @@ async function DashboardAssetRegistry({ householdId }: { householdId: string }):
               </tr>
             </thead>
             <tbody>
-              {sortedAssets.slice(0, 10).map((item) => {
+              {visibleAssets.map((item) => {
                 const tone = item.overdueScheduleCount > 0
                   ? "overdue"
                   : item.dueScheduleCount > 0

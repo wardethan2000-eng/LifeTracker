@@ -12,6 +12,8 @@ import { formatCurrency, formatDateTime } from "../lib/formatters";
 
 type InventoryTransactionHistoryProps = {
   householdId: string;
+  inventoryItemId?: string;
+  title?: string;
 };
 
 type TransactionTypeFilter = "all" | "purchase" | "consume" | "adjust";
@@ -64,7 +66,7 @@ const truncateText = (value: string | null, length = 72): string => {
   return `${value.slice(0, length - 1).trimEnd()}…`;
 };
 
-export function InventoryTransactionHistory({ householdId }: InventoryTransactionHistoryProps): JSX.Element {
+export function InventoryTransactionHistory({ householdId, inventoryItemId, title = "Transaction History" }: InventoryTransactionHistoryProps): JSX.Element {
   const [transactions, setTransactions] = useState<InventoryTransactionWithItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
@@ -80,8 +82,11 @@ export function InventoryTransactionHistory({ householdId }: InventoryTransactio
     ...(endDate ? { endDate: toEndDateIso(endDate) } : {}),
     ...(typeFilter !== "all" ? { type: typeFilter } : {}),
     ...(referenceTypeFilter !== "all" ? { referenceType: referenceTypeFilter } : {}),
+    ...(inventoryItemId ? { inventoryItemId } : {}),
     limit: pageSize,
-  }), [endDate, referenceTypeFilter, startDate, typeFilter]);
+  }), [endDate, inventoryItemId, referenceTypeFilter, startDate, typeFilter]);
+
+  const showItemColumn = !inventoryItemId;
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +153,7 @@ export function InventoryTransactionHistory({ householdId }: InventoryTransactio
     <section className="panel inventory-transaction-history">
       <div className="panel__header">
         <div>
-          <h2>Transaction History</h2>
+          <h2>{title}</h2>
           <div className="data-table__secondary">{transactions.length} shown</div>
         </div>
       </div>
@@ -196,7 +201,7 @@ export function InventoryTransactionHistory({ householdId }: InventoryTransactio
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Item</th>
+                  {showItemColumn ? <th>Item</th> : null}
                   <th>Type</th>
                   <th>Quantity</th>
                   <th>Balance After</th>
@@ -212,10 +217,12 @@ export function InventoryTransactionHistory({ householdId }: InventoryTransactio
                   return (
                     <tr key={transaction.id}>
                       <td>{formatDateTime(transaction.createdAt, "—")}</td>
-                      <td>
-                        <div className="data-table__primary">{transaction.itemName}</div>
-                        <div className="data-table__secondary">{transaction.itemPartNumber ?? "No part number"}</div>
-                      </td>
+                      {showItemColumn ? (
+                        <td>
+                          <div className="data-table__primary">{transaction.itemName}</div>
+                          <div className="data-table__secondary">{transaction.itemPartNumber ?? "No part number"}</div>
+                        </td>
+                      ) : null}
                       <td>
                         <span className={`inventory-transaction-type inventory-transaction-type--${tone}`}>
                           <span className="inventory-transaction-type__dot" aria-hidden="true" />

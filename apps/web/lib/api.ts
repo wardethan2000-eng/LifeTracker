@@ -34,6 +34,7 @@ import {
   schedulePartsReadinessSchema,
   inventoryTransactionListSchema,
   inventoryTransactionSchema,
+  inventoryItemDetailSchema,
   inventoryItemSummarySchema,
   inventoryItemConsumptionSchema,
   inventoryReorderForecastSchema,
@@ -145,6 +146,7 @@ import {
   type CreateScheduleInventoryItemInput,
   type InventoryTransactionList,
   type InventoryTransactionQuery,
+  type InventoryItemDetail,
   type UpdateInventoryItemInput,
   type InventoryItemSummary,
   type AssetPartsConsumption,
@@ -1505,6 +1507,12 @@ export const getHouseholdServiceProviders = async (householdId: string): Promise
   revalidate: 15
 });
 
+export const getServiceProvider = async (householdId: string, providerId: string): Promise<ServiceProvider> => apiRequest({
+  path: `/v1/households/${householdId}/service-providers/${providerId}`,
+  schema: serviceProviderSchema,
+  revalidate: 15
+});
+
 export const getHouseholdInventory = async (
   householdId: string,
   options?: {
@@ -1568,6 +1576,26 @@ export const getInventoryItemConsumption = async (
   path: `/v1/households/${householdId}/inventory/${inventoryItemId}/analytics/consumption`,
   schema: inventoryItemConsumptionSchema
 });
+
+export const getInventoryItemDetail = async (
+  householdId: string,
+  inventoryItemId: string,
+  options?: { transactionLimit?: number }
+): Promise<InventoryItemDetail> => {
+  const query = new URLSearchParams();
+
+  if (options?.transactionLimit !== undefined) {
+    query.set("transactionLimit", String(options.transactionLimit));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/inventory/${inventoryItemId}${suffix}`,
+    schema: inventoryItemDetailSchema,
+    cacheOptions: { revalidate: 30 }
+  });
+};
 
 export const getInventoryTurnover = async (householdId: string): Promise<InventoryTurnover[]> => apiRequest({
   path: `/v1/households/${householdId}/inventory/analytics/turnover`,
@@ -1740,6 +1768,13 @@ export const updateInventoryItem = async (
   body: input,
   schema: inventoryItemSummarySchema
 });
+
+export const deleteInventoryItem = async (householdId: string, inventoryItemId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/inventory/${inventoryItemId}`,
+    method: "DELETE"
+  });
+};
 
 export const createServiceProvider = async (
   householdId: string,

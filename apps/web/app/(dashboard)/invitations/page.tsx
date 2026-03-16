@@ -104,8 +104,10 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
                         <div>
                           <dt>Token</dt>
                           <dd style={{ display: "grid", gap: 8 }}>
-                            <span style={{ wordBreak: "break-all" }}>{invitation.token}</span>
-                            <CopyTextButton value={invitation.token} label="Copy Token" copiedLabel="Token Copied" />
+                            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
+                              <span style={{ wordBreak: "break-all", flex: "1 1 24rem" }}>{invitation.token}</span>
+                              <CopyTextButton value={invitation.token} label="Copy Token" copiedLabel="Token Copied" />
+                            </div>
                           </dd>
                         </div>
                         <div><dt>Accepted At</dt><dd>{invitation.acceptedAt ? formatDateTime(invitation.acceptedAt) : "Not accepted"}</dd></div>

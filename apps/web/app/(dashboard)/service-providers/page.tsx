@@ -11,6 +11,8 @@ type ServiceProvidersPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const buildProviderHref = (householdId: string, providerId: string): string => `/service-providers/${providerId}?householdId=${householdId}`;
+
 export default async function ServiceProvidersPage({ searchParams }: ServiceProvidersPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
@@ -81,6 +83,9 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
                       <form action={updateServiceProviderAction}>
                         <input type="hidden" name="householdId" value={household.id} />
                         <input type="hidden" name="providerId" value={provider.id} />
+                        <div className="inline-actions inline-actions--end" style={{ marginBottom: 16 }}>
+                          <Link href={buildProviderHref(household.id, provider.id)} className="button button--ghost button--sm">Open Details</Link>
+                        </div>
                         <div className="form-grid">
                           <label className="field"><span>Name</span><input type="text" name="name" defaultValue={provider.name} required /></label>
                           <label className="field"><span>Specialty</span><input type="text" name="specialty" defaultValue={provider.specialty ?? ""} /></label>

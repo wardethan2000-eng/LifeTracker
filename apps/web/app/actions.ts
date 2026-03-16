@@ -108,6 +108,7 @@ import {
   createProjectInventoryItem,
   createSchedule,
   createServiceProvider,
+  deleteInventoryItem,
   deleteComment,
   deleteAssetTimelineEntry,
   deleteHobby,
@@ -777,6 +778,14 @@ const revalidateInventoryPaths = (householdId: string): void => {
   revalidatePath(`/inventory?householdId=${householdId}`);
 };
 
+const revalidateInventoryDetailPath = (inventoryItemId: string): void => {
+  revalidatePath(`/inventory/${inventoryItemId}`);
+};
+
+const revalidateServiceProviderDetailPath = (providerId: string): void => {
+  revalidatePath(`/service-providers/${providerId}`);
+};
+
 export async function createHouseholdAction(formData: FormData): Promise<void> {
   const household = await createHousehold({
     name: getRequiredString(formData, "name")
@@ -858,6 +867,17 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
   await createInventoryItem(householdId, input);
   revalidateInventoryPaths(householdId);
   redirect(`/inventory?householdId=${householdId}`);
+}
+
+export async function deleteInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
+
+  await deleteInventoryItem(householdId, inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidateInventoryDetailPath(inventoryItemId);
+  redirect(redirectTo ?? `/inventory?householdId=${householdId}`);
 }
 
 export async function createAssetAction(formData: FormData): Promise<void> {
@@ -1647,15 +1667,22 @@ export async function updateServiceProviderAction(formData: FormData): Promise<v
 
   await updateServiceProvider(householdId, providerId, input);
   revalidateServiceProviderPaths(householdId);
+  revalidateServiceProviderDetailPath(providerId);
 }
 
 export async function deleteServiceProviderAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const providerId = getRequiredString(formData, "providerId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
 
   await deleteServiceProvider(householdId, providerId);
   revalidateServiceProviderPaths(householdId);
+  revalidateServiceProviderDetailPath(providerId);
   revalidateActivityPaths(householdId);
+
+  if (redirectTo) {
+    redirect(redirectTo);
+  }
 }
 
 export async function createInvitationAction(formData: FormData): Promise<void> {
