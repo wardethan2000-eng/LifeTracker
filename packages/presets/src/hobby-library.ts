@@ -600,7 +600,7 @@ export const hobbyPresetLibrary: HobbyPreset[] = [
             title: "Print in Progress",
             description: "Monitor periodically. Check for layer shifts, stringing, spaghetti failures, or detachment from bed. Most failures happen in the first 30 minutes.",
             stepType: "print",
-            durationMinutes: null,
+            durationMinutes: undefined,
           },
           {
             title: "Cooling",
@@ -694,7 +694,7 @@ export const hobbyPresetLibrary: HobbyPreset[] = [
             title: "Print in Progress",
             description: "PETG strings more than PLA — some stringing is normal and can be cleaned in post-processing. Watch for layer adhesion issues if the enclosure is cold.",
             stepType: "print",
-            durationMinutes: null,
+            durationMinutes: undefined,
           },
           {
             title: "Cooling",
@@ -1237,7 +1237,7 @@ export const hobbyPresetLibrary: HobbyPreset[] = [
             title: "Range Test",
             description: "Shoot 5-round groups at 100 yards minimum. Record chronograph data for every round. Inspect fired brass for pressure signs: flattened primers, ejector marks, shiny case heads. Log group sizes.",
             stepType: "range-test",
-            durationMinutes: null,
+            durationMinutes: undefined,
           },
           {
             title: "Log Results",
@@ -1349,7 +1349,7 @@ export const hobbyPresetLibrary: HobbyPreset[] = [
             title: "Function Test",
             description: "Shoot a magazine's worth through your primary pistol to confirm feeding, extraction, and ejection. Note any failures. Check for keyholing at the target (indicates bullet instability). If everything runs clean, the batch is good.",
             stepType: "range-test",
-            durationMinutes: null,
+            durationMinutes: undefined,
           },
         ],
         customFields: {

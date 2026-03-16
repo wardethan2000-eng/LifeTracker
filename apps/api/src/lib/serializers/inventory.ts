@@ -13,6 +13,7 @@ import {
   inventoryItemDetailSchema,
   inventoryItemSummarySchema,
   inventoryProjectLinkDetailSchema,
+  inventoryTransactionWithItemSchema,
   inventoryTransactionSchema,
   lowStockInventoryItemSchema,
   maintenanceLogPartSchema,
@@ -110,6 +111,19 @@ export const toInventoryTransactionResponse = (transaction: InventoryTransaction
   unitCost: transaction.unitCost ?? null,
   notes: transaction.notes ?? null,
   createdAt: transaction.createdAt.toISOString()
+});
+
+export const toInventoryTransactionWithItemResponse = (
+  transaction: InventoryTransactionRecord & {
+    inventoryItem: {
+      name: string;
+      partNumber: string | null;
+    };
+  }
+) => inventoryTransactionWithItemSchema.parse({
+  ...toInventoryTransactionResponse(transaction),
+  itemName: transaction.inventoryItem.name,
+  itemPartNumber: transaction.inventoryItem.partNumber ?? null
 });
 
 export const toMaintenanceLogPartWithInventoryResponse = (part: MaintenanceLogPartRecord) => maintenanceLogPartSchema.parse({

@@ -915,6 +915,51 @@ p { margin: 0; color: var(--ink-light); }
   margin-top: 2px;
 }
 
+/* Transaction History */
+
+.inventory-transaction-history .panel__body {
+  display: grid;
+  gap: 16px;
+}
+
+.inventory-transaction-history__filters {
+  padding: 20px 20px 0;
+}
+
+.inventory-transaction-history__footer {
+  display: flex;
+  justify-content: center;
+  padding: 0 20px 20px;
+}
+
+.inventory-transaction-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inventory-transaction-type__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.inventory-transaction-type--restock {
+  color: var(--accent);
+}
+
+.inventory-transaction-type--consume {
+  color: var(--warning);
+}
+
+.inventory-transaction-type--adjust {
+  color: var(--ink-muted);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 14. Tables
    ═══════════════════════════════════════════════════════════════════ */
@@ -1300,6 +1345,65 @@ textarea { resize: vertical; }
 
 .field--checkbox input {
   width: auto;
+}
+
+/* Multi-Part Log Form */
+
+.log-parts {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.log-parts__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.log-parts__count {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.log-parts__list {
+  display: grid;
+  gap: 16px;
+}
+
+.log-parts__row {
+  display: grid;
+  gap: 14px;
+}
+
+.log-parts__row--separated {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.log-parts__row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.log-parts__row-head strong {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.log-parts__remove {
+  min-width: 0;
+}
+
+.log-parts__actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .checkbox-field {

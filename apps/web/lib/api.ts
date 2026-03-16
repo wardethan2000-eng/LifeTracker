@@ -14,6 +14,7 @@ import {
   householdDashboardSchema,
   householdSummarySchema,
   inventoryProjectLinkDetailSchema,
+  inventoryTransactionListSchema,
   inventoryTransactionSchema,
   inventoryItemSummarySchema,
   libraryPresetSchema,
@@ -86,6 +87,8 @@ import {
   type HouseholdMember,
   type HouseholdSummary,
   type CreateInventoryItemInput,
+  type InventoryTransactionList,
+  type InventoryTransactionQuery,
   type UpdateInventoryItemInput,
   type InventoryItemSummary,
   type InventoryProjectLinkDetail,
@@ -684,6 +687,48 @@ export const getHouseholdLowStockInventory = async (householdId: string): Promis
   path: `/v1/households/${householdId}/inventory/low-stock`,
   schema: householdLowStockListSchema
 });
+
+export const getHouseholdInventoryTransactions = async (
+  householdId: string,
+  options?: InventoryTransactionQuery
+): Promise<InventoryTransactionList> => {
+  const query = new URLSearchParams();
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  if (options?.type) {
+    query.set("type", options.type);
+  }
+
+  if (options?.referenceType) {
+    query.set("referenceType", options.referenceType);
+  }
+
+  if (options?.inventoryItemId) {
+    query.set("inventoryItemId", options.inventoryItemId);
+  }
+
+  if (options?.limit !== undefined) {
+    query.set("limit", String(options.limit));
+  }
+
+  if (options?.cursor) {
+    query.set("cursor", options.cursor);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/inventory/transactions${suffix}`,
+    schema: inventoryTransactionListSchema
+  });
+};
 
 export const createInventoryItem = async (
   householdId: string,

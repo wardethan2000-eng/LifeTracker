@@ -917,6 +917,26 @@ export const createInventoryTransactionSchema = z.object({
   notes: z.string().max(2000).optional()
 });
 
+export const inventoryTransactionQuerySchema = z.object({
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  type: inventoryTransactionTypeSchema.optional(),
+  referenceType: z.string().max(80).optional(),
+  inventoryItemId: z.string().cuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().cuid().optional()
+});
+
+export const inventoryTransactionWithItemSchema = inventoryTransactionSchema.extend({
+  itemName: z.string(),
+  itemPartNumber: z.string().nullable()
+});
+
+export const inventoryTransactionListSchema = z.object({
+  transactions: z.array(inventoryTransactionWithItemSchema),
+  nextCursor: z.string().cuid().nullable()
+});
+
 export const assetInventoryItemSchema = z.object({
   id: z.string().cuid(),
   assetId: z.string().cuid(),
@@ -1794,6 +1814,9 @@ export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
 export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
 export type CreateInventoryTransactionInput = z.infer<typeof createInventoryTransactionSchema>;
+export type InventoryTransactionQuery = z.infer<typeof inventoryTransactionQuerySchema>;
+export type InventoryTransactionWithItem = z.infer<typeof inventoryTransactionWithItemSchema>;
+export type InventoryTransactionList = z.infer<typeof inventoryTransactionListSchema>;
 export type AssetInventoryItem = z.infer<typeof assetInventoryItemSchema>;
 export type CreateAssetInventoryItemInput = z.infer<typeof createAssetInventoryItemSchema>;
 export type ProjectInventoryItem = z.infer<typeof projectInventoryItemSchema>;

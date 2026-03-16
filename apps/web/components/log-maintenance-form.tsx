@@ -2,7 +2,7 @@
 
 import type { BarcodeLookupResult } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { BarcodeLookupField } from "./barcode-lookup-field";
 
 type LogMaintenanceFormProps = {
@@ -11,23 +11,66 @@ type LogMaintenanceFormProps = {
   createLogAction: (formData: FormData) => void;
 };
 
+type LogPartDraft = {
+  name: string;
+  partNumber: string;
+  quantity: string;
+  unitCost: string;
+  supplier: string;
+  notes: string;
+};
+
+const createEmptyPart = (): LogPartDraft => ({
+  name: "",
+  partNumber: "",
+  quantity: "",
+  unitCost: "",
+  supplier: "",
+  notes: "",
+});
+
 export function LogMaintenanceForm({ assetId, schedules, createLogAction }: LogMaintenanceFormProps): JSX.Element {
-  const [formKey, setFormKey] = useState(0);
-  const partNameRef = useRef<HTMLInputElement>(null);
-  const partNumberRef = useRef<HTMLInputElement>(null);
+  const [parts, setParts] = useState<LogPartDraft[]>([createEmptyPart()]);
+
+  const updatePart = useCallback((index: number, field: keyof LogPartDraft, value: string) => {
+    setParts((current) => current.map((part, partIndex) => (
+      partIndex === index
+        ? { ...part, [field]: value }
+        : part
+    )));
+  }, []);
+
+  const addPart = useCallback(() => {
+    setParts((current) => [...current, createEmptyPart()]);
+  }, []);
+
+  const removePart = useCallback((index: number) => {
+    setParts((current) => current.length === 1
+      ? current
+      : current.filter((_, partIndex) => partIndex !== index));
+  }, []);
 
   const handleBarcodeResult = useCallback((result: BarcodeLookupResult) => {
-    if (result.found && partNameRef.current) {
-      partNameRef.current.value = result.productName ?? "";
-    }
+    setParts((current) => {
+      const emptyIndex = current.findIndex((part) => !part.name.trim());
+      const targetIndex = emptyIndex >= 0 ? emptyIndex : current.length - 1;
 
-    if (partNumberRef.current) {
-      partNumberRef.current.value = result.barcode;
-    }
+      return current.map((part, partIndex) => {
+        if (partIndex !== targetIndex) {
+          return part;
+        }
+
+        return {
+          ...part,
+          name: result.found ? (result.productName ?? part.name) : part.name,
+          partNumber: result.barcode || part.partNumber,
+        };
+      });
+    });
   }, []);
 
   return (
-    <form action={createLogAction} className="form-grid" key={formKey}>
+    <form action={createLogAction} className="form-grid">
       <input type="hidden" name="assetId" value={assetId} />
       <label className="field field--full">
         <span>Schedule</span>
@@ -66,12 +109,45 @@ export function LogMaintenanceForm({ assetId, schedules, createLogAction }: LogM
         <span style={{ display: "block", marginBottom: 4, fontSize: "0.85rem", color: "var(--ink-muted)" }}>Look Up Part by Barcode</span>
         <BarcodeLookupField onResult={handleBarcodeResult} />
       </div>
-      <label className="field"><span>Part Name</span><input ref={partNameRef} type="text" name="partName" placeholder="Oil filter" /></label>
-      <label className="field"><span>Part Number</span><input ref={partNumberRef} type="text" name="partNumber" placeholder="FL-500S" /></label>
-      <label className="field"><span>Quantity</span><input type="number" name="partQuantity" min="0" step="0.1" placeholder="1" /></label>
-      <label className="field"><span>Unit Cost</span><input type="number" name="partUnitCost" min="0" step="0.01" placeholder="8.97" /></label>
-      <label className="field"><span>Supplier</span><input type="text" name="partSupplier" placeholder="AutoZone" /></label>
-      <label className="field field--full"><span>Part Notes</span><textarea name="partNotes" rows={2} placeholder="Optional part note" /></label>
+
+      <div className="field field--full log-parts">
+        <div className="log-parts__header">
+          <span>Parts Used</span>
+          <span className="log-parts__count">{parts.length} row{parts.length === 1 ? "" : "s"}</span>
+        </div>
+
+        <div className="log-parts__list">
+          {parts.map((part, index) => (
+            <div key={`part-row-${index}`} className={`log-parts__row${index > 0 ? " log-parts__row--separated" : ""}`}>
+              <div className="log-parts__row-head">
+                <strong>Part {index + 1}</strong>
+                {parts.length > 1 ? (
+                  <button
+                    type="button"
+                    className="button button--secondary button--sm log-parts__remove"
+                    onClick={() => removePart(index)}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              <div className="form-grid">
+                <label className="field"><span>Part Name</span><input type="text" name="partName" placeholder="Oil filter" value={part.name} onChange={(event) => updatePart(index, "name", event.target.value)} /></label>
+                <label className="field"><span>Part Number</span><input type="text" name="partNumber" placeholder="FL-500S" value={part.partNumber} onChange={(event) => updatePart(index, "partNumber", event.target.value)} /></label>
+                <label className="field"><span>Quantity</span><input type="number" name="partQuantity" min="0" step="0.1" placeholder="1" value={part.quantity} onChange={(event) => updatePart(index, "quantity", event.target.value)} /></label>
+                <label className="field"><span>Unit Cost</span><input type="number" name="partUnitCost" min="0" step="0.01" placeholder="8.97" value={part.unitCost} onChange={(event) => updatePart(index, "unitCost", event.target.value)} /></label>
+                <label className="field"><span>Supplier</span><input type="text" name="partSupplier" placeholder="AutoZone" value={part.supplier} onChange={(event) => updatePart(index, "supplier", event.target.value)} /></label>
+                <label className="field field--full"><span>Part Notes</span><textarea name="partNotes" rows={2} placeholder="Optional part note" value={part.notes} onChange={(event) => updatePart(index, "notes", event.target.value)} /></label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="log-parts__actions">
+          <button type="button" className="button button--secondary" onClick={addPart}>Add Part</button>
+        </div>
+      </div>
+
       <button type="submit" className="button button--primary">Add Log Entry</button>
     </form>
   );

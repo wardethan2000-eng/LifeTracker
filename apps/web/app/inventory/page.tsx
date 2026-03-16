@@ -4,6 +4,7 @@ import { AppShell } from "../../components/app-shell";
 import { InventoryEditableRow } from "../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../components/inventory-filter-bar";
 import { InventorySection } from "../../components/inventory-section";
+import { InventoryTransactionHistory } from "../../components/inventory-transaction-history";
 import {
   ApiError,
   getHouseholdInventory,
@@ -262,6 +263,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               </div>
             )}
           </InventorySection>
+
+          <InventoryTransactionHistory householdId={household.id} />
         </div>
       </AppShell>
     );
