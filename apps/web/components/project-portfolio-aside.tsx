@@ -1,19 +1,17 @@
-import type { ProjectSummary } from "@lifekeeper/types";
+import type { ProjectPortfolioItem } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
-import { getProjectInventoryRollups } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 import { buildPortfolioProjects, getRiskLabel, type ProjectSort } from "./project-portfolio-shared";
 
 type ProjectPortfolioAsideProps = {
   householdId: string;
-  projects: ProjectSummary[];
+  projects: ProjectPortfolioItem[];
   selectedSort: ProjectSort;
 };
 
-export async function ProjectPortfolioAside({ householdId, projects, selectedSort }: ProjectPortfolioAsideProps): Promise<JSX.Element> {
-  const inventoryRollups = await getProjectInventoryRollups(householdId);
-  const portfolioProjects = buildPortfolioProjects(projects, inventoryRollups, selectedSort);
+export function ProjectPortfolioAside({ householdId, projects, selectedSort }: ProjectPortfolioAsideProps): JSX.Element {
+  const portfolioProjects = buildPortfolioProjects(projects, selectedSort);
   const atRiskProjects = portfolioProjects.filter((project) => project.isAtRisk);
   const materialGapProjects = portfolioProjects
     .filter((project) => project.totalInventoryRemaining > 0)

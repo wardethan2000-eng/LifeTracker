@@ -8,12 +8,22 @@ import { assertMembership } from "../../lib/asset-access.js";
 import { enqueueNotificationDelivery, enqueueNotificationScan } from "../../lib/queues.js";
 import {
   parseNotificationPreferences,
+  toHouseholdNotificationListResponse,
   toNotificationResponse,
   toUserProfileResponse
 } from "../../lib/serializers/index.js";
 
+const householdParamsSchema = z.object({
+  householdId: z.string().cuid()
+});
+
 const notificationParamsSchema = z.object({
   notificationId: z.string().cuid()
+});
+
+const listHouseholdNotificationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  status: z.enum(["all", "unread", "read"]).default("all")
 });
 
 const listNotificationsQuerySchema = z.object({
@@ -28,6 +38,47 @@ const scanNotificationsBodySchema = z.object({
 });
 
 export const notificationRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/v1/households/:householdId/notifications", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const query = listHouseholdNotificationsQuerySchema.parse(request.query);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const notificationWhere = {
+      userId: request.auth.userId,
+      householdId: params.householdId,
+      ...(query.status === "unread"
+        ? { readAt: null }
+        : query.status === "read"
+          ? { readAt: { not: null } }
+          : {})
+    };
+
+    const [notifications, unreadCount] = await Promise.all([
+      app.prisma.notification.findMany({
+        where: notificationWhere,
+        orderBy: [{ scheduledFor: "desc" }, { createdAt: "desc" }],
+        take: query.limit
+      }),
+      app.prisma.notification.count({
+        where: {
+          userId: request.auth.userId,
+          householdId: params.householdId,
+          readAt: null
+        }
+      })
+    ]);
+
+    return toHouseholdNotificationListResponse({
+      notifications: notifications.map(toNotificationResponse),
+      unreadCount
+    });
+  });
+
   app.get("/v1/notifications", async (request) => {
     const query = listNotificationsQuerySchema.parse(request.query);
     const notifications = await app.prisma.notification.findMany({

@@ -24,6 +24,7 @@ import {
   toProjectAssetResponse,
   toProjectBudgetCategoryResponse,
   toProjectExpenseResponse,
+  toProjectPortfolioItemResponse,
   toProjectPhaseSummaryResponse,
   toProjectResponse,
   toProjectTaskResponse
@@ -53,6 +54,10 @@ const expenseParamsSchema = projectParamsSchema.extend({
 const listProjectsQuerySchema = z.object({
   status: projectStatusSchema.optional(),
   parentProjectId: z.string().optional()
+});
+
+const projectPortfolioQuerySchema = z.object({
+  status: projectStatusSchema.optional()
 });
 
 const isProjectSummaryTaskCompleted = (task: {
@@ -134,6 +139,46 @@ const toProjectSummary = (
     percentComplete,
     phaseProgress
   };
+};
+
+const buildProjectInventoryRollups = (
+  links: Array<{
+    projectId: string;
+    quantityNeeded: number;
+    quantityAllocated: number;
+    budgetedUnitCost: number | null;
+    inventoryItem: { unitCost: number | null };
+  }>
+) => {
+  const rollups = new Map<string, {
+    inventoryLineCount: number;
+    totalInventoryNeeded: number;
+    totalInventoryAllocated: number;
+    totalInventoryRemaining: number;
+    plannedInventoryCost: number;
+  }>();
+
+  for (const link of links) {
+    const current = rollups.get(link.projectId) ?? {
+      inventoryLineCount: 0,
+      totalInventoryNeeded: 0,
+      totalInventoryAllocated: 0,
+      totalInventoryRemaining: 0,
+      plannedInventoryCost: 0
+    };
+    const quantityRemaining = Math.max(link.quantityNeeded - link.quantityAllocated, 0);
+    const unitCost = link.budgetedUnitCost ?? link.inventoryItem.unitCost ?? 0;
+
+    current.inventoryLineCount += 1;
+    current.totalInventoryNeeded += link.quantityNeeded;
+    current.totalInventoryAllocated += link.quantityAllocated;
+    current.totalInventoryRemaining += quantityRemaining;
+    current.plannedInventoryCost += unitCost * link.quantityNeeded;
+
+    rollups.set(link.projectId, current);
+  }
+
+  return rollups;
 };
 
 const buildProjectBreadcrumbs = async (
@@ -249,6 +294,74 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return projects.map(toProjectSummary);
+  });
+
+  app.get("/v1/households/:householdId/projects/portfolio", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const query = projectPortfolioQuerySchema.parse(request.query);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const projects = await app.prisma.project.findMany({
+      where: {
+        householdId: params.householdId,
+        ...(query.status ? { status: query.status } : {})
+      },
+      include: {
+        expenses: { select: { amount: true } },
+        tasks: { select: { status: true, taskType: true, isCompleted: true, phaseId: true } },
+        phases: {
+          include: {
+            tasks: { select: { status: true, taskType: true, isCompleted: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
+        _count: { select: { tasks: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const projectIds = projects.map((project) => project.id);
+    const inventoryLinks = projectIds.length > 0
+      ? await app.prisma.projectInventoryItem.findMany({
+          where: {
+            projectId: { in: projectIds }
+          },
+          select: {
+            projectId: true,
+            quantityNeeded: true,
+            quantityAllocated: true,
+            budgetedUnitCost: true,
+            inventoryItem: {
+              select: {
+                unitCost: true
+              }
+            }
+          },
+          orderBy: [{ projectId: "asc" }, { createdAt: "asc" }]
+        })
+      : [];
+    const rollups = buildProjectInventoryRollups(inventoryLinks);
+
+    return projects.map((project) => {
+      const summary = toProjectSummary(project);
+      const rollup = rollups.get(project.id) ?? {
+        inventoryLineCount: 0,
+        totalInventoryNeeded: 0,
+        totalInventoryAllocated: 0,
+        totalInventoryRemaining: 0,
+        plannedInventoryCost: 0
+      };
+
+      return toProjectPortfolioItemResponse({
+        ...summary,
+        ...rollup
+      });
+    });
   });
 
   app.post("/v1/households/:householdId/projects", async (request, reply) => {

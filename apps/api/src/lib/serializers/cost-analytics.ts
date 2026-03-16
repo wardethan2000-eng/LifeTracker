@@ -3,6 +3,7 @@ import {
   assetCostSummarySchema,
   costForecastSchema,
   householdCostDashboardSchema,
+  householdCostOverviewSchema,
   projectBudgetAnalysisSchema,
   serviceProviderSpendSchema
 } from "@lifekeeper/types";
@@ -16,5 +17,7 @@ export const toHouseholdCostDashboardResponse = (value: unknown) => householdCos
 export const toServiceProviderSpendResponse = (value: unknown) => serviceProviderSpendSchema.parse(value);
 
 export const toCostForecastResponse = (value: unknown) => costForecastSchema.parse(value);
+
+export const toHouseholdCostOverviewResponse = (value: unknown) => householdCostOverviewSchema.parse(value);
 
 export const toProjectBudgetAnalysisResponse = (value: unknown) => projectBudgetAnalysisSchema.parse(value);

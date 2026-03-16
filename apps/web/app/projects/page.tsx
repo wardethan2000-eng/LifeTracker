@@ -6,7 +6,7 @@ import { AppShell } from "../../components/app-shell";
 import { ProjectPortfolioAside } from "../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../components/project-portfolio-stats";
 import { ProjectPortfolioTable } from "../../components/project-portfolio-table";
-import { ApiError, getHouseholdProjects, getMe } from "../../lib/api";
+import { ApiError, getHouseholdProjectPortfolio, getHouseholdProjects, getMe } from "../../lib/api";
 
 type ProjectsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -183,11 +183,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
     }
 
     const allProjectsPromise = getHouseholdProjects(household.id);
-    const visibleProjectsPromise = selectedStatus
-      ? getHouseholdProjects(household.id, { status: selectedStatus })
-      : allProjectsPromise;
+    const visiblePortfolioProjectsPromise = getHouseholdProjectPortfolio(
+      household.id,
+      selectedStatus ? { status: selectedStatus } : undefined
+    );
 
-    const [allProjects, statusScopedProjects] = await Promise.all([allProjectsPromise, visibleProjectsPromise]);
+    const [allProjects, statusScopedProjects] = await Promise.all([allProjectsPromise, visiblePortfolioProjectsPromise]);
     // Show only root-level projects by default; when a search query is active, include all depths
     const depthFilteredProjects = searchQuery.length > 0
       ? statusScopedProjects

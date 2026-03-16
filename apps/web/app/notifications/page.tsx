@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { markNotificationReadAction, enqueueNotificationScanAction } from "../actions";
 import { AppShell } from "../../components/app-shell";
-import { ApiError, getMe, getNotifications } from "../../lib/api";
+import { ApiError, getHouseholdNotifications, getMe } from "../../lib/api";
 import { formatDateTime, formatNotificationTone } from "../../lib/formatters";
 
 export default async function NotificationsPage(): Promise<JSX.Element> {
@@ -21,7 +21,7 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
       );
     }
 
-    const notifications = await getNotifications({ householdId: household.id, limit: 100 });
+    const notificationList = await getHouseholdNotifications(household.id, { limit: 100 });
 
     return (
       <AppShell activePath="/notifications">
@@ -38,10 +38,10 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
-              <h2>All Notifications ({notifications.length})</h2>
+              <h2>All Notifications ({notificationList.notifications.length})</h2>
             </div>
             <div className="panel__body">
-              {notifications.length === 0 ? (
+              {notificationList.notifications.length === 0 ? (
                 <p className="panel__empty">No notifications yet. Notifications are generated when maintenance schedules become due.</p>
               ) : (
                 <table className="data-table">
@@ -56,7 +56,7 @@ export default async function NotificationsPage(): Promise<JSX.Element> {
                     </tr>
                   </thead>
                   <tbody>
-                    {notifications.map((notification) => {
+                    {notificationList.notifications.map((notification) => {
                       const tone = formatNotificationTone(notification);
 
                       return (

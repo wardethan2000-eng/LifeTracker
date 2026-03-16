@@ -1,15 +1,10 @@
-import type { ProjectInventoryRollup, ProjectStatus, ProjectSummary } from "@lifekeeper/types";
+import type { ProjectPortfolioItem } from "@lifekeeper/types";
 
 export const projectSortValues = ["risk", "target", "budget", "progress"] as const;
 
 export type ProjectSort = (typeof projectSortValues)[number];
 
-export type PortfolioProject = ProjectSummary & {
-  inventoryLineCount: number;
-  totalInventoryNeeded: number;
-  totalInventoryAllocated: number;
-  totalInventoryRemaining: number;
-  plannedInventoryCost: number;
+export type PortfolioProject = ProjectPortfolioItem & {
   committedCost: number;
   budgetRatio: number | null;
   materialCoverage: number | null;
@@ -72,20 +67,17 @@ export const sortProjects = (projects: PortfolioProject[], sort: ProjectSort): P
 };
 
 export const buildPortfolioProjects = (
-  projects: ProjectSummary[],
-  inventoryRollups: ProjectInventoryRollup[],
+  projects: ProjectPortfolioItem[],
   selectedSort: ProjectSort
 ): PortfolioProject[] => {
-  const inventoryByProject = new Map(inventoryRollups.map((rollup) => [rollup.projectId, rollup]));
   const now = Date.now();
 
   return sortProjects(projects.map((project) => {
-    const inventoryRollup = inventoryByProject.get(project.id);
-    const inventoryLineCount = inventoryRollup?.inventoryLineCount ?? 0;
-    const totalInventoryNeeded = inventoryRollup?.totalInventoryNeeded ?? 0;
-    const totalInventoryAllocated = inventoryRollup?.totalInventoryAllocated ?? 0;
-    const totalInventoryRemaining = inventoryRollup?.totalInventoryRemaining ?? 0;
-    const plannedInventoryCost = inventoryRollup?.plannedInventoryCost ?? 0;
+    const inventoryLineCount = project.inventoryLineCount;
+    const totalInventoryNeeded = project.totalInventoryNeeded;
+    const totalInventoryAllocated = project.totalInventoryAllocated;
+    const totalInventoryRemaining = project.totalInventoryRemaining;
+    const plannedInventoryCost = project.plannedInventoryCost;
     const committedCost = project.totalSpent + plannedInventoryCost;
     const budgetRatio = project.totalBudgeted && project.totalBudgeted > 0
       ? committedCost / project.totalBudgeted

@@ -1,8 +1,7 @@
-import type { ProjectSummary } from "@lifekeeper/types";
+import type { ProjectPortfolioItem } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { ProjectProgressBar } from "./project-progress-bar";
-import { getProjectInventoryRollups } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/formatters";
 import {
   buildPortfolioProjects,
@@ -15,13 +14,12 @@ import {
 
 type ProjectPortfolioTableProps = {
   householdId: string;
-  projects: ProjectSummary[];
+  projects: ProjectPortfolioItem[];
   selectedSort: ProjectSort;
 };
 
-export async function ProjectPortfolioTable({ householdId, projects, selectedSort }: ProjectPortfolioTableProps): Promise<JSX.Element> {
-  const inventoryRollups = await getProjectInventoryRollups(householdId);
-  const portfolioProjects = buildPortfolioProjects(projects, inventoryRollups, selectedSort);
+export function ProjectPortfolioTable({ householdId, projects, selectedSort }: ProjectPortfolioTableProps): JSX.Element {
+  const portfolioProjects = buildPortfolioProjects(projects, selectedSort);
 
   return (
     <>

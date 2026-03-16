@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { maintenanceTriggerSchema } from "@lifekeeper/types";
 import {
   aggregateCostsByPeriod,
@@ -14,6 +14,7 @@ import {
   toAssetCostSummaryResponse,
   toCostForecastResponse,
   toHouseholdCostDashboardResponse,
+  toHouseholdCostOverviewResponse,
   toServiceProviderSpendResponse
 } from "../../lib/serializers/index.js";
 
@@ -223,6 +224,285 @@ const buildForecastResponse = async (
   });
 };
 
+const buildHouseholdCostDashboard = async (
+  prisma: PrismaClient,
+  householdId: string,
+  periodMonths: number
+) => {
+  const periodEnd = new Date();
+  const periodStart = startOfUtcMonth(addUtcMonths(periodEnd, -(periodMonths - 1)));
+  const logs = await prisma.maintenanceLog.findMany({
+    where: {
+      asset: { householdId },
+      completedAt: { gte: periodStart }
+    },
+    include: {
+      asset: {
+        select: {
+          id: true,
+          name: true,
+          category: true
+        }
+      },
+      parts: {
+        select: {
+          quantity: true,
+          unitCost: true
+        }
+      },
+      schedule: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
+    },
+    orderBy: {
+      completedAt: "asc"
+    }
+  });
+
+  const costEntries = logs.map((log) => ({
+    log,
+    breakdown: computeLogTotalCost(log)
+  }));
+  const totalSpend = costEntries.reduce((sum, item) => sum + item.breakdown.totalCost, 0);
+  const categoryMap = new Map<string, { category: string; categoryLabel: string; totalCost: number; assetIds: Set<string>; logCount: number }>();
+  const assetMap = new Map<string, { assetId: string; assetName: string; category: string; totalCost: number; logCount: number }>();
+  const scheduleMap = new Map<string, { scheduleName: string; totalCost: number; occurrences: number }>();
+
+  for (const entry of costEntries) {
+    const totalCost = entry.breakdown.totalCost;
+    const categoryKey = entry.log.asset.category;
+    const categoryEntry = categoryMap.get(categoryKey) ?? {
+      category: categoryKey,
+      categoryLabel: categoryLabel(categoryKey),
+      totalCost: 0,
+      assetIds: new Set<string>(),
+      logCount: 0
+    };
+    categoryEntry.totalCost += totalCost;
+    categoryEntry.assetIds.add(entry.log.asset.id);
+    categoryEntry.logCount += 1;
+    categoryMap.set(categoryKey, categoryEntry);
+
+    const assetEntry = assetMap.get(entry.log.asset.id) ?? {
+      assetId: entry.log.asset.id,
+      assetName: entry.log.asset.name,
+      category: entry.log.asset.category,
+      totalCost: 0,
+      logCount: 0
+    };
+    assetEntry.totalCost += totalCost;
+    assetEntry.logCount += 1;
+    assetMap.set(entry.log.asset.id, assetEntry);
+
+    if (entry.log.schedule) {
+      const scheduleEntry = scheduleMap.get(entry.log.schedule.id) ?? {
+        scheduleName: entry.log.schedule.name,
+        totalCost: 0,
+        occurrences: 0
+      };
+      scheduleEntry.totalCost += totalCost;
+      scheduleEntry.occurrences += 1;
+      scheduleMap.set(entry.log.schedule.id, scheduleEntry);
+    }
+  }
+
+  const monthly = aggregateCostsByPeriod(costEntries.map((entry) => ({
+    totalCost: entry.breakdown.totalCost,
+    completedAt: entry.log.completedAt
+  })), "month");
+
+  return toHouseholdCostDashboardResponse({
+    householdId,
+    periodStart: periodStart.toISOString(),
+    periodEnd: periodEnd.toISOString(),
+    totalSpend,
+    spendByCategory: Array.from(categoryMap.values())
+      .map((entry) => ({
+        category: entry.category,
+        categoryLabel: entry.categoryLabel,
+        totalCost: entry.totalCost,
+        assetCount: entry.assetIds.size,
+        logCount: entry.logCount
+      }))
+      .sort((left, right) => right.totalCost - left.totalCost),
+    spendByAsset: Array.from(assetMap.values()).sort((left, right) => right.totalCost - left.totalCost),
+    spendByMonth: monthly.periods.map((entry) => ({
+      month: entry.period,
+      totalCost: entry.totalCost,
+      logCount: entry.logCount
+    })),
+    topScheduleTypes: Array.from(scheduleMap.values())
+      .sort((left, right) => right.totalCost - left.totalCost)
+      .slice(0, 15)
+  });
+};
+
+const buildHouseholdServiceProviderSpend = async (
+  prisma: PrismaClient,
+  householdId: string
+) => {
+  const providers = await prisma.serviceProvider.findMany({
+    where: { householdId },
+    orderBy: { name: "asc" }
+  });
+  const providerIds = providers.map((provider) => provider.id);
+  const monthFloor = startOfUtcMonth(addUtcMonths(new Date(), -23));
+  const [maintenanceLogs, projectExpenses] = await Promise.all([
+    providerIds.length > 0
+      ? prisma.maintenanceLog.findMany({
+          where: {
+            serviceProviderId: { in: providerIds },
+            asset: { householdId }
+          },
+          include: {
+            parts: {
+              select: {
+                quantity: true,
+                unitCost: true
+              }
+            }
+          },
+          orderBy: { completedAt: "asc" }
+        })
+      : Promise.resolve([]),
+    providerIds.length > 0
+      ? prisma.projectExpense.findMany({
+          where: {
+            serviceProviderId: { in: providerIds },
+            project: { householdId }
+          },
+          orderBy: { createdAt: "asc" }
+        })
+      : Promise.resolve([])
+  ]);
+
+  const maintenanceSummary = new Map<string, { totalCost: number; count: number; firstUsed: Date | null; lastUsed: Date | null; monthly: Map<string, number> }>();
+  const projectSummary = new Map<string, { totalCost: number; count: number; firstUsed: Date | null; lastUsed: Date | null }>();
+
+  for (const log of maintenanceLogs as Array<{
+    serviceProviderId: string | null;
+    completedAt: Date;
+    cost: number | null;
+    laborHours: number | null;
+    laborRate: number | null;
+    parts: Array<{ quantity: number; unitCost: number | null }>;
+  }>) {
+    if (!log.serviceProviderId) {
+      continue;
+    }
+
+    const summary = maintenanceSummary.get(log.serviceProviderId) ?? {
+      totalCost: 0,
+      count: 0,
+      firstUsed: null,
+      lastUsed: null,
+      monthly: new Map<string, number>()
+    };
+    const totalCost = computeLogTotalCost(log).totalCost;
+    summary.totalCost += totalCost;
+    summary.count += 1;
+    summary.firstUsed = summary.firstUsed ? new Date(Math.min(summary.firstUsed.getTime(), log.completedAt.getTime())) : log.completedAt;
+    summary.lastUsed = summary.lastUsed ? new Date(Math.max(summary.lastUsed.getTime(), log.completedAt.getTime())) : log.completedAt;
+
+    if (log.completedAt >= monthFloor) {
+      const monthKey = `${log.completedAt.getUTCFullYear()}-${`${log.completedAt.getUTCMonth() + 1}`.padStart(2, "0")}`;
+      summary.monthly.set(monthKey, (summary.monthly.get(monthKey) ?? 0) + totalCost);
+    }
+
+    maintenanceSummary.set(log.serviceProviderId, summary);
+  }
+
+  for (const expense of projectExpenses as Array<{ serviceProviderId: string | null; amount: number; date: Date | null; createdAt: Date }>) {
+    if (!expense.serviceProviderId) {
+      continue;
+    }
+
+    const summary = projectSummary.get(expense.serviceProviderId) ?? {
+      totalCost: 0,
+      count: 0,
+      firstUsed: null,
+      lastUsed: null
+    };
+    const usedAt = expense.date ?? expense.createdAt;
+    summary.totalCost += expense.amount;
+    summary.count += 1;
+    summary.firstUsed = summary.firstUsed ? new Date(Math.min(summary.firstUsed.getTime(), usedAt.getTime())) : usedAt;
+    summary.lastUsed = summary.lastUsed ? new Date(Math.max(summary.lastUsed.getTime(), usedAt.getTime())) : usedAt;
+    projectSummary.set(expense.serviceProviderId, summary);
+  }
+
+  return toServiceProviderSpendResponse({
+    householdId,
+    providers: providers
+      .map((provider) => {
+        const maintenance = maintenanceSummary.get(provider.id);
+        const project = projectSummary.get(provider.id);
+        const firstUsedCandidates = [maintenance?.firstUsed, project?.firstUsed].filter((value): value is Date => Boolean(value));
+        const lastUsedCandidates = [maintenance?.lastUsed, project?.lastUsed].filter((value): value is Date => Boolean(value));
+
+        return {
+          providerId: provider.id,
+          providerName: provider.name,
+          specialty: provider.specialty,
+          totalMaintenanceCost: maintenance?.totalCost ?? 0,
+          maintenanceLogCount: maintenance?.count ?? 0,
+          totalProjectCost: project?.totalCost ?? 0,
+          projectExpenseCount: project?.count ?? 0,
+          totalCombinedCost: (maintenance?.totalCost ?? 0) + (project?.totalCost ?? 0),
+          firstUsed: firstUsedCandidates.length > 0
+            ? new Date(Math.min(...firstUsedCandidates.map((value) => value.getTime()))).toISOString()
+            : null,
+          lastUsed: lastUsedCandidates.length > 0
+            ? new Date(Math.max(...lastUsedCandidates.map((value) => value.getTime()))).toISOString()
+            : null,
+          spendByMonth: Array.from(maintenance?.monthly.entries() ?? [])
+            .map(([month, cost]) => ({ month, cost }))
+            .sort((left, right) => left.month.localeCompare(right.month))
+        };
+      })
+      .sort((left, right) => right.totalCombinedCost - left.totalCombinedCost)
+  });
+};
+
+const buildHouseholdCostForecast = async (
+  prisma: PrismaClient,
+  householdId: string
+) => {
+  const schedules = await prisma.maintenanceSchedule.findMany({
+    where: {
+      isActive: true,
+      asset: { householdId }
+    },
+    select: {
+      id: true,
+      assetId: true,
+      name: true,
+      estimatedCost: true,
+      triggerType: true,
+      triggerConfig: true,
+      metricId: true,
+      nextDueAt: true,
+      nextDueMetricValue: true,
+      asset: {
+        select: {
+          name: true
+        }
+      }
+    }
+  });
+
+  return buildForecastResponse(prisma, schedules.map((schedule) => ({
+    ...schedule,
+    assetName: schedule.asset.name
+  })), {
+    householdId,
+    assetId: null
+  });
+};
+
 export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/cost-analytics/dashboard", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
@@ -234,115 +514,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const periodEnd = new Date();
-    const periodStart = startOfUtcMonth(addUtcMonths(periodEnd, -(query.periodMonths - 1)));
-    const logs = await app.prisma.maintenanceLog.findMany({
-      where: {
-        asset: { householdId: params.householdId },
-        completedAt: { gte: periodStart }
-      },
-      include: {
-        asset: {
-          select: {
-            id: true,
-            name: true,
-            category: true
-          }
-        },
-        parts: {
-          select: {
-            quantity: true,
-            unitCost: true
-          }
-        },
-        schedule: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      },
-      orderBy: {
-        completedAt: "asc"
-      }
-    });
-
-    const costEntries = logs.map((log) => ({
-      log,
-      breakdown: computeLogTotalCost(log)
-    }));
-    const totalSpend = costEntries.reduce((sum, item) => sum + item.breakdown.totalCost, 0);
-    const categoryMap = new Map<string, { category: string; categoryLabel: string; totalCost: number; assetIds: Set<string>; logCount: number }>();
-    const assetMap = new Map<string, { assetId: string; assetName: string; category: string; totalCost: number; logCount: number }>();
-    const scheduleMap = new Map<string, { scheduleName: string; totalCost: number; occurrences: number }>();
-
-    for (const entry of costEntries) {
-      const totalCost = entry.breakdown.totalCost;
-      const categoryKey = entry.log.asset.category;
-      const categoryEntry = categoryMap.get(categoryKey) ?? {
-        category: categoryKey,
-        categoryLabel: categoryLabel(categoryKey),
-        totalCost: 0,
-        assetIds: new Set<string>(),
-        logCount: 0
-      };
-      categoryEntry.totalCost += totalCost;
-      categoryEntry.assetIds.add(entry.log.asset.id);
-      categoryEntry.logCount += 1;
-      categoryMap.set(categoryKey, categoryEntry);
-
-      const assetEntry = assetMap.get(entry.log.asset.id) ?? {
-        assetId: entry.log.asset.id,
-        assetName: entry.log.asset.name,
-        category: entry.log.asset.category,
-        totalCost: 0,
-        logCount: 0
-      };
-      assetEntry.totalCost += totalCost;
-      assetEntry.logCount += 1;
-      assetMap.set(entry.log.asset.id, assetEntry);
-
-      if (entry.log.schedule) {
-        const scheduleEntry = scheduleMap.get(entry.log.schedule.id) ?? {
-          scheduleName: entry.log.schedule.name,
-          totalCost: 0,
-          occurrences: 0
-        };
-        scheduleEntry.totalCost += totalCost;
-        scheduleEntry.occurrences += 1;
-        scheduleMap.set(entry.log.schedule.id, scheduleEntry);
-      }
-    }
-
-    const monthly = aggregateCostsByPeriod(costEntries.map((entry) => ({
-      totalCost: entry.breakdown.totalCost,
-      completedAt: entry.log.completedAt
-    })), "month");
-
-    return toHouseholdCostDashboardResponse({
-      householdId: params.householdId,
-      periodStart: periodStart.toISOString(),
-      periodEnd: periodEnd.toISOString(),
-      totalSpend,
-      spendByCategory: Array.from(categoryMap.values())
-        .map((entry) => ({
-          category: entry.category,
-          categoryLabel: entry.categoryLabel,
-          totalCost: entry.totalCost,
-          assetCount: entry.assetIds.size,
-          logCount: entry.logCount
-        }))
-        .sort((left, right) => right.totalCost - left.totalCost),
-      spendByAsset: Array.from(assetMap.values()).sort((left, right) => right.totalCost - left.totalCost),
-      spendByMonth: monthly.periods.map((entry) => ({
-        month: entry.period,
-        totalCost: entry.totalCost,
-        logCount: entry.logCount
-      })),
-      topScheduleTypes: Array.from(scheduleMap.values())
-        .sort((left, right) => right.totalCost - left.totalCost)
-        .slice(0, 15)
-    });
+    return buildHouseholdCostDashboard(app.prisma, params.householdId, query.periodMonths);
   });
 
   app.get("/v1/households/:householdId/cost-analytics/service-providers", async (request, reply) => {
@@ -354,126 +526,28 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const providers = await app.prisma.serviceProvider.findMany({
-      where: { householdId: params.householdId },
-      orderBy: { name: "asc" }
-    });
-    const providerIds = providers.map((provider) => provider.id);
-    const monthFloor = startOfUtcMonth(addUtcMonths(new Date(), -23));
-    const [maintenanceLogs, projectExpenses] = await Promise.all([
-      providerIds.length > 0
-        ? app.prisma.maintenanceLog.findMany({
-            where: {
-              serviceProviderId: { in: providerIds },
-              asset: { householdId: params.householdId }
-            },
-            include: {
-              parts: {
-                select: {
-                  quantity: true,
-                  unitCost: true
-                }
-              }
-            },
-            orderBy: { completedAt: "asc" }
-          })
-        : Promise.resolve([]),
-      providerIds.length > 0
-        ? app.prisma.projectExpense.findMany({
-            where: {
-              serviceProviderId: { in: providerIds },
-              project: { householdId: params.householdId }
-            },
-            orderBy: { createdAt: "asc" }
-          })
-        : Promise.resolve([])
+    return buildHouseholdServiceProviderSpend(app.prisma, params.householdId);
+  });
+
+  app.get("/v1/households/:householdId/cost-analytics/overview", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const [dashboard, serviceProviderSpend, forecast] = await Promise.all([
+      buildHouseholdCostDashboard(app.prisma, params.householdId, 12),
+      buildHouseholdServiceProviderSpend(app.prisma, params.householdId),
+      buildHouseholdCostForecast(app.prisma, params.householdId)
     ]);
 
-    const maintenanceSummary = new Map<string, { totalCost: number; count: number; firstUsed: Date | null; lastUsed: Date | null; monthly: Map<string, number> }>();
-    const projectSummary = new Map<string, { totalCost: number; count: number; firstUsed: Date | null; lastUsed: Date | null }>();
-
-    for (const log of maintenanceLogs as Array<{
-      serviceProviderId: string | null;
-      completedAt: Date;
-      cost: number | null;
-      laborHours: number | null;
-      laborRate: number | null;
-      parts: Array<{ quantity: number; unitCost: number | null }>;
-    }>) {
-      if (!log.serviceProviderId) {
-        continue;
-      }
-
-      const summary = maintenanceSummary.get(log.serviceProviderId) ?? {
-        totalCost: 0,
-        count: 0,
-        firstUsed: null,
-        lastUsed: null,
-        monthly: new Map<string, number>()
-      };
-      const totalCost = computeLogTotalCost(log).totalCost;
-      summary.totalCost += totalCost;
-      summary.count += 1;
-      summary.firstUsed = summary.firstUsed ? new Date(Math.min(summary.firstUsed.getTime(), log.completedAt.getTime())) : log.completedAt;
-      summary.lastUsed = summary.lastUsed ? new Date(Math.max(summary.lastUsed.getTime(), log.completedAt.getTime())) : log.completedAt;
-
-      if (log.completedAt >= monthFloor) {
-        const monthKey = `${log.completedAt.getUTCFullYear()}-${`${log.completedAt.getUTCMonth() + 1}`.padStart(2, "0")}`;
-        summary.monthly.set(monthKey, (summary.monthly.get(monthKey) ?? 0) + totalCost);
-      }
-
-      maintenanceSummary.set(log.serviceProviderId, summary);
-    }
-
-    for (const expense of projectExpenses as Array<{ serviceProviderId: string | null; amount: number; date: Date | null; createdAt: Date }>) {
-      if (!expense.serviceProviderId) {
-        continue;
-      }
-
-      const summary = projectSummary.get(expense.serviceProviderId) ?? {
-        totalCost: 0,
-        count: 0,
-        firstUsed: null,
-        lastUsed: null
-      };
-      const usedAt = expense.date ?? expense.createdAt;
-      summary.totalCost += expense.amount;
-      summary.count += 1;
-      summary.firstUsed = summary.firstUsed ? new Date(Math.min(summary.firstUsed.getTime(), usedAt.getTime())) : usedAt;
-      summary.lastUsed = summary.lastUsed ? new Date(Math.max(summary.lastUsed.getTime(), usedAt.getTime())) : usedAt;
-      projectSummary.set(expense.serviceProviderId, summary);
-    }
-
-    return toServiceProviderSpendResponse({
-      householdId: params.householdId,
-      providers: providers
-        .map((provider) => {
-          const maintenance = maintenanceSummary.get(provider.id);
-          const project = projectSummary.get(provider.id);
-          const firstUsedCandidates = [maintenance?.firstUsed, project?.firstUsed].filter((value): value is Date => Boolean(value));
-          const lastUsedCandidates = [maintenance?.lastUsed, project?.lastUsed].filter((value): value is Date => Boolean(value));
-
-          return {
-            providerId: provider.id,
-            providerName: provider.name,
-            specialty: provider.specialty,
-            totalMaintenanceCost: maintenance?.totalCost ?? 0,
-            maintenanceLogCount: maintenance?.count ?? 0,
-            totalProjectCost: project?.totalCost ?? 0,
-            projectExpenseCount: project?.count ?? 0,
-            totalCombinedCost: (maintenance?.totalCost ?? 0) + (project?.totalCost ?? 0),
-            firstUsed: firstUsedCandidates.length > 0
-              ? new Date(Math.min(...firstUsedCandidates.map((value) => value.getTime()))).toISOString()
-              : null,
-            lastUsed: lastUsedCandidates.length > 0
-              ? new Date(Math.max(...lastUsedCandidates.map((value) => value.getTime()))).toISOString()
-              : null,
-            spendByMonth: Array.from(maintenance?.monthly.entries() ?? [])
-              .map(([month, cost]) => ({ month, cost }))
-              .sort((left, right) => left.month.localeCompare(right.month))
-          };
-        })
-        .sort((left, right) => right.totalCombinedCost - left.totalCombinedCost)
+    return toHouseholdCostOverviewResponse({
+      dashboard,
+      serviceProviderSpend,
+      forecast
     });
   });
 
@@ -486,36 +560,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const schedules = await app.prisma.maintenanceSchedule.findMany({
-      where: {
-        isActive: true,
-        asset: { householdId: params.householdId }
-      },
-      select: {
-        id: true,
-        assetId: true,
-        name: true,
-        estimatedCost: true,
-        triggerType: true,
-        triggerConfig: true,
-        metricId: true,
-        nextDueAt: true,
-        nextDueMetricValue: true,
-        asset: {
-          select: {
-            name: true
-          }
-        }
-      }
-    });
-
-    return buildForecastResponse(app.prisma, schedules.map((schedule) => ({
-      ...schedule,
-      assetName: schedule.asset.name
-    })), {
-      householdId: params.householdId,
-      assetId: null
-    });
+    return buildHouseholdCostForecast(app.prisma, params.householdId);
   });
 
   app.get("/v1/assets/:assetId/cost-analytics/summary", async (request, reply) => {

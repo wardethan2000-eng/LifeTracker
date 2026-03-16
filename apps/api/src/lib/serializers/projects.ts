@@ -4,6 +4,7 @@ import {
   projectExpenseSchema,
   projectInventoryRollupSchema,
   projectNoteSchema,
+  projectPortfolioItemSchema,
   projectPhaseChecklistItemSchema,
   projectPhaseDetailSchema,
   projectPhaseSchema,
@@ -386,6 +387,41 @@ export const toProjectInventoryRollupResponse = (rollup: {
   totalInventoryRemaining: number;
   plannedInventoryCost: number;
 }) => projectInventoryRollupSchema.parse(rollup);
+
+export const toProjectPortfolioItemResponse = (item: {
+  id: string;
+  householdId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  startDate: string | null;
+  targetEndDate: string | null;
+  actualEndDate: string | null;
+  budgetAmount: number | null;
+  notes: string | null;
+  parentProjectId: string | null;
+  depth: number;
+  createdAt: string;
+  updatedAt: string;
+  totalBudgeted: number | null;
+  totalSpent: number;
+  taskCount: number;
+  completedTaskCount: number;
+  phaseCount: number;
+  completedPhaseCount: number;
+  percentComplete: number;
+  phaseProgress: Array<{
+    name: string;
+    status: string;
+    taskCount: number;
+    completedTaskCount: number;
+  }>;
+  inventoryLineCount: number;
+  totalInventoryNeeded: number;
+  totalInventoryAllocated: number;
+  totalInventoryRemaining: number;
+  plannedInventoryCost: number;
+}) => projectPortfolioItemSchema.parse(item);
 
 export const toProjectPhaseSupplyResponse = (supply: {
   id: string;

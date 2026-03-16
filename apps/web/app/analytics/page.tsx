@@ -11,12 +11,10 @@ import {
   getAssetDetail,
   getEnhancedProjections,
   getHouseholdAssets,
-  getHouseholdCostDashboard,
-  getHouseholdCostForecast,
+  getHouseholdCostOverview,
   getMe,
   getMetricRateAnalytics,
   getScheduleComplianceDashboard,
-  getServiceProviderSpend
 } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/formatters";
 
@@ -192,13 +190,16 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     return `/analytics?${query.toString()}`;
   };
 
-  const [costDashboard, serviceProviderSpend, costForecast, complianceDashboard, usageHighlights] = await Promise.all([
-    tab === "costs" ? getHouseholdCostDashboard(household.id).catch(() => null) : Promise.resolve(null),
-    tab === "costs" ? getServiceProviderSpend(household.id).catch(() => null) : Promise.resolve(null),
-    tab === "costs" ? getHouseholdCostForecast(household.id).catch(() => null) : Promise.resolve(null),
+  const [costOverview, complianceDashboard, usageHighlights] = await Promise.all([
+    tab === "costs"
+      ? getHouseholdCostOverview(household.id).catch(() => ({ dashboard: null, serviceProviderSpend: null, forecast: null }))
+      : Promise.resolve({ dashboard: null, serviceProviderSpend: null, forecast: null }),
     tab === "compliance" ? getScheduleComplianceDashboard(household.id, periodMonths).catch(() => null) : Promise.resolve(null),
     tab === "usage" ? loadUsageHighlights(household.id).catch(() => []) : Promise.resolve([])
   ]);
+  const costDashboard = costOverview.dashboard;
+  const serviceProviderSpend = costOverview.serviceProviderSpend;
+  const costForecast = costOverview.forecast;
 
   const renderCostsTab = (): JSX.Element => {
     const assetCount = costDashboard ? new Set(costDashboard.spendByAsset.map((asset) => asset.assetId)).size : 0;

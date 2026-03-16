@@ -18,7 +18,9 @@ import {
   dueWorkItemSchema,
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
+  householdNotificationListSchema,
   householdCostDashboardSchema,
+  householdCostOverviewSchema,
   scheduleComplianceDashboardSchema,
   householdMemberSchema,
   maintenanceLogSchema,
@@ -62,6 +64,7 @@ import {
   projectPhaseSupplyListSchema,
   projectPhaseSupplySchema,
   projectInventoryRollupListSchema,
+  projectPortfolioListSchema,
   projectShoppingListSchema,
   projectSchema,
   reorderProjectPhasesSchema,
@@ -102,6 +105,7 @@ import {
   type CreateProjectExpenseInput,
     type CostForecast,
     type HouseholdCostDashboard,
+  type HouseholdCostOverview,
   type ScheduleComplianceDashboard,
   type CreateProjectPhaseChecklistItemInput,
   type CreateProjectPhaseInput,
@@ -153,6 +157,7 @@ import {
   type MemberContributionPayload,
   type MeResponse,
   type Notification,
+  type HouseholdNotificationList,
   type OnTimeRatePayload,
   type OverdueTrendPayload,
   type ProjectAsset,
@@ -172,6 +177,7 @@ import {
   type ProjectTreeStats,
   type SearchEntityType,
   type SearchResponse,
+  type ProjectPortfolioItem,
   type ProjectSummary,
   type ProjectTask,
   type ProjectTaskChecklistItem,
@@ -687,6 +693,25 @@ export const getHouseholdProjects = async (
   });
 };
 
+export const getHouseholdProjectPortfolio = async (
+  householdId: string,
+  options?: { status?: ProjectStatus }
+): Promise<ProjectPortfolioItem[]> => {
+  const params = new URLSearchParams();
+
+  if (options?.status) {
+    params.set("status", options.status);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/projects/portfolio${suffix}`,
+    schema: projectPortfolioListSchema,
+    revalidate: 15
+  });
+};
+
 export const searchHousehold = async (
   householdId: string,
   query: string,
@@ -1115,6 +1140,28 @@ export const getNotifications = async (options?: {
   return apiRequest({
     path: `/v1/notifications${suffix}`,
     schema: notificationListSchema
+  });
+};
+
+export const getHouseholdNotifications = async (
+  householdId: string,
+  options?: { limit?: number; status?: "all" | "unread" | "read" }
+): Promise<HouseholdNotificationList> => {
+  const params = new URLSearchParams();
+
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  if (options?.status) {
+    params.set("status", options.status);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/notifications${suffix}`,
+    schema: householdNotificationListSchema
   });
 };
 
@@ -2323,6 +2370,12 @@ export const getServiceProviderSpend = async (householdId: string): Promise<Serv
 export const getHouseholdCostForecast = async (householdId: string): Promise<CostForecast> => apiRequest({
   path: `/v1/households/${householdId}/cost-analytics/forecast`,
   schema: costForecastSchema
+});
+
+export const getHouseholdCostOverview = async (householdId: string): Promise<HouseholdCostOverview> => apiRequest({
+  path: `/v1/households/${householdId}/cost-analytics/overview`,
+  schema: householdCostOverviewSchema,
+  revalidate: 30
 });
 
 export const getScheduleComplianceDashboard = async (

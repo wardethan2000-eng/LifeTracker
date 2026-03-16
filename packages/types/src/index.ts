@@ -779,6 +779,11 @@ export const householdDashboardSchema = z.object({
   notifications: z.array(notificationSchema)
 });
 
+export const householdNotificationListSchema = z.object({
+  notifications: z.array(notificationSchema),
+  unreadCount: z.number().int().min(0)
+});
+
 export const createMaintenanceScheduleSchema = z.object({
   assetId: z.string().cuid(),
   name: z.string().min(1).max(120),
@@ -1080,6 +1085,12 @@ export const costForecastSchema = z.object({
   total12m: z.number(),
   schedules: z.array(costForecastScheduleSchema),
   byAsset: z.array(costForecastByAssetSchema)
+});
+
+export const householdCostOverviewSchema = z.object({
+  dashboard: householdCostDashboardSchema.nullable(),
+  serviceProviderSpend: serviceProviderSpendSchema.nullable(),
+  forecast: costForecastSchema.nullable()
 });
 
 export const projectBudgetAnalysisPhaseSchema = z.object({
@@ -1996,6 +2007,14 @@ export const projectSummarySchema = projectSchema.extend({
   phaseProgress: z.array(projectPhaseProgressSchema).default([])
 });
 
+export const projectPortfolioItemSchema = projectSummarySchema.extend({
+  inventoryLineCount: z.number().int().min(0),
+  totalInventoryNeeded: z.number().int().min(0),
+  totalInventoryAllocated: z.number().int().min(0),
+  totalInventoryRemaining: z.number().int().min(0),
+  plannedInventoryCost: z.number().min(0)
+});
+
 export const projectDetailSchema = projectSchema.extend({
   assets: z.array(projectAssetSchema),
   hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema)),
@@ -2015,6 +2034,7 @@ export const projectTaskChecklistItemListSchema = z.array(projectTaskChecklistIt
 export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySummarySchema);
 export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 export const projectInventoryRollupListSchema = z.array(projectInventoryRollupSchema);
+export const projectPortfolioListSchema = z.array(projectPortfolioItemSchema);
 
 export const projectShoppingListItemSchema = z.object({
   id: z.string().cuid(),
@@ -2451,6 +2471,7 @@ export type PublicAssetReport = z.infer<typeof publicAssetReportSchema>;
 export type CsvExportDataset = z.infer<typeof csvExportDatasetSchema>;
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
+export type HouseholdNotificationList = z.infer<typeof householdNotificationListSchema>;
 export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesSchema>;
 export type AssetOverview = z.infer<typeof assetOverviewSchema>;
 export type DueWorkItem = z.infer<typeof dueWorkItemSchema>;
@@ -2477,6 +2498,7 @@ export type ServiceProviderSpend = z.infer<typeof serviceProviderSpendSchema>;
 export type CostForecastSchedule = z.infer<typeof costForecastScheduleSchema>;
 export type CostForecastByAsset = z.infer<typeof costForecastByAssetSchema>;
 export type CostForecast = z.infer<typeof costForecastSchema>;
+export type HouseholdCostOverview = z.infer<typeof householdCostOverviewSchema>;
 export type ProjectBudgetAnalysisPhase = z.infer<typeof projectBudgetAnalysisPhaseSchema>;
 export type ProjectBudgetAnalysisCategory = z.infer<typeof projectBudgetAnalysisCategorySchema>;
 export type ProjectBudgetAnalysis = z.infer<typeof projectBudgetAnalysisSchema>;
@@ -2581,6 +2603,7 @@ export type ProjectPhaseSummary = z.infer<typeof projectPhaseSummarySchema>;
 export type ProjectPhaseProgress = z.infer<typeof projectPhaseProgressSchema>;
 export type ProjectPhaseDetail = z.infer<typeof projectPhaseDetailSchema>;
 export type ProjectInventoryRollup = z.infer<typeof projectInventoryRollupSchema>;
+export type ProjectPortfolioItem = z.infer<typeof projectPortfolioItemSchema>;
 export type CreateProjectPhaseInput = z.infer<typeof createProjectPhaseSchema>;
 export type UpdateProjectPhaseInput = z.infer<typeof updateProjectPhaseSchema>;
 export type ReorderProjectPhasesInput = z.infer<typeof reorderProjectPhasesSchema>;

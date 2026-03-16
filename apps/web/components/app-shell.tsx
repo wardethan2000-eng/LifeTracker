@@ -1,12 +1,7 @@
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { JSX } from "react";
 import { ApiError, getMe } from "../lib/api";
-
-const SearchCommandPalette = dynamic(
-  () => import("./search-command-palette").then((mod) => ({ default: mod.SearchCommandPalette })),
-  { ssr: false }
-);
+import { SearchCommandPaletteLazy } from "./search-command-palette-lazy";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -125,7 +120,7 @@ export async function AppShell({ children, activePath }: AppShellProps): Promise
 
       <div className="main-content">
         <div className="shell-toolbar">
-          <SearchCommandPalette fallbackHouseholdId={fallbackHouseholdId} />
+          <SearchCommandPaletteLazy fallbackHouseholdId={fallbackHouseholdId} />
         </div>
         {children}
       </div>

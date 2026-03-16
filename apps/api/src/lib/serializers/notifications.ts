@@ -1,5 +1,5 @@
 import type { Notification } from "@prisma/client";
-import { notificationSchema } from "@lifekeeper/types";
+import { householdNotificationListSchema, notificationSchema } from "@lifekeeper/types";
 
 export const toNotificationResponse = (
   notification: Pick<Notification, "id" | "userId" | "householdId" | "assetId" | "scheduleId" | "dedupeKey" | "type" | "channel" | "status" | "title" | "body" | "scheduledFor" | "sentAt" | "readAt" | "escalationLevel" | "payload" | "createdAt" | "updatedAt">
@@ -11,3 +11,8 @@ export const toNotificationResponse = (
   createdAt: notification.createdAt.toISOString(),
   updatedAt: notification.updatedAt.toISOString()
 });
+
+export const toHouseholdNotificationListResponse = (value: {
+  notifications: Array<ReturnType<typeof toNotificationResponse>>;
+  unreadCount: number;
+}) => householdNotificationListSchema.parse(value);

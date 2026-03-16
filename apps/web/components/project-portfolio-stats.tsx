@@ -1,19 +1,17 @@
-import type { ProjectSummary } from "@lifekeeper/types";
+import type { ProjectPortfolioItem } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { getProjectInventoryRollups } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 import { buildPortfolioProjects, type ProjectSort } from "./project-portfolio-shared";
 
 type ProjectPortfolioStatsProps = {
   householdId: string;
-  projects: ProjectSummary[];
+  projects: ProjectPortfolioItem[];
   selectedStatusLabel: string;
   selectedSort: ProjectSort;
 };
 
-export async function ProjectPortfolioStats({ householdId, projects, selectedStatusLabel, selectedSort }: ProjectPortfolioStatsProps): Promise<JSX.Element> {
-  const inventoryRollups = await getProjectInventoryRollups(householdId);
-  const portfolioProjects = buildPortfolioProjects(projects, inventoryRollups, selectedSort);
+export function ProjectPortfolioStats({ householdId, projects, selectedStatusLabel, selectedSort }: ProjectPortfolioStatsProps): JSX.Element {
+  const portfolioProjects = buildPortfolioProjects(projects, selectedSort);
   const visibleBudget = portfolioProjects.reduce((sum, project) => sum + (project.totalBudgeted ?? 0), 0);
   const visibleSpent = portfolioProjects.reduce((sum, project) => sum + project.totalSpent, 0);
   const visibleCommitted = portfolioProjects.reduce((sum, project) => sum + project.committedCost, 0);
