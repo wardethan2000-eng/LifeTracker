@@ -1,11 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
-import { InventoryAnalyticsAssetParts } from "../../components/inventory-analytics-asset-parts";
-import { InventoryAnalyticsCommonality } from "../../components/inventory-analytics-commonality";
-import { InventoryAnalyticsReorder } from "../../components/inventory-analytics-reorder";
-import { InventoryAnalyticsSummary } from "../../components/inventory-analytics-summary";
-import { InventoryAnalyticsTurnover } from "../../components/inventory-analytics-turnover";
 import { InventoryBulkActions } from "../../components/inventory-bulk-actions";
 import { InventoryEditableRow } from "../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../components/inventory-filter-bar";
@@ -23,8 +18,6 @@ import { formatCurrency } from "../../lib/formatters";
 type InventoryPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
-
-type InventoryAnalyticsSection = "summary" | "turnover" | "reorder" | "asset-parts" | "commonality";
 
 const normalizeUnit = (unit: string): string => unit.trim().toLowerCase();
 
@@ -83,20 +76,10 @@ const buildInventoryHref = (householdId: string, params?: Record<string, string 
   return `/inventory?${query.toString()}`;
 };
 
-const isAnalyticsSection = (value: string | undefined): value is InventoryAnalyticsSection => (
-  value === "summary"
-  || value === "turnover"
-  || value === "reorder"
-  || value === "asset-parts"
-  || value === "commonality"
-);
-
 export default async function InventoryPage({ searchParams }: InventoryPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
-  const view = typeof params.view === "string" && params.view === "analytics" ? "analytics" : "inventory";
-  const section = typeof params.section === "string" && isAnalyticsSection(params.section) ? params.section : "summary";
   const itemTypeFilter = typeof params.itemType === "string" && (params.itemType === "consumable" || params.itemType === "equipment") ? params.itemType : undefined;
   const isEquipmentView = itemTypeFilter === "equipment";
 
@@ -116,52 +99,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     }
 
     const inventoryViewHref = buildInventoryHref(household.id, itemTypeFilter ? { itemType: itemTypeFilter } : undefined);
-    const analyticsViewHref = buildInventoryHref(household.id, { view: "analytics" });
-
-    if (view === "analytics") {
-      const analyticsTabs: Array<{ value: InventoryAnalyticsSection; label: string }> = [
-        { value: "summary", label: "Summary" },
-        { value: "turnover", label: "Turnover" },
-        { value: "reorder", label: "Reorder Forecast" },
-        { value: "asset-parts", label: "Asset Parts" },
-        { value: "commonality", label: "Shared Parts" }
-      ];
-
-      return (
-        <AppShell activePath="/inventory">
-          <header className="page-header">
-            <div>
-              <h1>Inventory</h1>
-              <p style={{ marginTop: 6 }}>Universal household stock across assets, projects, and standalone supplies.</p>
-            </div>
-            <div className="page-header__actions">
-              <Link href={inventoryViewHref} className="button button--ghost button--sm">Inventory</Link>
-              <Link href={analyticsViewHref} className="button button--primary button--sm">Analytics</Link>
-            </div>
-          </header>
-
-          <div className="page-body">
-            <nav className="analytics-tab-bar" aria-label="Inventory analytics sections">
-              {analyticsTabs.map((tab) => (
-                <Link
-                  key={tab.value}
-                  href={buildInventoryHref(household.id, { view: "analytics", section: tab.value })}
-                  className={`analytics-tab-bar__tab${section === tab.value ? " analytics-tab-bar__tab--active" : ""}`}
-                >
-                  {tab.label}
-                </Link>
-              ))}
-            </nav>
-
-            {section === "turnover" ? <InventoryAnalyticsTurnover householdId={household.id} /> : null}
-            {section === "reorder" ? <InventoryAnalyticsReorder householdId={household.id} /> : null}
-            {section === "asset-parts" ? <InventoryAnalyticsAssetParts householdId={household.id} /> : null}
-            {section === "commonality" ? <InventoryAnalyticsCommonality householdId={household.id} /> : null}
-            {section === "summary" ? <InventoryAnalyticsSummary householdId={household.id} /> : null}
-          </div>
-        </AppShell>
-      );
-    }
+    const analyticsViewHref = `/analytics?tab=inventory&householdId=${household.id}`;
 
     const [{ items }, lowStockItems] = await Promise.all([
       getHouseholdInventory(household.id, { limit: 100, ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}) }),
@@ -222,7 +160,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </div>
           <div className="page-header__actions">
             <Link href={inventoryViewHref} className="button button--primary button--sm">Inventory</Link>
-            <Link href={analyticsViewHref} className="button button--ghost button--sm">Analytics</Link>
+            <Link href={analyticsViewHref} className="button button--ghost button--sm">Analytics Hub</Link>
           </div>
         </header>
 

@@ -18,6 +18,7 @@ import {
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
   householdCostDashboardSchema,
+  scheduleComplianceDashboardSchema,
   householdMemberSchema,
   maintenanceLogSchema,
   maintenanceScheduleSchema,
@@ -98,6 +99,7 @@ import {
   type CreateProjectExpenseInput,
     type CostForecast,
     type HouseholdCostDashboard,
+  type ScheduleComplianceDashboard,
   type CreateProjectPhaseChecklistItemInput,
   type CreateProjectPhaseInput,
   type CreateProjectPhaseSupplyInput,
@@ -2235,6 +2237,24 @@ export const getHouseholdCostForecast = async (householdId: string): Promise<Cos
   path: `/v1/households/${householdId}/cost-analytics/forecast`,
   schema: costForecastSchema
 });
+
+export const getScheduleComplianceDashboard = async (
+  householdId: string,
+  periodMonths?: number
+): Promise<ScheduleComplianceDashboard> => {
+  const query = new URLSearchParams();
+
+  if (periodMonths !== undefined) {
+    query.set("periodMonths", String(periodMonths));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/schedule-compliance${suffix}`,
+    schema: scheduleComplianceDashboardSchema
+  });
+};
 
 export const getAssetCostSummary = async (assetId: string): Promise<AssetCostSummary> => apiRequest({
   path: `/v1/assets/${assetId}/cost-analytics/summary`,

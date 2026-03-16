@@ -17,6 +17,10 @@ const maintenanceScheduleId = "clkeeperschedule000000001";
 const overdueScheduleId = "clkeeperschedule000000002";
 const maintenanceLogId = "clkeeperlog00000000000001";
 const maintenanceLogFollowUpId = "clkeeperlog00000000000002";
+const maintenanceLogHistoryOilSpringId = "clkeeperlog00000000000003";
+const maintenanceLogHistoryOilFallId = "clkeeperlog00000000000004";
+const maintenanceLogHistoryTireSummerId = "clkeeperlog00000000000005";
+const maintenanceLogHistoryTireWinterId = "clkeeperlog00000000000006";
 const timelineEntryRustSpotId = "clkeepertimeline00000001";
 const timelineEntryStormFenceId = "clkeepertimeline00000002";
 const timelineEntryCeramicCoatId = "clkeepertimeline00000003";
@@ -650,6 +654,89 @@ async function main(): Promise<void> {
     }
   });
 
+  const historicalComplianceLogs = [
+    {
+      id: maintenanceLogHistoryOilSpringId,
+      assetId,
+      scheduleId: maintenanceScheduleId,
+      completedById: ownerUserId,
+      title: "[Seed] Engine oil and filter - spring cycle",
+      completedAt: new Date("2025-04-12T00:00:00.000Z"),
+      usageValue: 28640,
+      cost: 68.25,
+      laborHours: 1.1,
+      laborRate: 0,
+      difficultyRating: 2,
+      performedBy: "self",
+      metadata: {
+        source: "seed",
+        cycle: "spring-2025"
+      }
+    },
+    {
+      id: maintenanceLogHistoryOilFallId,
+      assetId,
+      scheduleId: maintenanceScheduleId,
+      completedById: memberUserId,
+      title: "[Seed] Engine oil and filter - fall cycle",
+      completedAt: new Date("2025-10-10T00:00:00.000Z"),
+      usageValue: 35890,
+      cost: 79.4,
+      laborHours: 1.35,
+      laborRate: 0,
+      difficultyRating: 2,
+      performedBy: "Household garage day",
+      metadata: {
+        source: "seed",
+        cycle: "fall-2025"
+      }
+    },
+    {
+      id: maintenanceLogHistoryTireSummerId,
+      assetId,
+      scheduleId: overdueScheduleId,
+      completedById: memberUserId,
+      title: "[Seed] Tire rotation and balance - summer",
+      completedAt: new Date("2025-08-28T00:00:00.000Z"),
+      cost: 44.5,
+      laborHours: 0.7,
+      laborRate: 60,
+      difficultyRating: 3,
+      performedBy: "Quick Lube Express",
+      metadata: {
+        source: "seed",
+        visitType: "shop-service",
+        cycle: "summer-2025"
+      }
+    },
+    {
+      id: maintenanceLogHistoryTireWinterId,
+      assetId,
+      scheduleId: overdueScheduleId,
+      completedById: ownerUserId,
+      title: "[Seed] Tire rotation and balance - winter",
+      completedAt: new Date("2025-11-15T00:00:00.000Z"),
+      cost: 47.25,
+      laborHours: 0.75,
+      laborRate: 62,
+      difficultyRating: 3,
+      performedBy: "Quick Lube Express",
+      metadata: {
+        source: "seed",
+        visitType: "shop-service",
+        cycle: "winter-2025"
+      }
+    }
+  ] as const;
+
+  for (const log of historicalComplianceLogs) {
+    await prisma.maintenanceLog.upsert({
+      where: { id: log.id },
+      update: log,
+      create: log
+    });
+  }
+
   // ── Tier 2: Service Provider ──────────────────────────────────────────────
   await prisma.serviceProvider.upsert({
     where: { id: serviceProviderId },
@@ -692,7 +779,16 @@ async function main(): Promise<void> {
   });
 
   await prisma.maintenanceLog.updateMany({
-    where: { id: { in: [maintenanceLogId, maintenanceLogFollowUpId] } },
+    where: {
+      id: {
+        in: [
+          maintenanceLogId,
+          maintenanceLogFollowUpId,
+          maintenanceLogHistoryTireSummerId,
+          maintenanceLogHistoryTireWinterId
+        ]
+      }
+    },
     data: { serviceProviderId }
   });
 
@@ -923,10 +1019,56 @@ async function main(): Promise<void> {
 
   // ── Tier 2: Maintenance Log Part ──────────────────────────────────────────
   await prisma.maintenanceLogPart.deleteMany({
-    where: { logId: { in: [maintenanceLogId, maintenanceLogFollowUpId] } }
+    where: {
+      logId: {
+        in: [
+          maintenanceLogId,
+          maintenanceLogFollowUpId,
+          maintenanceLogHistoryOilSpringId,
+          maintenanceLogHistoryOilFallId,
+          maintenanceLogHistoryTireWinterId
+        ]
+      }
+    }
   });
   await prisma.maintenanceLogPart.createMany({
     data: [
+      {
+        logId: maintenanceLogHistoryOilSpringId,
+        inventoryItemId: inventoryItemOilFilterId,
+        name: "Motorcraft FL-500S Oil Filter",
+        partNumber: "FL-500S",
+        quantity: 1,
+        unitCost: 8.49,
+        supplier: "AutoZone"
+      },
+      {
+        logId: maintenanceLogHistoryOilSpringId,
+        inventoryItemId: inventoryItemOilId,
+        name: "Full Synthetic 5W-30 Oil",
+        partNumber: "SYN-5W30",
+        quantity: 6,
+        unitCost: 6.15,
+        supplier: "AutoZone"
+      },
+      {
+        logId: maintenanceLogHistoryOilFallId,
+        inventoryItemId: inventoryItemOilFilterId,
+        name: "Motorcraft FL-500S Oil Filter",
+        partNumber: "FL-500S",
+        quantity: 1,
+        unitCost: 8.97,
+        supplier: "NAPA"
+      },
+      {
+        logId: maintenanceLogHistoryOilFallId,
+        inventoryItemId: inventoryItemOilId,
+        name: "Full Synthetic 5W-30 Oil",
+        partNumber: "SYN-5W30",
+        quantity: 6,
+        unitCost: 6.72,
+        supplier: "NAPA"
+      },
       {
         logId: maintenanceLogId,
         inventoryItemId: inventoryItemOilFilterId,
@@ -952,6 +1094,15 @@ async function main(): Promise<void> {
         partNumber: "WW-025",
         quantity: 1,
         unitCost: 3.5,
+        supplier: "Quick Lube Express"
+      },
+      {
+        logId: maintenanceLogHistoryTireWinterId,
+        inventoryItemId: inventoryItemWheelWeightId,
+        name: "Wheel Weights",
+        partNumber: "WW-025",
+        quantity: 1,
+        unitCost: 3.25,
         supplier: "Quick Lube Express"
       }
     ]

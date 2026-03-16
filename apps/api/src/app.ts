@@ -39,6 +39,7 @@ import { projectInventoryRoutes } from "./routes/projects/inventory.js";
 import { projectNoteRoutes } from "./routes/projects/notes.js";
 import { projectPhaseRoutes } from "./routes/projects/phases.js";
 import { searchRoutes } from "./routes/search/index.js";
+import scheduleComplianceRoutes from "./routes/schedule-compliance/index.js";
 import { attachmentRoutes } from "./routes/attachments/index.js";
 import { barcodeRoutes } from "./routes/barcode.js";
 import { hobbyRoutes } from "./routes/hobbies/index.js";
@@ -91,6 +92,7 @@ export const buildApp = () => {
   app.register(comparativeAnalyticsRoutes);
   app.register(commentRoutes);
   app.register(costAnalyticsRoutes);
+  app.register(scheduleComplianceRoutes);
   app.register(exportRoutes);
   app.register(invitationRoutes);
   app.register(projectRoutes);

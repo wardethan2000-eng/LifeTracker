@@ -14,7 +14,7 @@ const navItems = [
   { href: "/inventory", label: "Inventory", icon: "layers" },
   { href: "/assets/new", label: "Add Asset", icon: "plus" },
   { href: "/projects", label: "Projects", icon: "folder" },
-  { href: "/costs", label: "Cost Analytics", icon: "dollar" },
+  { href: "/analytics", label: "Analytics", icon: "dollar" },
   { href: "/hobbies", label: "Hobbies", icon: "beaker" },
   { href: "/maintenance", label: "Maintenance", icon: "wrench" },
   { href: "/activity", label: "Activity", icon: "pulse" },

@@ -39,9 +39,11 @@ import {
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
+import { AssetCostCharts } from "../../../components/asset-cost-charts";
 import { AssetExportActions } from "../../../components/asset-export-actions";
 import { AssetLabelActions } from "../../../components/asset-label-actions";
 import { AssetMaintenanceSections } from "../../../components/asset-maintenance-sections";
+import { AssetMetricCharts } from "../../../components/asset-metric-charts";
 import { AssetMetricList } from "../../../components/asset-metric-list";
 import { AssetProfileWorkbench } from "../../../components/asset-profile-workbench";
 import { AttachmentSection } from "../../../components/attachment-section";
@@ -975,6 +977,11 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                       <section>
                         <div className="eyebrow">Cost per {metric.unit}</div>
                         <div style={{ display: "grid", gap: "12px", marginTop: "10px" }}>
+                          <AssetMetricCharts
+                            costNormalizationEntries={insight.costNormalization.entries}
+                            projectionData={insight.projection}
+                            metricUnit={metric.unit}
+                          />
                           <p>
                             Average cost: {formatCurrency(insight.costNormalization.averageCostPerUnit)} per {metric.unit} across {insight.costNormalization.totalUsage.toFixed(0)} {metric.unit} of tracked usage
                           </p>
@@ -1088,6 +1095,11 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                   <span className="stat-card__sub">Maintenance records counted in cost history</span>
                 </div>
               </section>
+
+              <AssetCostCharts
+                costByYear={costSummary?.costByYear ?? []}
+                forecast={costForecast}
+              />
 
               <table className="data-table">
                 <thead>

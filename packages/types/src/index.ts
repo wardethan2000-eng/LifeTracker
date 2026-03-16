@@ -1111,6 +1111,67 @@ export const projectBudgetAnalysisSchema = z.object({
   projectedTotalAtBurnRate: z.number().nullable()
 });
 
+// ── Schedule Compliance Analytics Schemas ───────────────────────
+
+export const scheduleComplianceOverviewSchema = z.object({
+  totalCompletions: z.number().int().min(0),
+  onTimeCompletions: z.number().int().min(0),
+  lateCompletions: z.number().int().min(0),
+  onTimeRate: z.number().min(0).max(1),
+  averageDaysOverdue: z.number().nullable(),
+  currentOverdueCount: z.number().int().min(0),
+  currentDueCount: z.number().int().min(0)
+});
+
+export const complianceTrendPointSchema = z.object({
+  month: z.string(),
+  totalCompletions: z.number().int().min(0),
+  onTimeCompletions: z.number().int().min(0),
+  lateCompletions: z.number().int().min(0),
+  onTimeRate: z.number().min(0).max(1),
+  overdueAtEndOfMonth: z.number().int().min(0)
+});
+
+export const categoryAdherenceSchema = z.object({
+  category: z.string(),
+  categoryLabel: z.string(),
+  totalCompletions: z.number().int().min(0),
+  onTimeCompletions: z.number().int().min(0),
+  onTimeRate: z.number().min(0).max(1),
+  averageDaysOverdue: z.number().nullable(),
+  activeScheduleCount: z.number().int().min(0),
+  currentOverdueCount: z.number().int().min(0)
+});
+
+export const assetAdherenceSchema = z.object({
+  assetId: z.string(),
+  assetName: z.string(),
+  category: z.string(),
+  totalCompletions: z.number().int().min(0),
+  onTimeCompletions: z.number().int().min(0),
+  onTimeRate: z.number().min(0).max(1),
+  averageDaysOverdue: z.number().nullable(),
+  currentOverdueCount: z.number().int().min(0)
+});
+
+export const memberAdherenceSchema = z.object({
+  userId: z.string(),
+  displayName: z.string().nullable(),
+  totalCompletions: z.number().int().min(0),
+  onTimeCompletions: z.number().int().min(0),
+  onTimeRate: z.number().min(0).max(1)
+});
+
+export const scheduleComplianceDashboardSchema = z.object({
+  overview: scheduleComplianceOverviewSchema,
+  trend: z.array(complianceTrendPointSchema),
+  byCategory: z.array(categoryAdherenceSchema),
+  byAsset: z.array(assetAdherenceSchema),
+  byMember: z.array(memberAdherenceSchema),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime()
+});
+
 // ── Inventory Schemas ───────────────────────────────────────────────
 
 export const inventoryItemSchema = z.object({
@@ -2408,6 +2469,12 @@ export type CostForecast = z.infer<typeof costForecastSchema>;
 export type ProjectBudgetAnalysisPhase = z.infer<typeof projectBudgetAnalysisPhaseSchema>;
 export type ProjectBudgetAnalysisCategory = z.infer<typeof projectBudgetAnalysisCategorySchema>;
 export type ProjectBudgetAnalysis = z.infer<typeof projectBudgetAnalysisSchema>;
+export type ScheduleComplianceOverview = z.infer<typeof scheduleComplianceOverviewSchema>;
+export type ComplianceTrendPoint = z.infer<typeof complianceTrendPointSchema>;
+export type CategoryAdherence = z.infer<typeof categoryAdherenceSchema>;
+export type AssetAdherence = z.infer<typeof assetAdherenceSchema>;
+export type MemberAdherence = z.infer<typeof memberAdherenceSchema>;
+export type ScheduleComplianceDashboard = z.infer<typeof scheduleComplianceDashboardSchema>;
 
 export type ShallowAsset = z.infer<typeof shallowAssetSchema>;
 export type PurchaseDetails = z.infer<typeof purchaseDetailsSchema>;

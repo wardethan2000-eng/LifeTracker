@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { LkBarChart, LkDonutChart, LkLineChart, formatCurrencyTick, formatMonthTick } from "./charts";
 import { getInventoryAnalyticsSummary } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 
@@ -6,31 +7,8 @@ type InventoryAnalyticsSummaryProps = {
   householdId: string;
 };
 
-const monthFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short"
-});
-
-const getBarWidth = (value: number, max: number): string => {
-  if (max <= 0 || value <= 0) {
-    return "0%";
-  }
-
-  return `${Math.max((value / max) * 100, 4)}%`;
-};
-
-const formatMonthLabel = (month: string): string => {
-  const [yearPart, monthPart] = month.split("-");
-  const year = Number(yearPart ?? "1970");
-  const monthValue = Number(monthPart ?? "1");
-  const date = new Date(Date.UTC(year, monthValue - 1, 1));
-  return `${monthFormatter.format(date)} '${String(year).slice(-2)}`;
-};
-
 export async function InventoryAnalyticsSummary({ householdId }: InventoryAnalyticsSummaryProps): Promise<JSX.Element> {
   const analytics = await getInventoryAnalyticsSummary(householdId);
-  const topConsumerMax = Math.max(...analytics.topConsumers.map((item) => item.totalConsumed), 0);
-  const categoryMax = Math.max(...analytics.categoryBreakdown.map((item) => item.totalSpentLast12Months), 0);
-  const monthlyMax = Math.max(...analytics.monthlySpending.map((item) => item.totalSpent), 0);
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -62,20 +40,18 @@ export async function InventoryAnalyticsSummary({ householdId }: InventoryAnalyt
           <div className="panel__header">
             <h2>Top Consumers (12 Months)</h2>
           </div>
-          <div className="panel__body">
-            {analytics.topConsumers.length === 0 ? (
-              <p className="panel__empty">No consumption activity has been recorded in the last 12 months.</p>
-            ) : (
-              analytics.topConsumers.map((item) => (
-                <div key={item.inventoryItemId} className="analytics-chart-bar">
-                  <div className="analytics-chart-bar__label" title={item.itemName}>{item.itemName}</div>
-                  <div className="analytics-chart-bar__track">
-                    <div className="analytics-chart-bar__fill analytics-chart-bar__fill--warning" style={{ width: getBarWidth(item.totalConsumed, topConsumerMax) }} />
-                  </div>
-                  <div className="analytics-chart-bar__value">{item.totalConsumed} • {formatCurrency(item.totalSpent, "—")}</div>
-                </div>
-              ))
-            )}
+          <div className="panel__body--padded">
+            <LkBarChart
+              data={analytics.topConsumers.map((item) => ({
+                itemName: item.itemName,
+                totalConsumed: item.totalConsumed
+              }))}
+              xKey="itemName"
+              bars={[{ dataKey: "totalConsumed", label: "Consumed" }]}
+              layout="vertical"
+              height={300}
+              emptyMessage="No consumption activity has been recorded in the last 12 months."
+            />
           </div>
         </section>
 
@@ -83,20 +59,16 @@ export async function InventoryAnalyticsSummary({ householdId }: InventoryAnalyt
           <div className="panel__header">
             <h2>Spending by Category</h2>
           </div>
-          <div className="panel__body">
-            {analytics.categoryBreakdown.length === 0 ? (
-              <p className="panel__empty">No category spending has been recorded yet.</p>
-            ) : (
-              analytics.categoryBreakdown.map((entry) => (
-                <div key={entry.category} className="analytics-chart-bar">
-                  <div className="analytics-chart-bar__label" title={entry.category}>{entry.category}</div>
-                  <div className="analytics-chart-bar__track">
-                    <div className="analytics-chart-bar__fill" style={{ width: getBarWidth(entry.totalSpentLast12Months, categoryMax) }} />
-                  </div>
-                  <div className="analytics-chart-bar__value">{formatCurrency(entry.totalSpentLast12Months, "—")} • {entry.itemCount}</div>
-                </div>
-              ))
-            )}
+          <div className="panel__body--padded">
+            <LkDonutChart
+              data={analytics.categoryBreakdown.map((entry) => ({
+                name: entry.category,
+                value: entry.totalSpentLast12Months
+              }))}
+              centerValue={formatCurrency(analytics.totalSpentLast12Months, "—")}
+              centerLabel="12-Month Spend"
+              emptyMessage="No category spending has been recorded yet."
+            />
           </div>
         </section>
       </div>
@@ -105,16 +77,19 @@ export async function InventoryAnalyticsSummary({ householdId }: InventoryAnalyt
         <div className="panel__header">
           <h2>Monthly Inventory Spending</h2>
         </div>
-        <div className="panel__body">
-          {analytics.monthlySpending.map((entry) => (
-            <div key={entry.month} className="analytics-chart-bar">
-              <div className="analytics-chart-bar__label">{formatMonthLabel(entry.month)}</div>
-              <div className="analytics-chart-bar__track">
-                <div className="analytics-chart-bar__fill analytics-chart-bar__fill--success" style={{ width: getBarWidth(entry.totalSpent, monthlyMax) }} />
-              </div>
-              <div className="analytics-chart-bar__value">{formatCurrency(entry.totalSpent, "—")} • {entry.transactionCount}</div>
-            </div>
-          ))}
+        <div className="panel__body--padded">
+          <LkLineChart
+            data={analytics.monthlySpending.map((entry) => ({
+              month: entry.month,
+              totalSpent: entry.totalSpent,
+              transactionCount: entry.transactionCount
+            }))}
+            xKey="month"
+            xTickFormatter={formatMonthTick}
+            yTickFormatter={formatCurrencyTick}
+            lines={[{ dataKey: "totalSpent", label: "Monthly Spend" }]}
+            emptyMessage="No monthly inventory spending is available yet."
+          />
         </div>
       </section>
     </div>
