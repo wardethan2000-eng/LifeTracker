@@ -37,6 +37,7 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   asset: "Assets",
   schedule: "Schedules",
   log: "Maintenance Logs",
+  timeline_entry: "Timeline Entries",
   project: "Projects",
   service_provider: "Service Providers",
   inventory_item: "Inventory Items",
@@ -48,6 +49,7 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "asset",
   "schedule",
   "log",
+  "timeline_entry",
   "project",
   "service_provider",
   "inventory_item",
@@ -125,7 +127,7 @@ const deleteAssetSearchFamily = async (prisma: SearchPrisma, assetId: string): P
   await prisma.$executeRaw`
     DELETE FROM "SearchIndex"
     WHERE ("entityType" = 'asset' AND "entityId" = ${assetId})
-       OR ("parentEntityId" = ${assetId} AND "entityType" IN ('schedule', 'log', 'comment'))
+       OR ("parentEntityId" = ${assetId} AND "entityType" IN ('schedule', 'log', 'comment', 'timeline_entry'))
   `;
 };
 
@@ -589,6 +591,50 @@ export const syncCommentToSearchIndex = async (prisma: SearchPrisma, commentId: 
   });
 };
 
+export const syncTimelineEntryToSearchIndex = async (prisma: SearchPrisma, entryId: string): Promise<void> => {
+  const entry = await prisma.assetTimelineEntry.findUnique({
+    where: { id: entryId },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      entryDate: true,
+      category: true,
+      cost: true,
+      asset: {
+        select: {
+          id: true,
+          name: true,
+          householdId: true,
+          deletedAt: true
+        }
+      }
+    }
+  });
+
+  if (!entry || entry.asset.deletedAt) {
+    await deleteSearchIndexEntry(prisma, "timeline_entry", entryId);
+    return;
+  }
+
+  await upsertSearchIndexEntry(prisma, {
+    householdId: entry.asset.householdId,
+    entityType: "timeline_entry",
+    entityId: entry.id,
+    parentEntityId: entry.asset.id,
+    parentEntityName: entry.asset.name,
+    title: entry.title,
+    subtitle: entry.entryDate.toISOString(),
+    body: entry.description,
+    entityUrl: `/assets/${entry.asset.id}?tab=history`,
+    entityMeta: {
+      category: entry.category,
+      entryDate: entry.entryDate.toISOString(),
+      cost: entry.cost ?? null
+    }
+  });
+};
+
 export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId: string): Promise<void> => {
   const asset = await prisma.asset.findUnique({
     where: { id: assetId },
@@ -597,7 +643,8 @@ export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId
       deletedAt: true,
       schedules: { select: { id: true } },
       logs: { select: { id: true } },
-      comments: { select: { id: true } }
+      comments: { select: { id: true } },
+      timelineEntries: { select: { id: true } }
     }
   });
 
@@ -611,7 +658,8 @@ export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId
   await Promise.all([
     ...asset.schedules.map((schedule) => syncScheduleToSearchIndex(prisma, schedule.id)),
     ...asset.logs.map((log) => syncLogToSearchIndex(prisma, log.id)),
-    ...asset.comments.map((comment) => syncCommentToSearchIndex(prisma, comment.id))
+    ...asset.comments.map((comment) => syncCommentToSearchIndex(prisma, comment.id)),
+    ...asset.timelineEntries.map((entry) => syncTimelineEntryToSearchIndex(prisma, entry.id))
   ]);
 };
 
@@ -654,7 +702,7 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
     WHERE "householdId" = ${householdId}
   `;
 
-  const [assets, schedules, logs, projects, providers, inventoryItems, comments] = await Promise.all([
+  const [assets, schedules, logs, timelineEntries, projects, providers, inventoryItems, comments] = await Promise.all([
     prisma.asset.findMany({
       where: { householdId },
       select: { id: true }
@@ -664,6 +712,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
       select: { id: true }
     }),
     prisma.maintenanceLog.findMany({
+      where: { asset: { householdId } },
+      select: { id: true }
+    }),
+    prisma.assetTimelineEntry.findMany({
       where: { asset: { householdId } },
       select: { id: true }
     }),
@@ -695,6 +747,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const log of logs) {
     await syncLogToSearchIndex(prisma, log.id);
+  }
+
+  for (const entry of timelineEntries) {
+    await syncTimelineEntryToSearchIndex(prisma, entry.id);
   }
 
   for (const project of projects) {

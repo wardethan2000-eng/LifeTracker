@@ -8,5 +8,6 @@ export * from "./maintenance-logs.js";
 export * from "./notifications.js";
 export * from "./projects.js";
 export * from "./service-providers.js";
+export * from "./timeline.js";
 export * from "./usage-metrics.js";
 export * from "./users.js";

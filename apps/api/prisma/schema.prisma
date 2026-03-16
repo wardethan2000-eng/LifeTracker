@@ -192,6 +192,7 @@ model User {
   sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
   authoredComments        Comment[]             @relation("CommentAuthor")
+  timelineEntries         AssetTimelineEntry[]  @relation("TimelineEntryCreator")
   projectNotes            ProjectNote[]         @relation("ProjectNoteAuthor")
   attachments             Attachment[]          @relation("AttachmentUploader")
   createdHobbies          Hobby[]               @relation("HobbyCreator")
@@ -284,6 +285,7 @@ model Asset {
   usageMetrics         UsageMetric[]
   schedules            MaintenanceSchedule[]
   logs                 MaintenanceLog[]
+  timelineEntries      AssetTimelineEntry[]
   inventoryLinks       AssetInventoryItem[]
   notifications        Notification[]
   projectAssets        ProjectAsset[]
@@ -497,6 +499,29 @@ model MaintenanceLogPart {
 
   @@index([logId])
   @@index([inventoryItemId])
+}
+
+// A manual, user-authored event on an Asset timeline for history not covered by structured systems.
+model AssetTimelineEntry {
+  id          String    @id @default(cuid())
+  assetId     String
+  createdById String
+  title       String
+  description String?
+  entryDate   DateTime
+  category    String    @default("note")
+  cost        Float?
+  vendor      String?
+  tags        Json      @default("[]")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("TimelineEntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([assetId, entryDate])
+  @@index([createdById])
+  @@index([category])
 }
 
 // A generated alert for a user about asset or schedule activity within a household.

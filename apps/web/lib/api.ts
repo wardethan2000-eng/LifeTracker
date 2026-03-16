@@ -4,6 +4,8 @@ import {
   assetDetailResponseSchema,
   assetTransferListSchema,
   assetLabelDataSchema,
+  assetTimelineEntrySchema,
+  assetTimelineItemSchema,
   assetSchema,
   commentSchema,
   customPresetProfileSchema,
@@ -53,8 +55,12 @@ import {
   type AssetTransferList,
   type AssetDetailResponse,
   type AssetLabelData,
+  type AssetTimelineEntry,
+  type AssetTimelineItem,
+  type AssetTimelineQuery,
   type ActivityLog,
   type AcceptInvitationInput,
+  type CreateAssetTimelineEntryInput,
   type CompleteMaintenanceScheduleInput,
   type CreateCommentInput,
   type CreateConditionAssessmentInput,
@@ -128,6 +134,7 @@ import {
   type ReorderProjectPhasesInput,
   type ServiceProvider,
   type ThreadedComment,
+  type UpdateAssetTimelineEntryInput,
   type UpdateCommentInput,
   type UpdateProjectBudgetCategoryInput,
   type UpdateAssetInput,
@@ -248,6 +255,22 @@ const libraryPresetListSchema = libraryPresetSchema.array();
 const customPresetProfileListSchema = customPresetProfileSchema.array();
 const activityLogListSchema = activityLogSchema.array();
 const assetListSchema = assetSchema.array();
+const assetTimelineEntryListSchema = assetTimelineEntrySchema.array();
+const assetTimelineResponseSchema: Schema<{ items: AssetTimelineItem[]; nextCursor: string | null; totalSources: number }> = {
+  parse: (value: unknown) => {
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Invalid asset timeline response.");
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return {
+      items: assetTimelineItemSchema.array().parse(record.items ?? []),
+      nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null,
+      totalSources: typeof record.totalSources === "number" ? record.totalSources : 0
+    };
+  }
+};
 const commentWithRepliesSchema = commentSchema.extend({
   replies: commentSchema.array().default([])
 });
@@ -640,6 +663,124 @@ export const updateComment = async (
 export const deleteComment = async (assetId: string, commentId: string): Promise<void> => {
   await apiRequest({
     path: `/v1/assets/${assetId}/comments/${commentId}`,
+    method: "DELETE"
+  });
+};
+
+export const getAssetTimeline = async (
+  assetId: string,
+  query?: Partial<AssetTimelineQuery>
+): Promise<{ items: AssetTimelineItem[]; nextCursor: string | null; totalSources: number }> => {
+  const params = new URLSearchParams();
+
+  if (query?.sourceType) {
+    params.set("sourceType", query.sourceType);
+  }
+
+  if (query?.category) {
+    params.set("category", query.category);
+  }
+
+  if (query?.search) {
+    params.set("search", query.search);
+  }
+
+  if (query?.since) {
+    params.set("since", query.since);
+  }
+
+  if (query?.until) {
+    params.set("until", query.until);
+  }
+
+  if (query?.limit !== undefined) {
+    params.set("limit", String(query.limit));
+  }
+
+  if (query?.cursor) {
+    params.set("cursor", query.cursor);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/assets/${assetId}/timeline${suffix}`,
+    schema: assetTimelineResponseSchema
+  });
+};
+
+export const getAssetTimelineEntries = async (
+  assetId: string,
+  query?: {
+    category?: string;
+    since?: string;
+    until?: string;
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<AssetTimelineEntry[]> => {
+  const params = new URLSearchParams();
+
+  if (query?.category) {
+    params.set("category", query.category);
+  }
+
+  if (query?.since) {
+    params.set("since", query.since);
+  }
+
+  if (query?.until) {
+    params.set("until", query.until);
+  }
+
+  if (query?.limit !== undefined) {
+    params.set("limit", String(query.limit));
+  }
+
+  if (query?.cursor) {
+    params.set("cursor", query.cursor);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/assets/${assetId}/timeline-entries${suffix}`,
+    schema: assetTimelineEntryListSchema
+  });
+};
+
+export const getAssetTimelineEntry = async (
+  assetId: string,
+  entryId: string
+): Promise<AssetTimelineEntry> => apiRequest({
+  path: `/v1/assets/${assetId}/timeline-entries/${entryId}`,
+  schema: assetTimelineEntrySchema
+});
+
+export const createAssetTimelineEntry = async (
+  assetId: string,
+  input: CreateAssetTimelineEntryInput
+): Promise<AssetTimelineEntry> => apiRequest({
+  path: `/v1/assets/${assetId}/timeline-entries`,
+  method: "POST",
+  body: input,
+  schema: assetTimelineEntrySchema
+});
+
+export const updateAssetTimelineEntry = async (
+  assetId: string,
+  entryId: string,
+  input: UpdateAssetTimelineEntryInput
+): Promise<AssetTimelineEntry> => apiRequest({
+  path: `/v1/assets/${assetId}/timeline-entries/${entryId}`,
+  method: "PATCH",
+  body: input,
+  schema: assetTimelineEntrySchema
+});
+
+export const deleteAssetTimelineEntry = async (assetId: string, entryId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/assets/${assetId}/timeline-entries/${entryId}`,
     method: "DELETE"
   });
 };

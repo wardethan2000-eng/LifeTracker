@@ -39,11 +39,22 @@ export const assetFieldTypeValues = [
 export const customFieldTemplateTypeValues = assetFieldTypeValues;
 
 export const projectAssetRelationshipValues = ["target", "produces", "consumes", "supports"] as const;
+export const assetTimelineSourceTypeValues = [
+  "maintenance_log",
+  "timeline_entry",
+  "project_event",
+  "inventory_transaction",
+  "schedule_change",
+  "comment",
+  "condition_assessment",
+  "usage_reading"
+] as const;
 
 export const assetCategorySchema = z.enum(assetCategoryValues);
 export const assetVisibilitySchema = z.enum(assetVisibilityValues);
 export const householdRoleSchema = z.enum(householdRoleValues);
 export const projectAssetRelationshipSchema = z.enum(projectAssetRelationshipValues);
+export const assetTimelineSourceTypeSchema = z.enum(assetTimelineSourceTypeValues);
 export const authSourceSchema = z.enum(authSourceValues);
 export const notificationTypeSchema = z.enum(notificationTypeValues);
 export const triggerTypeSchema = z.enum(triggerTypeValues);
@@ -1679,12 +1690,88 @@ export const updateCommentSchema = z.object({
   body: z.string().min(1).max(5000)
 });
 
+// ── Asset Timeline Schemas ────────────────────────────────────────────
+
+export const assetTimelineEntrySchema = z.object({
+  id: z.string().cuid(),
+  assetId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  entryDate: z.string().datetime(),
+  category: z.string(),
+  cost: z.number().nullable(),
+  vendor: z.string().nullable(),
+  tags: z.array(z.string()).default([]),
+  metadata: z.unknown(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createAssetTimelineEntrySchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+  entryDate: z.string().datetime(),
+  category: z.string().max(100).optional(),
+  cost: z.number().min(0).optional(),
+  vendor: z.string().max(500).optional(),
+  tags: z.array(z.string().max(100)).max(20).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional()
+});
+
+export const updateAssetTimelineEntrySchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(5000).optional(),
+  entryDate: z.string().datetime().optional(),
+  category: z.string().max(100).optional(),
+  cost: z.number().min(0).optional(),
+  vendor: z.string().max(500).optional(),
+  tags: z.array(z.string().max(100)).max(20).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional()
+});
+
+const assetTimelinePartSchema = z.object({
+  name: z.string(),
+  partNumber: z.string().nullable(),
+  quantity: z.number(),
+  unitCost: z.number().nullable()
+});
+
+export const assetTimelineItemSchema = z.object({
+  id: z.string(),
+  sourceType: assetTimelineSourceTypeSchema,
+  sourceId: z.string(),
+  assetId: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  eventDate: z.string().datetime(),
+  category: z.string().nullable(),
+  cost: z.number().nullable(),
+  userId: z.string().nullable(),
+  userName: z.string().nullable(),
+  parts: z.array(assetTimelinePartSchema).optional(),
+  metadata: z.unknown(),
+  isEditable: z.boolean(),
+  createdAt: z.string().datetime()
+});
+
+export const assetTimelineQuerySchema = z.object({
+  sourceType: assetTimelineSourceTypeSchema.optional(),
+  category: z.string().optional(),
+  search: z.string().optional(),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().optional()
+});
+
 // ── Search Schemas ───────────────────────────────────────────────────
 
 export const searchEntityTypeValues = [
   "asset",
   "schedule",
   "log",
+  "timeline_entry",
   "project",
   "service_provider",
   "inventory_item",
@@ -1779,6 +1866,7 @@ export type AssetTypeSource = z.infer<typeof assetTypeSourceSchema>;
 export type AssetTransferType = z.infer<typeof assetTransferTypeSchema>;
 export type AssetFieldType = z.infer<typeof assetFieldTypeSchema>;
 export type CustomFieldTemplateType = z.infer<typeof customFieldTemplateTypeSchema>;
+export type AssetTimelineSourceType = z.infer<typeof assetTimelineSourceTypeSchema>;
 export type AssetFieldValue = z.infer<typeof assetFieldValueSchema>;
 export type AssetFieldOption = z.infer<typeof assetFieldOptionSchema>;
 export type AssetFieldDefinition = z.infer<typeof assetFieldDefinitionSchema>;
@@ -1948,6 +2036,11 @@ export type Comment = z.infer<typeof commentSchema>;
 export type ThreadedComment = z.infer<typeof threadedCommentSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type UpdateCommentInput = z.infer<typeof updateCommentSchema>;
+export type AssetTimelineEntry = z.infer<typeof assetTimelineEntrySchema>;
+export type CreateAssetTimelineEntryInput = z.infer<typeof createAssetTimelineEntrySchema>;
+export type UpdateAssetTimelineEntryInput = z.infer<typeof updateAssetTimelineEntrySchema>;
+export type AssetTimelineItem = z.infer<typeof assetTimelineItemSchema>;
+export type AssetTimelineQuery = z.infer<typeof assetTimelineQuerySchema>;
 export type ProjectShoppingListItem = z.infer<typeof projectShoppingListItemSchema>;
 export type ProjectShoppingListSupplierGroup = z.infer<typeof projectShoppingListSupplierGroupSchema>;
 export type ProjectShoppingList = z.infer<typeof projectShoppingListSchema>;

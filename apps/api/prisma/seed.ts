@@ -16,6 +16,13 @@ const maintenanceScheduleId = "clkeeperschedule000000001";
 const overdueScheduleId = "clkeeperschedule000000002";
 const maintenanceLogId = "clkeeperlog00000000000001";
 const maintenanceLogFollowUpId = "clkeeperlog00000000000002";
+const timelineEntryRustSpotId = "clkeepertimeline00000001";
+const timelineEntryStormFenceId = "clkeepertimeline00000002";
+const timelineEntryCeramicCoatId = "clkeepertimeline00000003";
+const timelineEntryTaxAssessmentId = "clkeepertimeline00000004";
+const timelineEntryWinterizeId = "clkeepertimeline00000005";
+const timelineEntryWeatherStripId = "clkeepertimeline00000006";
+const timelineEntryPanelInspectId = "clkeepertimeline00000007";
 const presetProfileId = "clkeeperpreset000000000001";
 const serviceProviderId = "clkeeperprovider0000000001";
 const renovationProviderId = "clkeeperprovider0000000002";
@@ -1855,6 +1862,136 @@ async function main(): Promise<void> {
       body: "I noticed that too. It might just be the sensor, but let's check the level after the next oil change."
     }
   });
+
+  // ── Tier 2: Manual Asset Timeline Entries ───────────────────────────────
+  const manualTimelineEntries = [
+    {
+      id: timelineEntryRustSpotId,
+      assetId,
+      createdById: ownerUserId,
+      title: "Noticed minor rust spot on rear quarter panel",
+      description: "Small bubble forming near the wheel arch. Took photos to track whether it spreads before fall detailing.",
+      entryDate: new Date("2025-10-18T15:30:00.000Z"),
+      category: "observation",
+      cost: null,
+      vendor: null,
+      tags: ["body", "rust", "monitoring"],
+      metadata: {
+        severity: "low",
+        location: "rear quarter panel"
+      }
+    },
+    {
+      id: timelineEntryStormFenceId,
+      assetId: homeAssetId,
+      createdById: memberUserId,
+      title: "Neighbor's tree fell on fence near the AC unit — no damage to unit",
+      description: "Fence section took the hit, but the condenser cabinet and lineset stayed clear. Logged it here in case we need to reference the storm later.",
+      entryDate: new Date("2025-09-03T20:10:00.000Z"),
+      category: "incident",
+      cost: null,
+      vendor: null,
+      tags: ["storm", "fence", "hvac"],
+      metadata: {
+        followUpNeeded: false
+      }
+    },
+    {
+      id: timelineEntryCeramicCoatId,
+      assetId,
+      createdById: ownerUserId,
+      title: "Applied ceramic coating to exterior",
+      description: "Completed full wash, clay, and single-stage polish before applying the coating. Paint should be easier to maintain through winter.",
+      entryDate: new Date("2025-11-09T18:45:00.000Z"),
+      category: "modification",
+      cost: 89.99,
+      vendor: "Chemical Guys",
+      tags: ["detailing", "paint", "protection"],
+      metadata: {
+        product: "HydroSlick",
+        estimatedDurabilityMonths: 12
+      }
+    },
+    {
+      id: timelineEntryTaxAssessmentId,
+      assetId: homeAssetId,
+      createdById: ownerUserId,
+      title: "Annual property tax assessment — noted home value increase",
+      description: "Assessment letter came in higher than expected. Worth keeping in the property history alongside renovation planning notes.",
+      entryDate: new Date("2026-01-22T14:00:00.000Z"),
+      category: "note",
+      cost: null,
+      vendor: null,
+      tags: ["tax", "valuation", "records"],
+      metadata: {
+        assessedValueChange: "increase"
+      }
+    },
+    {
+      id: timelineEntryWinterizeId,
+      assetId: homeAssetId,
+      createdById: memberUserId,
+      title: "Winterized irrigation system before first freeze",
+      description: "Shut off supply, blew out all zones, and tagged the controller so no one starts a cycle accidentally.",
+      entryDate: new Date("2025-11-05T16:20:00.000Z"),
+      category: "seasonal",
+      cost: null,
+      vendor: null,
+      tags: ["irrigation", "winter", "preventive"],
+      metadata: {
+        zonesCleared: 6
+      }
+    },
+    {
+      id: timelineEntryWeatherStripId,
+      assetId: homeAssetId,
+      createdById: ownerUserId,
+      title: "Replaced garage door weather stripping — bought at Home Depot",
+      description: "Old seal had hardened and was letting in drafts. New bottom seal closed the gap on the driveway side.",
+      entryDate: new Date("2025-12-14T17:05:00.000Z"),
+      category: "repair",
+      cost: 34.5,
+      vendor: "Home Depot",
+      tags: ["garage", "weatherproofing"],
+      metadata: {
+        material: "vinyl"
+      }
+    },
+    {
+      id: timelineEntryPanelInspectId,
+      assetId: homeAssetId,
+      createdById: ownerUserId,
+      title: "Had electrician inspect panel after power surge",
+      description: "No immediate damage found, but one breaker showed heat discoloration and should be watched during the next service visit.",
+      entryDate: new Date("2026-02-27T13:40:00.000Z"),
+      category: "inspection",
+      cost: 150,
+      vendor: "Ray's Electric",
+      tags: ["electrical", "inspection", "surge"],
+      metadata: {
+        followUpWindowDays: 90
+      }
+    }
+  ] as const;
+
+  for (const entry of manualTimelineEntries) {
+    await prisma.assetTimelineEntry.upsert({
+      where: { id: entry.id },
+      update: {
+        assetId: entry.assetId,
+        createdById: entry.createdById,
+        title: entry.title,
+        description: entry.description,
+        entryDate: entry.entryDate,
+        category: entry.category,
+        cost: entry.cost,
+        vendor: entry.vendor,
+        tags: entry.tags,
+        metadata: entry.metadata
+      },
+      create: entry
+    });
+  }
 
   // ── Tier 3: Hobby — Beer Brewing ─────────────────────────────────────────
 
