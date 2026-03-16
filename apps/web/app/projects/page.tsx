@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { ProjectPortfolioAside } from "../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../components/project-portfolio-stats";
 import { ProjectPortfolioTable } from "../../components/project-portfolio-table";
-import { ApiError, getHouseholdProjectPortfolio, getHouseholdProjects, getMe } from "../../lib/api";
+import { ApiError, getHouseholdProjectPortfolio, getHouseholdProjectStatusCounts, getMe } from "../../lib/api";
 
 type ProjectsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -181,22 +181,24 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       );
     }
 
-    const allProjectsPromise = getHouseholdProjects(household.id);
+    const projectStatusCountsPromise = getHouseholdProjectStatusCounts(household.id);
     const visiblePortfolioProjectsPromise = getHouseholdProjectPortfolio(
       household.id,
       selectedStatus ? { status: selectedStatus } : undefined
     );
 
-    const [allProjects, statusScopedProjects] = await Promise.all([allProjectsPromise, visiblePortfolioProjectsPromise]);
+    const [projectStatusCounts, statusScopedProjects] = await Promise.all([projectStatusCountsPromise, visiblePortfolioProjectsPromise]);
     // Show only root-level projects by default; when a search query is active, include all depths
     const depthFilteredProjects = searchQuery.length > 0
       ? statusScopedProjects
       : statusScopedProjects.filter((project) => project.depth === 0);
     const filteredProjects = depthFilteredProjects.filter((project) => matchesProjectSearch(project, searchQuery));
+    const projectCountByStatus = new Map(projectStatusCounts.map((entry) => [entry.status, entry.count]));
     const statusCounts = projectStatusValues.map((status) => ({
       status,
-      count: allProjects.filter((project) => project.status === status).length
+      count: projectCountByStatus.get(status) ?? 0
     }));
+    const allProjectsCount = statusCounts.reduce((sum, entry) => sum + entry.count, 0);
     const selectedStatusLabel = selectedStatus
       ? `${projectStatusLabels[selectedStatus]} scope`
       : "Across the current portfolio view";
@@ -276,7 +278,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                   className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
                 >
                   <span>All</span>
-                  <strong>{allProjects.length}</strong>
+                  <strong>{allProjectsCount}</strong>
                 </Link>
                 {statusCounts.map((item) => (
                   <Link

@@ -21,6 +21,7 @@ import {
   householdNotificationListSchema,
   householdCostDashboardSchema,
   householdCostOverviewSchema,
+  householdUsageHighlightListSchema,
   scheduleComplianceDashboardSchema,
   householdMemberSchema,
   maintenanceLogSchema,
@@ -65,6 +66,7 @@ import {
   projectPhaseSupplySchema,
   projectInventoryRollupListSchema,
   projectPortfolioListSchema,
+  projectStatusCountListSchema,
   projectShoppingListSchema,
   projectSchema,
   reorderProjectPhasesSchema,
@@ -106,6 +108,7 @@ import {
     type CostForecast,
     type HouseholdCostDashboard,
   type HouseholdCostOverview,
+  type HouseholdUsageHighlight,
   type ScheduleComplianceDashboard,
   type CreateProjectPhaseChecklistItemInput,
   type CreateProjectPhaseInput,
@@ -178,6 +181,7 @@ import {
   type SearchEntityType,
   type SearchResponse,
   type ProjectPortfolioItem,
+  type ProjectStatusCount,
   type ProjectSummary,
   type ProjectTask,
   type ProjectTaskChecklistItem,
@@ -707,6 +711,12 @@ export const getHouseholdProjects = async (
   });
 };
 
+export const getHouseholdProjectStatusCounts = async (householdId: string): Promise<ProjectStatusCount[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/status-counts`,
+  schema: projectStatusCountListSchema,
+  cachePolicy: { next: { revalidate: 30 } }
+});
+
 export const getHouseholdProjectPortfolio = async (
   householdId: string,
   options?: { status?: ProjectStatus }
@@ -1124,6 +1134,37 @@ export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> 
   schema: assetListSchema,
   cachePolicy: { next: { revalidate: 30 } }
 });
+
+export const getHouseholdUsageHighlights = async (
+  householdId: string,
+  options?: { limit?: number; assetLimit?: number; lookback?: number; bucketSize?: "week" | "month" }
+): Promise<HouseholdUsageHighlight[]> => {
+  const params = new URLSearchParams();
+
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  if (options?.assetLimit !== undefined) {
+    params.set("assetLimit", String(options.assetLimit));
+  }
+
+  if (options?.lookback !== undefined) {
+    params.set("lookback", String(options.lookback));
+  }
+
+  if (options?.bucketSize) {
+    params.set("bucketSize", options.bucketSize);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/metrics/analytics/highlights${suffix}`,
+    schema: householdUsageHighlightListSchema,
+    cachePolicy: { next: { revalidate: 30 } }
+  });
+};
 
 export const getNotifications = async (options?: {
   householdId?: string;

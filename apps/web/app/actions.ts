@@ -714,31 +714,26 @@ const buildLogPartsInput = (formData: FormData): NonNullable<CreateMaintenanceLo
 };
 
 const revalidateAssetPaths = (assetId: string): void => {
-  revalidatePath("/");
   revalidatePath("/assets");
   revalidatePath(`/assets/${assetId}`);
 };
 
 const revalidateServiceProviderPaths = (householdId: string): void => {
-  revalidatePath("/");
   revalidatePath("/service-providers");
   revalidatePath(`/service-providers?householdId=${householdId}`);
 };
 
 const revalidateActivityPaths = (householdId: string): void => {
-  revalidatePath("/");
   revalidatePath("/activity");
   revalidatePath(`/activity?householdId=${householdId}`);
 };
 
 const revalidateInvitationPaths = (householdId: string): void => {
-  revalidatePath("/");
   revalidatePath("/invitations");
   revalidatePath(`/invitations?householdId=${householdId}`);
 };
 
 const revalidateProjectPaths = (householdId: string, projectId?: string): void => {
-  revalidatePath("/");
   revalidatePath(`/projects?householdId=${householdId}`);
   revalidatePath("/projects");
 
@@ -749,7 +744,6 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
 };
 
 const revalidateHobbyRecipePaths = (hobbyId: string, recipeId?: string): void => {
-  revalidatePath("/");
   revalidatePath("/hobbies");
   revalidatePath(`/hobbies/${hobbyId}`);
 
@@ -759,7 +753,6 @@ const revalidateHobbyRecipePaths = (hobbyId: string, recipeId?: string): void =>
 };
 
 const revalidateHobbySessionPaths = (hobbyId: string, sessionId?: string): void => {
-  revalidatePath("/");
   revalidatePath("/hobbies");
   revalidatePath(`/hobbies/${hobbyId}`);
 
@@ -769,7 +762,6 @@ const revalidateHobbySessionPaths = (hobbyId: string, sessionId?: string): void 
 };
 
 const revalidateHobbyPaths = (hobbyId?: string): void => {
-  revalidatePath("/");
   revalidatePath("/hobbies");
 
   if (hobbyId) {
@@ -780,7 +772,6 @@ const revalidateHobbyPaths = (hobbyId?: string): void => {
 };
 
 const revalidateInventoryPaths = (householdId: string): void => {
-  revalidatePath("/");
   revalidatePath("/inventory");
   revalidatePath(`/inventory?householdId=${householdId}`);
 };
@@ -1067,12 +1058,12 @@ export async function transferAssetAction(formData: FormData): Promise<void> {
 
 export async function markNotificationReadAction(formData: FormData): Promise<void> {
   await markNotificationRead(getRequiredString(formData, "notificationId"));
-  revalidatePath("/");
+  revalidatePath("/notifications");
 }
 
 export async function enqueueNotificationScanAction(formData: FormData): Promise<void> {
   await enqueueNotificationScan(getRequiredString(formData, "householdId"));
-  revalidatePath("/");
+  revalidatePath("/notifications");
 }
 
 export async function updateMetricAction(formData: FormData): Promise<void> {
@@ -1220,8 +1211,7 @@ export async function applyPresetToAssetAction(formData: FormData): Promise<void
     source: "library",
     presetKey: getRequiredString(formData, "presetKey")
   });
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
 }
 
 export async function createMetricAction(formData: FormData): Promise<void> {
@@ -1523,8 +1513,8 @@ export async function createScheduleAction(formData: FormData): Promise<void> {
   }
 
   await createSchedule(assetId, input);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function toggleScheduleActiveAction(formData: FormData): Promise<void> {
@@ -1533,8 +1523,8 @@ export async function toggleScheduleActiveAction(formData: FormData): Promise<vo
   const isActive = getRequiredString(formData, "isActive") === "true";
 
   await updateSchedule(assetId, scheduleId, { isActive });
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function deleteScheduleAction(formData: FormData): Promise<void> {
@@ -1542,30 +1532,30 @@ export async function deleteScheduleAction(formData: FormData): Promise<void> {
   const scheduleId = getRequiredString(formData, "scheduleId");
 
   await deleteSchedule(assetId, scheduleId);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function archiveAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   await archiveAsset(assetId);
-  revalidatePath("/");
   revalidatePath("/assets");
+  revalidatePath("/maintenance");
   redirect("/assets");
 }
 
 export async function unarchiveAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   await unarchiveAsset(assetId);
-  revalidatePath("/");
-  revalidatePath(`/assets/${assetId}`);
+  revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function softDeleteAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   await softDeleteAsset(assetId);
-  revalidatePath("/");
   revalidatePath("/assets");
+  revalidatePath("/maintenance");
   redirect("/assets");
 }
 

@@ -7,12 +7,9 @@ import { InventoryAnalyticsSummary } from "../../components/inventory-analytics-
 import { InventoryAnalyticsTurnover } from "../../components/inventory-analytics-turnover";
 import { LkBarChart, LkDonutChart, LkLineChart } from "../../components/charts";
 import {
-  getAssetDetail,
-  getEnhancedProjections,
-  getHouseholdAssets,
   getHouseholdCostOverview,
+  getHouseholdUsageHighlights,
   getMe,
-  getMetricRateAnalytics,
   getScheduleComplianceDashboard,
 } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/formatters";
@@ -23,17 +20,6 @@ type AnalyticsPageProps = {
 
 type AnalyticsTab = "costs" | "inventory" | "compliance" | "usage";
 type InventorySection = "summary" | "turnover" | "reorder" | "asset-parts" | "commonality";
-
-type UsageHighlight = {
-  assetId: string;
-  assetName: string;
-  category: string;
-  metricCount: number;
-  anomalyCount: number;
-  projectedScheduleCount: number;
-  nextProjectedDue: string | null;
-  metricNames: string[];
-};
 
 const analyticsTabs: Array<{ value: AnalyticsTab; label: string }> = [
   { value: "costs", label: "Costs" },
@@ -99,53 +85,6 @@ const getComplianceBarColor = (value: number): string => {
   return "#c84d4d";
 };
 
-const loadUsageHighlights = async (householdId: string): Promise<UsageHighlight[]> => {
-  const assets = await getHouseholdAssets(householdId);
-  const highlights = (await Promise.all(assets.slice(0, 12).map(async (asset) => {
-    const detail = await getAssetDetail(asset.id).catch(() => null);
-
-    if (!detail || detail.metrics.length === 0) {
-      return null;
-    }
-
-    const metricInsights = await Promise.all(detail.metrics.map(async (metric) => {
-      const [rateAnalytics, enhancedProjection] = await Promise.all([
-        getMetricRateAnalytics(detail.asset.id, metric.id).catch(() => null),
-        getEnhancedProjections(detail.asset.id, metric.id).catch(() => null)
-      ]);
-
-      return {
-        metricName: metric.name,
-        anomalyCount: rateAnalytics?.buckets.filter((bucket) => bucket.isAnomaly && !bucket.insufficientData).length ?? 0,
-        projectedDates: enhancedProjection?.scheduleProjections
-          .filter((projection) => projection.projectedDate)
-          .map((projection) => projection.projectedDate!) ?? []
-      };
-    }));
-
-    const projectedDates = metricInsights.flatMap((insight) => insight.projectedDates).sort((left, right) => left.localeCompare(right));
-
-    return {
-      assetId: detail.asset.id,
-      assetName: detail.asset.name,
-      category: detail.asset.category,
-      metricCount: detail.metrics.length,
-      anomalyCount: metricInsights.reduce((sum, insight) => sum + insight.anomalyCount, 0),
-      projectedScheduleCount: projectedDates.length,
-      nextProjectedDue: projectedDates[0] ?? null,
-      metricNames: metricInsights.map((insight) => insight.metricName)
-    } satisfies UsageHighlight;
-  }))).filter((highlight) => highlight !== null);
-
-  return highlights
-    .sort((left, right) => (
-      right.metricCount - left.metricCount
-      || right.projectedScheduleCount - left.projectedScheduleCount
-      || right.anomalyCount - left.anomalyCount
-    ))
-    .slice(0, 8);
-};
-
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
   const me = await getMe();
@@ -194,7 +133,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       ? getHouseholdCostOverview(household.id).catch(() => ({ dashboard: null, serviceProviderSpend: null, forecast: null }))
       : Promise.resolve({ dashboard: null, serviceProviderSpend: null, forecast: null }),
     tab === "compliance" ? getScheduleComplianceDashboard(household.id, periodMonths).catch(() => null) : Promise.resolve(null),
-    tab === "usage" ? loadUsageHighlights(household.id).catch(() => []) : Promise.resolve([])
+    tab === "usage"
+      ? getHouseholdUsageHighlights(household.id, { limit: 8, assetLimit: 12, lookback: 365, bucketSize: "month" }).catch(() => [])
+      : Promise.resolve([])
   ]);
   const costDashboard = costOverview.dashboard;
   const serviceProviderSpend = costOverview.serviceProviderSpend;

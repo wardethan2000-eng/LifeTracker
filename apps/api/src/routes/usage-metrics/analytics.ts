@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { householdUsageHighlightListSchema } from "@lifekeeper/types";
 import {
   bucketUsageRates,
   calculateUsageRate,
@@ -8,7 +9,7 @@ import {
   detectUsageAnomaly,
   projectMultipleSchedules
 } from "@lifekeeper/utils";
-import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { assertMembership, getAccessibleAsset, personalAssetAccessWhere } from "../../lib/asset-access.js";
 import {
   toAssetMetricCorrelationMatrixResponse,
   toEnhancedUsageProjectionResponse,
@@ -20,6 +21,10 @@ const assetParamsSchema = z.object({
   assetId: z.string().cuid()
 });
 
+const householdParamsSchema = z.object({
+  householdId: z.string().cuid()
+});
+
 const metricParamsSchema = assetParamsSchema.extend({
   metricId: z.string().cuid()
 });
@@ -29,7 +34,160 @@ const rateAnalyticsQuerySchema = z.object({
   lookback: z.coerce.number().int().min(1).max(3650).default(365)
 });
 
+const householdUsageHighlightsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+  assetLimit: z.coerce.number().int().min(1).max(40).default(12),
+  lookback: z.coerce.number().int().min(30).max(3650).default(365),
+  bucketSize: z.enum(["week", "month"]).default("month")
+});
+
 export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/v1/households/:householdId/metrics/analytics/highlights", async (request, reply) => {
+    const startedAt = process.hrtime.bigint();
+    const params = householdParamsSchema.parse(request.params);
+    const query = householdUsageHighlightsQuerySchema.parse(request.query);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - query.lookback);
+
+    const assets = await app.prisma.asset.findMany({
+      where: {
+        householdId: params.householdId,
+        isArchived: false,
+        ...personalAssetAccessWhere(request.auth.userId)
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        usageMetrics: {
+          select: {
+            id: true,
+            name: true,
+            currentValue: true,
+            entries: {
+              where: {
+                recordedAt: {
+                  gte: since
+                }
+              },
+              select: {
+                value: true,
+                recordedAt: true
+              },
+              orderBy: {
+                recordedAt: "asc"
+              }
+            }
+          }
+        },
+        schedules: {
+          where: {
+            isActive: true,
+            metricId: { not: null },
+            nextDueMetricValue: { not: null }
+          },
+          select: {
+            id: true,
+            name: true,
+            metricId: true,
+            nextDueMetricValue: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: query.assetLimit
+    });
+
+    const highlights = assets
+      .map((asset) => {
+        if (asset.usageMetrics.length === 0) {
+          return null;
+        }
+
+        let anomalyCount = 0;
+        const projectedDates: string[] = [];
+        const metricNames = asset.usageMetrics.map((metric) => metric.name);
+
+        for (const metric of asset.usageMetrics) {
+          const bucketed = bucketUsageRates(
+            metric.entries.map((entry) => ({
+              value: entry.value,
+              date: entry.recordedAt
+            })),
+            query.bucketSize
+          );
+          const anomalyResult = detectUsageAnomaly(bucketed);
+          anomalyCount += anomalyResult.buckets.filter((bucket) => bucket.isAnomaly && !bucket.insufficientData).length;
+
+          const scheduleInputs = asset.schedules
+            .filter((schedule) => schedule.metricId === metric.id)
+            .map((schedule) => ({
+              scheduleId: schedule.id,
+              scheduleName: schedule.name,
+              nextDueMetricValue: schedule.nextDueMetricValue as number
+            }));
+
+          if (scheduleInputs.length === 0) {
+            continue;
+          }
+
+          const ratePerDay = calculateUsageRate(
+            metric.entries.map((entry) => ({
+              value: entry.value,
+              date: entry.recordedAt
+            }))
+          );
+
+          const projections = projectMultipleSchedules(metric.currentValue, ratePerDay, scheduleInputs);
+
+          projectedDates.push(
+            ...projections
+              .filter((projection) => projection.projectedDate)
+              .map((projection) => projection.projectedDate as string)
+          );
+        }
+
+        projectedDates.sort((left, right) => left.localeCompare(right));
+
+        return {
+          assetId: asset.id,
+          assetName: asset.name,
+          category: asset.category,
+          metricCount: asset.usageMetrics.length,
+          anomalyCount,
+          projectedScheduleCount: projectedDates.length,
+          nextProjectedDue: projectedDates[0] ?? null,
+          metricNames
+        };
+      })
+      .filter((highlight): highlight is NonNullable<typeof highlight> => highlight !== null)
+      .sort((left, right) => (
+        right.metricCount - left.metricCount
+        || right.projectedScheduleCount - left.projectedScheduleCount
+        || right.anomalyCount - left.anomalyCount
+      ))
+      .slice(0, query.limit);
+
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    request.log.info({
+      householdId: params.householdId,
+      assetSampleCount: assets.length,
+      highlightCount: highlights.length,
+      elapsedMs: Number(elapsedMs.toFixed(2))
+    }, "usage-highlights computed");
+
+    return householdUsageHighlightListSchema.parse(highlights);
+  });
+
   app.get("/v1/assets/:assetId/metrics/:metricId/analytics/rates", async (request, reply) => {
     const params = metricParamsSchema.parse(request.params);
     const query = rateAnalyticsQuerySchema.parse(request.query);

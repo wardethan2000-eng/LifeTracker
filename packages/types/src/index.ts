@@ -471,6 +471,17 @@ export const enhancedUsageProjectionSchema = z.object({
   }))
 });
 
+export const householdUsageHighlightSchema = z.object({
+  assetId: z.string().cuid(),
+  assetName: z.string(),
+  category: assetCategorySchema,
+  metricCount: z.number().int().min(0),
+  anomalyCount: z.number().int().min(0),
+  projectedScheduleCount: z.number().int().min(0),
+  nextProjectedDue: z.string().datetime().nullable(),
+  metricNames: z.array(z.string())
+});
+
 export const metricCorrelationSchema = z.object({
   metricA: z.object({
     id: z.string().cuid(),
@@ -497,6 +508,7 @@ export const assetMetricCorrelationMatrixSchema = z.object({
 export const usageRateAnalyticsListSchema = z.array(usageRateAnalyticsSchema);
 export const usageCostNormalizationListSchema = z.array(usageCostNormalizationSchema);
 export const enhancedUsageProjectionListSchema = z.array(enhancedUsageProjectionSchema);
+export const householdUsageHighlightListSchema = z.array(householdUsageHighlightSchema);
 export const metricCorrelationListSchema = z.array(metricCorrelationSchema);
 export const assetMetricCorrelationMatrixListSchema = z.array(assetMetricCorrelationMatrixSchema);
 
@@ -1586,6 +1598,10 @@ export const assetDetailResponseSchema = z.object({
 
 export const projectStatusValues = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
 export const projectStatusSchema = z.enum(projectStatusValues);
+export const projectStatusCountSchema = z.object({
+  status: projectStatusSchema,
+  count: z.number().int().min(0)
+});
 
 export const noteCategoryValues = ["research", "reference", "decision", "measurement", "general"] as const;
 export const noteCategorySchema = z.enum(noteCategoryValues);
@@ -2035,6 +2051,7 @@ export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySumm
 export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 export const projectInventoryRollupListSchema = z.array(projectInventoryRollupSchema);
 export const projectPortfolioListSchema = z.array(projectPortfolioItemSchema);
+export const projectStatusCountListSchema = z.array(projectStatusCountSchema);
 
 export const projectShoppingListItemSchema = z.object({
   id: z.string().cuid(),
@@ -2523,6 +2540,7 @@ export type UsageProjection = z.infer<typeof usageProjectionSchema>;
 export type UsageRateAnalytics = z.infer<typeof usageRateAnalyticsSchema>;
 export type UsageCostNormalization = z.infer<typeof usageCostNormalizationSchema>;
 export type EnhancedUsageProjection = z.infer<typeof enhancedUsageProjectionSchema>;
+export type HouseholdUsageHighlight = z.infer<typeof householdUsageHighlightSchema>;
 export type MetricCorrelation = z.infer<typeof metricCorrelationSchema>;
 export type AssetMetricCorrelationMatrix = z.infer<typeof assetMetricCorrelationMatrixSchema>;
 export type ServiceProvider = z.infer<typeof serviceProviderSchema>;
@@ -2569,6 +2587,7 @@ export type LowStockInventoryItem = z.infer<typeof lowStockInventoryItemSchema>;
 
 export type ShallowUser = z.infer<typeof shallowUserSchema>;
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
+export type ProjectStatusCount = z.infer<typeof projectStatusCountSchema>;
 export type ProjectTaskStatus = z.infer<typeof projectTaskStatusSchema>;
 export type ProjectPhaseStatus = z.infer<typeof projectPhaseStatusSchema>;
 export type NoteCategory = z.infer<typeof noteCategorySchema>;

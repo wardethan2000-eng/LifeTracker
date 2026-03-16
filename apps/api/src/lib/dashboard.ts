@@ -212,7 +212,9 @@ export const buildHouseholdDashboard = async (
 
     for (const schedule of asset.schedules) {
       const trigger = maintenanceTriggerSchema.safeParse(schedule.triggerConfig);
-      const leadTimeDays = trigger.success ? (trigger.data.leadTimeDays ?? 0) : 0;
+      const leadTimeDays = trigger.success && "leadTimeDays" in trigger.data
+        ? (trigger.data.leadTimeDays ?? 0)
+        : 0;
       const status = computeScheduleOverviewStatus({
         nextDueAt: schedule.nextDueAt,
         nextDueMetricValue: schedule.nextDueMetricValue,

@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createProjectSchema,
+  projectStatusCountListSchema,
+  projectStatusValues,
   updateProjectSchema,
   createProjectAssetSchema,
   updateProjectAssetSchema,
@@ -86,9 +88,9 @@ const toProjectSummary = (
     _count: { tasks: number };
     tasks: { status: string; taskType: string; isCompleted: boolean; phaseId: string | null }[];
     phases: {
+      id: string;
       name: string;
       status: string;
-      tasks: { status: string; taskType: string; isCompleted: boolean }[];
     }[];
   }
 ) => {
@@ -98,11 +100,21 @@ const toProjectSummary = (
   const phaseCount = project.phases.length;
   const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
   const percentComplete = taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0;
+  const tasksByPhase = project.tasks.reduce<Map<string, typeof project.tasks>>((accumulator, task) => {
+    if (!task.phaseId) {
+      return accumulator;
+    }
+
+    const current = accumulator.get(task.phaseId) ?? [];
+    current.push(task);
+    accumulator.set(task.phaseId, current);
+    return accumulator;
+  }, new Map());
   const phaseProgress = project.phases.map((phase) => ({
     name: phase.name,
     status: phase.status,
-    taskCount: phase.tasks.length,
-    completedTaskCount: phase.tasks.filter(isProjectSummaryTaskCompleted).length
+    taskCount: (tasksByPhase.get(phase.id) ?? []).length,
+    completedTaskCount: (tasksByPhase.get(phase.id) ?? []).filter(isProjectSummaryTaskCompleted).length
   }));
   const unphasedTasks = project.tasks.filter((task) => task.phaseId === null);
 
@@ -259,6 +271,33 @@ const getProjectTreeStats = async (
 export const projectRoutes: FastifyPluginAsync = async (app) => {
   // ── Project CRUD ─────────────────────────────────────────────────
 
+  app.get("/v1/households/:householdId/projects/status-counts", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const grouped = await app.prisma.project.groupBy({
+      by: ["status"],
+      where: {
+        householdId: params.householdId
+      },
+      _count: {
+        _all: true
+      }
+    });
+
+    const countByStatus = new Map(grouped.map((item) => [item.status, item._count._all]));
+
+    return projectStatusCountListSchema.parse(projectStatusValues.map((status) => ({
+      status,
+      count: countByStatus.get(status) ?? 0
+    })));
+  });
+
   app.get("/v1/households/:householdId/projects", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
     const query = listProjectsQuerySchema.parse(request.query);
@@ -283,8 +322,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         expenses: { select: { amount: true } },
         tasks: { select: { status: true, taskType: true, isCompleted: true, phaseId: true } },
         phases: {
-          include: {
-            tasks: { select: { status: true, taskType: true, isCompleted: true } }
+          select: {
+            id: true,
+            name: true,
+            status: true
           },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         },
@@ -315,8 +356,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         expenses: { select: { amount: true } },
         tasks: { select: { status: true, taskType: true, isCompleted: true, phaseId: true } },
         phases: {
-          include: {
-            tasks: { select: { status: true, taskType: true, isCompleted: true } }
+          select: {
+            id: true,
+            name: true,
+            status: true
           },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         },
