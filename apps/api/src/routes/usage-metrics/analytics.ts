@@ -411,20 +411,43 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       .sort((left, right) => right._count.entries - left._count.entries)
       .slice(0, 6);
 
-    const metricEntries = await Promise.all(
-      selectedMetrics.map(async (metric) => ({
-        metric,
-        entries: await app.prisma.usageMetricEntry.findMany({
-          where: { metricId: metric.id },
-          orderBy: { recordedAt: "desc" },
-          take: 200,
-          select: {
-            value: true,
-            recordedAt: true
-          }
-        })
-      }))
-    );
+    const selectedMetricIds = selectedMetrics.map((metric) => metric.id);
+    const entriesByMetricId = new Map<string, Array<{ value: number; recordedAt: Date }>>();
+    const allMetricEntries = await app.prisma.usageMetricEntry.findMany({
+      where: {
+        metricId: {
+          in: selectedMetricIds
+        }
+      },
+      orderBy: [
+        { metricId: "asc" },
+        { recordedAt: "desc" }
+      ],
+      select: {
+        metricId: true,
+        value: true,
+        recordedAt: true
+      }
+    });
+
+    for (const entry of allMetricEntries) {
+      const currentEntries = entriesByMetricId.get(entry.metricId) ?? [];
+
+      if (currentEntries.length >= 200) {
+        continue;
+      }
+
+      currentEntries.push({
+        value: entry.value,
+        recordedAt: entry.recordedAt
+      });
+      entriesByMetricId.set(entry.metricId, currentEntries);
+    }
+
+    const metricEntries = selectedMetrics.map((metric) => ({
+      metric,
+      entries: entriesByMetricId.get(metric.id) ?? []
+    }));
 
     const pairs: Array<{
       metricA: { id: string; name: string };

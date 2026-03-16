@@ -7,6 +7,12 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import {
+  syncAssetFamilyToSearchIndex,
+  syncHobbyToSearchIndex,
+  syncInventoryItemToSearchIndex,
+  syncProjectToSearchIndex
+} from "../../lib/search-index.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -91,6 +97,11 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    void Promise.all([
+      syncHobbyToSearchIndex(app.prisma, hobbyId),
+      syncAssetFamilyToSearchIndex(app.prisma, link.assetId)
+    ]).catch(console.error);
+
     return reply.code(201).send({
       id: link.id,
       hobbyId: link.hobbyId,
@@ -120,6 +131,11 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.hobbyAsset.delete({ where: { id: hobbyAssetId } });
+
+    void Promise.all([
+      syncHobbyToSearchIndex(app.prisma, hobbyId),
+      syncAssetFamilyToSearchIndex(app.prisma, existing.assetId)
+    ]).catch(console.error);
 
     return reply.code(204).send();
   });
@@ -181,6 +197,11 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    void Promise.all([
+      syncHobbyToSearchIndex(app.prisma, hobbyId),
+      syncInventoryItemToSearchIndex(app.prisma, link.inventoryItemId)
+    ]).catch(console.error);
+
     return reply.code(201).send({
       id: link.id,
       hobbyId: link.hobbyId,
@@ -209,6 +230,11 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.hobbyInventoryItem.delete({ where: { id: hobbyInventoryItemId } });
+
+    void Promise.all([
+      syncHobbyToSearchIndex(app.prisma, hobbyId),
+      syncInventoryItemToSearchIndex(app.prisma, existing.inventoryItemId)
+    ]).catch(console.error);
 
     return reply.code(204).send();
   });
@@ -270,6 +296,11 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    void Promise.all([
+      syncHobbyToSearchIndex(app.prisma, hobbyId),
+      syncProjectToSearchIndex(app.prisma, link.projectId)
+    ]).catch(console.error);
+
     return reply.code(201).send({
       id: link.id,
       hobbyId: link.hobbyId,
@@ -298,6 +329,11 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.hobbyProject.delete({ where: { id: hobbyProjectId } });
+
+    void Promise.all([
+      syncHobbyToSearchIndex(app.prisma, hobbyId),
+      syncProjectToSearchIndex(app.prisma, existing.projectId)
+    ]).catch(console.error);
 
     return reply.code(204).send();
   });

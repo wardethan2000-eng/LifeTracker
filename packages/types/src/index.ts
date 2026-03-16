@@ -2294,6 +2294,7 @@ export const searchEntityTypeValues = [
   "service_provider",
   "inventory_item",
   "comment",
+  "invitation",
   "hobby"
 ] as const;
 

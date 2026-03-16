@@ -43,6 +43,7 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   service_provider: "Service Providers",
   inventory_item: "Inventory Items",
   comment: "Comments",
+  invitation: "Invitations",
   hobby: "Hobbies"
 };
 
@@ -56,6 +57,7 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "service_provider",
   "inventory_item",
   "comment",
+  "invitation",
   "hobby"
 ];
 
@@ -366,7 +368,19 @@ export const syncAssetToSearchIndex = async (prisma: SearchPrisma, assetId: stri
       customFields: true,
       deletedAt: true,
       isArchived: true,
-      category: true
+      category: true,
+      hobbyLinks: {
+        select: {
+          hobby: {
+            select: {
+              name: true,
+              hobbyType: true
+            }
+          },
+          role: true,
+          notes: true
+        }
+      }
     }
   });
 
@@ -376,13 +390,20 @@ export const syncAssetToSearchIndex = async (prisma: SearchPrisma, assetId: stri
   }
 
   const customFieldText = flattenSearchValues(asset.customFields).join(" ");
+  const hobbyText = asset.hobbyLinks.flatMap((link) => [
+    link.hobby.name,
+    link.hobby.hobbyType,
+    link.role,
+    link.notes
+  ]).filter(Boolean).join(" ");
+
   await syncSearchIndexPayloads(prisma, "asset", asset.id, [{
     householdId: asset.householdId,
     entityType: "asset",
     entityId: asset.id,
     title: asset.name,
     subtitle: joinText(asset.manufacturer, asset.model),
-    body: joinText(asset.description, asset.serialNumber, asset.assetTag, customFieldText),
+    body: joinText(asset.description, asset.serialNumber, asset.assetTag, customFieldText, hobbyText),
     entityUrl: `/assets/${asset.id}`,
     entityMeta: {
       category: asset.category,
@@ -498,6 +519,18 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
             }
           }
         }
+      },
+      hobbyLinks: {
+        select: {
+          hobby: {
+            select: {
+              name: true,
+              hobbyType: true,
+              status: true
+            }
+          },
+          notes: true
+        }
       }
     }
   });
@@ -512,6 +545,12 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     phase.description,
     ...phase.supplies.flatMap((supply) => [supply.name, supply.description, supply.supplier, supply.notes])
   ]).filter(Boolean).join(" ");
+  const hobbyText = project.hobbyLinks.flatMap((link) => [
+    link.hobby.name,
+    link.hobby.hobbyType,
+    link.hobby.status,
+    link.notes
+  ]).filter(Boolean).join(" ");
 
   await syncSearchIndexPayloads(prisma, "project", project.id, [{
     householdId: project.householdId,
@@ -521,7 +560,7 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     parentEntityName: project.parentProject?.name ?? null,
     title: project.name,
     subtitle: project.status,
-    body: joinText(project.description, phaseText),
+    body: joinText(project.description, phaseText, hobbyText),
     entityUrl: `/projects/${project.id}?householdId=${project.householdId}`,
     entityMeta: {
       status: project.status
@@ -577,7 +616,18 @@ export const syncInventoryItemToSearchIndex = async (prisma: SearchPrisma, itemI
       manufacturer: true,
       category: true,
       quantityOnHand: true,
-      unit: true
+      unit: true,
+      hobbyLinks: {
+        select: {
+          hobby: {
+            select: {
+              name: true,
+              hobbyType: true
+            }
+          },
+          notes: true
+        }
+      }
     }
   });
 
@@ -586,13 +636,19 @@ export const syncInventoryItemToSearchIndex = async (prisma: SearchPrisma, itemI
     return;
   }
 
+  const hobbyText = item.hobbyLinks.flatMap((link) => [
+    link.hobby.name,
+    link.hobby.hobbyType,
+    link.notes
+  ]).filter(Boolean).join(" ");
+
   await syncSearchIndexPayloads(prisma, "inventory_item", item.id, [{
     householdId: item.householdId,
     entityType: "inventory_item",
     entityId: item.id,
     title: item.name,
     subtitle: joinText(item.manufacturer, item.partNumber),
-    body: joinText(item.description, item.partNumber, item.manufacturer, item.category),
+    body: joinText(item.description, item.partNumber, item.manufacturer, item.category, hobbyText),
     entityUrl: `/inventory?householdId=${item.householdId}&highlight=${item.id}`,
     entityMeta: {
       category: item.category,
@@ -637,6 +693,61 @@ export const syncCommentToSearchIndex = async (prisma: SearchPrisma, commentId: 
     entityUrl: `/assets/${comment.asset.id}?tab=comments`,
     entityMeta: {
       updatedAt: comment.updatedAt.toISOString()
+    }
+  }]);
+};
+
+export const syncInvitationToSearchIndex = async (prisma: SearchPrisma, invitationId: string): Promise<void> => {
+  const invitation = await prisma.householdInvitation.findUnique({
+    where: { id: invitationId },
+    select: {
+      id: true,
+      householdId: true,
+      email: true,
+      status: true,
+      expiresAt: true,
+      acceptedAt: true,
+      household: {
+        select: {
+          name: true
+        }
+      },
+      invitedBy: {
+        select: {
+          displayName: true
+        }
+      },
+      acceptedBy: {
+        select: {
+          displayName: true
+        }
+      }
+    }
+  });
+
+  if (!invitation) {
+    await deleteSearchIndexEntry(prisma, "invitation", invitationId);
+    return;
+  }
+
+  await syncSearchIndexPayloads(prisma, "invitation", invitation.id, [{
+    householdId: invitation.householdId,
+    entityType: "invitation",
+    entityId: invitation.id,
+    title: invitation.email,
+    subtitle: invitation.status,
+    body: joinText(
+      invitation.household.name,
+      invitation.invitedBy.displayName ? `Invited by ${invitation.invitedBy.displayName}` : null,
+      invitation.acceptedBy?.displayName ? `Accepted by ${invitation.acceptedBy.displayName}` : null,
+      `Expires ${invitation.expiresAt.toISOString()}`,
+      invitation.acceptedAt ? `Accepted ${invitation.acceptedAt.toISOString()}` : null
+    ),
+    entityUrl: `/invitations?householdId=${invitation.householdId}`,
+    entityMeta: {
+      status: invitation.status,
+      expiresAt: invitation.expiresAt.toISOString(),
+      acceptedAt: invitation.acceptedAt?.toISOString() ?? null
     }
   }]);
 };
@@ -847,7 +958,44 @@ export const syncHobbyToSearchIndex = async (prisma: SearchPrisma, hobbyId: stri
       name: true,
       description: true,
       hobbyType: true,
-      status: true
+      status: true,
+      notes: true,
+      customFields: true,
+      assetLinks: {
+        select: {
+          asset: {
+            select: {
+              name: true,
+              category: true
+            }
+          },
+          role: true,
+          notes: true
+        }
+      },
+      inventoryLinks: {
+        select: {
+          inventoryItem: {
+            select: {
+              name: true,
+              category: true,
+              manufacturer: true
+            }
+          },
+          notes: true
+        }
+      },
+      projectLinks: {
+        select: {
+          project: {
+            select: {
+              name: true,
+              status: true
+            }
+          },
+          notes: true
+        }
+      }
     }
   });
 
@@ -856,13 +1004,32 @@ export const syncHobbyToSearchIndex = async (prisma: SearchPrisma, hobbyId: stri
     return;
   }
 
+  const customFieldText = flattenSearchValues(hobby.customFields).join(" ");
+  const assetText = hobby.assetLinks.flatMap((link) => [
+    link.asset.name,
+    link.asset.category,
+    link.role,
+    link.notes
+  ]).filter(Boolean).join(" ");
+  const inventoryText = hobby.inventoryLinks.flatMap((link) => [
+    link.inventoryItem.name,
+    link.inventoryItem.category,
+    link.inventoryItem.manufacturer,
+    link.notes
+  ]).filter(Boolean).join(" ");
+  const projectText = hobby.projectLinks.flatMap((link) => [
+    link.project.name,
+    link.project.status,
+    link.notes
+  ]).filter(Boolean).join(" ");
+
   await syncSearchIndexPayloads(prisma, "hobby", hobby.id, [{
     householdId: hobby.householdId,
     entityType: "hobby",
     entityId: hobby.id,
     title: hobby.name,
     subtitle: hobby.hobbyType ?? hobby.status,
-    body: joinText(hobby.description, hobby.hobbyType),
+    body: joinText(hobby.description, hobby.hobbyType, hobby.notes, customFieldText, assetText, inventoryText, projectText),
     entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`,
     entityMeta: {
       status: hobby.status,
@@ -877,7 +1044,7 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
     WHERE "householdId" = ${householdId}
   `;
 
-  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments] = await Promise.all([
+  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments, invitations] = await Promise.all([
     prisma.asset.findMany({
       where: { householdId },
       select: { id: true }
@@ -921,6 +1088,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
         deletedAt: null
       },
       select: { id: true }
+    }),
+    prisma.householdInvitation.findMany({
+      where: { householdId },
+      select: { id: true }
     })
   ]);
 
@@ -958,6 +1129,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const comment of comments) {
     await syncCommentToSearchIndex(prisma, comment.id);
+  }
+
+  for (const invitation of invitations) {
+    await syncInvitationToSearchIndex(prisma, invitation.id);
   }
 
   const hobbies = await prisma.hobby.findMany({

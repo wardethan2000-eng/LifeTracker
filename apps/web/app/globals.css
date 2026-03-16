@@ -85,7 +85,6 @@
     (used outside of resource-layout contexts)
 
   DEPRECATED / LEGACY:
-  • .asset-studio — replaced by resource-layout + card system
   • .panel--studio on working surfaces — use .card instead
 
   ──────────────────────────────────────────────────────────────── */
@@ -2225,13 +2224,8 @@ textarea { resize: vertical; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ═══ 28. Asset Studio (Legacy)
-   ═══════════════════════════════════════════════════════════════════ */
-
-.asset-studio {
-  display: grid;
-  gap: 24px;
-}
+  ═══ 28. Studio Panels
+  ═══════════════════════════════════════════════════════════════════ */
 
 .panel-header__actions {
   display: flex;
@@ -3781,7 +3775,7 @@ textarea { resize: vertical; }
   }
 }
 
-/* Project Studio specific styles, loosely inheriting the asset-studio pattern */
+/* Project Studio specific styles */
 .project-studio {
   display: flex;
   flex-direction: column;

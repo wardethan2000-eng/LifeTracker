@@ -19,6 +19,11 @@ import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
+  ProjectHierarchyValidationError,
+  resolveProjectHierarchyInput,
+  syncProjectTreeDepths
+} from "../../lib/project-hierarchy.js";
+import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
@@ -417,17 +422,19 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    let depth = 0;
-    if (input.parentProjectId) {
-      const parentProject = await app.prisma.project.findFirst({
-        where: { id: input.parentProjectId, householdId: params.householdId }
-      });
+    let hierarchy: { parentProjectId: string | null; depth: number };
 
-      if (!parentProject) {
-        return reply.code(400).send({ message: "Parent project not found in this household." });
+    try {
+      hierarchy = await resolveProjectHierarchyInput(app.prisma, {
+        householdId: params.householdId,
+        parentProjectId: input.parentProjectId ?? null
+      });
+    } catch (error) {
+      if (error instanceof ProjectHierarchyValidationError) {
+        return reply.code(400).send({ message: error.message });
       }
 
-      depth = parentProject.depth + 1;
+      throw error;
     }
 
     const project = await app.prisma.project.create({
@@ -440,8 +447,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         targetEndDate: input.targetEndDate ? new Date(input.targetEndDate) : null,
         budgetAmount: input.budgetAmount ?? null,
         notes: input.notes ?? null,
-        parentProjectId: input.parentProjectId ?? null,
-        depth
+        parentProjectId: hierarchy.parentProjectId,
+        depth: hierarchy.depth
       }
     });
 
@@ -606,43 +613,35 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.notes !== undefined) data.notes = input.notes ?? null;
 
     if (input.parentProjectId !== undefined) {
-      if (input.parentProjectId === null) {
-        data.parentProjectId = null;
-        data.depth = 0;
-      } else {
-        if (input.parentProjectId === existing.id) {
-          return reply.code(400).send({ message: "A project cannot be its own parent." });
-        }
-
-        const parentProject = await app.prisma.project.findFirst({
-          where: { id: input.parentProjectId, householdId: params.householdId }
+      try {
+        const hierarchy = await resolveProjectHierarchyInput(app.prisma, {
+          householdId: params.householdId,
+          projectId: existing.id,
+          parentProjectId: input.parentProjectId
         });
 
-        if (!parentProject) {
-          return reply.code(400).send({ message: "Parent project not found in this household." });
+        data.parentProjectId = hierarchy.parentProjectId;
+        data.depth = hierarchy.depth;
+      } catch (error) {
+        if (error instanceof ProjectHierarchyValidationError) {
+          return reply.code(400).send({ message: error.message });
         }
 
-        const descendants = await app.prisma.$queryRaw<{ id: string }[]>`
-          WITH RECURSIVE tree AS (
-            SELECT id FROM "Project" WHERE "parentProjectId" = ${existing.id}
-            UNION ALL
-            SELECT p.id FROM "Project" p JOIN tree t ON p."parentProjectId" = t.id
-          )
-          SELECT id FROM tree
-        `;
-
-        if (descendants.some((d) => d.id === input.parentProjectId)) {
-          return reply.code(400).send({ message: "Cannot set parent to a descendant project — this would create a circular reference." });
-        }
-
-        data.parentProjectId = input.parentProjectId;
-        data.depth = parentProject.depth + 1;
+        throw error;
       }
     }
 
-    const project = await app.prisma.project.update({
-      where: { id: existing.id },
-      data
+    const project = await app.prisma.$transaction(async (tx) => {
+      const updatedProject = await tx.project.update({
+        where: { id: existing.id },
+        data
+      });
+
+      if (input.parentProjectId !== undefined) {
+        await syncProjectTreeDepths(tx, updatedProject.id);
+      }
+
+      return updatedProject;
     });
 
     await logActivity(app.prisma, {

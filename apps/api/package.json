@@ -14,6 +14,7 @@
     "notifications:scan": "tsx src/scripts/enqueue-notification-scan.ts",
     "notifications:scan:now": "tsx src/scripts/run-notification-scan.ts",
     "notifications:worker": "tsx src/workers/notifications.ts",
+    "projects:repair-depths": "tsx src/scripts/repair-project-depths.ts",
     "search:rebuild": "tsx src/scripts/rebuild-search-index.ts",
     "start": "node dist/index.js",
     "lint": "tsc -p tsconfig.json --noEmit",

@@ -716,6 +716,64 @@ export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => api
   revalidate: 60
 }));
 
+const getProjectDetailCached = cache(async (householdId: string, projectId: string): Promise<ProjectDetail> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}`,
+  schema: projectDetailSchema,
+  cacheOptions: { revalidate: 15 }
+}));
+
+const getProjectPhaseDetailsCached = cache(async (householdId: string, projectId: string): Promise<ProjectPhaseDetail[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/details`,
+  schema: projectPhaseDetailListSchema,
+  cachePolicy: { next: { revalidate: 15 } }
+}));
+
+const getHouseholdAssetsCached = cache(async (householdId: string): Promise<Asset[]> => apiRequest({
+  path: `/v1/assets?householdId=${householdId}`,
+  schema: assetListSchema,
+  cacheOptions: { revalidate: 30 }
+}));
+
+const getHouseholdMembersCached = cache(async (householdId: string): Promise<HouseholdMember[]> => apiRequest({
+  path: `/v1/households/${householdId}/members`,
+  schema: householdMemberListSchema,
+  revalidate: 15
+}));
+
+const getHouseholdServiceProvidersCached = cache(async (householdId: string): Promise<ServiceProvider[]> => apiRequest({
+  path: `/v1/households/${householdId}/service-providers`,
+  schema: serviceProviderListSchema,
+  revalidate: 15
+}));
+
+const getHouseholdInventoryCached = cache(async (
+  householdId: string,
+  suffix: string
+): Promise<{ items: InventoryItemSummary[]; nextCursor: string | null }> => apiRequest({
+  path: `/v1/households/${householdId}/inventory${suffix}`,
+  schema: householdInventoryListSchema,
+  cacheOptions: { revalidate: 30 }
+}));
+
+const getProjectNotesCached = cache(async (
+  householdId: string,
+  projectId: string,
+  suffix: string
+): Promise<ProjectNote[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/notes${suffix}`,
+  schema: projectNoteListSchema,
+  cacheOptions: { revalidate: 15 }
+}));
+
+const getProjectBudgetAnalysisCached = cache(async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectBudgetAnalysis> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/cost-analytics/budget-analysis`,
+  schema: projectBudgetAnalysisSchema,
+  cacheOptions: { revalidate: 15 }
+}));
+
 export const getHouseholdProjects = async (
   householdId: string,
   options?: {
@@ -1128,10 +1186,7 @@ export const deleteAssetTimelineEntry = async (assetId: string, entryId: string)
   });
 };
 
-export const getProjectDetail = async (householdId: string, projectId: string): Promise<ProjectDetail> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}`,
-  schema: projectDetailSchema
-});
+export const getProjectDetail = async (householdId: string, projectId: string): Promise<ProjectDetail> => getProjectDetailCached(householdId, projectId);
 
 export const getProjectPhases = async (
   householdId: string,
@@ -1153,11 +1208,7 @@ export const getProjectPhaseDetail = async (
 export const getProjectPhaseDetails = async (
   householdId: string,
   projectId: string
-): Promise<ProjectPhaseDetail[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/phases/details`,
-  schema: projectPhaseDetailListSchema,
-  cachePolicy: { next: { revalidate: 15 } }
-});
+): Promise<ProjectPhaseDetail[]> => getProjectPhaseDetailsCached(householdId, projectId);
 
 export const getProjectBudgetCategories = async (
   householdId: string,
@@ -1200,11 +1251,7 @@ export const getProjectShoppingList = async (
   schema: projectShoppingListSchema
 });
 
-export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => apiRequest({
-  path: `/v1/assets?householdId=${householdId}`,
-  schema: assetListSchema,
-  cacheOptions: { revalidate: 30 }
-});
+export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => getHouseholdAssetsCached(householdId);
 
 export const getHouseholdUsageHighlights = async (
   householdId: string,
@@ -1495,17 +1542,9 @@ export const getRegulatoryAssets = async (householdId: string): Promise<Regulato
   schema: regulatoryAssetOptionListSchema
 });
 
-export const getHouseholdMembers = async (householdId: string): Promise<HouseholdMember[]> => apiRequest({
-  path: `/v1/households/${householdId}/members`,
-  schema: householdMemberListSchema,
-  revalidate: 15
-});
+export const getHouseholdMembers = async (householdId: string): Promise<HouseholdMember[]> => getHouseholdMembersCached(householdId);
 
-export const getHouseholdServiceProviders = async (householdId: string): Promise<ServiceProvider[]> => apiRequest({
-  path: `/v1/households/${householdId}/service-providers`,
-  schema: serviceProviderListSchema,
-  revalidate: 15
-});
+export const getHouseholdServiceProviders = async (householdId: string): Promise<ServiceProvider[]> => getHouseholdServiceProvidersCached(householdId);
 
 export const getServiceProvider = async (householdId: string, providerId: string): Promise<ServiceProvider> => apiRequest({
   path: `/v1/households/${householdId}/service-providers/${providerId}`,
@@ -1552,11 +1591,7 @@ export const getHouseholdInventory = async (
 
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
 
-  return apiRequest({
-    path: `/v1/households/${householdId}/inventory${suffix}`,
-    schema: householdInventoryListSchema,
-    cacheOptions: { revalidate: 30 }
-  });
+  return getHouseholdInventoryCached(householdId, suffix);
 };
 
 export const getHouseholdLowStockInventory = async (householdId: string): Promise<LowStockInventoryItem[]> => apiRequest({
@@ -2417,10 +2452,7 @@ export const getProjectNotes = async (
 
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
 
-  return apiRequest({
-    path: `/v1/households/${householdId}/projects/${projectId}/notes${suffix}`,
-    schema: projectNoteListSchema
-  });
+  return getProjectNotesCached(householdId, projectId, suffix);
 };
 
 export const createProjectNote = async (
@@ -2602,10 +2634,7 @@ export const getAssetCostForecast = async (assetId: string): Promise<CostForecas
 export const getProjectBudgetAnalysis = async (
   householdId: string,
   projectId: string
-): Promise<ProjectBudgetAnalysis> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/cost-analytics/budget-analysis`,
-  schema: projectBudgetAnalysisSchema
-});
+): Promise<ProjectBudgetAnalysis> => getProjectBudgetAnalysisCached(householdId, projectId);
 
 export const createScheduleInventoryItem = async (
   assetId: string,

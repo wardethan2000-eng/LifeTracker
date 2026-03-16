@@ -205,24 +205,14 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, householdAssets, householdMembers, householdInventory, serviceProviders, projectNotes, projectBudgetAnalysis] = await Promise.all([
-      getProjectDetail(household.id, routeParams.projectId),
-      getHouseholdAssets(household.id),
-      getHouseholdMembers(household.id),
-      getHouseholdInventory(household.id, { limit: 100 }),
-      getHouseholdServiceProviders(household.id),
-      getProjectNotes(household.id, routeParams.projectId),
-      getProjectBudgetAnalysis(household.id, routeParams.projectId).catch(() => null)
-    ]);
+    const project = await getProjectDetail(household.id, routeParams.projectId);
 
     const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
-    const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
-    const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
     const quickTodos = project.tasks.filter((task) => task.taskType === "quick");
-    const fullTasks = project.tasks.filter((task) => task.taskType !== "quick");
-    const unphasedTasks = fullTasks.filter((task) => task.phaseId === null);
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const completedQuickTodoCount = quickTodos.filter((task) => task.isCompleted).length;
+    const fullTasks = project.tasks.filter((task) => task.taskType !== "quick");
+    const unphasedTasks = fullTasks.filter((task) => task.phaseId === null);
     const completedFullTaskCount = fullTasks.filter((task) => task.status === "completed").length;
     const completedTaskCount = completedQuickTodoCount + completedFullTaskCount;
     const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
@@ -351,14 +341,10 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           <div className="resource-layout">
             <div className="resource-layout__primary">
               <Suspense fallback={<PhaseDetailsSkeleton />}>
-                <ProjectPhaseDetailsSection
+                <ProjectPhaseDetailsPanel
                   householdId={household.id}
                   project={project}
-                  focusedPhaseId={focusedPhaseId}
-                  householdMembers={householdMembers}
-                  serviceProviders={serviceProviders}
-                  inventoryItems={householdInventory.items}
-                  projectBudgetAnalysis={projectBudgetAnalysis}
+                  {...(focusedPhaseId ? { focusedPhaseId } : {})}
                 />
               </Suspense>
 
@@ -508,175 +494,13 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 </div>
               </ExpandableCard>
 
-              <ExpandableCard
-                title="Tasks"
-                modalTitle="Tasks"
-                previewContent={<CompactTaskPreview tasks={fullTasks} />}
-              >
-                <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <form action={createProjectTaskAction}>
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <div className="form-grid">
-                        <label className="field field--full">
-                          <span>Task Title</span>
-                          <input name="title" placeholder="General task not assigned to a phase yet" required />
-                        </label>
-                        <label className="field field--full">
-                          <span>Description</span>
-                          <textarea name="description" rows={2} placeholder="Why this is still unphased, or what needs to be decided before slotting it into the timeline." />
-                        </label>
-                        <label className="field">
-                          <span>Status</span>
-                          <select name="status" defaultValue="pending">
-                            {taskStatusOptions.map((status) => (
-                              <option key={status} value={status}>{taskStatusLabels[status]}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>Assignee</span>
-                          <select name="assignedToId" defaultValue="">
-                            <option value="">Unassigned</option>
-                            {householdMembers.map((member) => (
-                              <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <div className="inline-actions" style={{ marginTop: 16 }}>
-                        <button type="submit" className="button">Add Task</button>
-                      </div>
-                    </form>
-                  </div>
-                  {unphasedTasks.length === 0 ? <p className="panel__empty">Every full task is assigned to a phase.</p> : null}
-                  <div className="schedule-stack">
-                    {unphasedTasks.map((task) => (
-                      <UnphasedTaskCard
-                        key={task.id}
-                        householdId={household.id}
-                        projectId={project.id}
-                        task={task}
-                        householdMembers={householdMembers}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </ExpandableCard>
+              <Suspense fallback={<TasksSkeleton fullTasks={fullTasks} />}>
+                <ProjectTasksPanel householdId={household.id} project={project} />
+              </Suspense>
 
-              <ExpandableCard
-                title="Research & Notes"
-                modalTitle="Research & Notes"
-                previewContent={
-                  <span className="data-table__secondary">
-                    {projectNotes.length} note{projectNotes.length !== 1 ? "s" : ""}
-                    {projectNotes.filter((n) => n.isPinned).length > 0 ? ` · ${projectNotes.filter((n) => n.isPinned).length} pinned` : ""}
-                  </span>
-                }
-              >
-                <div>
-                  <details style={{ marginBottom: 16 }}>
-                    <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
-                    <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <div className="workbench-grid" style={{ marginBottom: 12 }}>
-                        <label className="field">
-                          <span className="field__label">Title *</span>
-                          <input type="text" name="title" required maxLength={300} placeholder="Note title" />
-                        </label>
-                        <label className="field">
-                          <span className="field__label">Category</span>
-                          <select name="category" defaultValue="general">
-                            <option value="research">Research</option>
-                            <option value="reference">Reference</option>
-                            <option value="decision">Decision</option>
-                            <option value="measurement">Measurement</option>
-                            <option value="general">General</option>
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span className="field__label">Phase (optional)</span>
-                          <select name="phaseId" defaultValue="">
-                            <option value="">No phase</option>
-                            {project.phases.map((phase) => (
-                              <option key={phase.id} value={phase.id}>{phase.name}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span className="field__label">URL (optional)</span>
-                          <input type="url" name="url" placeholder="https://…" />
-                        </label>
-                      </div>
-                      <label className="field" style={{ display: "block", marginBottom: 12 }}>
-                        <span className="field__label">Body</span>
-                        <textarea name="body" rows={5} placeholder="Markdown supported…" style={{ width: "100%", resize: "vertical" }} />
-                      </label>
-                      <div className="inline-actions">
-                        <button type="submit" className="button">Save Note</button>
-                      </div>
-                    </form>
-                  </details>
-                  {projectNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
-                  <div className="schedule-stack">
-                    {projectNotes.map((note) => (
-                      <div
-                        key={note.id}
-                        className="schedule-card"
-                        style={note.isPinned ? { background: "var(--surface-accent)", borderLeft: "3px solid var(--accent)" } : undefined}
-                      >
-                        <div className="schedule-card__summary">
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 4 }}>
-                            <span className="pill">{({ research: "Research", reference: "Reference", decision: "Decision", measurement: "Measurement", general: "General" } as Record<string, string>)[note.category] ?? note.category}</span>
-                            {note.phaseName ? <span className="pill pill--muted">{note.phaseName}</span> : null}
-                            {note.isPinned ? <span className="pill pill--accent">PINNED</span> : null}
-                          </div>
-                          <div className="data-table__primary">{note.title}</div>
-                          {note.body ? (
-                            <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: "8px 0 0", fontFamily: "inherit", fontSize: "0.875rem" }}>
-                              {note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body}
-                            </pre>
-                          ) : null}
-                          {note.url ? (
-                            <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ display: "block", marginTop: 6, fontSize: "0.8125rem" }}>
-                              {(() => { try { return new URL(note.url).hostname; } catch { return note.url; } })()}
-                            </a>
-                          ) : null}
-                          <div className="data-table__secondary" style={{ marginTop: 8 }}>
-                            {note.createdBy?.displayName ?? "Unknown"} · {formatDate(note.createdAt)}
-                          </div>
-                        </div>
-                        <div className="inline-actions" style={{ marginTop: 8 }}>
-                          <form action={toggleProjectNotePinAction} style={{ display: "inline" }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="noteId" value={note.id} />
-                            <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
-                            <button type="submit" className="button button--ghost button--small">
-                              {note.isPinned ? "Unpin" : "Pin"}
-                            </button>
-                          </form>
-                          <form action={deleteProjectNoteAction} style={{ display: "inline" }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="noteId" value={note.id} />
-                            <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
-                          </form>
-                        </div>
-                        <AttachmentSection
-                          householdId={household.id}
-                          entityType="project_note"
-                          entityId={note.id}
-                          compact
-                          label=""
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </ExpandableCard>
+              <Suspense fallback={<ProjectNotesSkeleton />}>
+                <ProjectNotesPanel householdId={household.id} project={project} />
+              </Suspense>
 
               <Suspense fallback={<ShoppingListSkeleton />}>
                 <ProjectShoppingListSection householdId={household.id} projectId={project.id} />
@@ -697,85 +521,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 </dl>
               </Card>
 
-              <Card title={`Linked Assets (${project.assets.length})`}>
-                <form action={addProjectAssetAction} style={{ marginBottom: 8 }}>
-                  <input type="hidden" name="householdId" value={household.id} />
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <label className="field">
-                      <span>Asset</span>
-                      <select name="assetId" required defaultValue="">
-                        <option value="" disabled>Select an asset</option>
-                        {availableAssets.map((asset) => (
-                          <option key={asset.id} value={asset.id}>{asset.name} · {asset.category}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Relationship</span>
-                      <select name="relationship" defaultValue="target">
-                        <option value="target">This project works on this asset</option>
-                        <option value="produces">This project will create this asset</option>
-                        <option value="consumes">This project uses/consumes this asset</option>
-                        <option value="supports">This asset supports the project</option>
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Role / Description</span>
-                      <input name="role" placeholder="Primary, affected system, haul vehicle…" />
-                    </label>
-                    <button type="submit" className="button button--sm" disabled={availableAssets.length === 0}>Link Asset</button>
-                  </div>
-                </form>
-                {project.assets.length === 0 ? (
-                  <p className="panel__empty">No assets linked yet.</p>
-                ) : (() => {
-                  const sorted = [...project.assets].sort((a, b) => {
-                    const aOrder = assetRelationshipSortOrder[a.relationship ?? "target"] ?? 99;
-                    const bOrder = assetRelationshipSortOrder[b.relationship ?? "target"] ?? 99;
-                    return aOrder - bOrder;
-                  });
-                  let lastRelationship: string | null = null;
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                      {sorted.map((asset) => {
-                        const rel = asset.relationship ?? "target";
-                        const showHeader = rel !== lastRelationship;
-                        lastRelationship = rel;
-                        return (
-                          <div key={asset.id}>
-                            {showHeader && (
-                              <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 0 4px", borderTop: lastRelationship !== rel ? "1px solid var(--border)" : undefined }}>
-                                {assetRelationshipLabels[rel] ?? rel}
-                              </div>
-                            )}
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                              <div>
-                                {asset.asset ? (
-                                  <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link>
-                                ) : "Unknown asset"}
-                                {rel === "produces" && (
-                                  <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", fontStyle: "italic", marginTop: 2 }}>Asset will be created when this project completes</div>
-                                )}
-                                {asset.role ? <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{asset.role}</div> : null}
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                                <span className="status-badge" style={{ fontSize: "0.72rem" }}>{assetRelationshipLabels[rel] ?? rel}</span>
-                                <form action={removeProjectAssetAction}>
-                                  <input type="hidden" name="householdId" value={household.id} />
-                                  <input type="hidden" name="projectId" value={project.id} />
-                                  <input type="hidden" name="projectAssetId" value={asset.id} />
-                                  <button type="submit" className="button button--ghost button--sm">Remove</button>
-                                </form>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </Card>
+              <Suspense fallback={<LinkedAssetsSkeleton linkedAssetCount={project.assets.length} />}>
+                <ProjectLinkedAssetsCard householdId={household.id} project={project} />
+              </Suspense>
 
               <Suspense fallback={<LinkedInventorySkeleton />}>
                 <ProjectLinkedInventoryCard householdId={household.id} projectId={project.id} />
@@ -833,6 +581,357 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
 function getPhaseFocusHref(householdId: string, projectId: string, phaseId: string): string {
   return `/projects/${projectId}?householdId=${householdId}&focusPhaseId=${phaseId}#phase-${phaseId}`;
+}
+
+const LinkedAssetsSkeleton = ({ linkedAssetCount }: { linkedAssetCount: number }): JSX.Element => (
+  <Card title={`Linked Assets (${linkedAssetCount})`}>
+    <div style={{ display: "grid", gap: "10px" }}>
+      {[1, 2, 3].map((row) => (
+        <div key={row} className="skeleton-bar" style={{ width: "100%", height: 42, borderRadius: 10 }} />
+      ))}
+    </div>
+  </Card>
+);
+
+const TasksSkeleton = ({ fullTasks }: { fullTasks: Awaited<ReturnType<typeof getProjectDetail>>["tasks"] }): JSX.Element => (
+  <ExpandableCard
+    title="Tasks"
+    modalTitle="Tasks"
+    previewContent={<CompactTaskPreview tasks={fullTasks.filter((task) => task.taskType !== "quick")} />}
+  >
+    <div className="panel__empty">Loading task controls…</div>
+  </ExpandableCard>
+);
+
+const ProjectNotesSkeleton = (): JSX.Element => (
+  <ExpandableCard
+    title="Research & Notes"
+    modalTitle="Research & Notes"
+    previewContent={<span className="data-table__secondary">Loading notes…</span>}
+  >
+    <div className="panel__empty">Loading notes…</div>
+  </ExpandableCard>
+);
+
+async function ProjectPhaseDetailsPanel({
+  householdId,
+  project,
+  focusedPhaseId
+}: {
+  householdId: string;
+  project: Awaited<ReturnType<typeof getProjectDetail>>;
+  focusedPhaseId?: string;
+}): Promise<JSX.Element> {
+  const [householdMembers, serviceProviders, householdInventory, projectBudgetAnalysis] = await Promise.all([
+    getHouseholdMembers(householdId),
+    getHouseholdServiceProviders(householdId),
+    getHouseholdInventory(householdId, { limit: 100 }),
+    getProjectBudgetAnalysis(householdId, project.id).catch(() => null)
+  ]);
+
+  return (
+    <ProjectPhaseDetailsSection
+      householdId={householdId}
+      project={project}
+      focusedPhaseId={focusedPhaseId}
+      householdMembers={householdMembers}
+      serviceProviders={serviceProviders}
+      inventoryItems={householdInventory.items}
+      projectBudgetAnalysis={projectBudgetAnalysis}
+    />
+  );
+}
+
+async function ProjectTasksPanel({
+  householdId,
+  project
+}: {
+  householdId: string;
+  project: Awaited<ReturnType<typeof getProjectDetail>>;
+}): Promise<JSX.Element> {
+  const householdMembers = await getHouseholdMembers(householdId);
+  const fullTasks = project.tasks.filter((task) => task.taskType !== "quick");
+  const unphasedTasks = fullTasks.filter((task) => task.phaseId === null);
+
+  return (
+    <ExpandableCard
+      title="Tasks"
+      modalTitle="Tasks"
+      previewContent={<CompactTaskPreview tasks={fullTasks} />}
+    >
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <form action={createProjectTaskAction}>
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={project.id} />
+            <div className="form-grid">
+              <label className="field field--full">
+                <span>Task Title</span>
+                <input name="title" placeholder="General task not assigned to a phase yet" required />
+              </label>
+              <label className="field field--full">
+                <span>Description</span>
+                <textarea name="description" rows={2} placeholder="Why this is still unphased, or what needs to be decided before slotting it into the timeline." />
+              </label>
+              <label className="field">
+                <span>Status</span>
+                <select name="status" defaultValue="pending">
+                  {taskStatusOptions.map((status) => (
+                    <option key={status} value={status}>{taskStatusLabels[status]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Assignee</span>
+                <select name="assignedToId" defaultValue="">
+                  <option value="">Unassigned</option>
+                  {householdMembers.map((member) => (
+                    <option key={member.id} value={member.userId}>{member.user.displayName ?? member.user.email ?? member.userId}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="inline-actions" style={{ marginTop: 16 }}>
+              <button type="submit" className="button">Add Task</button>
+            </div>
+          </form>
+        </div>
+        {unphasedTasks.length === 0 ? <p className="panel__empty">Every full task is assigned to a phase.</p> : null}
+        <div className="schedule-stack">
+          {unphasedTasks.map((task) => (
+            <UnphasedTaskCard
+              key={task.id}
+              householdId={householdId}
+              projectId={project.id}
+              task={task}
+              householdMembers={householdMembers}
+            />
+          ))}
+        </div>
+      </div>
+    </ExpandableCard>
+  );
+}
+
+async function ProjectNotesPanel({
+  householdId,
+  project
+}: {
+  householdId: string;
+  project: Awaited<ReturnType<typeof getProjectDetail>>;
+}): Promise<JSX.Element> {
+  const projectNotes = await getProjectNotes(householdId, project.id);
+
+  return (
+    <ExpandableCard
+      title="Research & Notes"
+      modalTitle="Research & Notes"
+      previewContent={
+        <span className="data-table__secondary">
+          {projectNotes.length} note{projectNotes.length !== 1 ? "s" : ""}
+          {projectNotes.filter((note) => note.isPinned).length > 0 ? ` · ${projectNotes.filter((note) => note.isPinned).length} pinned` : ""}
+        </span>
+      }
+    >
+      <div>
+        <details style={{ marginBottom: 16 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
+          <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={project.id} />
+            <div className="workbench-grid" style={{ marginBottom: 12 }}>
+              <label className="field">
+                <span className="field__label">Title *</span>
+                <input type="text" name="title" required maxLength={300} placeholder="Note title" />
+              </label>
+              <label className="field">
+                <span className="field__label">Category</span>
+                <select name="category" defaultValue="general">
+                  <option value="research">Research</option>
+                  <option value="reference">Reference</option>
+                  <option value="decision">Decision</option>
+                  <option value="measurement">Measurement</option>
+                  <option value="general">General</option>
+                </select>
+              </label>
+              <label className="field">
+                <span className="field__label">Phase (optional)</span>
+                <select name="phaseId" defaultValue="">
+                  <option value="">No phase</option>
+                  {project.phases.map((phase) => (
+                    <option key={phase.id} value={phase.id}>{phase.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field__label">URL (optional)</span>
+                <input type="url" name="url" placeholder="https://…" />
+              </label>
+            </div>
+            <label className="field" style={{ display: "block", marginBottom: 12 }}>
+              <span className="field__label">Body</span>
+              <textarea name="body" rows={5} placeholder="Markdown supported…" style={{ width: "100%", resize: "vertical" }} />
+            </label>
+            <div className="inline-actions">
+              <button type="submit" className="button">Save Note</button>
+            </div>
+          </form>
+        </details>
+        {projectNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
+        <div className="schedule-stack">
+          {projectNotes.map((note) => (
+            <div
+              key={note.id}
+              className="schedule-card"
+              style={note.isPinned ? { background: "var(--surface-accent)", borderLeft: "3px solid var(--accent)" } : undefined}
+            >
+              <div className="schedule-card__summary">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                  <span className="pill">{({ research: "Research", reference: "Reference", decision: "Decision", measurement: "Measurement", general: "General" } as Record<string, string>)[note.category] ?? note.category}</span>
+                  {note.phaseName ? <span className="pill pill--muted">{note.phaseName}</span> : null}
+                  {note.isPinned ? <span className="pill pill--accent">PINNED</span> : null}
+                </div>
+                <div className="data-table__primary">{note.title}</div>
+                {note.body ? (
+                  <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: "8px 0 0", fontFamily: "inherit", fontSize: "0.875rem" }}>
+                    {note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body}
+                  </pre>
+                ) : null}
+                {note.url ? (
+                  <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ display: "block", marginTop: 6, fontSize: "0.8125rem" }}>
+                    {(() => { try { return new URL(note.url).hostname; } catch { return note.url; } })()}
+                  </a>
+                ) : null}
+                <div className="data-table__secondary" style={{ marginTop: 8 }}>
+                  {note.createdBy?.displayName ?? "Unknown"} · {formatDate(note.createdAt)}
+                </div>
+              </div>
+              <div className="inline-actions" style={{ marginTop: 8 }}>
+                <form action={toggleProjectNotePinAction} style={{ display: "inline" }}>
+                  <input type="hidden" name="householdId" value={householdId} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <input type="hidden" name="noteId" value={note.id} />
+                  <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
+                  <button type="submit" className="button button--ghost button--small">
+                    {note.isPinned ? "Unpin" : "Pin"}
+                  </button>
+                </form>
+                <form action={deleteProjectNoteAction} style={{ display: "inline" }}>
+                  <input type="hidden" name="householdId" value={householdId} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <input type="hidden" name="noteId" value={note.id} />
+                  <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                </form>
+              </div>
+              <AttachmentSection
+                householdId={householdId}
+                entityType="project_note"
+                entityId={note.id}
+                compact
+                label=""
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </ExpandableCard>
+  );
+}
+
+async function ProjectLinkedAssetsCard({
+  householdId,
+  project
+}: {
+  householdId: string;
+  project: Awaited<ReturnType<typeof getProjectDetail>>;
+}): Promise<JSX.Element> {
+  const householdAssets = await getHouseholdAssets(householdId);
+  const linkedAssetIds = new Set(project.assets.map((asset) => asset.assetId));
+  const availableAssets = householdAssets.filter((asset) => !linkedAssetIds.has(asset.id));
+
+  return (
+    <Card title={`Linked Assets (${project.assets.length})`}>
+      <form action={addProjectAssetAction} style={{ marginBottom: 8 }}>
+        <input type="hidden" name="householdId" value={householdId} />
+        <input type="hidden" name="projectId" value={project.id} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <label className="field">
+            <span>Asset</span>
+            <select name="assetId" required defaultValue="">
+              <option value="" disabled>Select an asset</option>
+              {availableAssets.map((asset) => (
+                <option key={asset.id} value={asset.id}>{asset.name} · {asset.category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Relationship</span>
+            <select name="relationship" defaultValue="target">
+              <option value="target">This project works on this asset</option>
+              <option value="produces">This project will create this asset</option>
+              <option value="consumes">This project uses/consumes this asset</option>
+              <option value="supports">This asset supports the project</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Role / Description</span>
+            <input name="role" placeholder="Primary, affected system, haul vehicle…" />
+          </label>
+          <button type="submit" className="button button--sm" disabled={availableAssets.length === 0}>Link Asset</button>
+        </div>
+      </form>
+      {project.assets.length === 0 ? (
+        <p className="panel__empty">No assets linked yet.</p>
+      ) : (() => {
+        const sorted = [...project.assets].sort((left, right) => {
+          const leftOrder = assetRelationshipSortOrder[left.relationship ?? "target"] ?? 99;
+          const rightOrder = assetRelationshipSortOrder[right.relationship ?? "target"] ?? 99;
+          return leftOrder - rightOrder;
+        });
+        let previousRelationship: string | null = null;
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {sorted.map((asset) => {
+              const relationship = asset.relationship ?? "target";
+              const showHeader = relationship !== previousRelationship;
+              previousRelationship = relationship;
+
+              return (
+                <div key={asset.id}>
+                  {showHeader && (
+                    <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 0 4px", borderTop: "1px solid var(--border)" }}>
+                      {assetRelationshipLabels[relationship] ?? relationship}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                    <div>
+                      {asset.asset ? (
+                        <Link href={`/assets/${asset.asset.id}`} className="data-table__link">{asset.asset.name}</Link>
+                      ) : "Unknown asset"}
+                      {relationship === "produces" && (
+                        <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", fontStyle: "italic", marginTop: 2 }}>Asset will be created when this project completes</div>
+                      )}
+                      {asset.role ? <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{asset.role}</div> : null}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span className="status-badge" style={{ fontSize: "0.72rem" }}>{assetRelationshipLabels[relationship] ?? relationship}</span>
+                      <form action={removeProjectAssetAction}>
+                        <input type="hidden" name="householdId" value={householdId} />
+                        <input type="hidden" name="projectId" value={project.id} />
+                        <input type="hidden" name="projectAssetId" value={asset.id} />
+                        <button type="submit" className="button button--ghost button--sm">Remove</button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+    </Card>
+  );
 }
 
 function ProjectSupplyQuickAddForm({

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { assertOwner, assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { toInvitationResponse } from "../../lib/serializers/index.js";
+import { syncInvitationToSearchIndex } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -60,6 +61,8 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
       metadata: { email: input.email }
     });
 
+    void syncInvitationToSearchIndex(app.prisma, invitation.id).catch(console.error);
+
     return reply.code(201).send(toInvitationResponse(invitation));
   });
 
@@ -104,10 +107,12 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (invitation.expiresAt < new Date()) {
-      await app.prisma.householdInvitation.update({
+      const expiredInvitation = await app.prisma.householdInvitation.update({
         where: { id: invitation.id },
         data: { status: "expired" }
       });
+
+      void syncInvitationToSearchIndex(app.prisma, expiredInvitation.id).catch(console.error);
 
       return reply.code(400).send({ message: "Invitation has expired." });
     }
@@ -173,6 +178,8 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
       metadata: { email: invitation.email }
     });
 
+    void syncInvitationToSearchIndex(app.prisma, invitation.id).catch(console.error);
+
     return {
       id: result.id,
       name: result.name,
@@ -220,6 +227,8 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
       entityId: invitation.id,
       metadata: { email: invitation.email }
     });
+
+    void syncInvitationToSearchIndex(app.prisma, updated.id).catch(console.error);
 
     return toInvitationResponse(updated);
   });
