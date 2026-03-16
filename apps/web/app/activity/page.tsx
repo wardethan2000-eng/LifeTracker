@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
+import { HouseholdCsvExportButton } from "../../components/asset-export-actions";
 import { ApiError, getHouseholdActivity, getMe } from "../../lib/api";
 import { formatDateTime } from "../../lib/formatters";
 
@@ -42,6 +43,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
             <h1>Activity Log</h1>
             <p style={{ marginTop: 6 }}>Household audit trail for assets, schedules, projects, invitations, and collaboration events.</p>
           </div>
+          <HouseholdCsvExportButton householdId={household.id} dataset="activity-log" />
         </header>
 
         <div className="page-body">

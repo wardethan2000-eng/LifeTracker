@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
+import { HouseholdCsvExportButton } from "../../components/asset-export-actions";
 import {
   getHouseholdCostDashboard,
   getHouseholdCostForecast,
@@ -54,6 +55,7 @@ export default async function CostsPage({ searchParams }: CostsPageProps): Promi
           <h1>Cost Analytics</h1>
           <p>{dashboard ? `${formatDate(dashboard.periodStart)} through ${formatDate(dashboard.periodEnd)}` : "Household spending intelligence"}</p>
         </div>
+        <HouseholdCsvExportButton householdId={household.id} dataset="cost-dashboard" />
       </header>
 
       <div className="page-body">

@@ -31,6 +31,7 @@ import { complianceAnalyticsRoutes } from "./routes/analytics/compliance.js";
 import { comparativeAnalyticsRoutes } from "./routes/analytics/comparative.js";
 import { commentRoutes } from "./routes/comments/index.js";
 import { costAnalyticsRoutes } from "./routes/cost-analytics/index.js";
+import { exportRoutes } from "./routes/exports/index.js";
 import { projectBudgetAnalyticsRoutes } from "./routes/cost-analytics/project-budget.js";
 import { invitationRoutes } from "./routes/invitations/index.js";
 import { projectRoutes } from "./routes/projects/index.js";
@@ -47,6 +48,8 @@ import { hobbyMetricRoutes } from "./routes/hobbies/metrics.js";
 import { hobbyLogRoutes } from "./routes/hobbies/logs.js";
 import { hobbyLinkRoutes } from "./routes/hobbies/links.js";
 import { hobbyShoppingListRoutes } from "./routes/hobbies/shopping-list.js";
+import { publicShareRoutes } from "./routes/share-links/public.js";
+import { shareLinkRoutes } from "./routes/share-links/index.js";
 
 export const buildApp = () => {
   const app = Fastify({
@@ -57,6 +60,7 @@ export const buildApp = () => {
     origin: true
   });
   app.register(prismaPlugin);
+  app.register(publicShareRoutes);
   app.register(authPlugin);
   app.register(storagePlugin);
   app.register(errorHandlerPlugin);
@@ -87,6 +91,7 @@ export const buildApp = () => {
   app.register(comparativeAnalyticsRoutes);
   app.register(commentRoutes);
   app.register(costAnalyticsRoutes);
+  app.register(exportRoutes);
   app.register(invitationRoutes);
   app.register(projectRoutes);
   app.register(projectBudgetAnalyticsRoutes);
@@ -96,6 +101,7 @@ export const buildApp = () => {
   app.register(searchRoutes);
   app.register(barcodeRoutes);
   app.register(attachmentRoutes);
+  app.register(shareLinkRoutes);
   app.register(hobbyRoutes);
   app.register(hobbyRecipeRoutes);
   app.register(hobbySessionRoutes);

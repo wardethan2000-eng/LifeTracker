@@ -5939,6 +5939,128 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--accent);
 }
 
+/* ── Export & Share Link UI ── */
+
+.export-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.share-link-form {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  display: grid;
+  gap: 12px;
+}
+
+.share-link-form .form-input,
+.share-link-url .form-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.share-link-url {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.share-link-url .form-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.share-link-list {
+  display: grid;
+}
+
+.share-link-list__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.share-link-list__item:last-child {
+  border-bottom: 0;
+}
+
+.share-link-list__label {
+  font-weight: 500;
+}
+
+.share-link-list__meta {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.public-report {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.public-report__header {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.public-report__brand {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.public-report__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 8px 0 0 0;
+}
+
+.public-report__meta dl {
+  margin: 0;
+}
+
+.public-report__cost-summary {
+  margin-top: 24px;
+}
+
+.public-report__cost-summary .stats-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .share-link-url,
+  .share-link-list__item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .public-report {
+    padding: 28px 16px;
+  }
+
+  .public-report__cost-summary .stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 56. Inventory Analytics
    ═══════════════════════════════════════════════════════════════════ */

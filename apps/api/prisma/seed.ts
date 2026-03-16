@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
+import { nanoid } from "nanoid";
 import { rebuildSearchIndex } from "../src/lib/search-index.js";
 
 const prisma = new PrismaClient();
@@ -2404,6 +2405,45 @@ async function main(): Promise<void> {
       },
     ],
   });
+
+  const existingForSaleShareLink = await prisma.shareLink.findFirst({
+    where: {
+      assetId,
+      label: "For sale listing"
+    }
+  });
+
+  if (!existingForSaleShareLink) {
+    await prisma.shareLink.create({
+      data: {
+        householdId,
+        assetId,
+        createdById: ownerUserId,
+        token: nanoid(32),
+        label: "For sale listing"
+      }
+    });
+  }
+
+  const existingExpiredShareLink = await prisma.shareLink.findFirst({
+    where: {
+      assetId,
+      label: "Insurance claim (expired)"
+    }
+  });
+
+  if (!existingExpiredShareLink) {
+    await prisma.shareLink.create({
+      data: {
+        householdId,
+        assetId,
+        createdById: ownerUserId,
+        token: nanoid(32),
+        label: "Insurance claim (expired)",
+        expiresAt: new Date("2025-02-01T00:00:00.000Z")
+      }
+    });
+  }
 
   await rebuildSearchIndex(prisma, householdId);
 

@@ -195,6 +195,7 @@ model User {
   timelineEntries         AssetTimelineEntry[]  @relation("TimelineEntryCreator")
   projectNotes            ProjectNote[]         @relation("ProjectNoteAuthor")
   attachments             Attachment[]          @relation("AttachmentUploader")
+  createdShareLinks       ShareLink[]           @relation("ShareLinkCreator")
   createdHobbies          Hobby[]               @relation("HobbyCreator")
 }
 
@@ -218,6 +219,7 @@ model Household {
   incomingAssetTransfers AssetTransfer[]        @relation("AssetTransferToHousehold")
   invitations      HouseholdInvitation[]
   attachments      Attachment[]
+  shareLinks       ShareLink[]
   hobbies          Hobby[]
 
   @@index([createdById])
@@ -291,6 +293,7 @@ model Asset {
   projectAssets        ProjectAsset[]
   comments             Comment[]
   transfers            AssetTransfer[]
+  shareLinks           ShareLink[]
   hobbyLinks           HobbyAsset[]
 
   @@index([householdId, isArchived])
@@ -1065,6 +1068,31 @@ model Attachment {
   @@index([uploadedById])
   @@index([storageKey])
   @@index([status])
+}
+
+model ShareLink {
+  id             String    @id @default(cuid())
+  householdId     String
+  assetId         String
+  createdById     String
+  token           String    @unique
+  label           String?
+  expiresAt       DateTime?
+  isRevoked       Boolean   @default(false)
+  viewCount       Int       @default(0)
+  lastViewedAt    DateTime?
+  dateRangeStart  DateTime?
+  dateRangeEnd    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  household       Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdBy       User      @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([token])
+  @@index([assetId])
+  @@index([householdId])
+  @@index([createdById])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗

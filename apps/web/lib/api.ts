@@ -64,7 +64,10 @@ import {
   projectSummarySchema,
   projectTaskSchema,
   projectTaskChecklistItemSchema,
+  publicAssetReportSchema,
   searchResponseSchema,
+  shareLinkListSchema,
+  shareLinkSchema,
   serviceProviderSchema,
   serviceProviderSpendSchema,
   threadedCommentSchema,
@@ -166,7 +169,9 @@ import {
   type ProjectTask,
   type ProjectTaskChecklistItem,
   type ProjectStatus,
+  type PublicAssetReport,
   type ReorderProjectPhasesInput,
+  type ShareLink,
   type ServiceProvider,
   type ServiceProviderSpend,
   type ThreadedComment,
@@ -174,6 +179,8 @@ import {
   type UpdateCommentInput,
   type UpdateProjectBudgetCategoryInput,
   type UpdateAssetInput,
+  type CreateShareLinkInput,
+  type CsvExportDataset,
   type UpdateProjectExpenseInput,
   type UpdateProjectInventoryItemInput,
   type UpdateProjectPhaseChecklistItemInput,
@@ -491,6 +498,30 @@ const getRequestHeaders = (contentType: string | null = "application/json"): Hea
   return headers;
 };
 
+const downloadFileFromProxy = async (path: string, filename: string): Promise<void> => {
+  if (typeof window === "undefined") {
+    throw new Error("File downloads must be triggered in the browser.");
+  }
+
+  const response = await fetch(getProxyPath(path), {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}.`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+};
+
 export const apiRequest = async <T>({
   path,
   method = "GET",
@@ -652,6 +683,108 @@ export const getHouseholdActivity = async (householdId: string): Promise<Activit
   path: `/v1/households/${householdId}/activity`,
   schema: activityLogListSchema
 });
+
+export const downloadAssetPdf = async (
+  assetId: string,
+  options?: { since?: string; until?: string }
+): Promise<void> => {
+  const params = new URLSearchParams();
+
+  if (options?.since) {
+    params.set("since", options.since);
+  }
+
+  if (options?.until) {
+    params.set("until", options.until);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  await downloadFileFromProxy(`/v1/assets/${assetId}/export/pdf${suffix}`, `asset-history-${assetId}.pdf`);
+};
+
+export const downloadAssetCsv = async (
+  assetId: string,
+  dataset: CsvExportDataset,
+  options?: { since?: string; until?: string }
+): Promise<void> => {
+  const params = new URLSearchParams({ dataset });
+
+  if (options?.since) {
+    params.set("since", options.since);
+  }
+
+  if (options?.until) {
+    params.set("until", options.until);
+  }
+
+  await downloadFileFromProxy(`/v1/assets/${assetId}/export/csv?${params.toString()}`, `${dataset}-${assetId}.csv`);
+};
+
+export const downloadHouseholdCsv = async (
+  householdId: string,
+  dataset: string,
+  options?: { since?: string; until?: string }
+): Promise<void> => {
+  const params = new URLSearchParams({ dataset });
+
+  if (options?.since) {
+    params.set("since", options.since);
+  }
+
+  if (options?.until) {
+    params.set("until", options.until);
+  }
+
+  await downloadFileFromProxy(`/v1/households/${householdId}/export/csv?${params.toString()}`, `${dataset}-${householdId}.csv`);
+};
+
+export const createShareLink = async (
+  householdId: string,
+  input: CreateShareLinkInput
+): Promise<ShareLink> => apiRequest({
+  path: `/v1/households/${householdId}/share-links`,
+  method: "POST",
+  body: input,
+  schema: shareLinkSchema
+});
+
+export const getShareLinks = async (householdId: string, assetId?: string): Promise<ShareLink[]> => {
+  const params = new URLSearchParams();
+
+  if (assetId) {
+    params.set("assetId", assetId);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/share-links${suffix}`,
+    schema: shareLinkListSchema
+  });
+};
+
+export const revokeShareLink = async (householdId: string, shareLinkId: string): Promise<ShareLink> => apiRequest({
+  path: `/v1/households/${householdId}/share-links/${shareLinkId}`,
+  method: "DELETE",
+  schema: shareLinkSchema
+});
+
+export const getPublicAssetReport = async (token: string): Promise<PublicAssetReport> => {
+  const response = await fetch(`${apiBaseUrl}/v1/public/share/${token}`, {
+    cache: "no-store"
+  });
+  const payload = await parseJson(response);
+
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+
+    throw new ApiError(message, response.status);
+  }
+
+  return publicAssetReportSchema.parse(payload);
+};
 
 export const getHouseholdInvitations = async (
   householdId: string,

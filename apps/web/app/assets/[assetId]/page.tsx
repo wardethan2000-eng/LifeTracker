@@ -39,6 +39,7 @@ import {
 } from "../../actions";
 import { AppShell } from "../../../components/app-shell";
 import { AssetDangerActions } from "../../../components/asset-danger-actions";
+import { AssetExportActions } from "../../../components/asset-export-actions";
 import { AssetLabelActions } from "../../../components/asset-label-actions";
 import { AssetMaintenanceSections } from "../../../components/asset-maintenance-sections";
 import { AssetMetricList } from "../../../components/asset-metric-list";
@@ -1427,6 +1428,13 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
           <section className="panel">
             <div className="panel__body--padded" style={{ display: "grid", gap: "16px" }}>
+              <AssetExportActions
+                assetId={detail.asset.id}
+                assetTag={detail.asset.assetTag}
+                assetName={detail.asset.name}
+                householdId={detail.asset.householdId}
+              />
+
               <TimelineFilters
                 assetId={detail.asset.id}
                 currentFilters={{

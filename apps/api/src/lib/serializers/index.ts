@@ -10,6 +10,7 @@ export * from "./inventory.js";
 export * from "./maintenance-logs.js";
 export * from "./notifications.js";
 export * from "./projects.js";
+export * from "./share-links.js";
 export * from "./service-providers.js";
 export * from "./timeline.js";
 export * from "./usage-analytics.js";

@@ -2257,6 +2257,59 @@ export const searchResponseSchema = z.object({
   groups: z.array(searchResultGroupSchema)
 });
 
+// ── Share Link Schemas ─────────────────────────────────────────────
+
+export const shareLinkSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  assetId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  token: z.string(),
+  label: z.string().nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  isRevoked: z.boolean(),
+  viewCount: z.number().int(),
+  lastViewedAt: z.string().datetime().nullable(),
+  dateRangeStart: z.string().datetime().nullable(),
+  dateRangeEnd: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createShareLinkSchema = z.object({
+  assetId: z.string().cuid(),
+  label: z.string().max(200).optional(),
+  expiresAt: z.string().datetime().optional(),
+  dateRangeStart: z.string().datetime().optional(),
+  dateRangeEnd: z.string().datetime().optional()
+});
+
+export const shareLinkListSchema = z.array(shareLinkSchema);
+
+export const publicAssetReportSchema = z.object({
+  assetName: z.string(),
+  assetCategory: z.string(),
+  assetMake: z.string().nullable(),
+  assetModel: z.string().nullable(),
+  assetYear: z.number().nullable(),
+  timelineItems: z.array(assetTimelineItemSchema),
+  costSummary: z.object({
+    lifetimeCost: z.number(),
+    logCount: z.number().int()
+  }),
+  generatedAt: z.string().datetime(),
+  dateRangeStart: z.string().datetime().nullable(),
+  dateRangeEnd: z.string().datetime().nullable()
+});
+
+export const csvExportDatasetSchema = z.enum([
+  "timeline",
+  "maintenance-logs",
+  "schedules",
+  "cost-summary",
+  "inventory"
+]);
+
 export type AssetCategory = z.infer<typeof assetCategorySchema>;
 export type AssetVisibility = z.infer<typeof assetVisibilitySchema>;
 export type HouseholdRole = z.infer<typeof householdRoleSchema>;
@@ -2320,6 +2373,10 @@ export type SearchResult = z.infer<typeof searchResultSchema>;
 export type SearchResultGroup = z.infer<typeof searchResultGroupSchema>;
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export type SearchResponse = z.infer<typeof searchResponseSchema>;
+export type ShareLink = z.infer<typeof shareLinkSchema>;
+export type CreateShareLinkInput = z.infer<typeof createShareLinkSchema>;
+export type PublicAssetReport = z.infer<typeof publicAssetReportSchema>;
+export type CsvExportDataset = z.infer<typeof csvExportDatasetSchema>;
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
 export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesSchema>;
