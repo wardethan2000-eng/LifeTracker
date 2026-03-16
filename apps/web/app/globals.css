@@ -5952,6 +5952,11 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 .analytics-tab-bar__tab {
+  appearance: none;
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
   padding: 10px 20px;
   font-size: 0.88rem;
   font-weight: 500;
@@ -6179,21 +6184,172 @@ html[data-ui-density="compact"] .resource-layout__aside {
   gap: 12px;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 57. Comparative Analytics
+   ═══════════════════════════════════════════════════════════════════ */
+
+.comparative-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.comparative-panel {
+  overflow: hidden;
+}
+
+.comparative-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.comparative-field {
+  min-width: 0;
+}
+
+.comparative-field--full {
+  grid-column: 1 / -1;
+}
+
+.comparative-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.comparative-hint,
+.comparative-note {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+.comparative-chart-shell {
+  height: 360px;
+}
+
+.comparative-chart-shell--short {
+  height: 320px;
+}
+
+.comparative-top-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.comparative-top-parts__column {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.comparative-ranked-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.comparative-ranked-list li {
+  display: grid;
+  gap: 2px;
+  color: var(--ink-light);
+  font-size: 0.9rem;
+}
+
+.comparative-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.comparative-summary-card {
+  min-height: 160px;
+}
+
+.comparative-summary-card--delta {
+  background: linear-gradient(180deg, var(--accent-bg), var(--surface));
+}
+
+.comparative-overline {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.comparative-delta {
+  font-weight: 600;
+}
+
+.comparative-delta--good {
+  color: var(--success);
+}
+
+.comparative-delta--bad {
+  color: var(--danger);
+}
+
+.comparative-member-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comparative-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.comparative-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.comparative-skeleton {
+  display: grid;
+  gap: 14px;
+}
+
 @media (max-width: 900px) {
   .analytics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .comparative-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
   .analytics-grid,
   .analytics-inline-metrics,
-  .analytics-detail-grid {
+  .analytics-detail-grid,
+  .comparative-filter-grid {
     grid-template-columns: 1fr;
   }
 
   .analytics-chart-bar__label {
     flex: 0 0 120px;
+  }
+
+  .comparative-chart-shell,
+  .comparative-chart-shell--short {
+    height: 280px;
   }
 }
 

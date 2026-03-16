@@ -27,6 +27,8 @@ import { serviceProviderRoutes } from "./routes/service-providers/index.js";
 import { usageMetricRoutes } from "./routes/usage-metrics/index.js";
 import { usageMetricAnalyticsRoutes } from "./routes/usage-metrics/analytics.js";
 import { activityLogRoutes } from "./routes/activity-logs/index.js";
+import { complianceAnalyticsRoutes } from "./routes/analytics/compliance.js";
+import { comparativeAnalyticsRoutes } from "./routes/analytics/comparative.js";
 import { commentRoutes } from "./routes/comments/index.js";
 import { costAnalyticsRoutes } from "./routes/cost-analytics/index.js";
 import { projectBudgetAnalyticsRoutes } from "./routes/cost-analytics/project-budget.js";
@@ -81,6 +83,8 @@ export const buildApp = () => {
   app.register(presetRoutes);
   app.register(serviceProviderRoutes);
   app.register(activityLogRoutes);
+  app.register(complianceAnalyticsRoutes);
+  app.register(comparativeAnalyticsRoutes);
   app.register(commentRoutes);
   app.register(costAnalyticsRoutes);
   app.register(invitationRoutes);

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import {
   activityLogSchema,
+  assetComparisonPayloadSchema,
   assetPartsConsumptionSchema,
   assetDetailResponseSchema,
   assetTransferListSchema,
@@ -8,8 +9,11 @@ import {
   assetTimelineEntrySchema,
   assetTimelineItemSchema,
   assetSchema,
+  categoryAdherencePayloadSchema,
   commentSchema,
+  complianceReportPayloadSchema,
   costForecastSchema,
+  completionCycleRecordSchema,
   customPresetProfileSchema,
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
@@ -29,11 +33,14 @@ import {
   inventoryItemConsumptionSchema,
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
+  memberContributionPayloadSchema,
   libraryPresetSchema,
   linkPreviewResponseSchema,
   lowStockInventoryItemSchema,
   meResponseSchema,
   notificationSchema,
+  onTimeRatePayloadSchema,
+  overdueTrendPayloadSchema,
   partCommonalitySchema,
   projectAssetSchema,
   projectBudgetCategoryListSchema,
@@ -62,6 +69,8 @@ import {
   serviceProviderSpendSchema,
   threadedCommentSchema,
   type Asset,
+  type AssetComparisonPayload,
+  type CategoryAdherencePayload,
   type AssetCostPerUnit,
   type AssetCostSummary,
   type AssetTransferList,
@@ -104,6 +113,8 @@ import {
   type CreateMaintenanceLogInput,
   type CreateUsageMetricEntryInput,
   type CreateUsageMetricInput,
+  type ComplianceReportPayload,
+  type CompletionCycleRecord,
   type HouseholdInventoryAnalytics,
   type CustomPresetProfile,
   type HouseholdDashboard,
@@ -130,8 +141,11 @@ import {
   type LowStockInventoryItem,
   type MaintenanceLog,
   type MaintenanceSchedule,
+  type MemberContributionPayload,
   type MeResponse,
   type Notification,
+  type OnTimeRatePayload,
+  type OverdueTrendPayload,
   type ProjectAsset,
   type ProjectBudgetCategory,
   type ProjectBudgetAnalysis,
@@ -172,8 +186,11 @@ import {
   type UpdateServiceProviderInput,
   type UpdateUsageMetricInput,
   type AllocateProjectInventoryInput,
+  regulatoryAssetOptionSchema,
+  type RegulatoryAssetOption,
   type UsageMetric,
   type UsageMetricEntry,
+  type YearOverYearPayload,
   type UsageProjection,
   type UsageRateAnalytics,
   type UsageCostNormalization,
@@ -182,6 +199,7 @@ import {
   usageMetricEntrySchema,
   assetCostPerUnitSchema,
   assetCostSummarySchema,
+  yearOverYearPayloadSchema,
   usageProjectionSchema,
   usageRateAnalyticsSchema,
   usageCostNormalizationSchema,
@@ -329,6 +347,7 @@ const assetPartsConsumptionListSchema = assetPartsConsumptionSchema.array();
 const inventoryTurnoverListSchema = inventoryTurnoverSchema.array();
 const inventoryReorderForecastListSchema = inventoryReorderForecastSchema.array();
 const partCommonalityListSchema = partCommonalitySchema.array();
+const regulatoryAssetOptionListSchema = regulatoryAssetOptionSchema.array();
 const importInventoryResultSchema: Schema<ImportInventoryResult> = {
   parse: (value: unknown) => {
     if (typeof value !== "object" || value === null) {
@@ -879,6 +898,192 @@ export const getProjectShoppingList = async (
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => apiRequest({
   path: `/v1/assets?householdId=${householdId}`,
   schema: assetListSchema
+});
+
+export const getAssetComparisonAnalytics = async (
+  householdId: string,
+  assetIds: string[],
+  options?: {
+    startDate?: string;
+    endDate?: string;
+  }
+): Promise<AssetComparisonPayload> => {
+  const query = new URLSearchParams({
+    householdId,
+    assetIds: assetIds.join(",")
+  });
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/comparative/assets?${query.toString()}`,
+    schema: assetComparisonPayloadSchema
+  });
+};
+
+export const getYearOverYearAnalytics = async (
+  householdId: string,
+  options?: {
+    assetId?: string;
+    years?: number[];
+  }
+): Promise<YearOverYearPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.assetId) {
+    query.set("assetId", options.assetId);
+  }
+
+  if (options?.years && options.years.length > 0) {
+    query.set("years", options.years.join(","));
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/comparative/year-over-year?${query.toString()}`,
+    schema: yearOverYearPayloadSchema
+  });
+};
+
+export const getMemberContributionAnalytics = async (
+  householdId: string,
+  options?: {
+    startDate?: string;
+    endDate?: string;
+  }
+): Promise<MemberContributionPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/comparative/member-contributions?${query.toString()}`,
+    schema: memberContributionPayloadSchema
+  });
+};
+
+export const getComplianceOnTimeRate = async (
+  householdId: string,
+  options?: {
+    startDate?: string;
+    endDate?: string;
+    assetId?: string;
+  }
+): Promise<OnTimeRatePayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  if (options?.assetId) {
+    query.set("assetId", options.assetId);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/compliance/on-time-rate?${query.toString()}`,
+    schema: onTimeRatePayloadSchema
+  });
+};
+
+export const getComplianceOverdueTrend = async (
+  householdId: string,
+  options?: {
+    startDate?: string;
+    endDate?: string;
+    assetId?: string;
+  }
+): Promise<OverdueTrendPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  if (options?.assetId) {
+    query.set("assetId", options.assetId);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/compliance/overdue-trend?${query.toString()}`,
+    schema: overdueTrendPayloadSchema
+  });
+};
+
+export const getComplianceCategoryAdherence = async (
+  householdId: string,
+  options?: {
+    startDate?: string;
+    endDate?: string;
+  }
+): Promise<CategoryAdherencePayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/compliance/category-adherence?${query.toString()}`,
+    schema: categoryAdherencePayloadSchema
+  });
+};
+
+export const getComplianceReport = async (
+  assetId: string,
+  householdId: string,
+  options?: {
+    startDate?: string;
+    endDate?: string;
+    gracePeriodDays?: number;
+  }
+): Promise<ComplianceReportPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.startDate) {
+    query.set("startDate", options.startDate);
+  }
+
+  if (options?.endDate) {
+    query.set("endDate", options.endDate);
+  }
+
+  if (options?.gracePeriodDays !== undefined) {
+    query.set("gracePeriodDays", String(options.gracePeriodDays));
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/compliance/report/${assetId}?${query.toString()}`,
+    schema: complianceReportPayloadSchema
+  });
+};
+
+export const getRegulatoryAssets = async (householdId: string): Promise<RegulatoryAssetOption[]> => apiRequest({
+  path: `/v1/analytics/compliance/regulatory-assets?householdId=${householdId}`,
+  schema: regulatoryAssetOptionListSchema
 });
 
 export const getHouseholdMembers = async (householdId: string): Promise<HouseholdMember[]> => apiRequest({

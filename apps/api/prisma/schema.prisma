@@ -376,6 +376,7 @@ model MaintenanceSchedule {
   estimatedCost      Float?
   estimatedMinutes   Int?
   isActive           Boolean          @default(true)
+  isRegulatory       Boolean          @default(false)
   lastCompletedAt    DateTime?
   nextDueAt          DateTime?
   nextDueMetricValue Float?

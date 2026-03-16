@@ -119,6 +119,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       triggerConfig: input.triggerConfig,
       notificationConfig: toInputJsonValue(input.notificationConfig),
       metricId,
+      isRegulatory: input.isRegulatory ?? false,
       nextDueAt: recalculated.nextDueAt,
       nextDueMetricValue: recalculated.nextDueMetricValue
     };
@@ -464,6 +465,10 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.isActive !== undefined) {
       data.isActive = input.isActive;
+    }
+
+    if (input.isRegulatory !== undefined) {
+      data.isRegulatory = input.isRegulatory;
     }
 
     if (input.lastCompletedAt !== undefined) {

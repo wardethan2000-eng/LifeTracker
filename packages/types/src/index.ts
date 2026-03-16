@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export * from "./analytics/comparative.js";
+export * from "./analytics/compliance.js";
 
 export const assetCategoryValues = [
   "vehicle",
@@ -232,6 +233,7 @@ export const presetScheduleTemplateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(1000).optional(),
   triggerTemplate: presetTriggerSchema,
+  isRegulatory: z.boolean().default(false),
   notificationConfig: notificationConfigSchema.default({
     channels: ["push"],
     sendAtDue: true,
@@ -791,6 +793,7 @@ export const createMaintenanceScheduleSchema = z.object({
   presetKey: z.string().max(160).optional(),
   estimatedCost: z.number().min(0).optional(),
   estimatedMinutes: z.number().int().min(0).optional(),
+  isRegulatory: z.boolean().optional(),
   assignedToId: z.string().cuid().optional()
 });
 
@@ -804,6 +807,7 @@ export const updateMaintenanceScheduleSchema = z.object({
   estimatedCost: z.number().min(0).optional(),
   estimatedMinutes: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
+  isRegulatory: z.boolean().optional(),
   lastCompletedAt: z.string().datetime().optional(),
   assignedToId: z.string().cuid().nullable().optional()
 });
@@ -865,6 +869,7 @@ export const maintenanceScheduleSchema = z.object({
   estimatedCost: z.number().nullable().default(null),
   estimatedMinutes: z.number().int().nullable().default(null),
   isActive: z.boolean(),
+  isRegulatory: z.boolean().default(false),
   lastCompletedAt: z.string().datetime().nullable(),
   nextDueAt: z.string().datetime().nullable(),
   nextDueMetricValue: z.number().nullable(),

@@ -126,6 +126,22 @@ const buildTriggerFromTemplate = (
 
 const metricLookupKey = (name: string, unit: string): string => `${name.toLowerCase()}::${unit.toLowerCase()}`;
 
+const regulatoryPresetPattern = /\b(regulatory|compliance|legal|required|mandated|faa|14\s*cfr|health\s*code|vgb)\b/i;
+
+const isRegulatoryPresetSchedule = (scheduleTemplate: PresetDefinition["scheduleTemplates"][number]): boolean => {
+  if (scheduleTemplate.isRegulatory) {
+    return true;
+  }
+
+  const haystack = [
+    scheduleTemplate.name,
+    scheduleTemplate.description,
+    ...scheduleTemplate.tags
+  ].filter((value): value is string => Boolean(value));
+
+  return haystack.some((value) => regulatoryPresetPattern.test(value));
+};
+
 export const applyPresetToAsset = async (
   prisma: PrismaExecutor,
   asset: Pick<Asset, "id" | "householdId" | "category" | "fieldDefinitions" | "customFields">,
@@ -251,6 +267,7 @@ export const applyPresetToAsset = async (
       triggerConfig: toInputJsonValue(triggerConfig),
       notificationConfig: toInputJsonValue(scheduleTemplate.notificationConfig),
       presetKey: options.sourceLabel,
+      isRegulatory: isRegulatoryPresetSchedule(scheduleTemplate),
       nextDueAt: recalculated.nextDueAt,
       nextDueMetricValue: recalculated.nextDueMetricValue
     };
