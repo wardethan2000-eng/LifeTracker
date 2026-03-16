@@ -52,6 +52,7 @@ Run `pnpm db:generate` after every Prisma schema change before writing code that
 
 - App Router with server components by default. Client components use `"use client"` directive.
 - API client lives in `apps/web/lib/api.ts` — a typed wrapper around fetch that handles auth headers and Zod parsing. Add new methods here for new endpoints.
+- API proxy: All browser-to-API requests that need to pass through the Next.js server (for cookie forwarding or to avoid CORS) use a catch-all proxy at `apps/web/app/api/[...path]/route.ts`. It forwards requests to `${LIFEKEEPER_API_BASE_URL}/v1/${path}` with auth header passthrough. The shared proxy utility lives in `apps/web/lib/api-proxy.ts`. Do not create individual proxy route files for new endpoints — the catch-all handles them automatically.
 - CSS is global in `apps/web/app/globals.css` — no CSS modules, no Tailwind. Use existing CSS custom properties (e.g. `var(--ink)`, `var(--surface)`, `var(--accent)`, `var(--border)`).
 - **Dashboard/home pages** use a card-based layout (`.panel--studio`, `.kv-grid`).
 - **Workbench screens** (asset create/edit, project create/settings) use the flat form paradigm with `.workbench-*` classes: `.workbench-form`, `.workbench-section`, `.workbench-grid`, `.workbench-table`, `.workbench-details`, `.workbench-bar`.
