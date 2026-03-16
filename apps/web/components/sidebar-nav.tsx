@@ -4,30 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { JSX } from "react";
 
-type UserData = {
-  userName: string;
-  initials: string;
-  userRole: string;
+export type SidebarNavItem = {
+  href: string;
+  label: string;
+  icon: string;
 };
 
 type SidebarNavProps = {
-  userData: UserData;
+  navItems: SidebarNavItem[];
 };
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: "grid" },
-  { href: "/assets", label: "Assets", icon: "box" },
-  { href: "/inventory", label: "Inventory", icon: "layers" },
-  { href: "/assets/new", label: "Add Asset", icon: "plus" },
-  { href: "/projects", label: "Projects", icon: "folder" },
-  { href: "/analytics", label: "Analytics", icon: "dollar" },
-  { href: "/hobbies", label: "Hobbies", icon: "beaker" },
-  { href: "/maintenance", label: "Maintenance", icon: "wrench" },
-  { href: "/activity", label: "Activity", icon: "pulse" },
-  { href: "/notifications", label: "Notifications", icon: "bell" },
-  { href: "/invitations", label: "Invitations", icon: "mail" },
-  { href: "/service-providers", label: "Providers", icon: "briefcase" },
-];
 
 const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
   switch (icon) {
@@ -60,48 +45,32 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
   }
 };
 
-export function SidebarNav({ userData }: SidebarNavProps): JSX.Element {
+export function SidebarNav({ navItems }: SidebarNavProps): JSX.Element {
   const pathname = usePathname();
 
   return (
-    <nav className="sidebar">
-      <div className="sidebar__brand">
-        <h1>AssetKeeper</h1>
-        <p>Maintenance Tracker</p>
-      </div>
+    <div className="sidebar__nav">
+      <div className="sidebar__section-label">Main</div>
+      {navItems.map((item) => {
+        const isAssetsCreatePath = pathname === "/assets/new" || pathname.startsWith("/assets/new/");
+        const isActive = item.href === "/"
+          ? pathname === "/"
+          : item.href === "/assets"
+            ? !isAssetsCreatePath && (pathname === item.href || pathname.startsWith(`${item.href}/`))
+            : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
-      <div className="sidebar__nav">
-        <div className="sidebar__section-label">Main</div>
-        {navItems.map((item) => {
-          const isAssetsCreatePath = pathname === "/assets/new" || pathname.startsWith("/assets/new/");
-          const isActive = item.href === "/"
-            ? pathname === "/"
-            : item.href === "/assets"
-              ? !isAssetsCreatePath && (pathname === item.href || pathname.startsWith(`${item.href}/`))
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
-            >
-              <NavIcon icon={item.icon} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="sidebar__footer">
-        <div className="sidebar__user">
-          <div className="sidebar__avatar">{userData.initials || "U"}</div>
-          <div className="sidebar__user-info">
-            <strong>{userData.userName}</strong>
-            <span>{userData.userRole}</span>
-          </div>
-        </div>
-      </div>
-    </nav>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            prefetch={true}
+            className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+          >
+            <NavIcon icon={item.icon} />
+            {item.label}
+          </Link>
+        );
+      })}
+    </div>
   );
 }

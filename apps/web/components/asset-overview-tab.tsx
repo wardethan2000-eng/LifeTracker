@@ -17,7 +17,7 @@ import {
   hobbyStatusBadgeClass,
   renderLogSummary,
   type AssetTimelineFeed
-} from "../app/assets/[assetId]/shared";
+} from "../app/(dashboard)/assets/[assetId]/shared";
 
 type AssetOverviewTabProps = {
   detail: AssetDetailResponse;

@@ -21,7 +21,7 @@ import {
   formatCategoryLabel,
   formatDateTime
 } from "../lib/formatters";
-import { formatTransferTypeLabel } from "../app/assets/[assetId]/shared";
+import { formatTransferTypeLabel } from "../app/(dashboard)/assets/[assetId]/shared";
 
 type AssetSettingsTabProps = {
   detail: AssetDetailResponse;

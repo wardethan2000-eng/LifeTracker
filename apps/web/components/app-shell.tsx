@@ -1,3 +1,4 @@
+// Deprecated: app shell now lives in app/(dashboard)/layout.tsx.
 import Link from "next/link";
 import type { JSX } from "react";
 import { ApiError, getMe } from "../lib/api";

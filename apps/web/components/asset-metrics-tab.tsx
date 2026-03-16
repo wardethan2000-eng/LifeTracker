@@ -21,7 +21,7 @@ import {
   getUsageRateStatusClass,
   getUsageRateStatusLabel,
   type MetricInsight
-} from "../app/assets/[assetId]/shared";
+} from "../app/(dashboard)/assets/[assetId]/shared";
 
 type AssetMetricsTabProps = {
   detail: AssetDetailResponse;

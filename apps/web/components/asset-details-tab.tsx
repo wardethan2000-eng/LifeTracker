@@ -12,7 +12,7 @@ import {
 import {
   renderMetaRow,
   renderMoneyMetaRow
-} from "../app/assets/[assetId]/shared";
+} from "../app/(dashboard)/assets/[assetId]/shared";
 
 type AssetDetailsTabProps = {
   detail: AssetDetailResponse;

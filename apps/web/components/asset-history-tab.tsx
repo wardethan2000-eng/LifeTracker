@@ -12,7 +12,7 @@ import { AssetExportActions } from "./asset-export-actions";
 import { TimelineEntryForm } from "./timeline-entry-form";
 import { TimelineFilters } from "./timeline-filters";
 import { TimelineItem } from "./timeline-item";
-import { buildAssetHistoryHref, getSearchParamValue, type AssetHistoryPageSearchParams, type AssetTimelineFeed } from "../app/assets/[assetId]/shared";
+import { buildAssetHistoryHref, getSearchParamValue, type AssetHistoryPageSearchParams, type AssetTimelineFeed } from "../app/(dashboard)/assets/[assetId]/shared";
 import { formatCurrency } from "../lib/formatters";
 
 type AssetHistoryTabProps = {

@@ -323,6 +323,7 @@ type RequestOptions<T> = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   schema?: Schema<T>;
+  cacheOptions?: RequestInit["cache"] | { revalidate: number };
   revalidate?: number | false;
   cachePolicy?: RequestCache | { next: { revalidate: number } } | { next: { tags: string[] } };
 };
@@ -562,23 +563,40 @@ export const apiRequest = async <T>({
   method = "GET",
   body,
   schema,
+  cacheOptions,
   revalidate,
   cachePolicy
 }: RequestOptions<T>): Promise<T> => {
   let response: Response;
 
-  const cacheOptions = method === "GET" && typeof revalidate === "number"
-    ? { next: { revalidate } }
-    : cachePolicy === undefined
-      ? { cache: "no-store" as const }
-      : typeof cachePolicy === "string"
+  const resolvedCacheOptions = (() => {
+    if (method !== "GET") {
+      return { cache: "no-store" as const };
+    }
+
+    if (cacheOptions !== undefined) {
+      return typeof cacheOptions === "string"
+        ? { cache: cacheOptions }
+        : { next: { revalidate: cacheOptions.revalidate } };
+    }
+
+    if (typeof revalidate === "number") {
+      return { next: { revalidate } };
+    }
+
+    if (cachePolicy !== undefined) {
+      return typeof cachePolicy === "string"
         ? { cache: cachePolicy }
         : { next: cachePolicy.next };
+    }
+
+    return { cache: "no-store" as const };
+  })();
 
   try {
     response = await fetch(getFetchTarget(path), {
       method,
-      ...cacheOptions,
+      ...resolvedCacheOptions,
       headers: getRequestHeaders(),
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     });
@@ -610,15 +628,17 @@ export const apiRequest = async <T>({
   return schema.parse(payload);
 };
 
+// cache() deduplicates getMe calls within a single RSC request/render pass.
 export const getMe = cache(async (): Promise<MeResponse> => apiRequest({
   path: "/v1/me",
-  schema: meResponseSchema
+  schema: meResponseSchema,
+  cacheOptions: { revalidate: 300 }
 }));
 
 export const getHouseholdDashboard = async (householdId: string): Promise<HouseholdDashboard> => apiRequest({
   path: `/v1/households/${householdId}/dashboard`,
   schema: householdDashboardSchema,
-  revalidate: 15
+  cacheOptions: { revalidate: 60 }
 });
 
 export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkItem[]> => apiRequest({
@@ -630,7 +650,7 @@ export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkI
 export const getAssetDetail = async (assetId: string): Promise<AssetDetailResponse> => apiRequest({
   path: `/v1/assets/${assetId}/detail`,
   schema: assetDetailResponseSchema,
-  revalidate: 15
+  cacheOptions: "no-store"
 });
 
 export const getAssetTransferHistory = async (assetId: string): Promise<AssetTransferList> => apiRequest({
@@ -707,7 +727,7 @@ export const getHouseholdProjects = async (
   return apiRequest({
     path: `/v1/households/${householdId}/projects${suffix}`,
     schema: projectSummaryListSchema,
-    revalidate: 15
+    cacheOptions: { revalidate: 30 }
   });
 };
 
@@ -1132,7 +1152,7 @@ export const getProjectShoppingList = async (
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => apiRequest({
   path: `/v1/assets?householdId=${householdId}`,
   schema: assetListSchema,
-  cachePolicy: { next: { revalidate: 30 } }
+  cacheOptions: { revalidate: 30 }
 });
 
 export const getHouseholdUsageHighlights = async (
@@ -1460,7 +1480,7 @@ export const getHouseholdInventory = async (
   return apiRequest({
     path: `/v1/households/${householdId}/inventory${suffix}`,
     schema: householdInventoryListSchema,
-    revalidate: 15
+    cacheOptions: { revalidate: 30 }
   });
 };
 
@@ -2712,6 +2732,7 @@ export const getHouseholdHobbies = async (
   const query = params.toString();
   const result = await apiRequest<{ items: HobbySummary[]; nextCursor: string | null }>({
     path: `/v1/households/${householdId}/hobbies${query ? `?${query}` : ""}`,
+    cacheOptions: { revalidate: 30 }
   });
   return result.items.map((item) => hobbySummarySchema.parse(item));
 };
