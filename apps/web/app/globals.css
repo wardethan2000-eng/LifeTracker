@@ -1,4 +1,97 @@
-/* ── AssetKeeper – Professional Dashboard Theme ── */
+/* ╔══════════════════════════════════════════════════════════════════╗
+  ║  LifeKeeper – globals.css – Table of Contents                  ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║                                                                ║
+  ║  Search for ═══ SECTION NAME to jump to any section.           ║
+  ║                                                                ║
+  ║  1.  Theme & Custom Properties                                 ║
+  ║  2.  Reset & Base                                              ║
+  ║  3.  App Shell                                                 ║
+  ║  4.  Sidebar                                                   ║
+  ║  5.  Main Content                                              ║
+  ║  6.  Toolbar & Density Toggle                                  ║
+  ║  7.  Search Trigger                                            ║
+  ║  8.  Page Layout                                               ║
+  ║  9.  Search Palette                                            ║
+  ║  10. Household Switcher                                        ║
+  ║  11. Stats Row                                                 ║
+  ║  12. Panels                                                    ║
+  ║  13. Inventory Domain                                          ║
+  ║  14. Tables                                                    ║
+  ║  15. Status Chips & Pills                                      ║
+  ║  16. Dashboard Layout                                          ║
+  ║  17. Quick Actions                                             ║
+  ║  18. Notification Feed                                         ║
+  ║  19. Buttons                                                   ║
+  ║  20. Forms & Fields                                            ║
+  ║  21. Form Section                                              ║
+  ║  22. Detail Pages                                              ║
+  ║  23. Danger Actions                                            ║
+  ║  24. Workbench Forms                                           ║
+  ║  25. Workbench Table                                           ║
+  ║  26. Workbench Details Accordion                               ║
+  ║  27. Workbench Sticky Bar                                      ║
+  ║  28. Asset Studio (Legacy)                                     ║
+  ║  29. DL Grids / Key-Value                                      ║
+  ║  30. Metric Cards                                              ║
+  ║  31. Schedule Stack                                            ║
+  ║  32. Log List                                                  ║
+  ║  33. Preset Cards                                              ║
+  ║  34. Asset Detail Groups                                       ║
+  ║  35. Legacy Utilities                                          ║
+  ║  36. Error Shell                                               ║
+  ║  37. Notes & Alerts                                            ║
+  ║  38. Table Row Tones                                           ║
+  ║  39. Form Layout Variants                                      ║
+  ║  40. Responsive Breakpoints                                    ║
+  ║  41. Skeleton Loading                                          ║
+  ║  42. Schedule Form                                             ║
+  ║  43. Schedule Card Actions                                     ║
+  ║  44. Field Value Tags                                          ║
+  ║  45. Asset Labels                                              ║
+  ║  46. Project Domain                                            ║
+  ║  47. Resource Layout                                           ║
+  ║  48. Card System                                               ║
+  ║  49. Expand Modal                                              ║
+  ║  50. Compact Preview                                           ║
+  ║  51. Link Preview Dialog                                       ║
+  ║  52. Barcode Lookup                                            ║
+  ║  53. Attachments                                               ║
+  ║  54. Hobby Domain                                              ║
+  ║                                                                ║
+  ╚══════════════════════════════════════════════════════════════════╝ */
+
+/* ── Container Pattern Quick Reference ──────────────────────────────
+
+  READING SURFACES (dashboard, list pages, detail overview tabs):
+  • .panel — standard container for content blocks
+  • .panel--studio — legacy styled panel with shadow, used on dashboard
+  • .stats-row > .stat-card — metric summary cards
+  • .data-table — full-width table inside a panel body
+
+  WORKING SURFACES (create, edit, settings screens):
+  • .card — always-open container for primary field groups (Core Identity)
+  • .card--collapsible — aside column metadata (Purchase, Warranty, etc.)
+  • .card--expandable — dense editing sections that toggle inline
+    (Custom Fields, Schedules, Metrics)
+  • .workbench-grid — 3-col form field layout inside any card body
+  • .workbench-table — dense repeating content table inside any card
+  • .workbench-bar — sticky save bar at page bottom
+
+  STANDALONE FORMS (service providers, inventory creation):
+  • .form-grid — 2-col simpler field layout
+  • .form-section — self-contained form card with header and border
+    (used outside of resource-layout contexts)
+
+  DEPRECATED / LEGACY:
+  • .asset-studio — replaced by resource-layout + card system
+  • .panel--studio on working surfaces — use .card instead
+
+  ──────────────────────────────────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 1. Theme & Custom Properties
+  ═══════════════════════════════════════════════════════════════════ */
 
 :root {
   --font-body: "Segoe UI", "Inter", "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -75,6 +168,10 @@ html[data-ui-density="compact"] {
   --density-summary-align: center;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 2. Reset & Base
+   ═══════════════════════════════════════════════════════════════════ */
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
@@ -102,7 +199,9 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 h3 { font-size: 1.05rem; font-weight: 600; }
 p { margin: 0; color: var(--ink-light); }
 
-/* ── App Shell ── */
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 3. App Shell
+  ═══════════════════════════════════════════════════════════════════ */
 
 .app-layout {
   display: grid;
@@ -110,7 +209,9 @@ p { margin: 0; color: var(--ink-light); }
   min-height: 100vh;
 }
 
-/* ── Sidebar ── */
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 4. Sidebar
+  ═══════════════════════════════════════════════════════════════════ */
 
 .sidebar {
   background: var(--bg-sidebar);
@@ -223,12 +324,18 @@ p { margin: 0; color: var(--ink-light); }
   font-size: 0.75rem;
 }
 
-/* ── Main Content ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 5. Main Content
+   ═══════════════════════════════════════════════════════════════════ */
 
 .main-content {
   min-width: 0;
   min-height: 100vh;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 6. Toolbar & Density Toggle
+   ═══════════════════════════════════════════════════════════════════ */
 
 .shell-toolbar {
   display: flex;
@@ -286,6 +393,10 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--accent);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 7. Search Trigger
+   ═══════════════════════════════════════════════════════════════════ */
+
 .search-trigger {
   display: inline-flex;
   align-items: center;
@@ -337,6 +448,10 @@ p { margin: 0; color: var(--ink-light); }
 
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 8. Page Layout
+  ═══════════════════════════════════════════════════════════════════ */
+
 .page-header {
   display: flex;
   align-items: center;
@@ -363,6 +478,10 @@ p { margin: 0; color: var(--ink-light); }
   gap: var(--density-page-gap);
   font-size: var(--density-font-size);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 9. Search Palette
+   ═══════════════════════════════════════════════════════════════════ */
 
 .search-palette {
   position: fixed;
@@ -537,7 +656,9 @@ p { margin: 0; color: var(--ink-light); }
   to { transform: rotate(360deg); }
 }
 
-/* ── Household Switcher ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 10. Household Switcher
+   ═══════════════════════════════════════════════════════════════════ */
 
 .household-switcher {
   display: flex;
@@ -568,7 +689,9 @@ p { margin: 0; color: var(--ink-light); }
   color: #fff;
 }
 
-/* ── Stat Cards ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 11. Stats Row
+   ═══════════════════════════════════════════════════════════════════ */
 
 .stats-row {
   display: grid;
@@ -618,7 +741,9 @@ p { margin: 0; color: var(--ink-light); }
 
 .stat-card--accent { border-left: 4px solid var(--accent); }
 
-/* ── Panel / Card ── */
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 12. Panels
+  ═══════════════════════════════════════════════════════════════════ */
 
 .panel {
   background: var(--surface);
@@ -699,7 +824,9 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
 }
 
-/* ── Inventory Filter Bar ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 13. Inventory Domain
+   ═══════════════════════════════════════════════════════════════════ */
 
 .inventory-filter-bar {
   display: flex;
@@ -788,7 +915,9 @@ p { margin: 0; color: var(--ink-light); }
   margin-top: 2px;
 }
 
-/* ── Tables ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 14. Tables
+   ═══════════════════════════════════════════════════════════════════ */
 
 .data-table {
   width: 100%;
@@ -855,7 +984,9 @@ p { margin: 0; color: var(--ink-light); }
   text-decoration: underline;
 }
 
-/* ── Status Chips ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 15. Status Chips & Pills
+   ═══════════════════════════════════════════════════════════════════ */
 
 .status-chip {
   display: inline-flex;
@@ -908,7 +1039,9 @@ p { margin: 0; color: var(--ink-light); }
   border: 1px solid var(--border);
 }
 
-/* ── Two-Column Dashboard Layout ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 16. Dashboard Layout
+   ═══════════════════════════════════════════════════════════════════ */
 
 .dashboard-grid {
   display: grid;
@@ -929,7 +1062,9 @@ p { margin: 0; color: var(--ink-light); }
   min-width: 0;
 }
 
-/* ── Quick Actions ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 17. Quick Actions
+   ═══════════════════════════════════════════════════════════════════ */
 
 .quick-actions {
   display: grid;
@@ -953,7 +1088,9 @@ p { margin: 0; color: var(--ink-light); }
   background: var(--surface-alt);
 }
 
-/* ── Notification Feed ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 18. Notification Feed
+   ═══════════════════════════════════════════════════════════════════ */
 
 .notification-feed {
   display: grid;
@@ -1003,7 +1140,9 @@ p { margin: 0; color: var(--ink-light); }
   align-items: center;
 }
 
-/* ── Buttons ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 19. Buttons
+   ═══════════════════════════════════════════════════════════════════ */
 
 .button {
   display: inline-flex;
@@ -1086,7 +1225,9 @@ p { margin: 0; color: var(--ink-light); }
   text-decoration: underline;
 }
 
-/* ── Forms ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 20. Forms & Fields
+   ═══════════════════════════════════════════════════════════════════ */
 
 input, select, textarea {
   width: 100%;
@@ -1174,7 +1315,9 @@ textarea { resize: vertical; }
   width: auto;
 }
 
-/* ── Form Section ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 21. Form Section
+   ═══════════════════════════════════════════════════════════════════ */
 
 .form-section {
   display: grid;
@@ -1203,7 +1346,9 @@ textarea { resize: vertical; }
   max-width: 65ch;
 }
 
-/* ── Detail Page ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 22. Detail Pages
+   ═══════════════════════════════════════════════════════════════════ */
 
 .detail-topbar {
   padding: 16px 28px;
@@ -1461,7 +1606,10 @@ textarea { resize: vertical; }
   gap: 4px;
 }
 
-/* ── Danger actions ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 23. Danger Actions
+   ═══════════════════════════════════════════════════════════════════ */
+
 .asset-danger-actions {
   display: flex;
   align-items: center;
@@ -1491,7 +1639,9 @@ textarea { resize: vertical; }
   font-size: 0.75rem;
 }
 
-/* ── Workbench Forms (creation & edit screens) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 24. Workbench Forms
+   ═══════════════════════════════════════════════════════════════════ */
 
 .workbench-form {
   display: grid;
@@ -1740,7 +1890,9 @@ textarea { resize: vertical; }
   background: var(--surface-alt);
 }
 
-/* ── Workbench Table (repeating content) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 25. Workbench Table
+   ═══════════════════════════════════════════════════════════════════ */
 
 .workbench-table {
   width: 100%;
@@ -1811,7 +1963,9 @@ textarea { resize: vertical; }
   padding: 16px;
 }
 
-/* ── Workbench Details Accordion ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 26. Workbench Details Accordion
+   ═══════════════════════════════════════════════════════════════════ */
 
 .workbench-details {
   border-bottom: 1px solid var(--border);
@@ -1853,7 +2007,9 @@ textarea { resize: vertical; }
   color: var(--ink);
 }
 
-/* ── Workbench Sticky Action Bar ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 27. Workbench Sticky Bar
+   ═══════════════════════════════════════════════════════════════════ */
 
 .workbench-bar {
   position: sticky;
@@ -1876,7 +2032,9 @@ textarea { resize: vertical; }
   padding: 8px 24px;
 }
 
-/* ── Asset Studio (legacy — keep for non-workbench panels) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 28. Asset Studio (Legacy)
+   ═══════════════════════════════════════════════════════════════════ */
 
 .asset-studio {
   display: grid;
@@ -1903,7 +2061,9 @@ textarea { resize: vertical; }
   gap: 14px;
 }
 
-/* ── DL Grids ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 29. DL Grids / Key-Value
+   ═══════════════════════════════════════════════════════════════════ */
 
 .kv-grid,
 .data-list,
@@ -1948,7 +2108,9 @@ textarea { resize: vertical; }
   color: var(--ink);
 }
 
-/* ── Metric Cards ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 30. Metric Cards
+   ═══════════════════════════════════════════════════════════════════ */
 
 .metric-grid {
   display: grid;
@@ -1974,7 +2136,9 @@ textarea { resize: vertical; }
   line-height: 1.1;
 }
 
-/* ── Schedule Stack ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 31. Schedule Stack
+   ═══════════════════════════════════════════════════════════════════ */
 
 .schedule-stack {
   display: grid;
@@ -2028,7 +2192,9 @@ textarea { resize: vertical; }
   justify-content: flex-end;
 }
 
-/* ── Log List ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 32. Log List
+   ═══════════════════════════════════════════════════════════════════ */
 
 .log-list {
   display: grid;
@@ -2048,7 +2214,9 @@ textarea { resize: vertical; }
   border-bottom: 0;
 }
 
-/* ── Preset Cards ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 33. Preset Cards
+   ═══════════════════════════════════════════════════════════════════ */
 
 .preset-grid {
   display: grid;
@@ -2091,7 +2259,9 @@ textarea { resize: vertical; }
   color: var(--ink);
 }
 
-/* ── Asset Detail Groups ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 34. Asset Detail Groups
+   ═══════════════════════════════════════════════════════════════════ */
 
 .asset-detail-groups {
   display: grid;
@@ -2108,7 +2278,9 @@ textarea { resize: vertical; }
   background: var(--surface-alt);
 }
 
-/* ── Panel Header (legacy compat) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 35. Legacy Utilities
+   ═══════════════════════════════════════════════════════════════════ */
 
 .panel-header {
   display: flex;
@@ -2137,7 +2309,9 @@ textarea { resize: vertical; }
   font-weight: 600;
 }
 
-/* ── Error Shell ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 36. Error Shell
+   ═══════════════════════════════════════════════════════════════════ */
 
 .error-shell {
   display: grid;
@@ -2179,6 +2353,10 @@ textarea { resize: vertical; }
   color: var(--ink);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 37. Notes & Alerts
+   ═══════════════════════════════════════════════════════════════════ */
+
 .note {
   padding: 12px 16px;
   border-radius: var(--radius);
@@ -2188,7 +2366,9 @@ textarea { resize: vertical; }
   font-size: 0.88rem;
 }
 
-/* ── Row tones ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 38. Table Row Tones
+   ═══════════════════════════════════════════════════════════════════ */
 
 .row--overdue td:first-child {
   box-shadow: inset 3px 0 0 var(--danger);
@@ -2203,7 +2383,9 @@ textarea { resize: vertical; }
   box-shadow: inset 3px 0 0 var(--success);
 }
 
-/* ── Form inside panels ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 39. Form Layout Variants
+   ═══════════════════════════════════════════════════════════════════ */
 
 .form-grid--create {
   padding: 20px;
@@ -2213,8 +2395,13 @@ textarea { resize: vertical; }
   gap: 12px;
 }
 
-/* ── Responsive ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 40. Responsive Breakpoints
+   ═══════════════════════════════════════════════════════════════════ */
 
+/* Kept in place rather than moved to file end so later domain sections retain their existing cascade order. */
+
+/* ── 1280px ── */
 @media (max-width: 1280px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -2225,6 +2412,7 @@ textarea { resize: vertical; }
   }
 }
 
+/* ── 1024px ── */
 @media (max-width: 1024px) {
   .app-layout {
     grid-template-columns: 1fr;
@@ -2263,6 +2451,7 @@ textarea { resize: vertical; }
   }
 }
 
+/* ── 768px ── */
 @media (max-width: 768px) {
   .stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2332,6 +2521,7 @@ textarea { resize: vertical; }
   }
 }
 
+/* ── 480px ── */
 @media (max-width: 480px) {
   .stats-row {
     grid-template-columns: 1fr;
@@ -2350,7 +2540,9 @@ textarea { resize: vertical; }
   }
 }
 
-/* ── Skeleton Loading ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 41. Skeleton Loading
+   ═══════════════════════════════════════════════════════════════════ */
 
 .skeleton-page {
   min-height: 100vh;
@@ -2376,7 +2568,9 @@ textarea { resize: vertical; }
   100% { background-position: -200% 0; }
 }
 
-/* ── Schedule Form (dynamic trigger-aware) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 42. Schedule Form
+   ═══════════════════════════════════════════════════════════════════ */
 
 .schedule-form__section-label {
   display: block;
@@ -2489,7 +2683,9 @@ textarea { resize: vertical; }
   line-height: 1.45;
 }
 
-/* ── Schedule Card Actions (collapsible) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 43. Schedule Card Actions
+   ═══════════════════════════════════════════════════════════════════ */
 
 .schedule-card__actions-area {
   display: grid;
@@ -2515,7 +2711,9 @@ textarea { resize: vertical; }
   border-color: var(--accent) !important;
 }
 
-/* ── Field Value Tags ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 44. Field Value Tags
+   ═══════════════════════════════════════════════════════════════════ */
 
 .field-value__tags {
   display: flex;
@@ -2523,7 +2721,9 @@ textarea { resize: vertical; }
   gap: 4px;
 }
 
-/* ── Asset Labels ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 45. Asset Labels
+   ═══════════════════════════════════════════════════════════════════ */
 
 .asset-label-panel__body {
   display: grid;
@@ -2642,7 +2842,9 @@ textarea { resize: vertical; }
   color: #334155;
 }
 
-/* ── Projects Portfolio ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 46. Project Domain
+   ═══════════════════════════════════════════════════════════════════ */
 
 .project-filter-panel__body {
   display: grid;
@@ -3041,6 +3243,7 @@ textarea { resize: vertical; }
     break-inside: avoid;
   }
 }
+
 /* Project Studio specific styles, loosely inheriting the asset-studio pattern */
 .project-studio {
   display: flex;
@@ -3148,9 +3351,9 @@ textarea { resize: vertical; }
   outline: none;
 }
 
-/* ══════════════════════════════════════════════════
-   RESOURCE LAYOUT SYSTEM (two-column working surfaces)
-   ══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 47. Resource Layout
+  ═══════════════════════════════════════════════════════════════════ */
 
 .resource-layout {
   display: grid;
@@ -3189,9 +3392,9 @@ textarea { resize: vertical; }
   }
 }
 
-/* ══════════════════════════════════════════
-   CARD SYSTEM
-   ══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 48. Card System
+   ═══════════════════════════════════════════════════════════════════ */
 
 .card {
   background: var(--surface);
@@ -3396,9 +3599,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
   gap: 10px;
 }
 
-/* ══════════════════════════════════════════
-   EXPAND MODAL
-   ══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+  ═══ 49. Expand Modal
+  ═══════════════════════════════════════════════════════════════════ */
 
 .expand-modal-backdrop {
   position: fixed;
@@ -3493,7 +3696,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
   }
 }
 
-/* ─── Compact preview tables inside expandable cards ─── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 50. Compact Preview
+   ═══════════════════════════════════════════════════════════════════ */
 
 .compact-preview {
   display: grid;
@@ -3568,7 +3773,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-style: italic;
 }
 
-/* ── Link Preview Dialog ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 51. Link Preview Dialog
+   ═══════════════════════════════════════════════════════════════════ */
 
 .link-preview--overlay {
   position: fixed;
@@ -3743,7 +3950,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
   }
 }
 
-/* ── Barcode Lookup ────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 52. Barcode Lookup
+   ═══════════════════════════════════════════════════════════════════ */
 
 .barcode-lookup {
   display: flex;
@@ -3785,7 +3994,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--ink-muted);
 }
 
-/* ── Attachments ───────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 53. Attachments
+   ═══════════════════════════════════════════════════════════════════ */
 
 /* Upload drop zone */
 .attachment-upload {
@@ -4088,7 +4299,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
   }
 }
 
-/* ── Hobbies ──────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 54. Hobby Domain
+   ═══════════════════════════════════════════════════════════════════ */
 
 /* Pipeline step indicator */
 .hobby-pipeline-indicator {
