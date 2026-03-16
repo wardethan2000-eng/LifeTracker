@@ -200,6 +200,14 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           },
           orderBy: { createdAt: "desc" }
         },
+        hobbyLinks: {
+          include: {
+            hobby: {
+              select: { id: true, name: true, hobbyType: true, status: true }
+            }
+          },
+          orderBy: { createdAt: "desc" }
+        },
         projectLinks: {
           include: {
             project: {

@@ -185,6 +185,20 @@ export const toInventoryItemDetailResponse = (
     projectLinks: (Pick<ProjectInventoryItem, "id" | "projectId" | "inventoryItemId" | "quantityNeeded" | "quantityAllocated" | "budgetedUnitCost" | "notes" | "createdAt" | "updatedAt"> & {
       project: Pick<Project, "id" | "name">;
     })[];
+    hobbyLinks: Array<{
+      id: string;
+      hobbyId: string;
+      inventoryItemId: string;
+      notes: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      hobby: {
+        id: string;
+        name: string;
+        hobbyType: string | null;
+        status: string;
+      };
+    }>;
   }
 ) => inventoryItemDetailSchema.parse({
   ...toInventoryItemSummaryResponse(item),
@@ -197,6 +211,15 @@ export const toInventoryItemDetailResponse = (
     ...toProjectInventoryItemResponse(link),
     quantityRemaining: link.quantityNeeded - link.quantityAllocated,
     project: link.project
+  })),
+  hobbyLinks: item.hobbyLinks.map((link) => ({
+    id: link.id,
+    hobbyId: link.hobbyId,
+    hobbyName: link.hobby.name,
+    hobbyType: link.hobby.hobbyType ?? null,
+    hobbyStatus: link.hobby.status,
+    role: null,
+    notes: link.notes ?? null
   }))
 });
 

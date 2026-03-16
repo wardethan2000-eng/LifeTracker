@@ -1006,7 +1006,8 @@ export const inventoryItemDetailSchema = inventoryItemSummarySchema.extend({
       id: z.string().cuid(),
       name: z.string()
     })
-  }))
+  })),
+  hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema))
 });
 
 export const lowStockInventoryItemSchema = z.object({
@@ -1029,6 +1030,7 @@ export const assetDetailResponseSchema = z.object({
   metrics: z.array(usageMetricResponseSchema),
   schedules: z.array(maintenanceScheduleSchema),
   recentLogs: z.array(maintenanceLogSchema),
+  hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema)),
   dueScheduleCount: z.number().int().min(0),
   overdueScheduleCount: z.number().int().min(0)
 });
@@ -1451,6 +1453,7 @@ export const projectSummarySchema = projectSchema.extend({
 
 export const projectDetailSchema = projectSchema.extend({
   assets: z.array(projectAssetSchema),
+  hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema)),
   tasks: z.array(projectTaskSchema),
   expenses: z.array(projectExpenseSchema),
   phases: z.array(projectPhaseSummarySchema),
@@ -2067,6 +2070,17 @@ export const hobbySummarySchema = hobbySchema.extend({
   linkedInventoryCount: z.number(),
 });
 export type HobbySummary = z.infer<typeof hobbySummarySchema>;
+
+export const hobbyLinkSummarySchema = z.object({
+  id: z.string(),
+  hobbyId: z.string(),
+  hobbyName: z.string(),
+  hobbyType: z.string().nullable(),
+  hobbyStatus: z.string(),
+  role: z.string().nullable(),
+  notes: z.string().nullable(),
+});
+export type HobbyLinkSummary = z.infer<typeof hobbyLinkSummarySchema>;
 
 // Hobby detail (GET /hobbies/:id enriched response)
 export const hobbyDetailAssetLinkSchema = z.object({

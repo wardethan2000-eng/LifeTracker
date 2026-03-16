@@ -222,6 +222,13 @@ export const buildAssetDetail = async (
     include: {
       parentAsset: { select: { id: true, name: true, category: true } },
       childAssets: { select: { id: true, name: true, category: true } },
+      hobbyLinks: {
+        include: {
+          hobby: {
+            select: { id: true, name: true, hobbyType: true, status: true }
+          }
+        }
+      },
       usageMetrics: {
         orderBy: { createdAt: "asc" }
       },
@@ -258,6 +265,15 @@ export const buildAssetDetail = async (
     metrics: detail.usageMetrics.map(toUsageMetricResponse),
     schedules,
     recentLogs: detail.logs.map(log => toMaintenanceLogResponse(log, log.parts)),
+    hobbyLinks: detail.hobbyLinks.map((link) => ({
+      id: link.id,
+      hobbyId: link.hobbyId,
+      hobbyName: link.hobby.name,
+      hobbyType: link.hobby.hobbyType ?? null,
+      hobbyStatus: link.hobby.status,
+      role: link.role ?? null,
+      notes: link.notes ?? null
+    })),
     dueScheduleCount: schedules.filter((schedule) => schedule.status === "due").length,
     overdueScheduleCount: schedules.filter((schedule) => schedule.status === "overdue").length
   });

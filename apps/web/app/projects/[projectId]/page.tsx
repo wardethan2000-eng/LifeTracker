@@ -99,6 +99,19 @@ const taskStatusLabels: Record<(typeof taskStatusOptions)[number], string> = {
 
 const toDateInputValue = (value: string | null | undefined): string => value ? value.slice(0, 10) : "";
 
+const hobbyStatusBadgeClass = (status: string): string => {
+  switch (status) {
+    case "active":
+      return "pill pill--success";
+    case "paused":
+      return "pill pill--warning";
+    case "archived":
+      return "pill pill--muted";
+    default:
+      return "pill";
+  }
+};
+
 export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps): Promise<JSX.Element> {
   const routeParams = await params;
   const query = searchParams ? await searchParams : {};
@@ -1034,6 +1047,32 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   <div><dt>Remaining cost</dt><dd>{formatCurrency(remainingProcurementCost, "$0.00")}</dd></div>
                 </dl>
               </Card>
+
+              {project.hobbyLinks.length > 0 ? (
+                <Card title="Linked Hobbies">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {project.hobbyLinks.map((link) => (
+                      <div
+                        key={link.id}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                          paddingBottom: "10px",
+                          borderBottom: "1px solid var(--border)"
+                        }}
+                      >
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+                          <Link href={`/hobbies/${link.hobbyId}`} className="data-table__link">{link.hobbyName}</Link>
+                          <span className={hobbyStatusBadgeClass(link.hobbyStatus)}>{link.hobbyStatus}</span>
+                          {link.hobbyType ? <span className="pill">{link.hobbyType}</span> : null}
+                        </div>
+                        {link.notes ? <div className="data-table__secondary">{link.notes}</div> : null}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
             </div>
           </div>
         </div>

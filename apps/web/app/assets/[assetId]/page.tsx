@@ -127,6 +127,19 @@ const formatTransferTypeLabel = (value: "reassignment" | "household_transfer"): 
   ? "Reassignment"
   : "Household Transfer";
 
+const hobbyStatusBadgeClass = (status: string): string => {
+  switch (status) {
+    case "active":
+      return "pill pill--success";
+    case "paused":
+      return "pill pill--warning";
+    case "archived":
+      return "pill pill--muted";
+    default:
+      return "pill";
+  }
+};
+
 async function loadMetricInsights(assetId: string, detail: AssetDetailResponse): Promise<Record<string, MetricInsight>> {
   const metricPayloads = await Promise.all(
     detail.metrics.map(async (metric) => {
@@ -270,6 +283,36 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               </dl>
             </div>
           </section>
+
+          {detail.hobbyLinks.length > 0 ? (
+            <section className="panel">
+              <div className="panel__header">
+                <h2>Linked Hobbies</h2>
+              </div>
+              <div className="panel__body--padded">
+                <div style={{ display: "grid", gap: "12px" }}>
+                  {detail.hobbyLinks.map((link) => (
+                    <div
+                      key={link.id}
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        alignItems: "center"
+                      }}
+                    >
+                      <Link href={`/hobbies/${link.hobbyId}`} className="text-link">
+                        {link.hobbyName}
+                      </Link>
+                      <span className={hobbyStatusBadgeClass(link.hobbyStatus)}>{link.hobbyStatus}</span>
+                      {link.hobbyType ? <span className="pill">{link.hobbyType}</span> : null}
+                      {link.role ? <span style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>role: {link.role}</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <section className="panel">
             <div className="panel__header">

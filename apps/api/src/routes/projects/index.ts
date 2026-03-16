@@ -320,6 +320,13 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
             asset: { select: { id: true, name: true, category: true } }
           }
         },
+        hobbyLinks: {
+          include: {
+            hobby: {
+              select: { id: true, name: true, hobbyType: true, status: true }
+            }
+          }
+        },
         tasks: {
           include: {
             assignedTo: { select: { id: true, displayName: true } },
@@ -394,6 +401,15 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     return {
       ...toProjectResponse(project),
       assets: project.assets.map(toProjectAssetResponse),
+      hobbyLinks: project.hobbyLinks.map((link) => ({
+        id: link.id,
+        hobbyId: link.hobbyId,
+        hobbyName: link.hobby.name,
+        hobbyType: link.hobby.hobbyType ?? null,
+        hobbyStatus: link.hobby.status,
+        role: null,
+        notes: link.notes ?? null
+      })),
       tasks: project.tasks.map(toProjectTaskResponse),
       expenses: project.expenses.map(toProjectExpenseResponse),
       phases: project.phases.map(toProjectPhaseSummaryResponse),
