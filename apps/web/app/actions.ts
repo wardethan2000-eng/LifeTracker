@@ -9,6 +9,7 @@ import type {
   AssetVisibility,
   CompleteMaintenanceScheduleInput,
   CreateAssetInput,
+  CreateAssetTimelineEntryInput,
   CreateAssetTransferInput,
   CreateCommentInput,
   CreateConditionAssessmentInput,
@@ -44,6 +45,7 @@ import type {
   ProjectStatus,
   ProjectTaskStatus,
   UpdateCommentInput,
+  UpdateAssetTimelineEntryInput,
   UpdateProjectBudgetCategoryInput,
   UpdateProjectInventoryItemInput,
   UpdateProjectNoteInput,
@@ -80,6 +82,7 @@ import {
   archiveAsset,
   completeSchedule,
   createComment,
+  createAssetTimelineEntry,
   createInvitation,
   createAssetTransfer,
   createMetricEntry,
@@ -106,6 +109,7 @@ import {
   createSchedule,
   createServiceProvider,
   deleteComment,
+  deleteAssetTimelineEntry,
   deleteHobby,
   deleteHobbyRecipe,
   deleteMetric,
@@ -133,6 +137,7 @@ import {
   unarchiveAsset,
   updateAsset,
   updateComment,
+  updateAssetTimelineEntry,
   updateHobby,
   updateHobbyRecipe,
   updateProject,
@@ -1292,6 +1297,112 @@ export async function deleteCommentAction(formData: FormData): Promise<void> {
   const householdId = getOptionalString(formData, "householdId");
 
   await deleteComment(assetId, commentId);
+  revalidateAssetPaths(assetId);
+
+  if (householdId) {
+    revalidateActivityPaths(householdId);
+  }
+}
+
+export async function createTimelineEntryAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const householdId = getOptionalString(formData, "householdId");
+  const tags = getOptionalString(formData, "tags")
+    ?.split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const input: CreateAssetTimelineEntryInput = {
+    title: getRequiredString(formData, "title"),
+    entryDate: toIsoString(getRequiredString(formData, "entryDate")) ?? new Date().toISOString()
+  };
+
+  const description = getOptionalString(formData, "description");
+  const category = getOptionalString(formData, "category");
+  const cost = getOptionalNumber(formData, "cost");
+  const vendor = getOptionalString(formData, "vendor");
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (category) {
+    input.category = category;
+  }
+
+  if (cost !== undefined) {
+    input.cost = cost;
+  }
+
+  if (vendor) {
+    input.vendor = vendor;
+  }
+
+  if (tags && tags.length > 0) {
+    input.tags = tags;
+  }
+
+  await createAssetTimelineEntry(assetId, input);
+  revalidateAssetPaths(assetId);
+
+  if (householdId) {
+    revalidateActivityPaths(householdId);
+  }
+}
+
+export async function updateTimelineEntryAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const entryId = getRequiredString(formData, "entryId");
+  const input: UpdateAssetTimelineEntryInput = {};
+
+  const title = getOptionalString(formData, "title");
+  const description = getOptionalString(formData, "description");
+  const entryDate = toIsoString(getOptionalString(formData, "entryDate"));
+  const category = getOptionalString(formData, "category");
+  const cost = getOptionalNumber(formData, "cost");
+  const vendor = getOptionalString(formData, "vendor");
+  const tags = getOptionalString(formData, "tags")
+    ?.split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+
+  if (title) {
+    input.title = title;
+  }
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (entryDate) {
+    input.entryDate = entryDate;
+  }
+
+  if (category) {
+    input.category = category;
+  }
+
+  if (cost !== undefined) {
+    input.cost = cost;
+  }
+
+  if (vendor) {
+    input.vendor = vendor;
+  }
+
+  if (tags && tags.length > 0) {
+    input.tags = tags;
+  }
+
+  await updateAssetTimelineEntry(assetId, entryId, input);
+  revalidateAssetPaths(assetId);
+}
+
+export async function deleteTimelineEntryAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const entryId = getRequiredString(formData, "entryId");
+  const householdId = getOptionalString(formData, "householdId");
+
+  await deleteAssetTimelineEntry(assetId, entryId);
   revalidateAssetPaths(assetId);
 
   if (householdId) {
