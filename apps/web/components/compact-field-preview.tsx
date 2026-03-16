@@ -18,7 +18,7 @@ export function CompactFieldPreview({ fieldDefinitions }: CompactFieldPreviewPro
   if (totalCount === 0) {
     return (
       <div className="compact-preview">
-        <p className="compact-preview__empty">No custom fields defined.</p>
+        <p className="compact-preview__empty compact-preview__empty--action">Click to define custom fields</p>
       </div>
     );
   }

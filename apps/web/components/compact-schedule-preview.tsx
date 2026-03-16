@@ -28,7 +28,7 @@ export function CompactSchedulePreview({ scheduleTemplates }: CompactSchedulePre
   if (count === 0) {
     return (
       <div className="compact-preview">
-        <p className="compact-preview__empty">No maintenance schedules configured.</p>
+        <p className="compact-preview__empty compact-preview__empty--action">Click to define maintenance schedules</p>
       </div>
     );
   }

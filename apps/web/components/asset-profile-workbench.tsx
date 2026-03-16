@@ -1578,7 +1578,7 @@ export function AssetProfileWorkbench({
                     list={`${inputIdPrefix}-detail-sections`}
                     value={detailTargetSection}
                     onChange={(event) => setDetailTargetSection(event.target.value)}
-                    placeholder="Optional sectionâ€¦"
+                    placeholder="Optional section..."
                   />
                 </label>
                 <div style={{ display: 'flex', gap: '6px', paddingBottom: '1px' }}>
@@ -1608,7 +1608,7 @@ export function AssetProfileWorkbench({
                 <tbody>
                   {fieldDefinitions.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="workbench-table__empty">No custom fields yet â€” add one above</td>
+                      <td colSpan={4} className="workbench-table__empty">No custom fields yet - add one above</td>
                     </tr>
                   ) : null}
 
@@ -1663,7 +1663,7 @@ export function AssetProfileWorkbench({
                         <tr className="workbench-table__section-head">
                           <td colSpan={3}>{groupLabel}</td>
                           <td>
-                            <button type="button" className="button button--ghost button--xs" onClick={() => removeSection(groupLabel)} title="Remove section">âœ• Remove</button>
+                            <button type="button" className="button button--ghost button--xs" onClick={() => removeSection(groupLabel)} title="Remove section">x Remove</button>
                           </td>
                         </tr>
                         {fields.map(({ field, index }) => {
@@ -1721,7 +1721,6 @@ export function AssetProfileWorkbench({
             title="Usage Metrics"
             modalTitle="Usage Metric Templates"
             previewContent={<CompactMetricPreview metricTemplates={metricTemplates} />}
-            actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap' }}>
               <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: 0, flex: '1 1 320px' }}>
@@ -1732,7 +1731,7 @@ export function AssetProfileWorkbench({
               {isCreateMode ? <button type="button" className="button button--secondary button--sm" onClick={addMetricDraft}>+ Add Metric</button> : null}
             </div>
             {metricDrafts.length === 0 ? (
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No metrics yet â€” select a template in Core Identity to populate these, or add one manually.</p>
+              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No metrics yet - select a template in Core Identity to populate these, or add one manually.</p>
             ) : (
               <div className="workbench-table-wrap">
                 <table className="workbench-table">
@@ -1829,7 +1828,6 @@ export function AssetProfileWorkbench({
             title="Maintenance Schedules"
             modalTitle="Schedule Templates"
             previewContent={<CompactSchedulePreview scheduleTemplates={scheduleTemplates} />}
-            actions={isCreateMode ? <span className="card__header-note">Configure on expand</span> : undefined}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap' }}>
               <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: 0, flex: '1 1 320px' }}>
@@ -1840,7 +1838,7 @@ export function AssetProfileWorkbench({
               {isCreateMode ? <button type="button" className="button button--secondary button--sm" onClick={addScheduleDraft}>+ Add Schedule</button> : null}
             </div>
             {scheduleDrafts.length === 0 ? (
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No schedules yet â€” select a template in Core Identity to populate these, or add one manually.</p>
+              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No schedules yet - select a template in Core Identity to populate these, or add one manually.</p>
             ) : (
               <div className="workbench-table-wrap">
                 <table className="workbench-table">

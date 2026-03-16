@@ -21,10 +21,11 @@ export function ExpandableCard({
   badge
 }: ExpandableCardProps): JSX.Element {
   const [open, setOpen] = useState(false);
+  const toggleOpen = () => setOpen((current) => !current);
 
   return (
     <div className={`card card--expandable${open ? " card--open" : ""}`}>
-      <div className="card__header">
+      <div className="card__header" onClick={toggleOpen}>
         <div className="card__header-left">
           <h3>{title}</h3>
           {badge && badge.count > 0 ? (
@@ -33,7 +34,7 @@ export function ExpandableCard({
             </span>
           ) : null}
         </div>
-        <div className="card__header-actions">
+        <div className="card__header-actions" onClick={(event) => event.stopPropagation()}>
           {actions}
           <button
             type="button"
@@ -41,13 +42,15 @@ export function ExpandableCard({
             title={`${open ? "Collapse" : "Expand"} ${title}`}
             aria-label={`${open ? "Collapse" : "Expand"} ${title}`}
             aria-expanded={open}
-            onClick={() => setOpen((current) => !current)}
+            onClick={toggleOpen}
           >
             {open ? "▴" : "▾"}
           </button>
         </div>
       </div>
-      <div className="card__body">{previewContent}</div>
+      <div className={`card__body${open ? "" : " card__body--interactive"}`} onClick={open ? undefined : toggleOpen}>
+        {previewContent}
+      </div>
       <div className="card__collapse-region">
         <div className="card__collapse-inner">
           <div className="card__collapse-content">{children}</div>

@@ -11,7 +11,7 @@ export function CompactMetricPreview({ metricTemplates }: CompactMetricPreviewPr
   if (count === 0) {
     return (
       <div className="compact-preview">
-        <p className="compact-preview__empty">No usage metrics configured.</p>
+        <p className="compact-preview__empty compact-preview__empty--action">Click to define usage metrics</p>
       </div>
     );
   }

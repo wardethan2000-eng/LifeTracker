@@ -83,9 +83,12 @@ export async function AppShell({ children, activePath }: AppShellProps): Promise
           <div className="sidebar__section-label">Main</div>
           {navItems.map((item) => (
             (() => {
+              const isAssetsCreatePath = activePath === "/assets/new" || activePath.startsWith("/assets/new/");
               const isActive = item.href === "/"
                 ? activePath === "/"
-                : activePath === item.href || activePath.startsWith(`${item.href}/`);
+                : item.href === "/assets"
+                  ? !isAssetsCreatePath && (activePath === item.href || activePath.startsWith(`${item.href}/`))
+                  : activePath === item.href || activePath.startsWith(`${item.href}/`);
 
               return (
             <Link
