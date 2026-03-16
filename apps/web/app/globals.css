@@ -4736,6 +4736,134 @@ html[data-ui-density="compact"] .resource-layout__aside {
   gap: 8px;
 }
 
+.recipe-ingredient-row--new {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.recipe-ingredient-row input,
+.recipe-ingredient-row select,
+.recipe-ingredient-row textarea {
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.recipe-ingredient-row input:focus,
+.recipe-ingredient-row select:focus,
+.recipe-ingredient-row textarea:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.recipe-ingredient-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+}
+
+.recipe-step-item {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.recipe-step-item:last-child {
+  border-bottom: none;
+}
+
+.recipe-step-item__number {
+  width: 24px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.recipe-step-item__reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.recipe-step-item__reorder .button {
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+}
+
+.recipe-step-item__reorder .button:hover {
+  color: var(--accent);
+}
+
+.recipe-step-type-input {
+  max-width: 120px;
+}
+
+.recipe-step-description-toggle {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.75rem;
+  justify-self: start;
+}
+
+.recipe-field-saved {
+  color: var(--success);
+  font-size: 0.75rem;
+  animation: recipe-saved-fade 2s ease forwards;
+}
+
+@keyframes recipe-saved-fade {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.recipe-submit-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  z-index: 10;
+}
+
+.recipe-custom-fields {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .recipe-step-item {
+    flex-direction: column;
+  }
+
+  .recipe-step-item__reorder {
+    flex-direction: row;
+  }
+}
+
 .shopping-list-panel {
   background: var(--surface);
   border: 1px solid var(--border);

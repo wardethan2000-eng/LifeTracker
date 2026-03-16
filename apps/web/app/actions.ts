@@ -34,6 +34,8 @@ import type {
   CreateUsageMetricEntryInput,
   CreateUsageMetricInput,
   CreateHobbyInput,
+  CreateHobbyRecipeInput,
+  CreateHobbySessionInput,
   HobbySessionLifecycleMode,
   HobbyStatus,
   MaintenanceTrigger,
@@ -53,11 +55,14 @@ import type {
   UpdateProjectInput,
   UpdateProjectTaskChecklistItemInput,
   UpdateProjectTaskInput,
+  UpdateHobbyRecipeInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
 import {
   assetCustomFieldsSchema,
   assetFieldDefinitionsSchema,
+  createHobbyRecipeIngredientInputSchema,
+  createHobbyRecipeStepInputSchema,
   presetScheduleTemplateSchema,
   presetUsageMetricTemplateSchema
 } from "@lifekeeper/types";
@@ -91,6 +96,8 @@ import {
   createAsset,
   createHousehold,
   createHobby,
+  createHobbyRecipe,
+  createHobbySession,
   createInventoryItem,
   createMaintenanceLog,
   createPresetProfile,
@@ -98,6 +105,7 @@ import {
   createSchedule,
   createServiceProvider,
   deleteComment,
+  deleteHobbyRecipe,
   deleteMetric,
   deleteHobbySession,
   deleteProject,
@@ -123,6 +131,7 @@ import {
   unarchiveAsset,
   updateAsset,
   updateComment,
+  updateHobbyRecipe,
   updateProject,
   updateProjectBudgetCategory,
   updateProjectExpense,
@@ -727,6 +736,16 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
   if (projectId) {
     revalidatePath(`/projects/${projectId}?householdId=${householdId}`);
     revalidatePath(`/projects/${projectId}`);
+  }
+};
+
+const revalidateHobbyRecipePaths = (hobbyId: string, recipeId?: string): void => {
+  revalidatePath("/");
+  revalidatePath("/hobbies");
+  revalidatePath(`/hobbies/${hobbyId}`);
+
+  if (recipeId) {
+    revalidatePath(`/hobbies/${hobbyId}/recipes/${recipeId}`);
   }
 };
 
@@ -2337,6 +2356,95 @@ export async function createHobbyAction(formData: FormData): Promise<void> {
 
   const hobby = await createHobby(householdId, input);
   redirect(`/hobbies/${hobby.id}`);
+}
+
+export async function createHobbyRecipeAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const description = getOptionalString(formData, "description");
+  const styleCategory = getOptionalString(formData, "styleCategory");
+  const estimatedDuration = getOptionalString(formData, "estimatedDuration");
+  const estimatedCost = getOptionalNumber(formData, "estimatedCost");
+  const yieldValue = getOptionalString(formData, "yield");
+  const notes = getOptionalString(formData, "notes");
+  const ingredients = parseJsonField(
+    formData,
+    "ingredientsJson",
+    createHobbyRecipeIngredientInputSchema.array(),
+    []
+  );
+  const steps = parseJsonField(
+    formData,
+    "stepsJson",
+    createHobbyRecipeStepInputSchema.array(),
+    []
+  );
+
+  const input: CreateHobbyRecipeInput = {
+    name: getRequiredString(formData, "name"),
+    ingredients,
+    steps
+  };
+
+  if (description) input.description = description;
+  if (styleCategory) input.styleCategory = styleCategory;
+  if (estimatedDuration) input.estimatedDuration = estimatedDuration;
+  if (estimatedCost !== undefined) input.estimatedCost = estimatedCost;
+  if (yieldValue) input.yield = yieldValue;
+  if (notes) input.notes = notes;
+
+  const recipe = await createHobbyRecipe(householdId, hobbyId, input);
+  revalidateHobbyRecipePaths(hobbyId, recipe.id);
+  redirect(`/hobbies/${hobbyId}/recipes/${recipe.id}`);
+}
+
+export async function updateHobbyRecipeAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const recipeId = getRequiredString(formData, "recipeId");
+  const input: UpdateHobbyRecipeInput = {};
+
+  const name = getOptionalString(formData, "name");
+
+  if (name) {
+    input.name = name;
+  }
+
+  input.description = getNullableString(formData, "description");
+  input.styleCategory = getNullableString(formData, "styleCategory");
+  input.estimatedDuration = getNullableString(formData, "estimatedDuration");
+  input.estimatedCost = getNullableNumber(formData, "estimatedCost");
+  input.yield = getNullableString(formData, "yield");
+  input.notes = getNullableString(formData, "notes");
+
+  await updateHobbyRecipe(householdId, hobbyId, recipeId, input);
+  revalidateHobbyRecipePaths(hobbyId, recipeId);
+}
+
+export async function deleteHobbyRecipeAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const recipeId = getRequiredString(formData, "recipeId");
+
+  await deleteHobbyRecipe(householdId, hobbyId, recipeId);
+  revalidateHobbyRecipePaths(hobbyId);
+  redirect(`/hobbies/${hobbyId}?tab=recipes`);
+}
+
+export async function createSessionFromRecipeAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const recipeId = getRequiredString(formData, "recipeId");
+  const recipeName = getRequiredString(formData, "recipeName");
+
+  const input: CreateHobbySessionInput = {
+    name: `Session from ${recipeName}`,
+    recipeId
+  };
+
+  const session = await createHobbySession(householdId, hobbyId, input);
+  revalidateHobbySessionPaths(hobbyId, session.id);
+  redirect(`/hobbies/${hobbyId}/sessions/${session.id}`);
 }
 
 export async function advanceHobbySessionAction(formData: FormData): Promise<void> {
