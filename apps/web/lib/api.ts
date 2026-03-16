@@ -699,6 +699,15 @@ export const getAssetLabelData = async (assetId: string): Promise<AssetLabelData
   schema: assetLabelDataSchema
 });
 
+export const lookupAssetByTag = async (tag: string): Promise<Asset> => {
+  const query = new URLSearchParams({ tag });
+
+  return apiRequest({
+    path: `/v1/assets/lookup?${query.toString()}`,
+    schema: assetSchema
+  });
+};
+
 export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => apiRequest({
   path: "/v1/presets/library",
   schema: libraryPresetListSchema,
@@ -780,11 +789,51 @@ export const searchHousehold = async (
   });
 };
 
-export const getHouseholdActivity = async (householdId: string): Promise<ActivityLog[]> => apiRequest({
-  path: `/v1/households/${householdId}/activity`,
-  schema: activityLogListSchema,
-  revalidate: 15
-});
+export const getHouseholdActivity = async (
+  householdId: string,
+  options?: {
+    entityType?: string;
+    entityId?: string;
+    userId?: string;
+    since?: string;
+    cursor?: string;
+    limit?: number;
+  }
+): Promise<ActivityLog[]> => {
+  const params = new URLSearchParams();
+
+  if (options?.entityType) {
+    params.set("entityType", options.entityType);
+  }
+
+  if (options?.entityId) {
+    params.set("entityId", options.entityId);
+  }
+
+  if (options?.userId) {
+    params.set("userId", options.userId);
+  }
+
+  if (options?.since) {
+    params.set("since", options.since);
+  }
+
+  if (options?.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/activity${suffix}`,
+    schema: activityLogListSchema,
+    revalidate: 15
+  });
+};
 
 export const downloadAssetPdf = async (
   assetId: string,

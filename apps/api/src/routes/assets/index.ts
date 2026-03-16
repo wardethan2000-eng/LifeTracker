@@ -22,7 +22,7 @@ import {
   personalAssetAccessWhere
 } from "../../lib/asset-access.js";
 import {
-  buildAssetLabelUrl,
+  buildAssetScanUrl,
   ensureAssetTag
 } from "../../lib/asset-tags.js";
 import { toAssetResponse } from "../../lib/serializers/index.js";
@@ -171,7 +171,8 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const payloadUrl = buildAssetLabelUrl(asset.id);
+    const assetTag = asset.assetTag ?? await ensureAssetTag(app.prisma, asset.id);
+    const payloadUrl = buildAssetScanUrl(assetTag);
 
     if (query.format === "svg") {
       const svg = await QRCode.toString(payloadUrl, {
@@ -214,7 +215,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       category: asset.category,
       manufacturer: asset.manufacturer ?? null,
       model: asset.model ?? null,
-      qrPayloadUrl: buildAssetLabelUrl(asset.id)
+      qrPayloadUrl: buildAssetScanUrl(assetTag)
     });
   });
 

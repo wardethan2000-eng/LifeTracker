@@ -11,7 +11,7 @@ export const resolveAppBaseUrl = (): string => trimTrailingSlashes(
   || defaultAppBaseUrl
 );
 
-export const buildAssetLabelUrl = (assetId: string): string => new URL(`/assets/${assetId}`, `${resolveAppBaseUrl()}/`).toString();
+export const buildAssetScanUrl = (assetTag: string): string => new URL(`/scan/${encodeURIComponent(assetTag)}`, `${resolveAppBaseUrl()}/`).toString();
 
 export const deriveAssetTag = (assetId: string, tailLength = 8): string => {
   const normalizedLength = Math.min(Math.max(tailLength, 8), assetId.length);

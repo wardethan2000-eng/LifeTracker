@@ -1,6 +1,10 @@
-import { createAssetSchema } from "@lifekeeper/types";
-import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { createAssetSchema, type AssetDetailResponse, type BarcodeLookupResult } from "@lifekeeper/types";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { getAssetDetailMobile, lookupAssetByTagMobile, lookupBarcodeMobile } from "./lib/api";
+import { type AssetScanTarget } from "./lib/scan";
+import { AssetDetailStubScreen } from "./screens/AssetDetailStubScreen";
+import { ProductLookupScreen } from "./screens/ProductLookupScreen";
 import { ScanScreen } from "./screens/ScanScreen";
 
 const exampleAsset = createAssetSchema.parse({
@@ -14,10 +18,62 @@ const exampleAsset = createAssetSchema.parse({
 });
 
 export default function App() {
-  const [showScanner, setShowScanner] = useState(false);
+  const [screen, setScreen] = useState<"home" | "scanner" | "loading" | "asset" | "product">("home");
+  const [assetDetail, setAssetDetail] = useState<AssetDetailResponse | null>(null);
+  const [barcodeResult, setBarcodeResult] = useState<BarcodeLookupResult | null>(null);
 
-  if (showScanner) {
-    return <ScanScreen onBack={() => setShowScanner(false)} />;
+  const returnHome = useCallback(() => {
+    setAssetDetail(null);
+    setBarcodeResult(null);
+    setScreen("home");
+  }, []);
+
+  const openScanner = useCallback(() => {
+    setAssetDetail(null);
+    setBarcodeResult(null);
+    setScreen("scanner");
+  }, []);
+
+  const handleAssetScan = useCallback(async (target: AssetScanTarget) => {
+    setScreen("loading");
+
+    const detail = target.kind === "asset-id"
+      ? await getAssetDetailMobile(target.assetId)
+      : await lookupAssetByTagMobile(target.tag).then((asset) => getAssetDetailMobile(asset.id));
+
+    setAssetDetail(detail);
+    setScreen("asset");
+  }, []);
+
+  const handleProductScan = useCallback(async (data: { barcode: string; format: string }) => {
+    setScreen("loading");
+    const result = await lookupBarcodeMobile(data.barcode, data.format);
+    setBarcodeResult(result);
+    setScreen("product");
+  }, []);
+
+  if (screen === "scanner") {
+    return <ScanScreen onBack={returnHome} onAssetScan={handleAssetScan} onProductScan={handleProductScan} />;
+  }
+
+  if (screen === "loading") {
+    return (
+      <SafeAreaView style={styles.loadingSafeArea}>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color="#0d9488" />
+          <Text style={styles.loadingHeading}>Resolving Scan</Text>
+          <Text style={styles.loadingBody}>Fetching the matching asset or product record from the API.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (screen === "asset" && assetDetail) {
+    return <AssetDetailStubScreen detail={assetDetail} onBack={returnHome} onScanAgain={openScanner} />;
+  }
+
+  if (screen === "product" && barcodeResult) {
+    return <ProductLookupScreen result={barcodeResult} onBack={returnHome} onScanAgain={openScanner} />;
   }
 
   return (
@@ -30,8 +86,8 @@ export default function App() {
         </Text>
         <Text style={styles.assetLabel}>{exampleAsset.name}</Text>
         <Text style={styles.assetMeta}>{exampleAsset.category} asset preset-ready</Text>
-        <TouchableOpacity style={styles.scanButton} onPress={() => setShowScanner(true)}>
-          <Text style={styles.scanButtonText}>Scan a Barcode</Text>
+        <TouchableOpacity style={styles.scanButton} onPress={openScanner}>
+          <Text style={styles.scanButtonText}>Scan Code</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -89,5 +145,29 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600"
+  },
+  loadingSafeArea: {
+    flex: 1,
+    backgroundColor: "#f3efe5",
+    justifyContent: "center",
+    padding: 24
+  },
+  loadingCard: {
+    borderRadius: 28,
+    backgroundColor: "#fffaf2",
+    padding: 24,
+    gap: 12,
+    alignItems: "center"
+  },
+  loadingHeading: {
+    color: "#14342b",
+    fontSize: 24,
+    fontWeight: "800"
+  },
+  loadingBody: {
+    color: "#35554a",
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center"
   }
 });
