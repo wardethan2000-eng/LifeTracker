@@ -294,6 +294,10 @@ function parseHomeDepotUrlFallback(parsedUrl: URL): LinkPreviewResponse | null {
 
   const slug = match[1];
   const productId = match[2];
+  if (!slug || !productId) {
+    return null;
+  }
+
   const slugSegments = slug.split("-").filter(Boolean);
   let model: string | null = null;
   let productNameSegments = slugSegments;
@@ -301,10 +305,14 @@ function parseHomeDepotUrlFallback(parsedUrl: URL): LinkPreviewResponse | null {
   if (slugSegments.length >= 2) {
     const last = slugSegments[slugSegments.length - 1];
     const previous = slugSegments[slugSegments.length - 2];
-    const lastLooksLikeModelPart = /^[A-Za-z0-9]{1,8}$/.test(last) && /\d/.test(last);
-    const previousLooksLikeModelPart = /^[A-Za-z0-9]{1,8}$/.test(previous) && /[A-Za-z]/.test(previous);
+    const lastLooksLikeModelPart = last
+      ? /^[A-Za-z0-9]{1,8}$/.test(last) && /\d/.test(last)
+      : false;
+    const previousLooksLikeModelPart = previous
+      ? /^[A-Za-z0-9]{1,8}$/.test(previous) && /[A-Za-z]/.test(previous)
+      : false;
 
-    if (lastLooksLikeModelPart && previousLooksLikeModelPart) {
+    if (lastLooksLikeModelPart && previousLooksLikeModelPart && previous && last) {
       model = `${previous.toUpperCase()}-${last.toUpperCase()}`;
       productNameSegments = slugSegments.slice(0, -2);
     }
@@ -762,7 +770,7 @@ function joinDistinctList(values: Array<string | null | undefined>, separator = 
   return unique.length > 0 ? unique.join(separator) : null;
 }
 
-function extractTextNodes($elements: cheerio.Cheerio<cheerio.Element>): string[] {
+function extractTextNodes($elements: cheerio.Cheerio<any>): string[] {
   return $elements
     .map((_index, element) => sanitizeFieldValue(cheerio.load(element).text()))
     .get()
@@ -988,7 +996,9 @@ function normalizeFieldValues(fields: FieldMap, retailer: string | null, rawTitl
     const cleanedName = stripAmazonTitlePrefix(stripTitleSuffix(name.value)) ?? name.value;
 
     if (isRetailerOnlyName(cleanedName, retailer)) {
-      const fallbackName = stripAmazonTitlePrefix(stripTitleSuffix(rawTitle));
+      const fallbackName = rawTitle
+        ? stripAmazonTitlePrefix(stripTitleSuffix(rawTitle))
+        : null;
 
       if (isRetailerOnlyName(fallbackName, retailer)) {
         fields.delete('name');
