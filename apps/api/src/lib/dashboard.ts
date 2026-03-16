@@ -1,4 +1,4 @@
-import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema } from "@lifekeeper/types";
+import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema, maintenanceTriggerSchema } from "@lifekeeper/types";
 import type { PrismaClient } from "@prisma/client";
 import { getAccessibleAsset, getMembership, personalAssetAccessWhere } from "./asset-access.js";
 import { toMaintenanceLogResponse } from "./maintenance-logs.js";
@@ -29,6 +29,40 @@ const formatDueSummary = (schedule: ReturnType<typeof toMaintenanceScheduleRespo
   }
 
   return `${schedule.name} needs attention.`;
+};
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const computeScheduleOverviewStatus = (
+  schedule: {
+    nextDueAt: Date | null;
+    nextDueMetricValue: number | null;
+    metricCurrentValue: number | null;
+    leadTimeDays: number;
+  },
+  now: Date
+): "overdue" | "due" | "upcoming" => {
+  if (schedule.nextDueAt && schedule.nextDueAt < now) {
+    return "overdue";
+  }
+
+  if (schedule.nextDueAt) {
+    const dueWindowStart = new Date(schedule.nextDueAt.getTime() - (schedule.leadTimeDays * MILLISECONDS_PER_DAY));
+
+    if (dueWindowStart < now) {
+      return "due";
+    }
+  }
+
+  if (
+    schedule.nextDueMetricValue !== null
+    && schedule.metricCurrentValue !== null
+    && schedule.metricCurrentValue >= schedule.nextDueMetricValue
+  ) {
+    return "overdue";
+  }
+
+  return "upcoming";
 };
 
 export const listHouseholdDueWork = async (
@@ -109,7 +143,7 @@ export const buildHouseholdDashboard = async (
     throw new Error("Dashboard membership context is unavailable.");
   }
 
-  const [household, dueWork, assets, notifications] = await Promise.all([
+  const [household, dueWork, assets, notifications, unreadNotificationCount] = await Promise.all([
     prisma.household.findUnique({
       where: { id: householdId },
       include: {
@@ -131,7 +165,10 @@ export const buildHouseholdDashboard = async (
       include: {
         schedules: {
           where: { isActive: true },
-          include: {
+          select: {
+            nextDueAt: true,
+            nextDueMetricValue: true,
+            triggerConfig: true,
             metric: {
               select: { currentValue: true }
             }
@@ -152,6 +189,13 @@ export const buildHouseholdDashboard = async (
       },
       orderBy: [{ scheduledFor: "desc" }, { createdAt: "desc" }],
       take: options.notificationLimit ?? 8
+    }),
+    prisma.notification.count({
+      where: {
+        userId,
+        householdId,
+        readAt: null
+      }
     })
   ]);
 
@@ -159,20 +203,45 @@ export const buildHouseholdDashboard = async (
     throw new DashboardNotFoundError();
   }
 
+  const now = new Date();
+
   const assetOverviews = assets.map((asset) => {
-    const scheduleResponses = asset.schedules.map(toMaintenanceScheduleResponse);
-    const dueScheduleCount = scheduleResponses.filter((schedule) => schedule.status === "due").length;
-    const overdueScheduleCount = scheduleResponses.filter((schedule) => schedule.status === "overdue").length;
-    const nextDueAt = scheduleResponses
-      .map((schedule) => schedule.nextDueAt)
-      .filter((value): value is string => value !== null)
-      .sort()[0] ?? null;
+    let dueScheduleCount = 0;
+    let overdueScheduleCount = 0;
+    let earliestNextDueAt: string | null = null;
+
+    for (const schedule of asset.schedules) {
+      const trigger = maintenanceTriggerSchema.safeParse(schedule.triggerConfig);
+      const leadTimeDays = trigger.success ? (trigger.data.leadTimeDays ?? 0) : 0;
+      const status = computeScheduleOverviewStatus({
+        nextDueAt: schedule.nextDueAt,
+        nextDueMetricValue: schedule.nextDueMetricValue,
+        metricCurrentValue: schedule.metric?.currentValue ?? null,
+        leadTimeDays
+      }, now);
+
+      if (status === "due") {
+        dueScheduleCount++;
+      }
+
+      if (status === "overdue") {
+        overdueScheduleCount++;
+      }
+
+      if (schedule.nextDueAt) {
+        const nextDueAtIso = schedule.nextDueAt.toISOString();
+
+        if (!earliestNextDueAt || nextDueAtIso < earliestNextDueAt) {
+          earliestNextDueAt = nextDueAtIso;
+        }
+      }
+    }
 
     return {
       asset: toAssetResponse(asset),
       dueScheduleCount,
       overdueScheduleCount,
-      nextDueAt,
+      nextDueAt: earliestNextDueAt,
       lastCompletedAt: asset.logs[0]?.completedAt.toISOString() ?? null
     };
   });
@@ -191,13 +260,7 @@ export const buildHouseholdDashboard = async (
       assetCount: assets.length,
       dueScheduleCount: dueWork.filter((item) => item.status === "due").length,
       overdueScheduleCount: dueWork.filter((item) => item.status === "overdue").length,
-      unreadNotificationCount: await prisma.notification.count({
-        where: {
-          userId,
-          householdId,
-          readAt: null
-        }
-      })
+      unreadNotificationCount
     },
     dueWork,
     assets: assetOverviews,

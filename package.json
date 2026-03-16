@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.6.3",
   "scripts": {
     "build": "turbo run build",
+    "benchmark:web": "pnpm --filter @lifekeeper/web benchmark",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
