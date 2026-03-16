@@ -1,11 +1,24 @@
 import type { JSX } from "react";
 import Link from "next/link";
+import {
+  archiveHobbyAction,
+  createSessionFromRecipeAction,
+  deleteHobbyAction,
+  restoreHobbyAction,
+} from "../../actions";
 import { AppShell } from "../../../components/app-shell";
+import { HobbyDangerActions } from "../../../components/hobby-danger-actions";
+import { HobbyJournalManager } from "../../../components/hobby-journal-manager";
+import { HobbyLinksManager } from "../../../components/hobby-links-manager";
+import { HobbyMetricsManager } from "../../../components/hobby-metrics-manager";
 import { HobbySessionAdvanceButton } from "../../../components/hobby-session-advance-button";
 import { HobbyShoppingListButton } from "../../../components/hobby-shopping-list-button";
 import {
   ApiError,
   getHobbyDetail,
+  getHouseholdAssets,
+  getHouseholdInventory,
+  getHouseholdProjects,
   getHobbyRecipes,
   getHobbySessions,
   getHobbyMetrics,
@@ -14,11 +27,7 @@ import {
   getMe,
 } from "../../../lib/api";
 import type {
-  HobbyLog,
-  HobbyMetricDefinition,
   HobbyMetricReading,
-  HobbyRecipe,
-  HobbySessionSummary,
 } from "@lifekeeper/types";
 
 type HobbyDetailPageProps = {
@@ -70,11 +79,14 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const hobby = await getHobbyDetail(household.id, hobbyId);
 
-    const [recipes, sessions, metrics, logs] = await Promise.all([
+    const [recipes, sessions, metrics, logs, assets, inventoryCatalog, projects] = await Promise.all([
       getHobbyRecipes(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbyMetrics(household.id, hobbyId),
       getHobbyLogs(household.id, hobbyId),
+      getHouseholdAssets(household.id),
+      getHouseholdInventory(household.id, { limit: 100 }),
+      getHouseholdProjects(household.id),
     ]);
 
     // Load metric readings for all metrics
@@ -87,6 +99,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const activeSessions = sessions.filter((s) => s.status !== "completed" && s.status !== "cancelled");
     const completedSessions = sessions.filter((s) => s.status === "completed");
+    const suggestedSession = activeSessions[0] ?? sessions[0] ?? null;
     const isPipeline = hobby.lifecycleMode === "pipeline";
     const pipelineSteps = hobby.statusPipeline.sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -242,10 +255,14 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
               <div className="panel__header"><h2>Quick Actions</h2></div>
               <div className="panel__body--padded">
                 <div style={{ display: "grid", gap: "8px" }}>
-                  <Link href={`/hobbies/${hobbyId}?tab=sessions`} className="btn btn--sm">Start New Session</Link>
-                  <Link href={`/hobbies/${hobbyId}?tab=recipes`} className="btn btn--sm btn--ghost">Add Recipe</Link>
-                  <Link href={`/hobbies/${hobbyId}?tab=metrics`} className="btn btn--sm btn--ghost">Record Metric</Link>
-                  <Link href={`/hobbies/${hobbyId}?tab=journal`} className="btn btn--sm btn--ghost">Write Journal Entry</Link>
+                  <Link href={`/hobbies/${hobbyId}/sessions/new`} className="button button--primary button--sm">Start New Session</Link>
+                  <Link href={`/hobbies/${hobbyId}/recipes/new`} className="button button--secondary button--sm">Add Recipe</Link>
+                  <Link href={`/hobbies/${hobbyId}/edit`} className="button button--ghost button--sm">Edit Hobby</Link>
+                  {suggestedSession ? (
+                    <Link href={`/hobbies/${hobbyId}/sessions/${suggestedSession.id}`} className="button button--ghost button--sm">
+                      Open Session Workspace
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             </section>
@@ -256,8 +273,8 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const renderRecipesTab = (): JSX.Element => (
       <div style={{ display: "grid", gap: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <Link href={`/hobbies/${hobbyId}/recipes/new`} className="btn btn--primary btn--sm">New Recipe</Link>
+        <div className="inline-actions inline-actions--end">
+          <Link href={`/hobbies/${hobbyId}/recipes/new`} className="button button--primary button--sm">New Recipe</Link>
         </div>
         {recipes.length === 0 ? (
           <div className="panel">
@@ -293,6 +310,21 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
                   </div>
                 </Link>
                 <div className="recipe-card__actions">
+                  <Link href={`/hobbies/${hobbyId}/recipes/${recipe.id}`} className="button button--ghost button--sm">
+                    View Recipe
+                  </Link>
+                  <Link href={`/hobbies/${hobbyId}/recipes/${recipe.id}/edit`} className="button button--secondary button--sm">
+                    Edit
+                  </Link>
+                  <form action={createSessionFromRecipeAction}>
+                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="hobbyId" value={hobbyId} />
+                    <input type="hidden" name="recipeId" value={recipe.id} />
+                    <input type="hidden" name="recipeName" value={recipe.name} />
+                    <button type="submit" className="button button--primary button--sm">
+                      Start Session
+                    </button>
+                  </form>
                   <HobbyShoppingListButton
                     householdId={household.id}
                     hobbyId={hobbyId}
@@ -309,8 +341,8 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const renderSessionsTab = (): JSX.Element => (
       <div style={{ display: "grid", gap: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <Link href={`/hobbies/${hobbyId}/sessions/new`} className="btn btn--primary btn--sm">New Session</Link>
+        <div className="inline-actions inline-actions--end">
+          <Link href={`/hobbies/${hobbyId}/sessions/new`} className="button button--primary button--sm">New Session</Link>
         </div>
         {sessions.length === 0 ? (
           <div className="panel">
@@ -352,226 +384,47 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
     );
 
     const renderInventoryTab = (): JSX.Element => {
-      const equipmentLinks = hobby.assetLinks;
-      const consumableLinks = hobby.inventoryLinks;
-      const categories = hobby.inventoryCategories;
-
       return (
-        <div style={{ display: "grid", gap: "24px" }}>
-          <section className="panel">
-            <div className="panel__header"><h2>Equipment</h2></div>
-            <div className="panel__body--padded">
-              {equipmentLinks.length === 0 ? (
-                <p className="panel__empty">No equipment linked to this hobby.</p>
-              ) : (
-                <table className="data-table" style={{ width: "100%" }}>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Category</th>
-                      <th>Role</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {equipmentLinks.map((link) => (
-                      <tr key={link.id}>
-                        <td>
-                          <Link href={`/assets/${link.assetId}`} className="text-link">{link.asset.name}</Link>
-                        </td>
-                        <td>{link.asset.category}</td>
-                        <td>{link.role ?? "-"}</td>
-                        <td>{link.notes ?? "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel__header"><h2>Consumables &amp; Supplies</h2></div>
-            <div className="panel__body--padded">
-              {consumableLinks.length === 0 ? (
-                <p className="panel__empty">No inventory items linked to this hobby.</p>
-              ) : (
-                <>
-                  {categories.length > 0 ? (
-                    categories.map((cat) => {
-                      const catItems = consumableLinks.filter((link) =>
-                        link.notes?.toLowerCase().includes(cat.categoryName.toLowerCase())
-                      );
-                      if (catItems.length === 0) return null;
-                      return (
-                        <div key={cat.id} style={{ marginBottom: "16px" }}>
-                          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "8px" }}>{cat.categoryName}</h3>
-                          <table className="data-table" style={{ width: "100%" }}>
-                            <thead>
-                              <tr><th>Name</th><th>On Hand</th><th>Unit</th></tr>
-                            </thead>
-                            <tbody>
-                              {catItems.map((link) => (
-                                <tr key={link.id}>
-                                  <td>{link.inventoryItem.name}</td>
-                                  <td>{link.inventoryItem.quantityOnHand}</td>
-                                  <td>{link.inventoryItem.unit}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })
-                  ) : null}
-                  <table className="data-table" style={{ width: "100%" }}>
-                    <thead>
-                      <tr><th>Name</th><th>On Hand</th><th>Unit</th><th>Notes</th></tr>
-                    </thead>
-                    <tbody>
-                      {consumableLinks.map((link) => (
-                        <tr key={link.id}>
-                          <td>{link.inventoryItem.name}</td>
-                          <td>{link.inventoryItem.quantityOnHand}</td>
-                          <td>{link.inventoryItem.unit}</td>
-                          <td>{link.notes ?? "-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
-              )}
-            </div>
-          </section>
-        </div>
+        <HobbyLinksManager
+          householdId={household.id}
+          hobbyId={hobbyId}
+          initialAssetLinks={hobby.assetLinks}
+          initialInventoryLinks={hobby.inventoryLinks}
+          initialProjectLinks={hobby.projectLinks}
+          initialCategories={hobby.inventoryCategories}
+          availableAssets={assets.map((asset) => ({ id: asset.id, name: asset.name, category: asset.category }))}
+          availableInventoryItems={inventoryCatalog.items.map((item) => ({ id: item.id, name: item.name, unit: item.unit, quantityOnHand: item.quantityOnHand }))}
+          availableProjects={projects.map((project) => ({ id: project.id, name: project.name, status: project.status }))}
+        />
       );
     };
 
     const renderMetricsTab = (): JSX.Element => (
-      <div style={{ display: "grid", gap: "16px" }}>
-        {metrics.length === 0 ? (
-          <div className="panel">
-            <div className="panel__body--padded">
-              <p className="panel__empty">No metric definitions configured for this hobby.</p>
-            </div>
-          </div>
-        ) : (
-          metrics.map((metric) => {
-            const readings = metricReadingsMap[metric.id] ?? [];
-            return (
-              <section key={metric.id} className="panel">
-                <div className="panel__header">
-                  <h2>{metric.name}</h2>
-                  <span className="pill">{metric.unit}</span>
-                </div>
-                <div className="panel__body--padded">
-                  {metric.description ? (
-                    <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginBottom: "12px" }}>{metric.description}</p>
-                  ) : null}
-                  {readings.length === 0 ? (
-                    <p className="panel__empty">No readings recorded yet.</p>
-                  ) : (
-                    <>
-                      {readings.length >= 3 ? (
-                        <div className="hobby-metric-sparkline" style={{ display: "flex", alignItems: "end", gap: "2px", height: "40px", marginBottom: "16px" }}>
-                          {(() => {
-                            const vals = readings.slice(0, 20).reverse().map((r) => r.value);
-                            const min = Math.min(...vals);
-                            const max = Math.max(...vals);
-                            const range = max - min || 1;
-                            return vals.map((v, i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  flex: 1,
-                                  height: `${((v - min) / range) * 100}%`,
-                                  minHeight: "4px",
-                                  background: "var(--accent)",
-                                  borderRadius: "2px 2px 0 0",
-                                }}
-                                title={`${v} ${metric.unit}`}
-                              />
-                            ));
-                          })()}
-                        </div>
-                      ) : null}
-                      <table className="data-table" style={{ width: "100%" }}>
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Value</th>
-                            <th>Notes</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {readings.slice(0, 10).map((reading) => (
-                            <tr key={reading.id}>
-                              <td>{formatDate(reading.readingDate)}</td>
-                              <td><strong>{reading.value}</strong> {metric.unit}</td>
-                              <td>{reading.notes ?? "-"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
-                  )}
-                </div>
-              </section>
-            );
-          })
-        )}
-      </div>
+      <HobbyMetricsManager
+        householdId={household.id}
+        hobbyId={hobbyId}
+        initialMetrics={metrics}
+        initialReadingsMap={metricReadingsMap}
+      />
     );
 
     const renderJournalTab = (): JSX.Element => (
-      <div style={{ display: "grid", gap: "16px" }}>
-        {logs.length === 0 ? (
-          <div className="panel">
-            <div className="panel__body--padded">
-              <p className="panel__empty">No journal entries yet. Start documenting your hobby journey.</p>
-            </div>
-          </div>
-        ) : (
-          logs.map((log) => {
-            const borderColor =
-              log.logType === "tasting" ? "var(--accent)"
-              : log.logType === "progress" ? "var(--success)"
-              : log.logType === "issue" ? "var(--warning)"
-              : "var(--ink-muted)";
-            return (
-              <article
-                key={log.id}
-                className="hobby-journal-card"
-                style={{
-                  padding: "16px",
-                  border: "1px solid var(--border)",
-                  borderRadius: "8px",
-                  borderLeft: `4px solid ${borderColor}`,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    {log.title ? <strong>{log.title}</strong> : null}
-                    <span className="pill" style={{ marginLeft: log.title ? "8px" : "0" }}>{log.logType}</span>
-                  </div>
-                  <span style={{ color: "var(--ink-muted)", fontSize: "0.8rem" }}>{formatDate(log.logDate)}</span>
-                </div>
-                {log.content ? (
-                  <p style={{ marginTop: "8px", color: "var(--ink-muted)", fontSize: "0.9rem", whiteSpace: "pre-wrap" }}>
-                    {log.content}
-                  </p>
-                ) : null}
-              </article>
-            );
-          })
-        )}
-      </div>
+      <HobbyJournalManager
+        householdId={household.id}
+        hobbyId={hobbyId}
+        initialLogs={logs}
+      />
     );
 
     const renderSettingsTab = (): JSX.Element => (
       <div style={{ display: "grid", gap: "24px" }}>
         <section className="panel">
-          <div className="panel__header"><h2>Hobby Details</h2></div>
+          <div className="panel__header">
+            <h2>Hobby Details</h2>
+            <Link href={`/hobbies/${hobbyId}/edit`} className="button button--secondary button--sm">
+              Edit Hobby
+            </Link>
+          </div>
           <div className="panel__body--padded">
             <dl className="data-list">
               <div><dt>Name</dt><dd>{hobby.name}</dd></div>
@@ -579,6 +432,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
               <div><dt>Status</dt><dd><span className={statusBadgeClass(hobby.status)}>{hobby.status}</span></dd></div>
               {hobby.hobbyType ? <div><dt>Hobby Type</dt><dd>{hobby.hobbyType}</dd></div> : null}
               <div><dt>Lifecycle Mode</dt><dd>{isPipeline ? "Pipeline" : "Binary"}</dd></div>
+              <div><dt>Notes</dt><dd>{hobby.notes ?? "Not set"}</dd></div>
               <div><dt>Created</dt><dd>{formatDate(hobby.createdAt)}</dd></div>
               <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt)}</dd></div>
             </dl>
@@ -665,6 +519,14 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
             <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginBottom: "12px" }}>
               Archiving or deleting a hobby cannot be easily reversed. Proceed with caution.
             </p>
+            <HobbyDangerActions
+              householdId={household.id}
+              hobbyId={hobbyId}
+              isArchived={hobby.status === "archived"}
+              archiveAction={archiveHobbyAction}
+              restoreAction={restoreHobbyAction}
+              deleteAction={deleteHobbyAction}
+            />
           </div>
         </section>
       </div>
@@ -680,28 +542,24 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
               {hobby.description ?? "No description."}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <div className="page-header__actions">
+            <Link href={`/hobbies/${hobbyId}/sessions/new`} className="button button--primary button--sm">
+              New Session
+            </Link>
+            <Link href={`/hobbies/${hobbyId}/edit`} className="button button--secondary button--sm">
+              Edit Hobby
+            </Link>
             <span className={statusBadgeClass(hobby.status)}>{hobby.status}</span>
             {hobby.hobbyType ? <span className="pill">{hobby.hobbyType}</span> : null}
           </div>
         </header>
 
-        <nav className="tab-navigation" aria-label="Hobby sections">
-          <ul style={{ display: "flex", gap: "24px", listStyle: "none", padding: "0 0 12px 0", margin: "16px 0 24px 0", borderBottom: "1px solid var(--border-color)", overflowX: "auto" }}>
+        <div className="page-body">
+        <nav aria-label="Hobby sections">
+          <ul className="hobby-tab-bar">
             {tabs.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={`/hobbies/${hobbyId}?tab=${item.id}`}
-                  style={{
-                    textDecoration: "none",
-                    color: tab === item.id ? "var(--ink-base)" : "var(--ink-muted)",
-                    fontWeight: tab === item.id ? "600" : "normal",
-                    paddingBottom: "12px",
-                    borderBottom: tab === item.id ? "2px solid var(--ink-base)" : "none",
-                    display: "block",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+              <li key={item.id} className={tab === item.id ? "hobby-tab-bar__item hobby-tab-bar__item--active" : "hobby-tab-bar__item"}>
+                <Link href={`/hobbies/${hobbyId}?tab=${item.id}`}>
                   {item.label}
                 </Link>
               </li>
@@ -718,6 +576,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           {tab === "journal" ? renderJournalTab() : null}
           {tab === "settings" ? renderSettingsTab() : null}
         </main>
+        </div>
       </AppShell>
     );
   } catch (error) {

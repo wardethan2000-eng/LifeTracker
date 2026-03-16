@@ -105,7 +105,7 @@ export function HobbySessionAdvanceButton({
         <div style={{ display: "grid", gap: "4px", justifyItems: "start" }}>
           <button
             type="button"
-            className="btn btn--sm btn--primary"
+            className="button button--primary button--sm"
             disabled={isAdvancing || justCompleted || !nextStep}
             onClick={handleAdvance}
             aria-label={`Advance ${sessionName} to the next step`}

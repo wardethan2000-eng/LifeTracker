@@ -55,6 +55,7 @@ import type {
   UpdateProjectInput,
   UpdateProjectTaskChecklistItemInput,
   UpdateProjectTaskInput,
+  UpdateHobbyInput,
   UpdateHobbyRecipeInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
@@ -105,6 +106,7 @@ import {
   createSchedule,
   createServiceProvider,
   deleteComment,
+  deleteHobby,
   deleteHobbyRecipe,
   deleteMetric,
   deleteHobbySession,
@@ -131,6 +133,7 @@ import {
   unarchiveAsset,
   updateAsset,
   updateComment,
+  updateHobby,
   updateHobbyRecipe,
   updateProject,
   updateProjectBudgetCategory,
@@ -756,6 +759,17 @@ const revalidateHobbySessionPaths = (hobbyId: string, sessionId?: string): void 
 
   if (sessionId) {
     revalidatePath(`/hobbies/${hobbyId}/sessions/${sessionId}`);
+  }
+};
+
+const revalidateHobbyPaths = (hobbyId?: string): void => {
+  revalidatePath("/");
+  revalidatePath("/hobbies");
+
+  if (hobbyId) {
+    revalidatePath(`/hobbies/${hobbyId}`);
+    revalidatePath(`/hobbies/${hobbyId}/edit`);
+    revalidatePath(`/hobbies/${hobbyId}/sessions/new`);
   }
 };
 
@@ -2355,7 +2369,58 @@ export async function createHobbyAction(formData: FormData): Promise<void> {
   if (presetKey) input.presetKey = presetKey;
 
   const hobby = await createHobby(householdId, input);
+  revalidateHobbyPaths(hobby.id);
   redirect(`/hobbies/${hobby.id}`);
+}
+
+export async function updateHobbyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const input: UpdateHobbyInput = {};
+
+  const name = getOptionalString(formData, "name");
+  const status = getOptionalString(formData, "status") as HobbyStatus | undefined;
+  const lifecycleMode = getOptionalString(formData, "lifecycleMode") as HobbySessionLifecycleMode | undefined;
+  const hobbyType = getOptionalString(formData, "hobbyType");
+
+  if (name) input.name = name;
+  if (status) input.status = status;
+  if (lifecycleMode) input.lifecycleMode = lifecycleMode;
+  if (hobbyType) input.hobbyType = hobbyType;
+
+  input.description = getNullableString(formData, "description");
+  input.notes = getNullableString(formData, "notes");
+
+  await updateHobby(householdId, hobbyId, input);
+  revalidateHobbyPaths(hobbyId);
+  redirect(`/hobbies/${hobbyId}`);
+}
+
+export async function archiveHobbyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+
+  await updateHobby(householdId, hobbyId, { status: "archived" });
+  revalidateHobbyPaths(hobbyId);
+  redirect(`/hobbies/${hobbyId}?tab=settings`);
+}
+
+export async function restoreHobbyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+
+  await updateHobby(householdId, hobbyId, { status: "active" });
+  revalidateHobbyPaths(hobbyId);
+  redirect(`/hobbies/${hobbyId}?tab=settings`);
+}
+
+export async function deleteHobbyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+
+  await deleteHobby(householdId, hobbyId);
+  revalidateHobbyPaths();
+  redirect("/hobbies");
 }
 
 export async function createHobbyRecipeAction(formData: FormData): Promise<void> {
@@ -2441,6 +2506,27 @@ export async function createSessionFromRecipeAction(formData: FormData): Promise
     name: `Session from ${recipeName}`,
     recipeId
   };
+
+  const session = await createHobbySession(householdId, hobbyId, input);
+  revalidateHobbySessionPaths(hobbyId, session.id);
+  redirect(`/hobbies/${hobbyId}/sessions/${session.id}`);
+}
+
+export async function createHobbySessionAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+
+  const input: CreateHobbySessionInput = {
+    name: getRequiredString(formData, "name"),
+  };
+
+  const recipeId = getOptionalString(formData, "recipeId");
+  const startDate = getOptionalString(formData, "startDate");
+  const notes = getOptionalString(formData, "notes");
+
+  if (recipeId) input.recipeId = recipeId;
+  if (startDate) input.startDate = new Date(`${startDate}T00:00:00.000Z`).toISOString();
+  if (notes) input.notes = notes;
 
   const session = await createHobbySession(householdId, hobbyId, input);
   revalidateHobbySessionPaths(hobbyId, session.id);

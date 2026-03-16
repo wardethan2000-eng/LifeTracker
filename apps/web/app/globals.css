@@ -4734,6 +4734,79 @@ html[data-ui-density="compact"] .resource-layout__aside {
   margin-top: 8px;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recipe-card__actions form {
+  display: inline-flex;
+}
+
+.hobby-manager-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.hobby-manager-note {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.hobby-manager-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.hobby-link-list {
+  display: grid;
+  gap: 10px;
+}
+
+.hobby-link-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.hobby-link-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.hobby-link-meta span {
+  color: var(--ink-muted);
+  font-size: 0.86rem;
+}
+
+.hobby-history-intro {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+
+.hobby-pill-button {
+  margin-left: 8px;
+  padding: 0;
+  min-height: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.hobby-pill-button:hover {
+  background: transparent;
+  text-decoration: underline;
 }
 
 .recipe-ingredient-row--new {
@@ -4975,6 +5048,80 @@ html[data-ui-density="compact"] .resource-layout__aside {
 /* Shopping list — highlight deficit rows */
 .hobby-shopping-deficit {
   background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.hobby-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hobby-card-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.hobby-card {
+  display: block;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.hobby-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+}
+
+.hobby-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hobby-card__name {
+  font-size: 1.05rem;
+}
+
+.hobby-card__description {
+  margin-top: 10px;
+  color: var(--ink-light);
+}
+
+.hobby-card__type-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.hobby-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+.hobby-card__stats span {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+}
+
+.hobby-card__active-badge {
+  background: var(--success-bg) !important;
+  color: var(--success);
+  font-weight: 600;
 }
 
 /* Hobby status filter strip (used on list page) */

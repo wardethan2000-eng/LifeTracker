@@ -32,6 +32,7 @@ export default async function NewHobbyPage(): Promise<JSX.Element> {
 
         <div className="page-body">
           <HobbyWorkbench
+            mode="create"
             action={createHobbyAction}
             householdId={household.id}
             presets={hobbyPresetLibrary}

@@ -14,6 +14,12 @@ const hobbyStatusLabels: Record<HobbyStatus, string> = {
   archived: "Archived",
 };
 
+const hobbyStatusPillClasses: Record<HobbyStatus, string> = {
+  active: "pill pill--success",
+  paused: "pill pill--warning",
+  archived: "pill pill--muted",
+};
+
 const getParam = (value: string | string[] | undefined): string | undefined => {
   if (typeof value === "string" && value.length > 0) return value;
   return Array.isArray(value) ? value[0] : undefined;
@@ -41,9 +47,10 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
       );
     }
 
-    const hobbies = await getHouseholdHobbies(household.id, {
-      ...(selectedStatus ? { status: selectedStatus } : {}),
-    });
+    const hobbies = await getHouseholdHobbies(household.id);
+    const visibleHobbies = selectedStatus
+      ? hobbies.filter((hobby) => hobby.status === selectedStatus)
+      : hobbies;
 
     const totalActive = hobbies.filter((h) => h.status === "active").length;
     const totalSessions = hobbies.reduce((sum, h) => sum + h.sessionCount, 0);
@@ -108,21 +115,25 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
           </div>
 
           {/* Hobby cards */}
-          {hobbies.length === 0 ? (
+          {visibleHobbies.length === 0 ? (
             <section className="panel">
               <div className="panel__body--padded panel__empty">
-                <p>No hobbies yet. Create your first hobby to start tracking sessions, recipes, and inventory.</p>
+                <p>
+                  {selectedStatus
+                    ? `No ${hobbyStatusLabels[selectedStatus].toLowerCase()} hobbies found.`
+                    : "No hobbies yet. Create your first hobby to start tracking sessions, recipes, and inventory."}
+                </p>
                 <Link href="/hobbies/new" className="button button--primary">Create Your First Hobby</Link>
               </div>
             </section>
           ) : (
             <div className="hobby-card-grid">
-              {hobbies.map((hobby) => (
+              {visibleHobbies.map((hobby) => (
                 <Link key={hobby.id} href={`/hobbies/${hobby.id}`} className="panel hobby-card">
                   <div className="panel__body--padded">
                     <div className="hobby-card__header">
                       <h3 className="hobby-card__name">{hobby.name}</h3>
-                      <span className={`status-badge status-badge--${hobby.status}`}>
+                      <span className={hobbyStatusPillClasses[hobby.status]}>
                         {hobbyStatusLabels[hobby.status]}
                       </span>
                     </div>

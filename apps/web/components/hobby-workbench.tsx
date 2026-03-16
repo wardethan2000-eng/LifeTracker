@@ -1,12 +1,14 @@
 "use client";
-import type { HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
+import type { Hobby, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
 import { useRouter } from "next/navigation";
 import { useState, type JSX, type FormEvent } from "react";
 
 type HobbyWorkbenchProps = {
+  mode: "create" | "edit";
   action: (formData: FormData) => Promise<void>;
   householdId: string;
   presets: HobbyPreset[];
+  initialHobby?: Pick<Hobby, "id" | "name" | "description" | "status" | "lifecycleMode" | "hobbyType" | "notes"> | null;
 };
 
 const hobbyStatusOptions: { value: HobbyStatus; label: string }[] = [
@@ -15,12 +17,20 @@ const hobbyStatusOptions: { value: HobbyStatus; label: string }[] = [
   { value: "archived", label: "Archived" },
 ];
 
-export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchProps): JSX.Element {
+export function HobbyWorkbench({
+  mode,
+  action,
+  householdId,
+  presets,
+  initialHobby = null,
+}: HobbyWorkbenchProps): JSX.Element {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<HobbyStatus>("active");
-  const [lifecycleMode, setLifecycleMode] = useState<HobbySessionLifecycleMode>("binary");
+  const [name, setName] = useState(initialHobby?.name ?? "");
+  const [description, setDescription] = useState(initialHobby?.description ?? "");
+  const [status, setStatus] = useState<HobbyStatus>(initialHobby?.status ?? "active");
+  const [lifecycleMode, setLifecycleMode] = useState<HobbySessionLifecycleMode>(initialHobby?.lifecycleMode ?? "binary");
+  const [hobbyType, setHobbyType] = useState(initialHobby?.hobbyType ?? "");
+  const [notes, setNotes] = useState(initialHobby?.notes ?? "");
   const [selectedPresetKey, setSelectedPresetKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +45,7 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
         setDescription(preset.description);
       }
       setLifecycleMode(preset.lifecycleMode);
+      setHobbyType(preset.label);
     }
   };
 
@@ -46,17 +57,21 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
     try {
       const formData = new FormData();
       formData.set("householdId", householdId);
+      if (initialHobby?.id) {
+        formData.set("hobbyId", initialHobby.id);
+      }
       formData.set("name", name);
-      if (description) formData.set("description", description);
+      formData.set("description", description);
       formData.set("status", status);
       formData.set("lifecycleMode", lifecycleMode);
+      formData.set("hobbyType", hobbyType);
+      formData.set("notes", notes);
       if (selectedPresetKey) {
         formData.set("presetKey", selectedPresetKey);
-        formData.set("hobbyType", selectedPreset?.label ?? selectedPresetKey);
       }
       await action(formData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create hobby.");
+      setError(err instanceof Error ? err.message : `Failed to ${mode === "create" ? "create" : "update"} hobby.`);
       setSubmitting(false);
     }
   };
@@ -81,18 +96,31 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
             />
           </label>
 
-          <label className="workbench-field workbench-field--wide">
-            <span className="workbench-field__label">Hobby Type (Preset)</span>
-            <select
+          {mode === "create" ? (
+            <label className="workbench-field workbench-field--wide">
+              <span className="workbench-field__label">Hobby Preset</span>
+              <select
+                className="workbench-field__input"
+                value={selectedPresetKey}
+                onChange={(e) => handlePresetChange(e.target.value)}
+              >
+                <option value="">None — start from scratch</option>
+                {presets.map((preset) => (
+                  <option key={preset.key} value={preset.key}>{preset.label}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <label className="workbench-field">
+            <span className="workbench-field__label">Hobby Type</span>
+            <input
+              type="text"
               className="workbench-field__input"
-              value={selectedPresetKey}
-              onChange={(e) => handlePresetChange(e.target.value)}
-            >
-              <option value="">None — start from scratch</option>
-              {presets.map((preset) => (
-                <option key={preset.key} value={preset.key}>{preset.label}</option>
-              ))}
-            </select>
+              value={hobbyType}
+              onChange={(e) => setHobbyType(e.target.value)}
+              placeholder="e.g. Brewing, Pottery, Woodworking"
+            />
           </label>
 
           <label className="workbench-field workbench-field--wide">
@@ -144,10 +172,21 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
               </label>
             </div>
           </fieldset>
+
+          <label className="workbench-field workbench-field--wide">
+            <span className="workbench-field__label">Notes</span>
+            <textarea
+              className="workbench-field__input workbench-field__textarea"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              placeholder="Add setup notes, process reminders, or household conventions."
+            />
+          </label>
         </div>
       </section>
 
-      {selectedPreset && (
+      {mode === "create" && selectedPreset && (
         <section className="workbench-section">
           <div className="workbench-section__head">
             <h3>What this preset includes</h3>
@@ -205,7 +244,7 @@ export function HobbyWorkbench({ action, householdId, presets }: HobbyWorkbenchP
           className="button button--primary"
           disabled={submitting || !name.trim()}
         >
-          {submitting ? "Creating…" : "Create Hobby"}
+          {submitting ? (mode === "create" ? "Creating…" : "Saving…") : (mode === "create" ? "Create Hobby" : "Save Hobby")}
         </button>
       </div>
     </form>

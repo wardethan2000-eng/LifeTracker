@@ -64,7 +64,7 @@ export function HobbyShoppingListButton({
     <div style={{ width: "100%" }}>
       <button
         type="button"
-        className="btn btn--sm btn--ghost"
+        className="button button--secondary button--sm"
         onClick={loadShoppingList}
         disabled={loadState === "loading"}
       >
@@ -75,14 +75,14 @@ export function HobbyShoppingListButton({
         <div className="shopping-list-panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
             <strong>{shoppingList?.recipeName ?? recipeName}</strong>
-            <button type="button" className="btn btn--sm btn--ghost" onClick={closePanel}>Close</button>
+            <button type="button" className="button button--ghost button--sm" onClick={closePanel}>Close</button>
           </div>
 
           {error ? (
             <div style={{ display: "grid", gap: "10px" }}>
               <p>Failed to load shopping list. Try again.</p>
               <div>
-                <button type="button" className="btn btn--sm btn--ghost" onClick={loadShoppingList}>Retry</button>
+                <button type="button" className="button button--ghost button--sm" onClick={loadShoppingList}>Retry</button>
               </div>
             </div>
           ) : shoppingList && shoppingList.items.length === 0 ? (
