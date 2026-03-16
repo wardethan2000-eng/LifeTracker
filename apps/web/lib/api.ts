@@ -552,7 +552,7 @@ export const apiRequest = async <T>({
         : { next: cachePolicy.next };
 
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, {
+    response = await fetch(getFetchTarget(path), {
       method,
       ...cacheOptions,
       headers: getRequestHeaders(),

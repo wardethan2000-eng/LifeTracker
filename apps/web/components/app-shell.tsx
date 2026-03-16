@@ -1,7 +1,12 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { JSX } from "react";
 import { ApiError, getMe } from "../lib/api";
-import { SearchCommandPalette } from "./search-command-palette";
+
+const SearchCommandPalette = dynamic(
+  () => import("./search-command-palette").then((mod) => ({ default: mod.SearchCommandPalette })),
+  { ssr: false }
+);
 
 type AppShellProps = {
   children: React.ReactNode;

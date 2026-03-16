@@ -104,11 +104,13 @@ const getComplianceBarColor = (value: number): string => {
 
 const loadUsageHighlights = async (householdId: string): Promise<UsageHighlight[]> => {
   const assets = await getHouseholdAssets(householdId);
-  const assetDetails = (await Promise.all(assets.slice(0, 12).map(async (asset) => getAssetDetail(asset.id).catch(() => null))))
-    .filter((detail): detail is NonNullable<typeof detail> => detail !== null)
-    .filter((detail) => detail.metrics.length > 0);
+  const highlights = (await Promise.all(assets.slice(0, 12).map(async (asset) => {
+    const detail = await getAssetDetail(asset.id).catch(() => null);
 
-  const highlights = await Promise.all(assetDetails.map(async (detail) => {
+    if (!detail || detail.metrics.length === 0) {
+      return null;
+    }
+
     const metricInsights = await Promise.all(detail.metrics.map(async (metric) => {
       const [rateAnalytics, enhancedProjection] = await Promise.all([
         getMetricRateAnalytics(detail.asset.id, metric.id).catch(() => null),
@@ -136,7 +138,7 @@ const loadUsageHighlights = async (householdId: string): Promise<UsageHighlight[
       nextProjectedDue: projectedDates[0] ?? null,
       metricNames: metricInsights.map((insight) => insight.metricName)
     } satisfies UsageHighlight;
-  }));
+  }))).filter((highlight): highlight is UsageHighlight => highlight !== null);
 
   return highlights
     .sort((left, right) => (
