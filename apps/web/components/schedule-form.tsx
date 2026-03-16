@@ -264,6 +264,16 @@ export function ScheduleForm({ assetId, metrics, action }: ScheduleFormProps): J
           <input type="hidden" name="digest" value={channels.has("digest") ? "on" : ""} />
         </div>
 
+        <label className="field">
+          <span>Estimated Cost</span>
+          <input type="number" name="estimatedCost" min="0" step="0.01" placeholder="Cost per occurrence" />
+        </label>
+
+        <label className="field">
+          <span>Estimated Time (minutes)</span>
+          <input type="number" name="estimatedMinutes" min="0" step="1" placeholder="Minutes per occurrence" />
+        </label>
+
         <div className="field field--full inline-actions inline-actions--end">
           <button type="button" className="button button--ghost" onClick={() => setExpanded(false)}>Cancel</button>
           <button type="submit" className="button button--primary" disabled={needsMetric && !hasMetrics}>Create Schedule</button>

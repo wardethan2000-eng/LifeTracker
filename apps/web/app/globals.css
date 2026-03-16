@@ -2301,6 +2301,47 @@ textarea { resize: vertical; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   ═══ Cost Analytics
+   ═══════════════════════════════════════════════════════════════════ */
+
+.cost-bar {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) minmax(0, 1fr) minmax(180px, auto);
+  gap: 12px;
+  align-items: center;
+  min-height: 28px;
+}
+
+.cost-bar__label {
+  min-width: 140px;
+  font-weight: 600;
+}
+
+.cost-bar__value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.variance-positive {
+  color: var(--success, #16a34a);
+}
+
+.variance-negative {
+  color: var(--danger, #dc2626);
+}
+
+.concentration-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--warning-bg, #fef3c7);
+  color: var(--warning-text, #92400e);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    ═══ 30. Metric Cards
    ═══════════════════════════════════════════════════════════════════ */
 

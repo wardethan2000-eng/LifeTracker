@@ -1508,6 +1508,17 @@ export async function createScheduleAction(formData: FormData): Promise<void> {
     input.metricId = metricId;
   }
 
+  const estimatedCost = getOptionalNumber(formData, "estimatedCost");
+  const estimatedMinutes = getOptionalNumber(formData, "estimatedMinutes");
+
+  if (estimatedCost !== undefined) {
+    input.estimatedCost = estimatedCost;
+  }
+
+  if (estimatedMinutes !== undefined) {
+    input.estimatedMinutes = Math.trunc(estimatedMinutes);
+  }
+
   await createSchedule(assetId, input);
   revalidatePath("/");
   revalidatePath(`/assets/${assetId}`);

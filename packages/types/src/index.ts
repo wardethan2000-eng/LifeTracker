@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./analytics/comparative.js";
+
 export const assetCategoryValues = [
   "vehicle",
   "home",

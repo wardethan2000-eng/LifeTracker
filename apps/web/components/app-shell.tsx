@@ -14,6 +14,7 @@ const navItems = [
   { href: "/inventory", label: "Inventory", icon: "layers" },
   { href: "/assets/new", label: "Add Asset", icon: "plus" },
   { href: "/projects", label: "Projects", icon: "folder" },
+  { href: "/costs", label: "Cost Analytics", icon: "dollar" },
   { href: "/hobbies", label: "Hobbies", icon: "beaker" },
   { href: "/maintenance", label: "Maintenance", icon: "wrench" },
   { href: "/activity", label: "Activity", icon: "pulse" },
@@ -32,6 +33,8 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
     case "folder":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>;
+    case "dollar":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>;
     case "beaker":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3h15"/><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3"/><path d="M6 14h12"/></svg>;
     case "briefcase":

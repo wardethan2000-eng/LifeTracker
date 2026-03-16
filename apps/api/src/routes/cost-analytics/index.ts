@@ -68,7 +68,7 @@ type ScheduleForecastSource = {
   assetName: string;
   name: string;
   estimatedCost: number | null;
-  triggerType: Prisma.TriggerType;
+  triggerType: string;
   triggerConfig: Prisma.JsonValue;
   metricId: string | null;
   nextDueAt: Date | null;

@@ -52,6 +52,7 @@ import {
   getHouseholdAssets,
   getHouseholdInventory,
   getHouseholdMembers,
+  getProjectBudgetAnalysis,
   getHouseholdServiceProviders,
   getMe,
   getProjectDetail,
@@ -132,13 +133,14 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, householdAssets, householdMembers, householdInventory, serviceProviders, projectNotes] = await Promise.all([
+    const [project, householdAssets, householdMembers, householdInventory, serviceProviders, projectNotes, projectBudgetAnalysis] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getHouseholdAssets(household.id),
       getHouseholdMembers(household.id),
       getHouseholdInventory(household.id, { limit: 100 }),
       getHouseholdServiceProviders(household.id),
-      getProjectNotes(household.id, routeParams.projectId)
+      getProjectNotes(household.id, routeParams.projectId),
+      getProjectBudgetAnalysis(household.id, routeParams.projectId).catch(() => null)
     ]);
 
     const phaseDetails = await Promise.all(project.phases.map((phase) => getProjectPhaseDetail(household.id, project.id, phase.id)));
@@ -681,6 +683,76 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     expenses={project.expenses}
                     phaseDetails={phaseDetails}
                   />
+                  {projectBudgetAnalysis ? (
+                    <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16, display: "grid", gap: 16 }}>
+                      <div>
+                        <h3>Variance Analysis</h3>
+                        <p style={{ marginTop: 8 }}>
+                          Variance: {formatCurrency(projectBudgetAnalysis.variance, "$0.00")}
+                          {projectBudgetAnalysis.variancePercent !== null ? ` (${projectBudgetAnalysis.variancePercent.toFixed(1)}% ${projectBudgetAnalysis.variance >= 0 ? "under" : "over"} budget)` : ""}
+                        </p>
+                        {projectBudgetAnalysis.burnRate !== null ? (
+                          <p style={{ marginTop: 8, color: "var(--ink-muted)" }}>
+                            Current burn rate: {formatCurrency(projectBudgetAnalysis.burnRate, "$0.00")}/day
+                          </p>
+                        ) : null}
+                        {projectBudgetAnalysis.projectedTotalAtBurnRate !== null && project.targetEndDate ? (
+                          <p style={{ marginTop: 8, color: "var(--ink-muted)" }}>
+                            At current pace, projected total spend: {formatCurrency(projectBudgetAnalysis.projectedTotalAtBurnRate, "$0.00")} by {formatDate(project.targetEndDate)}
+                            {project.budgetAmount !== null && projectBudgetAnalysis.projectedTotalAtBurnRate > project.budgetAmount ? (
+                              <span className="concentration-pill" style={{ marginLeft: 8 }}>Tracking over budget</span>
+                            ) : null}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Phase Name</th>
+                            <th>Budget</th>
+                            <th>Actual</th>
+                            <th>Variance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projectBudgetAnalysis.byPhase.map((phase) => (
+                            <tr key={phase.phaseId}>
+                              <td>{phase.phaseName}</td>
+                              <td>{formatCurrency(phase.budgetAmount, "No budget")}</td>
+                              <td>{formatCurrency(phase.actualSpend, "$0.00")}</td>
+                              <td style={{ color: phase.variance >= 0 ? "var(--success)" : "var(--danger)" }}>
+                                {formatCurrency(phase.variance, "$0.00")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Category Name</th>
+                            <th>Budget</th>
+                            <th>Actual</th>
+                            <th>Variance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projectBudgetAnalysis.byCategory.map((category) => (
+                            <tr key={category.categoryId}>
+                              <td>{category.categoryName}</td>
+                              <td>{formatCurrency(category.budgetAmount, "No budget")}</td>
+                              <td>{formatCurrency(category.actualSpend, "$0.00")}</td>
+                              <td style={{ color: category.variance >= 0 ? "var(--success)" : "var(--danger)" }}>
+                                {formatCurrency(category.variance, "$0.00")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
                   <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
                     <div className="schedule-stack">
                       {project.expenses.length === 0 ? <p className="panel__empty">No expenses tracked yet.</p> : null}
