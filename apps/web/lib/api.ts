@@ -15,6 +15,7 @@ import {
   costForecastSchema,
   completionCycleRecordSchema,
   customPresetProfileSchema,
+  dueWorkItemSchema,
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
   householdCostDashboardSchema,
@@ -120,6 +121,7 @@ import {
   type CreateUsageMetricInput,
   type ComplianceReportPayload,
   type CompletionCycleRecord,
+  type DueWorkItem,
   type HouseholdInventoryAnalytics,
   type CustomPresetProfile,
   type HouseholdDashboard,
@@ -308,12 +310,14 @@ type RequestOptions<T> = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   schema?: Schema<T>;
+  cachePolicy?: RequestCache | { next: { revalidate: number } } | { next: { tags: string[] } };
 };
 
 const libraryPresetListSchema = libraryPresetSchema.array();
 const customPresetProfileListSchema = customPresetProfileSchema.array();
 const activityLogListSchema = activityLogSchema.array();
 const assetListSchema = assetSchema.array();
+const dueWorkItemListSchema = dueWorkItemSchema.array();
 const assetTimelineEntryListSchema = assetTimelineEntrySchema.array();
 const assetTimelineResponseSchema: Schema<{ items: AssetTimelineItem[]; nextCursor: string | null; totalSources: number }> = {
   parse: (value: unknown) => {
@@ -387,6 +391,7 @@ const importInventoryResultSchema: Schema<ImportInventoryResult> = {
   }
 };
 const maintenanceLogListSchema = maintenanceLogSchema.array();
+const notificationListSchema = notificationSchema.array();
 const projectBudgetCategorySummarySchema = projectBudgetCategoryListSchema.element;
 const projectBudgetCategorySummaryListSchema = projectBudgetCategoryListSchema;
 const projectInventoryListSchema = inventoryProjectLinkDetailSchema.array();
@@ -528,14 +533,21 @@ export const apiRequest = async <T>({
   path,
   method = "GET",
   body,
-  schema
+  schema,
+  cachePolicy
 }: RequestOptions<T>): Promise<T> => {
   let response: Response;
+
+  const cacheOptions = cachePolicy === undefined
+    ? { cache: "no-store" as const }
+    : typeof cachePolicy === "string"
+      ? { cache: cachePolicy }
+      : { next: cachePolicy.next };
 
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {
       method,
-      cache: "no-store",
+      ...cacheOptions,
       headers: getRequestHeaders(),
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     });
@@ -574,12 +586,20 @@ export const getMe = cache(async (): Promise<MeResponse> => apiRequest({
 
 export const getHouseholdDashboard = async (householdId: string): Promise<HouseholdDashboard> => apiRequest({
   path: `/v1/households/${householdId}/dashboard`,
-  schema: householdDashboardSchema
+  schema: householdDashboardSchema,
+  cachePolicy: { next: { revalidate: 15 } }
+});
+
+export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkItem[]> => apiRequest({
+  path: `/v1/households/${householdId}/due-work?limit=100&status=all`,
+  schema: dueWorkItemListSchema,
+  cachePolicy: { next: { revalidate: 15 } }
 });
 
 export const getAssetDetail = async (assetId: string): Promise<AssetDetailResponse> => apiRequest({
   path: `/v1/assets/${assetId}/detail`,
-  schema: assetDetailResponseSchema
+  schema: assetDetailResponseSchema,
+  cachePolicy: { next: { revalidate: 15 } }
 });
 
 export const getAssetTransferHistory = async (assetId: string): Promise<AssetTransferList> => apiRequest({
@@ -629,7 +649,8 @@ export const getAssetLabelData = async (assetId: string): Promise<AssetLabelData
 
 export const getLibraryPresets = cache(async (): Promise<LibraryPreset[]> => apiRequest({
   path: "/v1/presets/library",
-  schema: libraryPresetListSchema
+  schema: libraryPresetListSchema,
+  cachePolicy: { next: { revalidate: 3600 } }
 }));
 
 export const getHouseholdProjects = async (
@@ -1032,8 +1053,42 @@ export const getProjectShoppingList = async (
 
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => apiRequest({
   path: `/v1/assets?householdId=${householdId}`,
-  schema: assetListSchema
+  schema: assetListSchema,
+  cachePolicy: { next: { revalidate: 30 } }
 });
+
+export const getNotifications = async (options?: {
+  householdId?: string;
+  status?: string;
+  unreadOnly?: boolean;
+  limit?: number;
+}): Promise<Notification[]> => {
+  const params = new URLSearchParams();
+
+  if (options?.householdId) {
+    params.set("householdId", options.householdId);
+  }
+
+  if (options?.status) {
+    params.set("status", options.status);
+  }
+
+  if (options?.unreadOnly !== undefined) {
+    params.set("unreadOnly", String(options.unreadOnly));
+  }
+
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/notifications${suffix}`,
+    schema: notificationListSchema,
+    cachePolicy: { next: { revalidate: 15 } }
+  });
+};
 
 export const getAssetComparisonAnalytics = async (
   householdId: string,

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
-import { ApiError, getHouseholdDashboard, getMe } from "../../lib/api";
+import { ApiError, getHouseholdDueWork, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../../lib/formatters";
 
 export default async function MaintenancePage(): Promise<JSX.Element> {
@@ -20,7 +20,9 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
       );
     }
 
-    const dashboard = await getHouseholdDashboard(household.id);
+    const dueWork = await getHouseholdDueWork(household.id);
+    const overdueScheduleCount = dueWork.filter((item) => item.status === "overdue").length;
+    const dueScheduleCount = dueWork.filter((item) => item.status === "due").length;
 
     return (
       <AppShell activePath="/maintenance">
@@ -33,19 +35,15 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
           <section className="stats-row">
             <div className="stat-card stat-card--danger">
               <span className="stat-card__label">Overdue</span>
-              <strong className="stat-card__value">{dashboard.stats.overdueScheduleCount}</strong>
+              <strong className="stat-card__value">{overdueScheduleCount}</strong>
             </div>
             <div className="stat-card stat-card--warning">
               <span className="stat-card__label">Due Now</span>
-              <strong className="stat-card__value">{dashboard.stats.dueScheduleCount}</strong>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__label">Total Assets</span>
-              <strong className="stat-card__value">{dashboard.stats.assetCount}</strong>
+              <strong className="stat-card__value">{dueScheduleCount}</strong>
             </div>
             <div className="stat-card stat-card--accent">
               <span className="stat-card__label">Work Items</span>
-              <strong className="stat-card__value">{dashboard.dueWork.length}</strong>
+              <strong className="stat-card__value">{dueWork.length}</strong>
             </div>
           </section>
 
@@ -55,7 +53,7 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
               <h2>All Due & Overdue Work</h2>
             </div>
             <div className="panel__body">
-              {dashboard.dueWork.length === 0 ? (
+              {dueWork.length === 0 ? (
                 <p className="panel__empty">No maintenance is currently due or overdue. Everything is on track.</p>
               ) : (
                 <table className="data-table">
@@ -72,7 +70,7 @@ export default async function MaintenancePage(): Promise<JSX.Element> {
                     </tr>
                   </thead>
                   <tbody>
-                    {dashboard.dueWork.map((item) => (
+                    {dueWork.map((item) => (
                       <tr key={item.scheduleId} className={`row--${item.status}`}>
                         <td>
                           <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>

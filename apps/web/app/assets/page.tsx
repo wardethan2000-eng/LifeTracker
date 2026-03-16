@@ -1,13 +1,11 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
-import { ApiError, getHouseholdDashboard, getMe } from "../../lib/api";
+import { ApiError, getHouseholdAssets, getMe } from "../../lib/api";
 import {
-  formatAssetStateLabel,
   formatCategoryLabel,
   formatDate,
-  formatVisibilityLabel,
-  getAssetTone
+  formatVisibilityLabel
 } from "../../lib/formatters";
 
 type AssetsPageProps = {
@@ -33,9 +31,9 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
       );
     }
 
-    const dashboard = await getHouseholdDashboard(household.id);
-    const sortedAssets = [...dashboard.assets].sort(
-      (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
+    const assets = await getHouseholdAssets(household.id);
+    const sortedAssets = [...assets].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
     return (
@@ -64,40 +62,32 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
                       <th>Asset</th>
                       <th>Category</th>
                       <th>Visibility</th>
-                      <th>Status</th>
-                      <th>Overdue</th>
-                      <th>Due Now</th>
-                      <th>Next Due</th>
-                      <th>Last Completed</th>
+                      <th>State</th>
+                      <th>Manufacturer</th>
+                      <th>Model</th>
+                      <th>Created</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedAssets.map((item) => {
-                      const tone = getAssetTone(item);
-                      const subtitle = [item.asset.manufacturer, item.asset.model].filter(Boolean).join(" ");
-
-                      return (
-                        <tr key={item.asset.id} className={`row--${tone}`}>
-                          <td>
-                            <div className="data-table__primary">
-                              <Link href={`/assets/${item.asset.id}`} className="data-table__link">{item.asset.name}</Link>
-                            </div>
-                            {subtitle && <div className="data-table__secondary">{subtitle}</div>}
-                          </td>
-                          <td><span className="pill">{formatCategoryLabel(item.asset.category)}</span></td>
-                          <td><span className="pill">{formatVisibilityLabel(item.asset.visibility)}</span></td>
-                          <td><span className={`status-chip status-chip--${tone}`}>{formatAssetStateLabel(item)}</span></td>
-                          <td><strong>{item.overdueScheduleCount}</strong></td>
-                          <td><strong>{item.dueScheduleCount}</strong></td>
-                          <td>{formatDate(item.nextDueAt, "—")}</td>
-                          <td>{formatDate(item.lastCompletedAt, "No history")}</td>
-                          <td>
-                            <Link href={`/assets/${item.asset.id}`} className="data-table__link">Open</Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {sortedAssets.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <div className="data-table__primary">
+                            <Link href={`/assets/${item.id}`} className="data-table__link">{item.name}</Link>
+                          </div>
+                        </td>
+                        <td><span className="pill">{formatCategoryLabel(item.category)}</span></td>
+                        <td><span className="pill">{formatVisibilityLabel(item.visibility)}</span></td>
+                        <td>{item.state}</td>
+                        <td>{item.manufacturer ?? "—"}</td>
+                        <td>{item.model ?? "—"}</td>
+                        <td>{formatDate(item.createdAt)}</td>
+                        <td>
+                          <Link href={`/assets/${item.id}`} className="data-table__link">Open</Link>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}
@@ -121,6 +111,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
         </AppShell>
       );
     }
+
     throw error;
   }
 }

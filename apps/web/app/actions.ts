@@ -1120,6 +1120,7 @@ export async function createMetricEntryAction(formData: FormData): Promise<void>
 
   await createMetricEntry(assetId, metricId, input);
   revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function completeScheduleAction(formData: FormData): Promise<void> {
@@ -1158,6 +1159,7 @@ export async function completeScheduleAction(formData: FormData): Promise<void> 
 
   await completeSchedule(assetId, scheduleId, input);
   revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function createLogAction(formData: FormData): Promise<void> {
@@ -1209,6 +1211,7 @@ export async function createLogAction(formData: FormData): Promise<void> {
 
   await createMaintenanceLog(assetId, input);
   revalidateAssetPaths(assetId);
+  revalidatePath("/maintenance");
 }
 
 export async function applyPresetToAssetAction(formData: FormData): Promise<void> {
