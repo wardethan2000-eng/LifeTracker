@@ -960,6 +960,69 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
 }
 
+/* Inventory Bulk Actions */
+
+.inventory-bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inventory-bulk-actions__import {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inventory-bulk-actions__file {
+  width: auto;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-light);
+  font-size: 0.84rem;
+}
+
+.inventory-bulk-actions__file::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.inventory-bulk-actions__result {
+  flex-basis: 100%;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.inventory-bulk-actions__result p {
+  color: inherit;
+}
+
+.inventory-bulk-actions__result ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.inventory-bulk-actions__result--success {
+  color: var(--accent);
+}
+
+.inventory-bulk-actions__result--warning {
+  color: var(--warning);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 14. Tables
    ═══════════════════════════════════════════════════════════════════ */

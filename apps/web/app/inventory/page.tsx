@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AppShell } from "../../components/app-shell";
+import { InventoryBulkActions } from "../../components/inventory-bulk-actions";
 import { InventoryEditableRow } from "../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../components/inventory-filter-bar";
 import { InventorySection } from "../../components/inventory-section";
@@ -201,7 +202,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </section>
           )}
 
-          <InventorySection householdId={household.id} totalCount={items.length} categoryOptions={categoryOptions}>
+          <InventorySection
+            householdId={household.id}
+            totalCount={items.length}
+            categoryOptions={categoryOptions}
+            actions={<InventoryBulkActions householdId={household.id} />}
+          >
             {items.length === 0 ? (
               <p className="panel__empty">No inventory items found for this household yet.</p>
             ) : (

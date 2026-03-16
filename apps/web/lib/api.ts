@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { z } from "zod";
 import {
   activityLogSchema,
   assetDetailResponseSchema,
@@ -226,6 +227,8 @@ type Schema<T> = {
   parse: (value: unknown) => T;
 };
 
+export type ImportInventoryResult = z.infer<typeof importInventoryResultSchema>;
+
 type RequestOptions<T> = {
   path: string;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -259,6 +262,15 @@ const householdInventoryListSchema = {
   }
 };
 const householdLowStockListSchema = lowStockInventoryItemSchema.array();
+const importInventoryResultSchema = z.object({
+  created: z.number(),
+  skipped: z.number(),
+  errors: z.array(z.object({
+    index: z.number(),
+    message: z.string()
+  })),
+  createdItems: z.array(inventoryItemSummarySchema)
+});
 const maintenanceLogListSchema = maintenanceLogSchema.array();
 const projectBudgetCategorySummarySchema = projectBudgetCategoryListSchema.element;
 const projectBudgetCategorySummaryListSchema = projectBudgetCategoryListSchema;
@@ -339,6 +351,40 @@ export const getApiBaseUrl = (): string => apiBaseUrl;
 
 export const getDevUserId = (): string => devUserId;
 
+const getProxyPath = (path: string): string => {
+  if (path.startsWith("/v1/")) {
+    return `/api/${path.slice(4)}`;
+  }
+
+  if (path === "/v1") {
+    return "/api";
+  }
+
+  return `/api${path}`;
+};
+
+const getFetchTarget = (path: string): string => {
+  if (typeof window !== "undefined") {
+    return getProxyPath(path);
+  }
+
+  return `${apiBaseUrl}${path}`;
+};
+
+const getRequestHeaders = (contentType: string | null = "application/json"): HeadersInit => {
+  const headers = new Headers();
+
+  if (contentType) {
+    headers.set("content-type", contentType);
+  }
+
+  if (typeof window === "undefined") {
+    headers.set("x-dev-user-id", devUserId);
+  }
+
+  return headers;
+};
+
 export const apiRequest = async <T>({
   path,
   method = "GET",
@@ -351,10 +397,7 @@ export const apiRequest = async <T>({
     response = await fetch(`${apiBaseUrl}${path}`, {
       method,
       cache: "no-store",
-      headers: {
-        "content-type": "application/json",
-        "x-dev-user-id": devUserId
-      },
+      headers: getRequestHeaders(),
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     });
   } catch (error) {
@@ -692,6 +735,77 @@ export const getHouseholdLowStockInventory = async (householdId: string): Promis
   path: `/v1/households/${householdId}/inventory/low-stock`,
   schema: householdLowStockListSchema
 });
+
+export const exportHouseholdInventory = async (householdId: string): Promise<string> => {
+  const path = `/v1/households/${householdId}/inventory/export`;
+  let response: Response;
+
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "GET",
+      cache: "no-store",
+      headers: getRequestHeaders(null)
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message
+      ? ` ${error.message}`
+      : "";
+
+    throw new ApiError(
+      `Unable to reach the API at ${apiBaseUrl}.${detail}`,
+      503
+    );
+  }
+
+  if (!response.ok) {
+    const payload = await parseJson(response);
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+
+    throw new ApiError(message, response.status);
+  }
+
+  return response.text();
+};
+
+export const importHouseholdInventory = async (
+  householdId: string,
+  items: Array<Record<string, unknown>>
+): Promise<ImportInventoryResult> => {
+  const path = `/v1/households/${householdId}/inventory/import`;
+  let response: Response;
+
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "POST",
+      cache: "no-store",
+      headers: getRequestHeaders(),
+      body: JSON.stringify({ items })
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message
+      ? ` ${error.message}`
+      : "";
+
+    throw new ApiError(
+      `Unable to reach the API at ${apiBaseUrl}.${detail}`,
+      503
+    );
+  }
+
+  const payload = await parseJson(response);
+
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+
+    throw new ApiError(message, response.status);
+  }
+
+  return importInventoryResultSchema.parse(payload);
+};
 
 export const getHouseholdInventoryTransactions = async (
   householdId: string,

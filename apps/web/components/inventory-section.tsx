@@ -21,6 +21,7 @@ type InventorySectionProps = {
   householdId: string;
   totalCount: number;
   categoryOptions: string[];
+  actions?: ReactNode;
   children: ReactNode;
 };
 
@@ -41,7 +42,7 @@ const commonCategoryOptions = [
 
 const customCategoryValue = "__custom__";
 
-export function InventorySection({ householdId, totalCount, categoryOptions, children }: InventorySectionProps): JSX.Element {
+export function InventorySection({ householdId, totalCount, categoryOptions, actions, children }: InventorySectionProps): JSX.Element {
   const [showForm, setShowForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [customCategory, setCustomCategory] = useState("");
@@ -115,6 +116,7 @@ export function InventorySection({ householdId, totalCount, categoryOptions, chi
           <div className="data-table__secondary">Household-wide stock, organized by category across assets, projects, and shared supplies</div>
         </div>
         <div className="panel__header-actions">
+          {actions}
           <button
             type="button"
             className={`button button--primary button--sm${showForm ? " button--active" : ""}`}
