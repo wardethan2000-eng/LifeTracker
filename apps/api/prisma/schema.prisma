@@ -584,7 +584,7 @@ model Notification {
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  PROJECTS                                                       ║
+// ║  PROJECTS - CORE                                                ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 // A household-scoped work effort that organizes phases, tasks, budgets, and linked resources.
@@ -742,7 +742,7 @@ model InventoryTransaction {
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  PROJECTS                                                       ║
+// ║  PROJECTS - RELATIONSHIPS & EXECUTION                           ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 // Join table linking a Project to an Asset with the asset's role in that work.
@@ -1052,6 +1052,10 @@ model WebhookDelivery {
 // ╚══════════════════════════════════════════════════════════════════╝
 
 // An invitation token used to add a person to a Household by email.
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  INVITATIONS                                                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
 model HouseholdInvitation {
   id               String           @id @default(cuid())
   householdId      String

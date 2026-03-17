@@ -1,8 +1,17 @@
 import type { Prisma } from "@prisma/client";
 import {
   hobbyLogSchema,
+  hobbyDetailAssetLinkSchema,
+  hobbyDetailInventoryLinkSchema,
+  hobbyDetailProjectLinkSchema,
+  hobbyInventoryCategorySchema,
+  hobbyMetricDefinitionSchema,
+  hobbyMetricReadingPageSchema,
+  hobbyMetricReadingSchema,
   hobbyRecipeIngredientSchema,
+  hobbyRecipeShoppingListSchema,
   hobbyRecipeSchema,
+  hobbyRecipeSummarySchema,
   hobbyRecipeStepSchema,
   hobbySessionIngredientSchema,
   hobbySessionSchema,
@@ -103,6 +112,33 @@ export const toRecipeResponse = (recipe: {
   isArchived: recipe.isArchived,
   createdAt: recipe.createdAt.toISOString(),
   updatedAt: recipe.updatedAt.toISOString()
+});
+
+export const toRecipeSummaryResponse = (recipe: {
+  id: string;
+  hobbyId: string;
+  name: string;
+  description: string | null;
+  sourceType: string;
+  styleCategory: string | null;
+  customFields: Prisma.JsonValue;
+  estimatedDuration: string | null;
+  estimatedCost: number | null;
+  yield: string | null;
+  notes: string | null;
+  isArchived: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  _count: {
+    ingredients: number;
+    steps: number;
+    sessions: number;
+  };
+}) => hobbyRecipeSummarySchema.parse({
+  ...toRecipeResponse(recipe),
+  ingredientCount: recipe._count.ingredients,
+  stepCount: recipe._count.steps,
+  sessionCount: recipe._count.sessions
 });
 
 export const toIngredientResponse = (ingredient: {
@@ -273,6 +309,161 @@ export const toSessionStepResponse = (step: {
   createdAt: step.createdAt.toISOString(),
   updatedAt: step.updatedAt.toISOString()
 });
+
+export const toHobbyAssetLinkResponse = (link: {
+  id: string;
+  hobbyId: string;
+  assetId: string;
+  role: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  asset: {
+    id: string;
+    name: string;
+    category: string;
+  };
+}) => hobbyDetailAssetLinkSchema.parse({
+  id: link.id,
+  hobbyId: link.hobbyId,
+  assetId: link.assetId,
+  role: link.role,
+  notes: link.notes,
+  asset: link.asset,
+  createdAt: link.createdAt.toISOString(),
+  updatedAt: link.updatedAt.toISOString()
+});
+
+export const toHobbyInventoryLinkResponse = (link: {
+  id: string;
+  hobbyId: string;
+  inventoryItemId: string;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  inventoryItem: {
+    id: string;
+    name: string;
+    quantityOnHand: number;
+    unit: string;
+  };
+}) => hobbyDetailInventoryLinkSchema.parse({
+  id: link.id,
+  hobbyId: link.hobbyId,
+  inventoryItemId: link.inventoryItemId,
+  notes: link.notes,
+  inventoryItem: link.inventoryItem,
+  createdAt: link.createdAt.toISOString(),
+  updatedAt: link.updatedAt.toISOString()
+});
+
+export const toHobbyProjectLinkResponse = (link: {
+  id: string;
+  hobbyId: string;
+  projectId: string;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  project: {
+    id: string;
+    name: string;
+    status: string;
+  };
+}) => hobbyDetailProjectLinkSchema.parse({
+  id: link.id,
+  hobbyId: link.hobbyId,
+  projectId: link.projectId,
+  notes: link.notes,
+  project: link.project,
+  createdAt: link.createdAt.toISOString(),
+  updatedAt: link.updatedAt.toISOString()
+});
+
+export const toHobbyInventoryCategoryResponse = (category: {
+  id: string;
+  hobbyId: string;
+  categoryName: string;
+  sortOrder: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyInventoryCategorySchema.parse({
+  id: category.id,
+  hobbyId: category.hobbyId,
+  categoryName: category.categoryName,
+  sortOrder: category.sortOrder,
+  createdAt: category.createdAt.toISOString(),
+  updatedAt: category.updatedAt.toISOString()
+});
+
+export const toHobbyMetricDefinitionResponse = (metric: {
+  id: string;
+  hobbyId: string;
+  name: string;
+  unit: string;
+  description: string | null;
+  metricType: string;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyMetricDefinitionSchema.parse({
+  id: metric.id,
+  hobbyId: metric.hobbyId,
+  name: metric.name,
+  unit: metric.unit,
+  description: metric.description,
+  metricType: metric.metricType,
+  createdAt: metric.createdAt.toISOString(),
+  updatedAt: metric.updatedAt.toISOString()
+});
+
+export const toHobbyMetricReadingResponse = (reading: {
+  id: string;
+  metricDefinitionId: string;
+  sessionId: string | null;
+  value: number;
+  readingDate: Date;
+  notes: string | null;
+  createdAt: Date;
+}) => hobbyMetricReadingSchema.parse({
+  id: reading.id,
+  metricDefinitionId: reading.metricDefinitionId,
+  sessionId: reading.sessionId,
+  value: reading.value,
+  readingDate: reading.readingDate.toISOString(),
+  notes: reading.notes,
+  createdAt: reading.createdAt.toISOString()
+});
+
+export const toHobbyMetricReadingPageResponse = (payload: {
+  items: Array<{
+    id: string;
+    metricDefinitionId: string;
+    sessionId: string | null;
+    value: number;
+    readingDate: Date;
+    notes: string | null;
+    createdAt: Date;
+  }>;
+  nextCursor: string | null;
+}) => hobbyMetricReadingPageSchema.parse({
+  items: payload.items.map(toHobbyMetricReadingResponse),
+  nextCursor: payload.nextCursor
+});
+
+export const toHobbyRecipeShoppingListResponse = (payload: {
+  recipeId: string;
+  recipeName: string;
+  items: Array<{
+    ingredientId: string;
+    ingredientName: string;
+    quantityNeeded: number;
+    quantityOnHand: number;
+    deficit: number;
+    unit: string;
+    inventoryItemId: string | null;
+    estimatedCost: number | null;
+  }>;
+  totalEstimatedCost: number | null;
+}) => hobbyRecipeShoppingListSchema.parse(payload);
 
 export const toLogResponse = (log: {
   id: string;

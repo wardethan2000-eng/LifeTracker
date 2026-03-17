@@ -14,6 +14,7 @@ import {
   slugifyPresetKey,
   toCustomPresetProfileResponse
 } from "../../lib/presets.js";
+import { toInputJsonValue } from "../../lib/prisma-json.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -30,8 +31,6 @@ const libraryPresetParamsSchema = z.object({
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
 });
-
-const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
 export const presetRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/presets/library", async () => presetLibrary);

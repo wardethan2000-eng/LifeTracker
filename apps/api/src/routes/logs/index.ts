@@ -12,6 +12,7 @@ import {
   InventoryError
 } from "../../lib/inventory.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
+import { toInputJsonValue } from "../../lib/prisma-json.js";
 import {
   syncScheduleCompletionFromLogs,
   toMaintenanceLogResponse
@@ -32,8 +33,6 @@ const listLogsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().cuid().optional()
 });
-
-const toInputJsonValue = (value: Record<string, unknown>): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
 export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/logs", async (request, reply) => {

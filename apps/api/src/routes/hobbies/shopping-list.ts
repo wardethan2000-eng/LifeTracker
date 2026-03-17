@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { toHobbyRecipeShoppingListResponse } from "../../lib/serializers/index.js";
 
 const recipeParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -59,12 +60,12 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
       const costs = items.map((i) => i.estimatedCost).filter((c): c is number => c !== null);
       const totalEstimatedCost = costs.length > 0 ? costs.reduce((sum, c) => sum + c, 0) : null;
 
-      return reply.send({
+      return reply.send(toHobbyRecipeShoppingListResponse({
         recipeId: recipe.id,
         recipeName: recipe.name,
         items,
         totalEstimatedCost,
-      });
+      }));
     }
   );
 };

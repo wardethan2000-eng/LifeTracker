@@ -18,6 +18,14 @@ import {
   groupTransactionsByMonth
 } from "../../lib/inventory-analytics.js";
 import { getHouseholdInventoryItem } from "../../lib/inventory.js";
+import {
+  toAssetPartsConsumptionResponse,
+  toHouseholdInventoryAnalyticsResponse,
+  toInventoryItemConsumptionResponse,
+  toInventoryReorderForecastResponse,
+  toInventoryTurnoverResponse,
+  toPartCommonalityResponse
+} from "../../lib/serializers/index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -250,7 +258,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       return map;
     }, new Map());
 
-    return reply.send(householdInventoryAnalyticsSchema.parse({
+    return reply.send(toHouseholdInventoryAnalyticsResponse({
       totalItems: items.length,
       totalValue: items.reduce((sum, item) => sum + (item.unitCost !== null ? item.quantityOnHand * item.unitCost : 0), 0),
       totalSpentLast30Days: spendForTransactions(last30DayTransactions),
@@ -333,7 +341,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       ? computeProjectedDate(item.quantityOnHand, averageConsumptionPerMonth ?? 0, item.reorderThreshold)
       : null;
 
-    return reply.send(inventoryItemConsumptionSchema.parse({
+    return reply.send(toInventoryItemConsumptionResponse({
       inventoryItemId: item.id,
       itemName: item.name,
       partNumber: item.partNumber,
@@ -476,7 +484,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       };
     });
 
-    return reply.send(z.array(inventoryTurnoverSchema).parse(rows.sort((left, right) => {
+    return reply.send(rows.sort((left, right) => {
       const byVelocity = velocityOrder[left.velocityCategory] - velocityOrder[right.velocityCategory];
 
       if (byVelocity !== 0) {
@@ -484,7 +492,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       }
 
       return (right.daysSinceLastConsumption ?? Number.MAX_SAFE_INTEGER) - (left.daysSinceLastConsumption ?? Number.MAX_SAFE_INTEGER);
-    })));
+    }).map(toInventoryTurnoverResponse));
   });
 
   app.get("/v1/households/:householdId/inventory/analytics/reorder-forecast", async (request, reply) => {
@@ -579,7 +587,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       };
     });
 
-    return reply.send(z.array(inventoryReorderForecastSchema).parse(result.sort((left, right) => {
+    return reply.send(result.sort((left, right) => {
       const byUrgency = urgencyOrder[left.urgency] - urgencyOrder[right.urgency];
 
       if (byUrgency !== 0) {
@@ -587,7 +595,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       }
 
       return (left.daysUntilReorder ?? Number.MAX_SAFE_INTEGER) - (right.daysUntilReorder ?? Number.MAX_SAFE_INTEGER);
-    })));
+    }).map(toInventoryReorderForecastResponse));
   });
 
   app.get("/v1/households/:householdId/inventory/analytics/asset-consumption", async (request, reply) => {
@@ -727,7 +735,9 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       })
     }));
 
-    return reply.send(z.array(assetPartsConsumptionSchema).parse(result.sort((left, right) => right.totalPartsCost - left.totalPartsCost)));
+    return reply.send(result
+      .sort((left, right) => right.totalPartsCost - left.totalPartsCost)
+      .map(toAssetPartsConsumptionResponse));
   });
 
   app.get("/v1/households/:householdId/inventory/analytics/part-commonality", async (request, reply) => {
@@ -834,6 +844,6 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
         return right.totalQuantityAcrossAssets - left.totalQuantityAcrossAssets;
       });
 
-    return reply.send(z.array(partCommonalitySchema).parse(result));
+    return reply.send(result.map(toPartCommonalityResponse));
   });
 };

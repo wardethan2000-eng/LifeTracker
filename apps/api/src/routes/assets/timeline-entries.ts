@@ -7,6 +7,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { toAssetTimelineEntryResponse } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncTimelineEntryToSearchIndex } from "../../lib/search-index.js";
 
@@ -25,8 +26,6 @@ const listTimelineEntriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().cuid().optional()
 });
-
-const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
 export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/timeline-entries", async (request, reply) => {

@@ -14,6 +14,7 @@ import { logActivity } from "../../lib/activity-log.js";
 import {
   toIngredientResponse,
   toRecipeResponse,
+  toRecipeSummaryResponse,
   toStepResponse
 } from "../../lib/serializers/index.js";
 
@@ -73,12 +74,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.send(recipes.map((r) => ({
-      ...toRecipeResponse(r),
-      ingredientCount: r._count.ingredients,
-      stepCount: r._count.steps,
-      sessionCount: r._count.sessions,
-    })));
+    return reply.send(recipes.map(toRecipeSummaryResponse));
   });
 
   // POST .../recipes

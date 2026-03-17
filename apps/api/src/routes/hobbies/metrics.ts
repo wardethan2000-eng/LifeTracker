@@ -6,6 +6,11 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import {
+  toHobbyMetricDefinitionResponse,
+  toHobbyMetricReadingPageResponse,
+  toHobbyMetricReadingResponse
+} from "../../lib/serializers/index.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -45,16 +50,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       orderBy: { name: "asc" }
     });
 
-    return reply.send(metrics.map((m) => ({
-      id: m.id,
-      hobbyId: m.hobbyId,
-      name: m.name,
-      unit: m.unit,
-      description: m.description,
-      metricType: m.metricType,
-      createdAt: m.createdAt.toISOString(),
-      updatedAt: m.updatedAt.toISOString(),
-    })));
+    return reply.send(metrics.map(toHobbyMetricDefinitionResponse));
   });
 
   // POST .../metrics
@@ -84,16 +80,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.code(201).send({
-      id: metric.id,
-      hobbyId: metric.hobbyId,
-      name: metric.name,
-      unit: metric.unit,
-      description: metric.description,
-      metricType: metric.metricType,
-      createdAt: metric.createdAt.toISOString(),
-      updatedAt: metric.updatedAt.toISOString(),
-    });
+    return reply.code(201).send(toHobbyMetricDefinitionResponse(metric));
   });
 
   // PATCH .../metrics/:metricId
@@ -123,16 +110,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.send({
-      id: metric.id,
-      hobbyId: metric.hobbyId,
-      name: metric.name,
-      unit: metric.unit,
-      description: metric.description,
-      metricType: metric.metricType,
-      createdAt: metric.createdAt.toISOString(),
-      updatedAt: metric.updatedAt.toISOString(),
-    });
+    return reply.send(toHobbyMetricDefinitionResponse(metric));
   });
 
   // DELETE .../metrics/:metricId
@@ -189,18 +167,10 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const items = hasMore ? readings.slice(0, limit) : readings;
     const nextCursor = hasMore ? items[items.length - 1]!.id : null;
 
-    return reply.send({
-      items: items.map((r) => ({
-        id: r.id,
-        metricDefinitionId: r.metricDefinitionId,
-        sessionId: r.sessionId,
-        value: r.value,
-        readingDate: r.readingDate.toISOString(),
-        notes: r.notes,
-        createdAt: r.createdAt.toISOString(),
-      })),
-      nextCursor,
-    });
+    return reply.send(toHobbyMetricReadingPageResponse({
+      items,
+      nextCursor
+    }));
   });
 
   // POST .../metrics/:metricId/readings
@@ -230,15 +200,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.code(201).send({
-      id: reading.id,
-      metricDefinitionId: reading.metricDefinitionId,
-      sessionId: reading.sessionId,
-      value: reading.value,
-      readingDate: reading.readingDate.toISOString(),
-      notes: reading.notes,
-      createdAt: reading.createdAt.toISOString(),
-    });
+    return reply.code(201).send(toHobbyMetricReadingResponse(reading));
   });
 
   // DELETE .../metrics/:metricId/readings/:readingId

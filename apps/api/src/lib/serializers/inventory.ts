@@ -10,16 +10,22 @@ import type {
 } from "@prisma/client";
 import {
   assetInventoryItemSchema,
+  assetPartsConsumptionSchema,
+  householdInventoryAnalyticsSchema,
+  inventoryItemConsumptionSchema,
   scheduleInventoryItemSchema,
   scheduleInventoryLinkDetailSchema,
   inventoryAssetLinkDetailSchema,
   inventoryItemDetailSchema,
+  inventoryReorderForecastSchema,
   inventoryItemSummarySchema,
   inventoryProjectLinkDetailSchema,
   inventoryTransactionWithItemSchema,
   inventoryTransactionSchema,
+  inventoryTurnoverSchema,
   lowStockInventoryItemSchema,
   maintenanceLogPartSchema,
+  partCommonalitySchema,
   projectInventoryItemSchema
 } from "@lifekeeper/types";
 import {
@@ -258,3 +264,15 @@ export const toLowStockInventoryItemResponse = (item: InventorySummaryRecord) =>
   unit: item.unit,
   deficit: calculateInventoryDeficit(item.quantityOnHand, item.reorderThreshold)
 });
+
+export const toHouseholdInventoryAnalyticsResponse = (payload: unknown) => householdInventoryAnalyticsSchema.parse(payload);
+
+export const toInventoryItemConsumptionResponse = (payload: unknown) => inventoryItemConsumptionSchema.parse(payload);
+
+export const toInventoryTurnoverResponse = (payload: unknown) => inventoryTurnoverSchema.parse(payload);
+
+export const toInventoryReorderForecastResponse = (payload: unknown) => inventoryReorderForecastSchema.parse(payload);
+
+export const toAssetPartsConsumptionResponse = (payload: unknown) => assetPartsConsumptionSchema.parse(payload);
+
+export const toPartCommonalityResponse = (payload: unknown) => partCommonalitySchema.parse(payload);

@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { buildRateLimitKey, enforceRateLimit } from "./lib/rate-limit.js";
 import { authPlugin } from "./plugins/auth.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
@@ -78,6 +79,76 @@ const resolveAllowedCorsOrigins = (): Set<string> => {
   return new Set(configuredOrigins.map(normalizeOrigin));
 };
 
+const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPluginAsync[]) => {
+  for (const plugin of plugins) {
+    await scope.register(plugin);
+  }
+};
+
+const publicRoutePlugins: FastifyPluginAsync[] = [
+  publicShareRoutes,
+  healthRoutes
+];
+
+const accountRoutePlugins: FastifyPluginAsync[] = [
+  meRoutes,
+  notificationRoutes,
+  dashboardRoutes,
+  searchRoutes,
+  barcodeRoutes
+];
+
+const householdRoutePlugins: FastifyPluginAsync[] = [
+  householdRoutes,
+  householdInventoryAnalyticsRoutes,
+  householdInventoryItemRoutes,
+  householdProjectInventoryRollupRoutes,
+  householdInventoryTransactionRoutes,
+  householdLinkPreviewRoutes,
+  presetRoutes,
+  serviceProviderRoutes,
+  activityLogRoutes,
+  complianceAnalyticsRoutes,
+  comparativeAnalyticsRoutes,
+  commentRoutes,
+  costAnalyticsRoutes,
+  exportRoutes,
+  invitationRoutes,
+  projectBudgetAnalyticsRoutes,
+  webhookRoutes,
+  hobbyRoutes,
+  hobbyRecipeRoutes,
+  hobbySessionRoutes,
+  hobbyMetricRoutes,
+  hobbyLogRoutes,
+  hobbyLinkRoutes,
+  hobbyShoppingListRoutes
+];
+
+const assetRoutePlugins: FastifyPluginAsync[] = [
+  assetRoutes,
+  assetInventoryRoutes,
+  timelineEntryRoutes,
+  timelineRoutes,
+  assetTransferRoutes,
+  usageMetricRoutes,
+  usageMetricAnalyticsRoutes,
+  scheduleRoutes,
+  scheduleInventoryRoutes,
+  maintenanceLogRoutes,
+  maintenanceLogPartRoutes,
+  scheduleComplianceRoutes,
+  attachmentRoutes,
+  shareLinkRoutes
+];
+
+const projectRoutePlugins: FastifyPluginAsync[] = [
+  projectRoutes,
+  projectInventoryRoutes,
+  projectPhaseRoutes,
+  projectNoteRoutes
+];
+
 export const buildApp = () => {
   const app = Fastify({
     logger: true
@@ -115,58 +186,24 @@ export const buildApp = () => {
     }
   });
   app.register(prismaPlugin);
-  app.register(publicShareRoutes);
+  app.register(async (publicApp) => {
+    await registerRouteGroup(publicApp, publicRoutePlugins);
+  });
   app.register(authPlugin);
   app.register(storagePlugin);
   app.register(errorHandlerPlugin);
-  app.register(healthRoutes);
-  app.register(meRoutes);
-  app.register(householdRoutes);
-  app.register(householdInventoryAnalyticsRoutes);
-  app.register(householdInventoryItemRoutes);
-  app.register(householdProjectInventoryRollupRoutes);
-  app.register(householdInventoryTransactionRoutes);
-  app.register(householdLinkPreviewRoutes);
-  app.register(notificationRoutes);
-  app.register(dashboardRoutes);
-  app.register(assetRoutes);
-  app.register(assetInventoryRoutes);
-  app.register(timelineEntryRoutes);
-  app.register(timelineRoutes);
-  app.register(assetTransferRoutes);
-  app.register(usageMetricRoutes);
-  app.register(usageMetricAnalyticsRoutes);
-  app.register(scheduleRoutes);
-  app.register(scheduleInventoryRoutes);
-  app.register(maintenanceLogRoutes);
-  app.register(maintenanceLogPartRoutes);
-  app.register(presetRoutes);
-  app.register(serviceProviderRoutes);
-  app.register(activityLogRoutes);
-  app.register(complianceAnalyticsRoutes);
-  app.register(comparativeAnalyticsRoutes);
-  app.register(commentRoutes);
-  app.register(costAnalyticsRoutes);
-  app.register(scheduleComplianceRoutes);
-  app.register(exportRoutes);
-  app.register(invitationRoutes);
-  app.register(projectRoutes);
-  app.register(projectBudgetAnalyticsRoutes);
-  app.register(projectInventoryRoutes);
-  app.register(projectPhaseRoutes);
-  app.register(projectNoteRoutes);
-  app.register(searchRoutes);
-  app.register(barcodeRoutes);
-  app.register(attachmentRoutes);
-  app.register(shareLinkRoutes);
-  app.register(webhookRoutes);
-  app.register(hobbyRoutes);
-  app.register(hobbyRecipeRoutes);
-  app.register(hobbySessionRoutes);
-  app.register(hobbyMetricRoutes);
-  app.register(hobbyLogRoutes);
-  app.register(hobbyLinkRoutes);
-  app.register(hobbyShoppingListRoutes);
+  app.register(async (authenticatedApp) => {
+    await registerRouteGroup(authenticatedApp, accountRoutePlugins);
+    await authenticatedApp.register(async (householdScope) => {
+      await registerRouteGroup(householdScope, householdRoutePlugins);
+    });
+    await authenticatedApp.register(async (assetScope) => {
+      await registerRouteGroup(assetScope, assetRoutePlugins);
+    });
+    await authenticatedApp.register(async (projectScope) => {
+      await registerRouteGroup(projectScope, projectRoutePlugins);
+    });
+  });
 
   return app;
 };

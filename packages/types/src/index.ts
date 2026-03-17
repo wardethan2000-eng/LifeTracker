@@ -3433,6 +3433,12 @@ export const hobbyMetricReadingSchema = z.object({
 });
 export type HobbyMetricReading = z.infer<typeof hobbyMetricReadingSchema>;
 
+export const hobbyMetricReadingPageSchema = z.object({
+  items: z.array(hobbyMetricReadingSchema),
+  nextCursor: z.string().cuid().nullable(),
+});
+export type HobbyMetricReadingPage = z.infer<typeof hobbyMetricReadingPageSchema>;
+
 export const createHobbyMetricReadingInputSchema = z.object({
   sessionId: z.string().cuid().optional(),
   value: z.number(),
@@ -3483,6 +3489,13 @@ export const hobbyRecipeDetailSchema = hobbyRecipeSchema.extend({
   sessionCount: z.number(),
 });
 export type HobbyRecipeDetail = z.infer<typeof hobbyRecipeDetailSchema>;
+
+export const hobbyRecipeSummarySchema = hobbyRecipeSchema.extend({
+  ingredientCount: z.number(),
+  stepCount: z.number(),
+  sessionCount: z.number(),
+});
+export type HobbyRecipeSummary = z.infer<typeof hobbyRecipeSummarySchema>;
 
 // Shopping list schemas
 export const hobbyRecipeShoppingListItemSchema = z.object({

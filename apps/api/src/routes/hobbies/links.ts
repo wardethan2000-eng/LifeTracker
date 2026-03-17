@@ -8,6 +8,12 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import {
+  toHobbyAssetLinkResponse,
+  toHobbyInventoryCategoryResponse,
+  toHobbyInventoryLinkResponse,
+  toHobbyProjectLinkResponse
+} from "../../lib/serializers/index.js";
+import {
   syncAssetFamilyToSearchIndex,
   syncHobbyToSearchIndex,
   syncInventoryItemToSearchIndex,
@@ -56,16 +62,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.send(links.map((link) => ({
-      id: link.id,
-      hobbyId: link.hobbyId,
-      assetId: link.assetId,
-      role: link.role,
-      notes: link.notes,
-      asset: link.asset,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
-    })));
+    return reply.send(links.map(toHobbyAssetLinkResponse));
   });
 
   // POST .../links/assets
@@ -102,16 +99,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       syncAssetFamilyToSearchIndex(app.prisma, link.assetId)
     ]).catch(console.error);
 
-    return reply.code(201).send({
-      id: link.id,
-      hobbyId: link.hobbyId,
-      assetId: link.assetId,
-      role: link.role,
-      notes: link.notes,
-      asset: link.asset,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
-    });
+    return reply.code(201).send(toHobbyAssetLinkResponse(link));
   });
 
   // DELETE .../links/assets/:hobbyAssetId
@@ -158,15 +146,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.send(links.map((link) => ({
-      id: link.id,
-      hobbyId: link.hobbyId,
-      inventoryItemId: link.inventoryItemId,
-      notes: link.notes,
-      inventoryItem: link.inventoryItem,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
-    })));
+    return reply.send(links.map(toHobbyInventoryLinkResponse));
   });
 
   // POST .../links/inventory
@@ -202,15 +182,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       syncInventoryItemToSearchIndex(app.prisma, link.inventoryItemId)
     ]).catch(console.error);
 
-    return reply.code(201).send({
-      id: link.id,
-      hobbyId: link.hobbyId,
-      inventoryItemId: link.inventoryItemId,
-      notes: link.notes,
-      inventoryItem: link.inventoryItem,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
-    });
+    return reply.code(201).send(toHobbyInventoryLinkResponse(link));
   });
 
   // DELETE .../links/inventory/:hobbyInventoryItemId
@@ -257,15 +229,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.send(links.map((link) => ({
-      id: link.id,
-      hobbyId: link.hobbyId,
-      projectId: link.projectId,
-      notes: link.notes,
-      project: link.project,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
-    })));
+    return reply.send(links.map(toHobbyProjectLinkResponse));
   });
 
   // POST .../links/projects
@@ -301,15 +265,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       syncProjectToSearchIndex(app.prisma, link.projectId)
     ]).catch(console.error);
 
-    return reply.code(201).send({
-      id: link.id,
-      hobbyId: link.hobbyId,
-      projectId: link.projectId,
-      notes: link.notes,
-      project: link.project,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
-    });
+    return reply.code(201).send(toHobbyProjectLinkResponse(link));
   });
 
   // DELETE .../links/projects/:hobbyProjectId
@@ -354,14 +310,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       orderBy: { sortOrder: "asc" }
     });
 
-    return reply.send(categories.map((c) => ({
-      id: c.id,
-      hobbyId: c.hobbyId,
-      categoryName: c.categoryName,
-      sortOrder: c.sortOrder,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-    })));
+    return reply.send(categories.map(toHobbyInventoryCategoryResponse));
   });
 
   // POST .../links/inventory-categories
@@ -389,14 +338,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return reply.code(201).send({
-      id: category.id,
-      hobbyId: category.hobbyId,
-      categoryName: category.categoryName,
-      sortOrder: category.sortOrder,
-      createdAt: category.createdAt.toISOString(),
-      updatedAt: category.updatedAt.toISOString(),
-    });
+    return reply.code(201).send(toHobbyInventoryCategoryResponse(category));
   });
 
   // DELETE .../links/inventory-categories/:categoryId

@@ -11,9 +11,8 @@ import {
   type MaintenanceTrigger,
   type PresetDefinition
 } from "@lifekeeper/types";
+import { toInputJsonValue } from "./prisma-json.js";
 import { recalculateScheduleFields } from "./schedule-state.js";
-
-const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
 const customFieldTemplatesArraySchema = presetCustomFieldTemplateSchema.array();
 const metricTemplatesArraySchema = presetUsageMetricTemplateSchema.array();
