@@ -26,7 +26,8 @@ export const resolveProjectHierarchyInput = async (
   const parentProject = await prisma.project.findFirst({
     where: {
       id: options.parentProjectId,
-      householdId: options.householdId
+      householdId: options.householdId,
+      deletedAt: null
     },
     select: {
       id: true,
@@ -41,9 +42,9 @@ export const resolveProjectHierarchyInput = async (
   if (options.projectId) {
     const descendants = await prisma.$queryRaw<{ id: string }[]>`
       WITH RECURSIVE tree AS (
-        SELECT id FROM "Project" WHERE "parentProjectId" = ${options.projectId}
+        SELECT id FROM "Project" WHERE "parentProjectId" = ${options.projectId} AND "deletedAt" IS NULL
         UNION ALL
-        SELECT p.id FROM "Project" p JOIN tree t ON p."parentProjectId" = t.id
+        SELECT p.id FROM "Project" p JOIN tree t ON p."parentProjectId" = t.id WHERE p."deletedAt" IS NULL
       )
       SELECT id FROM tree
     `;
@@ -70,10 +71,12 @@ export const syncProjectTreeDepths = async (
       SELECT id, "parentProjectId", depth
       FROM "Project"
       WHERE id = ${rootProjectId}
+        AND "deletedAt" IS NULL
       UNION ALL
       SELECT child.id, child."parentProjectId", tree.depth + 1
       FROM "Project" child
       JOIN tree ON child."parentProjectId" = tree.id
+      WHERE child."deletedAt" IS NULL
     )
     UPDATE "Project" AS target
     SET depth = tree.depth
@@ -93,11 +96,13 @@ export const repairHouseholdProjectDepths = async (
       FROM "Project"
       WHERE "householdId" = ${householdId}
         AND "parentProjectId" IS NULL
+        AND "deletedAt" IS NULL
       UNION ALL
       SELECT child.id, tree.expected_depth + 1
       FROM "Project" child
       JOIN tree ON child."parentProjectId" = tree.id
       WHERE child."householdId" = ${householdId}
+        AND child."deletedAt" IS NULL
     )
     UPDATE "Project" AS target
     SET depth = tree.expected_depth
@@ -113,11 +118,13 @@ export const repairHouseholdProjectDepths = async (
       FROM "Project"
       WHERE "householdId" = ${householdId}
         AND "parentProjectId" IS NULL
+        AND "deletedAt" IS NULL
       UNION ALL
       SELECT child.id, tree.expected_depth + 1
       FROM "Project" child
       JOIN tree ON child."parentProjectId" = tree.id
       WHERE child."householdId" = ${householdId}
+        AND child."deletedAt" IS NULL
     )
     SELECT COUNT(*)::bigint AS updated_count
     FROM "Project" project

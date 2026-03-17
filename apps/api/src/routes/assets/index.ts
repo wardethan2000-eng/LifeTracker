@@ -3,6 +3,7 @@ import {
   assetLabelDataSchema,
   assetLookupQuerySchema,
   assetSchema,
+  createOffsetPaginationQuerySchema,
   createAssetSchema,
   createConditionAssessmentSchema,
   purchaseDetailsSchema,
@@ -17,14 +18,16 @@ import type { FastifyPluginAsync } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
 import {
-  assertMembership,
+  requireHouseholdMembership,
   getAccessibleAsset,
   personalAssetAccessWhere
 } from "../../lib/asset-access.js";
+import { buildOffsetPage } from "../../lib/pagination.js";
 import {
   buildAssetScanUrl,
   ensureAssetTag
 } from "../../lib/asset-tags.js";
+import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { toAssetResponse } from "../../lib/serializers/index.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { syncAssetFamilyToSearchIndex } from "../../lib/search-index.js";
@@ -33,7 +36,10 @@ const assetIdParamsSchema = z.object({
   assetId: z.string().cuid()
 });
 
-const listAssetsQuerySchema = z.object({
+const listAssetsQuerySchema = createOffsetPaginationQuerySchema({
+  defaultLimit: 25,
+  maxLimit: 100
+}).extend({
   householdId: z.string().cuid(),
   includeArchived: z.coerce.boolean().default(false),
   includeDeleted: z.coerce.boolean().default(false)
@@ -44,16 +50,12 @@ const assetLabelQuerySchema = z.object({
   size: z.coerce.number().int().min(100).max(1000).default(300)
 });
 
-const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
-
 export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets", async (request, reply) => {
     const query = listAssetsQuerySchema.parse(request.query);
 
-    try {
-      await assertMembership(app.prisma, query.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, query.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const where: Prisma.AssetWhereInput = {
@@ -62,6 +64,24 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       ...(query.includeArchived ? {} : { isArchived: false }),
       ...(query.includeDeleted ? {} : { deletedAt: null })
     };
+
+    if (query.paginated) {
+      const [assets, total] = await Promise.all([
+        app.prisma.asset.findMany({
+          where,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          skip: query.offset,
+          take: query.limit
+        }),
+        app.prisma.asset.count({ where })
+      ]);
+
+      return buildOffsetPage(
+        assets.map((asset) => toAssetResponse(asset)),
+        total,
+        query
+      );
+    }
 
     const assets = await app.prisma.asset.findMany({
       where,
@@ -94,10 +114,8 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/assets", async (request, reply) => {
     const input = createAssetSchema.parse(request.body);
 
-    try {
-      await assertMembership(app.prisma, input.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, input.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     // Validate parent asset if specified

@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
+  createOffsetPaginationQuerySchema,
   createProjectSchema,
   projectStatusCountListSchema,
   projectStatusValues,
@@ -16,8 +17,10 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership } from "../../lib/asset-access.js";
+import { assertMembership, requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { emitDomainEvent } from "../../lib/domain-events.js";
+import { buildOffsetPage } from "../../lib/pagination.js";
 import {
   ProjectHierarchyValidationError,
   resolveProjectHierarchyInput,
@@ -58,13 +61,25 @@ const expenseParamsSchema = projectParamsSchema.extend({
   expenseId: z.string().cuid()
 });
 
-const listProjectsQuerySchema = z.object({
+const listProjectsQuerySchema = createOffsetPaginationQuerySchema({
+  defaultLimit: 25,
+  maxLimit: 100
+}).extend({
   status: projectStatusSchema.optional(),
   parentProjectId: z.string().optional()
 });
 
 const projectPortfolioQuerySchema = z.object({
   status: projectStatusSchema.optional()
+});
+
+const activeProjectWhere = (
+  householdId: string,
+  projectId?: string
+): Prisma.ProjectWhereInput => ({
+  householdId,
+  deletedAt: null,
+  ...(projectId ? { id: projectId } : {})
 });
 
 const isProjectSummaryTaskCompleted = (task: {
@@ -207,11 +222,12 @@ const buildProjectBreadcrumbs = async (
     WITH RECURSIVE ancestors AS (
       SELECT id, name, "parentProjectId"
       FROM "Project"
-      WHERE id = ${projectId} AND "householdId" = ${householdId}
+      WHERE id = ${projectId} AND "householdId" = ${householdId} AND "deletedAt" IS NULL
       UNION ALL
       SELECT p.id, p.name, p."parentProjectId"
       FROM "Project" p
       JOIN ancestors a ON p.id = a."parentProjectId"
+      WHERE p."deletedAt" IS NULL
     )
     SELECT id, name FROM ancestors
   `;
@@ -237,10 +253,11 @@ const getProjectTreeStats = async (
     descendant_count: bigint;
   }[]>`
     WITH RECURSIVE project_tree AS (
-      SELECT id FROM "Project" WHERE id = ${projectId}
+      SELECT id FROM "Project" WHERE id = ${projectId} AND "deletedAt" IS NULL
       UNION ALL
       SELECT p.id FROM "Project" p
       JOIN project_tree pt ON p."parentProjectId" = pt.id
+      WHERE p."deletedAt" IS NULL
     )
     SELECT
       SUM(proj."budgetAmount") as tree_budget,
@@ -279,16 +296,15 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/status-counts", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
 
-    try {
-      await assertMembership(app.prisma, params.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const grouped = await app.prisma.project.groupBy({
       by: ["status"],
       where: {
-        householdId: params.householdId
+        householdId: params.householdId,
+        deletedAt: null
       },
       _count: {
         _all: true
@@ -307,21 +323,20 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const query = listProjectsQuerySchema.parse(request.query);
 
-    try {
-      await assertMembership(app.prisma, params.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const where: Prisma.ProjectWhereInput = {
       householdId: params.householdId,
+      deletedAt: null,
       ...(query.status ? { status: query.status } : {}),
       ...(query.parentProjectId !== undefined
         ? { parentProjectId: query.parentProjectId === "null" ? null : query.parentProjectId }
         : {})
     };
 
-    const projects = await app.prisma.project.findMany({
+    const projectQuery = {
       where,
       include: {
         expenses: { select: { amount: true } },
@@ -336,8 +351,27 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         },
         _count: { select: { tasks: true } }
       },
-      orderBy: { createdAt: "desc" }
-    });
+      orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }]
+    } satisfies Prisma.ProjectFindManyArgs;
+
+    if (query.paginated) {
+      const [projects, total] = await Promise.all([
+        app.prisma.project.findMany({
+          ...projectQuery,
+          skip: query.offset,
+          take: query.limit
+        }),
+        app.prisma.project.count({ where })
+      ]);
+
+      return buildOffsetPage(
+        projects.map(toProjectSummary),
+        total,
+        query
+      );
+    }
+
+    const projects = await app.prisma.project.findMany(projectQuery);
 
     return projects.map(toProjectSummary);
   });
@@ -346,15 +380,14 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const query = projectPortfolioQuerySchema.parse(request.query);
 
-    try {
-      await assertMembership(app.prisma, params.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const projects = await app.prisma.project.findMany({
       where: {
         householdId: params.householdId,
+        deletedAt: null,
         ...(query.status ? { status: query.status } : {})
       },
       include: {
@@ -416,10 +449,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const input = createProjectSchema.parse(request.body);
 
-    try {
-      await assertMembership(app.prisma, params.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     let hierarchy: { parentProjectId: string | null; depth: number };
@@ -469,14 +500,12 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId", async (request, reply) => {
     const params = projectParamsSchema.parse(request.params);
 
-    try {
-      await assertMembership(app.prisma, params.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       include: {
         assets: {
           include: {
@@ -527,7 +556,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const [breadcrumbs, childProjects] = await Promise.all([
       buildProjectBreadcrumbs(app.prisma as PrismaClient, project.id, params.householdId),
       app.prisma.project.findMany({
-        where: { parentProjectId: project.id, householdId: params.householdId },
+        where: { parentProjectId: project.id, householdId: params.householdId, deletedAt: null },
         include: {
           tasks: { select: { status: true, taskType: true, isCompleted: true } },
           expenses: { select: { amount: true } },
@@ -595,7 +624,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId }
+      where: activeProjectWhere(params.householdId, params.projectId)
     });
 
     if (!existing) {
@@ -668,14 +697,28 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId }
+      where: activeProjectWhere(params.householdId, params.projectId)
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    await app.prisma.project.delete({ where: { id: existing.id } });
+    await app.prisma.project.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() }
+    });
+
+    await emitDomainEvent(app.prisma, {
+      householdId: params.householdId,
+      eventType: "project.deleted",
+      entityType: "project",
+      entityId: existing.id,
+      payload: {
+        name: existing.name,
+        status: existing.status
+      }
+    });
 
     void removeSearchIndexEntry(app.prisma, "project", existing.id).catch(console.error);
 
@@ -695,7 +738,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId }
+      where: activeProjectWhere(params.householdId, params.projectId)
     });
 
     if (!existing) {
@@ -740,7 +783,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId }
+      where: activeProjectWhere(params.householdId, params.projectId)
     });
 
     if (!project) {
@@ -801,7 +844,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectAsset.findFirst({
       where: {
         id: params.projectAssetId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       },
       include: { asset: { select: { id: true, name: true, category: true } } }
     });
@@ -845,7 +888,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const projectAsset = await app.prisma.projectAsset.findFirst({
       where: {
         id: params.projectAssetId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
 
@@ -870,7 +913,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       select: { id: true }
     });
 
@@ -903,7 +946,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       select: { id: true, householdId: true }
     });
 
@@ -936,6 +979,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
         where: {
           id: input.scheduleId,
+          deletedAt: null,
           asset: { householdId: params.householdId }
         },
         select: { id: true }
@@ -1000,7 +1044,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectTask.findFirst({
       where: {
         id: params.taskId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
 
@@ -1033,6 +1077,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
         where: {
           id: input.scheduleId,
+          deletedAt: null,
           asset: { householdId: params.householdId }
         },
         select: { id: true }
@@ -1165,7 +1210,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectTask.findFirst({
       where: {
         id: params.taskId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
 
@@ -1191,7 +1236,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       select: { id: true }
     });
 
@@ -1254,7 +1299,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectTask.findFirst({
       where: {
         id: params.taskId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
 
@@ -1311,7 +1356,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       select: { id: true }
     });
 
@@ -1338,7 +1383,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       select: { id: true }
     });
 
@@ -1421,7 +1466,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectExpense.findFirst({
       where: {
         id: params.expenseId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
 
@@ -1505,7 +1550,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectExpense.findFirst({
       where: {
         id: params.expenseId,
-        project: { id: params.projectId, householdId: params.householdId }
+        project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
 
@@ -1530,7 +1575,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const project = await app.prisma.project.findFirst({
-      where: { id: params.projectId, householdId: params.householdId },
+      where: activeProjectWhere(params.householdId, params.projectId),
       select: { id: true }
     });
 
@@ -1541,10 +1586,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     // Collect all project IDs in the tree rooted at this project
     const treeRows = await app.prisma.$queryRaw<{ id: string }[]>`
       WITH RECURSIVE project_tree AS (
-        SELECT id FROM "Project" WHERE id = ${params.projectId}
+        SELECT id FROM "Project" WHERE id = ${params.projectId} AND "deletedAt" IS NULL
         UNION ALL
         SELECT p.id FROM "Project" p
         JOIN project_tree pt ON p."parentProjectId" = pt.id
+        WHERE p."deletedAt" IS NULL
       )
       SELECT id FROM project_tree
     `;

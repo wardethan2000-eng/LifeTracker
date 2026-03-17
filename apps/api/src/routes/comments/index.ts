@@ -1,75 +1,394 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createCommentSchema,
+  createOffsetPaginationQuerySchema,
   updateCommentSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
-import { toCommentResponse } from "../../lib/serializers/index.js";
-import { syncCommentToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
+import { emitDomainEvent } from "../../lib/domain-events.js";
+import { buildOffsetPage } from "../../lib/pagination.js";
+import { commentResponseInclude, toCommentResponse, type CommentResponseRecord } from "../../lib/serializers/index.js";
+import { removeSearchIndexEntry, syncCommentToSearchIndex } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
 });
 
-const commentParamsSchema = assetParamsSchema.extend({
+const projectParamsSchema = z.object({
+  householdId: z.string().cuid(),
+  projectId: z.string().cuid()
+});
+
+const hobbyParamsSchema = z.object({
+  householdId: z.string().cuid(),
+  hobbyId: z.string().cuid()
+});
+
+const inventoryParamsSchema = z.object({
+  householdId: z.string().cuid(),
+  inventoryItemId: z.string().cuid()
+});
+
+const assetCommentParamsSchema = assetParamsSchema.extend({
   commentId: z.string().cuid()
 });
 
-export const commentRoutes: FastifyPluginAsync = async (app) => {
-  // ── List comments (threaded) ────────────────────────────────────
+const projectCommentParamsSchema = projectParamsSchema.extend({
+  commentId: z.string().cuid()
+});
 
+const hobbyCommentParamsSchema = hobbyParamsSchema.extend({
+  commentId: z.string().cuid()
+});
+
+const inventoryCommentParamsSchema = inventoryParamsSchema.extend({
+  commentId: z.string().cuid()
+});
+
+const listCommentsQuerySchema = createOffsetPaginationQuerySchema({
+  defaultLimit: 25,
+  maxLimit: 100
+});
+
+type CommentRecord = CommentResponseRecord;
+
+type ThreadedCommentResponse = ReturnType<typeof toCommentResponse> & {
+  replies: ReturnType<typeof toCommentResponse>[];
+};
+
+type CommentEntityType = "asset" | "project" | "hobby" | "inventory_item";
+
+type CommentTarget = {
+  householdId: string;
+  entityType: CommentEntityType;
+  entityId: string;
+  targetName: string;
+  relationData: {
+    assetId?: string;
+    projectId?: string;
+    hobbyId?: string;
+    inventoryItemId?: string;
+  };
+};
+
+const buildCommentThreads = (
+  topLevelComments: CommentRecord[],
+  replyComments: CommentRecord[]
+): ThreadedCommentResponse[] => {
+  const repliesByParent = new Map<string, ReturnType<typeof toCommentResponse>[]>();
+
+  for (const reply of replyComments) {
+    if (!reply.parentCommentId) {
+      continue;
+    }
+
+    const existing = repliesByParent.get(reply.parentCommentId) ?? [];
+    existing.push(toCommentResponse(reply));
+    repliesByParent.set(reply.parentCommentId, existing);
+  }
+
+  return topLevelComments.map((comment) => ({
+    ...toCommentResponse(comment),
+    replies: repliesByParent.get(comment.id) ?? []
+  }));
+};
+
+const buildCommentWhere = (target: CommentTarget) => ({
+  householdId: target.householdId,
+  entityType: target.entityType,
+  entityId: target.entityId,
+  deletedAt: null
+});
+
+const commentInclude = commentResponseInclude;
+
+const listTargetComments = async (
+  prisma: PrismaClientLike,
+  target: CommentTarget,
+  query: z.infer<typeof listCommentsQuerySchema>
+) => {
+  if (query.paginated) {
+    const [topLevelComments, total] = await Promise.all([
+      prisma.comment.findMany({
+        where: {
+          ...buildCommentWhere(target),
+          parentCommentId: null
+        },
+        include: commentInclude,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: query.offset,
+        take: query.limit
+      }),
+      prisma.comment.count({
+        where: {
+          ...buildCommentWhere(target),
+          parentCommentId: null
+        }
+      })
+    ]);
+
+    const replies = topLevelComments.length === 0
+      ? []
+      : await prisma.comment.findMany({
+          where: {
+            ...buildCommentWhere(target),
+            parentCommentId: {
+              in: topLevelComments.map((comment) => comment.id)
+            }
+          },
+          include: commentInclude,
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+        });
+
+    return buildOffsetPage(buildCommentThreads(topLevelComments, replies), total, query);
+  }
+
+  const comments = await prisma.comment.findMany({
+    where: buildCommentWhere(target),
+    include: commentInclude,
+    orderBy: { createdAt: "asc" }
+  });
+
+  const topLevelComments = comments.filter((comment) => comment.parentCommentId === null).reverse();
+  const replyComments = comments.filter((comment) => comment.parentCommentId !== null);
+
+  return buildCommentThreads(topLevelComments, replyComments);
+};
+
+type PrismaClientLike = {
+  comment: {
+    findMany: PrismaClient["comment"]["findMany"];
+    count: PrismaClient["comment"]["count"];
+    findFirst: PrismaClient["comment"]["findFirst"];
+    create: PrismaClient["comment"]["create"];
+    update: PrismaClient["comment"]["update"];
+    updateMany: PrismaClient["comment"]["updateMany"];
+  };
+};
+
+type CommentMutationResult =
+  | { comment: CommentRecord }
+  | { error: { code: number; message: string } };
+
+const createComment = async (
+  app: Parameters<FastifyPluginAsync>[0],
+  target: CommentTarget,
+  userId: string,
+  input: z.infer<typeof createCommentSchema>
+): Promise<CommentMutationResult> => {
+  if (input.parentCommentId) {
+    const parent = await app.prisma.comment.findFirst({
+      where: {
+        id: input.parentCommentId,
+        ...buildCommentWhere(target)
+      }
+    });
+
+    if (!parent) {
+      return { error: { code: 400, message: "Parent comment not found for this target." } } as const;
+    }
+  }
+
+  const comment = await app.prisma.comment.create({
+    data: {
+      householdId: target.householdId,
+      entityType: target.entityType,
+      entityId: target.entityId,
+      authorId: userId,
+      body: input.body,
+      parentCommentId: input.parentCommentId ?? null,
+      ...target.relationData
+    },
+    include: commentInclude
+  });
+
+  await Promise.all([
+    logActivity(app.prisma, {
+      householdId: target.householdId,
+      userId,
+      action: "comment.created",
+      entityType: "comment",
+      entityId: comment.id,
+      metadata: {
+        targetType: target.entityType,
+        targetId: target.entityId,
+        targetName: target.targetName,
+        bodyPreview: comment.body.slice(0, 100)
+      }
+    }),
+    emitDomainEvent(app.prisma, {
+      householdId: target.householdId,
+      eventType: "comment.created",
+      entityType: "comment",
+      entityId: comment.id,
+      payload: {
+        targetType: target.entityType,
+        targetId: target.entityId,
+        targetName: target.targetName,
+        bodyPreview: comment.body.slice(0, 100)
+      }
+    })
+  ]);
+
+  void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
+
+  return { comment } as const;
+};
+
+const updateComment = async (
+  app: Parameters<FastifyPluginAsync>[0],
+  target: CommentTarget,
+  commentId: string,
+  userId: string,
+  input: z.infer<typeof updateCommentSchema>
+): Promise<CommentMutationResult> => {
+  const existing = await app.prisma.comment.findFirst({
+    where: {
+      id: commentId,
+      ...buildCommentWhere(target)
+    }
+  });
+
+  if (!existing) {
+    return { error: { code: 404, message: "Comment not found." } } as const;
+  }
+
+  if (existing.authorId !== userId) {
+    return { error: { code: 403, message: "Only the author can edit this comment." } } as const;
+  }
+
+  const comment = await app.prisma.comment.update({
+    where: { id: existing.id },
+    data: {
+      body: input.body,
+      editedAt: new Date()
+    },
+    include: commentInclude
+  });
+
+  await Promise.all([
+    logActivity(app.prisma, {
+      householdId: target.householdId,
+      userId,
+      action: "comment.updated",
+      entityType: "comment",
+      entityId: comment.id,
+      metadata: {
+        targetType: target.entityType,
+        targetId: target.entityId,
+        targetName: target.targetName,
+        bodyPreview: comment.body.slice(0, 100)
+      }
+    }),
+    emitDomainEvent(app.prisma, {
+      householdId: target.householdId,
+      eventType: "comment.updated",
+      entityType: "comment",
+      entityId: comment.id,
+      payload: {
+        targetType: target.entityType,
+        targetId: target.entityId,
+        targetName: target.targetName,
+        bodyPreview: comment.body.slice(0, 100)
+      }
+    })
+  ]);
+
+  void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
+
+  return { comment } as const;
+};
+
+const deleteComment = async (
+  app: Parameters<FastifyPluginAsync>[0],
+  target: CommentTarget,
+  commentId: string,
+  userId: string
+) => {
+  const existing = await app.prisma.comment.findFirst({
+    where: {
+      id: commentId,
+      ...buildCommentWhere(target)
+    }
+  });
+
+  if (!existing) {
+    return { error: { code: 404, message: "Comment not found." } } as const;
+  }
+
+  if (existing.authorId !== userId) {
+    return { error: { code: 403, message: "Only the author can delete this comment." } } as const;
+  }
+
+  await app.prisma.$transaction(async (tx) => {
+    await tx.comment.updateMany({
+      where: {
+        parentCommentId: existing.id,
+        deletedAt: null
+      },
+      data: { parentCommentId: null }
+    });
+
+    await tx.comment.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() }
+    });
+  });
+
+  await Promise.all([
+    logActivity(app.prisma, {
+      householdId: target.householdId,
+      userId,
+      action: "comment.deleted",
+      entityType: "comment",
+      entityId: existing.id,
+      metadata: {
+        targetType: target.entityType,
+        targetId: target.entityId,
+        targetName: target.targetName,
+        bodyPreview: existing.body.slice(0, 100)
+      }
+    }),
+    emitDomainEvent(app.prisma, {
+      householdId: target.householdId,
+      eventType: "comment.deleted",
+      entityType: "comment",
+      entityId: existing.id,
+      payload: {
+        targetType: target.entityType,
+        targetId: target.entityId,
+        targetName: target.targetName,
+        bodyPreview: existing.body.slice(0, 100)
+      }
+    })
+  ]);
+
+  void removeSearchIndexEntry(app.prisma, "comment", existing.id).catch(console.error);
+
+  return { success: true } as const;
+};
+
+export const commentRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/comments", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);
+    const query = listCommentsQuerySchema.parse(request.query);
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const comments = await app.prisma.comment.findMany({
-      where: {
-        assetId: asset.id,
-        deletedAt: null
-      },
-      include: {
-        author: { select: { id: true, displayName: true } }
-      },
-      orderBy: { createdAt: "asc" }
-    });
-
-    // Build threaded structure: top-level comments with nested replies
-    type CommentWithReplies = ReturnType<typeof toCommentResponse> & { replies: ReturnType<typeof toCommentResponse>[] };
-    const topLevel: CommentWithReplies[] = [];
-    const childMap = new Map<string, ReturnType<typeof toCommentResponse>[]>();
-
-    for (const comment of comments) {
-      const response = toCommentResponse(comment);
-
-      if (!comment.parentCommentId) {
-        topLevel.push({ ...response, replies: [] });
-      } else {
-        if (!childMap.has(comment.parentCommentId)) {
-          childMap.set(comment.parentCommentId, []);
-        }
-
-        childMap.get(comment.parentCommentId)!.push(response);
-      }
-    }
-
-    // Attach replies to their parents
-    for (const parent of topLevel) {
-      parent.replies = childMap.get(parent.id) ?? [];
-    }
-
-    // Return top-level in descending createdAt order, replies in ascending
-    topLevel.reverse();
-
-    return topLevel;
+    return listTargetComments(app.prisma, {
+      householdId: asset.householdId,
+      entityType: "asset",
+      entityId: asset.id,
+      targetName: asset.name,
+      relationData: { assetId: asset.id }
+    }, query);
   });
-
-  // ── Create comment ──────────────────────────────────────────────
 
   app.post("/v1/assets/:assetId/comments", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);
@@ -80,54 +399,23 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    if (input.parentCommentId) {
-      const parent = await app.prisma.comment.findFirst({
-        where: {
-          id: input.parentCommentId,
-          assetId: asset.id,
-          deletedAt: null
-        }
-      });
+    const result = await createComment(app, {
+      householdId: asset.householdId,
+      entityType: "asset",
+      entityId: asset.id,
+      targetName: asset.name,
+      relationData: { assetId: asset.id }
+    }, request.auth.userId, input);
 
-      if (!parent) {
-        return reply.code(400).send({ message: "Parent comment not found or belongs to a different asset." });
-      }
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
     }
 
-    const comment = await app.prisma.comment.create({
-      data: {
-        assetId: asset.id,
-        authorId: request.auth.userId,
-        body: input.body,
-        parentCommentId: input.parentCommentId ?? null
-      },
-      include: {
-        author: { select: { id: true, displayName: true } }
-      }
-    });
-
-    await logActivity(app.prisma, {
-      householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "comment.created",
-      entityType: "comment",
-      entityId: comment.id,
-      metadata: {
-        assetId: asset.id,
-        assetName: asset.name,
-        bodyPreview: comment.body.slice(0, 100)
-      }
-    });
-
-    void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
-
-    return reply.code(201).send(toCommentResponse(comment));
+    return reply.code(201).send(toCommentResponse(result.comment));
   });
 
-  // ── Update comment (author only) ───────────────────────────────
-
   app.patch("/v1/assets/:assetId/comments/:commentId", async (request, reply) => {
-    const params = commentParamsSchema.parse(request.params);
+    const params = assetCommentParamsSchema.parse(request.params);
     const input = updateCommentSchema.parse(request.body);
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
@@ -135,109 +423,403 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const existing = await app.prisma.comment.findFirst({
-      where: {
-        id: params.commentId,
-        assetId: asset.id,
-        deletedAt: null
-      }
-    });
-
-    if (!existing) {
-      return reply.code(404).send({ message: "Comment not found." });
-    }
-
-    if (existing.authorId !== request.auth.userId) {
-      return reply.code(403).send({ message: "Only the author can edit this comment." });
-    }
-
-    const comment = await app.prisma.comment.update({
-      where: { id: existing.id },
-      data: {
-        body: input.body,
-        editedAt: new Date()
-      },
-      include: {
-        author: { select: { id: true, displayName: true } }
-      }
-    });
-
-    await logActivity(app.prisma, {
+    const result = await updateComment(app, {
       householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "comment.updated",
-      entityType: "comment",
-      entityId: comment.id,
-      metadata: {
-        assetId: asset.id,
-        assetName: asset.name,
-        bodyPreview: comment.body.slice(0, 100)
-      }
-    });
+      entityType: "asset",
+      entityId: asset.id,
+      targetName: asset.name,
+      relationData: { assetId: asset.id }
+    }, params.commentId, request.auth.userId, input);
 
-    void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
 
-    return toCommentResponse(comment);
+    return toCommentResponse(result.comment);
   });
 
-  // ── Delete comment ──────────────────────────────────────────────
-
   app.delete("/v1/assets/:assetId/comments/:commentId", async (request, reply) => {
-    const params = commentParamsSchema.parse(request.params);
+    const params = assetCommentParamsSchema.parse(request.params);
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const existing = await app.prisma.comment.findFirst({
-      where: {
-        id: params.commentId,
-        assetId: asset.id,
-        deletedAt: null
-      }
-    });
-
-    if (!existing) {
-      return reply.code(404).send({ message: "Comment not found." });
-    }
-
-    if (existing.authorId !== request.auth.userId) {
-      return reply.code(403).send({ message: "Only the author can delete this comment." });
-    }
-
-    // Design choice: When deleting a parent comment, keep replies as orphaned
-    // top-level comments so no discussion is lost. Set their parentCommentId to null.
-    // This could be revisited to cascade-delete if desired.
-    await app.prisma.$transaction(async (tx) => {
-      await tx.comment.updateMany({
-        where: {
-          parentCommentId: existing.id,
-          deletedAt: null
-        },
-        data: { parentCommentId: null }
-      });
-
-      await tx.comment.update({
-        where: { id: existing.id },
-        data: { deletedAt: new Date() }
-      });
-    });
-
-    await logActivity(app.prisma, {
+    const result = await deleteComment(app, {
       householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "comment.deleted",
-      entityType: "comment",
-      entityId: existing.id,
-      metadata: {
-        assetId: asset.id,
-        assetName: asset.name,
-        bodyPreview: existing.body.slice(0, 100)
-      }
+      entityType: "asset",
+      entityId: asset.id,
+      targetName: asset.name,
+      relationData: { assetId: asset.id }
+    }, params.commentId, request.auth.userId);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(204).send();
+  });
+
+  app.get("/v1/households/:householdId/projects/:projectId/comments", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+    const query = listCommentsQuerySchema.parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
     });
 
-    void removeSearchIndexEntry(app.prisma, "comment", existing.id).catch(console.error);
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    return listTargetComments(app.prisma, {
+      householdId: project.householdId,
+      entityType: "project",
+      entityId: project.id,
+      targetName: project.name,
+      relationData: { projectId: project.id }
+    }, query);
+  });
+
+  app.post("/v1/households/:householdId/projects/:projectId/comments", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+    const input = createCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    const result = await createComment(app, {
+      householdId: project.householdId,
+      entityType: "project",
+      entityId: project.id,
+      targetName: project.name,
+      relationData: { projectId: project.id }
+    }, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(201).send(toCommentResponse(result.comment));
+  });
+
+  app.patch("/v1/households/:householdId/projects/:projectId/comments/:commentId", async (request, reply) => {
+    const params = projectCommentParamsSchema.parse(request.params);
+    const input = updateCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    const result = await updateComment(app, {
+      householdId: project.householdId,
+      entityType: "project",
+      entityId: project.id,
+      targetName: project.name,
+      relationData: { projectId: project.id }
+    }, params.commentId, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return toCommentResponse(result.comment);
+  });
+
+  app.delete("/v1/households/:householdId/projects/:projectId/comments/:commentId", async (request, reply) => {
+    const params = projectCommentParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    const result = await deleteComment(app, {
+      householdId: project.householdId,
+      entityType: "project",
+      entityId: project.id,
+      targetName: project.name,
+      relationData: { projectId: project.id }
+    }, params.commentId, request.auth.userId);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(204).send();
+  });
+
+  app.get("/v1/households/:householdId/hobbies/:hobbyId/comments", async (request, reply) => {
+    const params = hobbyParamsSchema.parse(request.params);
+    const query = listCommentsQuerySchema.parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: params.hobbyId, householdId: params.householdId },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!hobby) {
+      return reply.code(404).send({ message: "Hobby not found." });
+    }
+
+    return listTargetComments(app.prisma, {
+      householdId: hobby.householdId,
+      entityType: "hobby",
+      entityId: hobby.id,
+      targetName: hobby.name,
+      relationData: { hobbyId: hobby.id }
+    }, query);
+  });
+
+  app.post("/v1/households/:householdId/hobbies/:hobbyId/comments", async (request, reply) => {
+    const params = hobbyParamsSchema.parse(request.params);
+    const input = createCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: params.hobbyId, householdId: params.householdId },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!hobby) {
+      return reply.code(404).send({ message: "Hobby not found." });
+    }
+
+    const result = await createComment(app, {
+      householdId: hobby.householdId,
+      entityType: "hobby",
+      entityId: hobby.id,
+      targetName: hobby.name,
+      relationData: { hobbyId: hobby.id }
+    }, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(201).send(toCommentResponse(result.comment));
+  });
+
+  app.patch("/v1/households/:householdId/hobbies/:hobbyId/comments/:commentId", async (request, reply) => {
+    const params = hobbyCommentParamsSchema.parse(request.params);
+    const input = updateCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: params.hobbyId, householdId: params.householdId },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!hobby) {
+      return reply.code(404).send({ message: "Hobby not found." });
+    }
+
+    const result = await updateComment(app, {
+      householdId: hobby.householdId,
+      entityType: "hobby",
+      entityId: hobby.id,
+      targetName: hobby.name,
+      relationData: { hobbyId: hobby.id }
+    }, params.commentId, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return toCommentResponse(result.comment);
+  });
+
+  app.delete("/v1/households/:householdId/hobbies/:hobbyId/comments/:commentId", async (request, reply) => {
+    const params = hobbyCommentParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: params.hobbyId, householdId: params.householdId },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!hobby) {
+      return reply.code(404).send({ message: "Hobby not found." });
+    }
+
+    const result = await deleteComment(app, {
+      householdId: hobby.householdId,
+      entityType: "hobby",
+      entityId: hobby.id,
+      targetName: hobby.name,
+      relationData: { hobbyId: hobby.id }
+    }, params.commentId, request.auth.userId);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(204).send();
+  });
+
+  app.get("/v1/households/:householdId/inventory/:inventoryItemId/comments", async (request, reply) => {
+    const params = inventoryParamsSchema.parse(request.params);
+    const query = listCommentsQuerySchema.parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const inventoryItem = await app.prisma.inventoryItem.findFirst({
+      where: { id: params.inventoryItemId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!inventoryItem) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    return listTargetComments(app.prisma, {
+      householdId: inventoryItem.householdId,
+      entityType: "inventory_item",
+      entityId: inventoryItem.id,
+      targetName: inventoryItem.name,
+      relationData: { inventoryItemId: inventoryItem.id }
+    }, query);
+  });
+
+  app.post("/v1/households/:householdId/inventory/:inventoryItemId/comments", async (request, reply) => {
+    const params = inventoryParamsSchema.parse(request.params);
+    const input = createCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const inventoryItem = await app.prisma.inventoryItem.findFirst({
+      where: { id: params.inventoryItemId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!inventoryItem) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    const result = await createComment(app, {
+      householdId: inventoryItem.householdId,
+      entityType: "inventory_item",
+      entityId: inventoryItem.id,
+      targetName: inventoryItem.name,
+      relationData: { inventoryItemId: inventoryItem.id }
+    }, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(201).send(toCommentResponse(result.comment));
+  });
+
+  app.patch("/v1/households/:householdId/inventory/:inventoryItemId/comments/:commentId", async (request, reply) => {
+    const params = inventoryCommentParamsSchema.parse(request.params);
+    const input = updateCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const inventoryItem = await app.prisma.inventoryItem.findFirst({
+      where: { id: params.inventoryItemId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!inventoryItem) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    const result = await updateComment(app, {
+      householdId: inventoryItem.householdId,
+      entityType: "inventory_item",
+      entityId: inventoryItem.id,
+      targetName: inventoryItem.name,
+      relationData: { inventoryItemId: inventoryItem.id }
+    }, params.commentId, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return toCommentResponse(result.comment);
+  });
+
+  app.delete("/v1/households/:householdId/inventory/:inventoryItemId/comments/:commentId", async (request, reply) => {
+    const params = inventoryCommentParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const inventoryItem = await app.prisma.inventoryItem.findFirst({
+      where: { id: params.inventoryItemId, householdId: params.householdId, deletedAt: null },
+      select: { id: true, householdId: true, name: true }
+    });
+
+    if (!inventoryItem) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    const result = await deleteComment(app, {
+      householdId: inventoryItem.householdId,
+      entityType: "inventory_item",
+      entityId: inventoryItem.id,
+      targetName: inventoryItem.name,
+      relationData: { inventoryItemId: inventoryItem.id }
+    }, params.commentId, request.auth.userId);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
 
     return reply.code(204).send();
   });

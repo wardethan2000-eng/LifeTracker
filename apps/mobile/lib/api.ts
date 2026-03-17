@@ -2,6 +2,7 @@ import {
   assetDetailResponseSchema,
   assetSchema,
   barcodeLookupResultSchema,
+  devFixtureIds,
   type Asset,
   type AssetDetailResponse,
   type BarcodeLookupResult
@@ -26,7 +27,7 @@ const apiBaseUrl = (
 
 const devUserId = process.env.EXPO_PUBLIC_LIFEKEEPER_DEV_USER_ID?.trim()
   || process.env.EXPO_PUBLIC_DEV_USER_ID?.trim()
-  || "clkeeperuser0000000000001";
+  || devFixtureIds.ownerUserId;
 
 const parseJson = async (response: Response): Promise<unknown> => {
   const text = await response.text();

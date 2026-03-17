@@ -37,7 +37,8 @@ export const getHouseholdInventoryItem = async (
 ) => prisma.inventoryItem.findFirst({
   where: {
     id: inventoryItemId,
-    householdId
+    householdId,
+    deletedAt: null
   }
 });
 
@@ -176,7 +177,7 @@ export const applyInventoryTransaction = async (
     where: { id: options.inventoryItemId }
   });
 
-  if (!item) {
+  if (!item || item.deletedAt) {
     throw new InventoryError("INVENTORY_ITEM_NOT_FOUND", "Inventory item not found.");
   }
 

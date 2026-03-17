@@ -18,6 +18,7 @@
     "search:rebuild": "tsx src/scripts/rebuild-search-index.ts",
     "start": "node dist/index.js",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format": "echo format not configured",
     "prisma:generate": "prisma generate",

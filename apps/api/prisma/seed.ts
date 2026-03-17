@@ -1,13 +1,14 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
+import { devFixtureIds } from "@lifekeeper/types";
 import { nanoid } from "nanoid";
 import { rebuildSearchIndex } from "../src/lib/search-index.js";
 
 const prisma = new PrismaClient();
 
-const ownerUserId = "clkeeperuser0000000000001";
-const memberUserId = "clkeeperuser0000000000002";
-const householdId = "clkeeperhouse000000000001";
+const ownerUserId = devFixtureIds.ownerUserId;
+const memberUserId = devFixtureIds.memberUserId;
+const householdId = devFixtureIds.householdId;
 const assetId = "clkeeperasset0000000000001";
 const personalAssetId = "clkeeperasset0000000000002";
 const childAssetId = "clkeeperasset0000000000003";
@@ -2001,6 +2002,9 @@ async function main(): Promise<void> {
   await prisma.comment.deleteMany({ where: { assetId } });
   const rootComment = await prisma.comment.create({
     data: {
+      householdId,
+      entityType: "asset",
+      entityId: assetId,
       assetId,
       authorId: ownerUserId,
       body: "The oil light flickered briefly last week — worth watching."
@@ -2008,6 +2012,9 @@ async function main(): Promise<void> {
   });
   await prisma.comment.create({
     data: {
+      householdId,
+      entityType: "asset",
+      entityId: assetId,
       assetId,
       authorId: memberUserId,
       parentCommentId: rootComment.id,

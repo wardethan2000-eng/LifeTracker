@@ -69,12 +69,12 @@ const supplyParamsSchema = phaseParamsSchema.extend({
 });
 
 const getProject = (app: FastifyInstance, householdId: string, projectId: string) => app.prisma.project.findFirst({
-  where: { id: projectId, householdId },
+  where: { id: projectId, householdId, deletedAt: null },
   select: { id: true, householdId: true, name: true }
 });
 
 const getPhase = (app: FastifyInstance, projectId: string, phaseId: string) => app.prisma.projectPhase.findFirst({
-  where: { id: phaseId, projectId }
+  where: { id: phaseId, projectId, project: { deletedAt: null } }
 });
 
 const getNextSortOrder = async (
@@ -415,7 +415,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const item = await app.prisma.projectPhaseChecklistItem.findFirst({
-      where: { id: params.checklistItemId, phase: { id: params.phaseId, projectId: params.projectId } }
+      where: {
+        id: params.checklistItemId,
+        phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+      }
     });
 
     if (!item) {
@@ -448,7 +451,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const item = await app.prisma.projectPhaseChecklistItem.findFirst({
-      where: { id: params.checklistItemId, phase: { id: params.phaseId, projectId: params.projectId } }
+      where: {
+        id: params.checklistItemId,
+        phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+      }
     });
 
     if (!item) {
@@ -468,7 +474,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const task = await app.prisma.projectTask.findFirst({
-      where: { id: params.taskId, project: { id: params.projectId, householdId: params.householdId } }
+      where: { id: params.taskId, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
     });
 
     if (!task) {
@@ -492,7 +498,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const task = await app.prisma.projectTask.findFirst({
-      where: { id: params.taskId, project: { id: params.projectId, householdId: params.householdId } }
+      where: { id: params.taskId, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
     });
 
     if (!task) {
@@ -524,7 +530,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const item = await app.prisma.projectTaskChecklistItem.findFirst({
-      where: { id: params.checklistItemId, task: { id: params.taskId, projectId: params.projectId } }
+      where: {
+        id: params.checklistItemId,
+        task: { id: params.taskId, projectId: params.projectId, project: { deletedAt: null } }
+      }
     });
 
     if (!item) {
@@ -555,7 +564,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const item = await app.prisma.projectTaskChecklistItem.findFirst({
-      where: { id: params.checklistItemId, task: { id: params.taskId, projectId: params.projectId } }
+      where: {
+        id: params.checklistItemId,
+        task: { id: params.taskId, projectId: params.projectId, project: { deletedAt: null } }
+      }
     });
 
     if (!item) {
@@ -639,7 +651,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const category = await app.prisma.projectBudgetCategory.findFirst({
-      where: { id: params.categoryId, projectId: params.projectId }
+      where: { id: params.categoryId, projectId: params.projectId, project: { deletedAt: null } }
     });
 
     if (!category) {
@@ -671,7 +683,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const category = await app.prisma.projectBudgetCategory.findFirst({
-      where: { id: params.categoryId, projectId: params.projectId }
+      where: { id: params.categoryId, projectId: params.projectId, project: { deletedAt: null } }
     });
 
     if (!category) {
@@ -927,7 +939,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const supply = await app.prisma.projectPhaseSupply.findFirst({
-      where: { id: params.supplyId, phase: { id: params.phaseId, projectId: params.projectId } }
+      where: {
+        id: params.supplyId,
+        phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+      }
     });
 
     if (!supply) {

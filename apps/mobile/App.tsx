@@ -1,4 +1,4 @@
-import { createAssetSchema, type AssetDetailResponse, type BarcodeLookupResult } from "@lifekeeper/types";
+import { createAssetSchema, devFixtureIds, type AssetDetailResponse, type BarcodeLookupResult } from "@lifekeeper/types";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { getAssetDetailMobile, lookupAssetByTagMobile, lookupBarcodeMobile } from "./lib/api";
@@ -8,7 +8,7 @@ import { ProductLookupScreen } from "./screens/ProductLookupScreen";
 import { ScanScreen } from "./screens/ScanScreen";
 
 const exampleAsset = createAssetSchema.parse({
-  householdId: "clkeeperhouse000000000001",
+  householdId: devFixtureIds.householdId,
   name: "Primary Vehicle",
   category: "vehicle",
   visibility: "shared",
@@ -37,19 +37,36 @@ export default function App() {
   const handleAssetScan = useCallback(async (target: AssetScanTarget) => {
     setScreen("loading");
 
-    const detail = target.kind === "asset-id"
-      ? await getAssetDetailMobile(target.assetId)
-      : await lookupAssetByTagMobile(target.tag).then((asset) => getAssetDetailMobile(asset.id));
+    try {
+      const detail = target.kind === "asset-id"
+        ? await getAssetDetailMobile(target.assetId)
+        : await lookupAssetByTagMobile(target.tag).then((asset) => getAssetDetailMobile(asset.id));
 
-    setAssetDetail(detail);
-    setScreen("asset");
+      setAssetDetail(detail);
+      setScreen("asset");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The scanned asset could not be loaded.";
+      setAssetDetail(null);
+      setBarcodeResult(null);
+      setScreen("home");
+      Alert.alert("Asset Lookup Failed", message);
+    }
   }, []);
 
   const handleProductScan = useCallback(async (data: { barcode: string; format: string }) => {
     setScreen("loading");
-    const result = await lookupBarcodeMobile(data.barcode, data.format);
-    setBarcodeResult(result);
-    setScreen("product");
+
+    try {
+      const result = await lookupBarcodeMobile(data.barcode, data.format);
+      setBarcodeResult(result);
+      setScreen("product");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The scanned barcode could not be resolved.";
+      setAssetDetail(null);
+      setBarcodeResult(null);
+      setScreen("home");
+      Alert.alert("Barcode Lookup Failed", message);
+    }
   }, []);
 
   if (screen === "scanner") {

@@ -1,20 +1,24 @@
+import { Prisma } from "@prisma/client";
 import { commentSchema } from "@lifekeeper/types";
 import { toShallowUserResponse } from "./users.js";
 
-export const toCommentResponse = (comment: {
-  id: string;
-  assetId: string;
-  authorId: string;
-  body: string;
-  parentCommentId: string | null;
-  editedAt: Date | null;
-  deletedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  author: { id: string; displayName: string | null };
-}) => commentSchema.parse({
+export const commentResponseInclude = Prisma.validator<Prisma.CommentInclude>()({
+  author: { select: { id: true, displayName: true } }
+});
+
+export type CommentResponseRecord = Prisma.CommentGetPayload<{
+  include: typeof commentResponseInclude;
+}>;
+
+export const toCommentResponse = (comment: CommentResponseRecord) => commentSchema.parse({
   id: comment.id,
+  householdId: comment.householdId,
+  entityType: comment.entityType,
+  entityId: comment.entityId,
   assetId: comment.assetId,
+  projectId: comment.projectId,
+  hobbyId: comment.hobbyId,
+  inventoryItemId: comment.inventoryItemId,
   authorId: comment.authorId,
   author: toShallowUserResponse(comment.author),
   body: comment.body,

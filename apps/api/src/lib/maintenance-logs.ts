@@ -9,7 +9,7 @@ export const syncScheduleCompletionFromLogs = async (
   scheduleId: string
 ) => {
   const latestLog = await prisma.maintenanceLog.findFirst({
-    where: { scheduleId },
+    where: { scheduleId, deletedAt: null },
     orderBy: [
       { completedAt: "desc" },
       { createdAt: "desc" }

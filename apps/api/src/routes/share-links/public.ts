@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { buildRateLimitKey, enforceRateLimit } from "../../lib/rate-limit.js";
 import { toPublicAssetReportResponse } from "../../lib/serializers/index.js";
 import { buildAssetCostSummary, buildAssetTimeline } from "../exports/index.js";
 
@@ -10,6 +11,17 @@ const publicShareParamsSchema = z.object({
 export const publicShareRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/public/share/:token", async (request, reply) => {
     const params = publicShareParamsSchema.parse(request.params);
+
+    if (await enforceRateLimit(reply, {
+      scope: "public-share",
+      key: buildRateLimitKey(request, params.token),
+      max: 30,
+      windowMs: 10 * 60 * 1000,
+      message: "Share link rate limit exceeded. Try again shortly."
+    })) {
+      return reply;
+    }
+
     const shareLink = await app.prisma.shareLink.findUnique({
       where: {
         token: params.token

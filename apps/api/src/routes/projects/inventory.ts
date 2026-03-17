@@ -30,7 +30,8 @@ const projectInventoryItemParamsSchema = projectParamsSchema.extend({
 const getProject = (app: FastifyInstance, householdId: string, projectId: string) => app.prisma.project.findFirst({
   where: {
     id: projectId,
-    householdId
+    householdId,
+    deletedAt: null
   }
 });
 

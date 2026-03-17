@@ -1,4 +1,5 @@
 import type { Asset, Prisma, PrismaClient } from "@prisma/client";
+import type { FastifyReply } from "fastify";
 
 export class ForbiddenError extends Error {
   constructor(message = "FORBIDDEN") {
@@ -49,6 +50,21 @@ export const assertMembership = async (
 
   if (!membership) {
     throw new ForbiddenError();
+  }
+};
+
+export const requireHouseholdMembership = async (
+  prisma: PrismaClient,
+  householdId: string,
+  userId: string,
+  reply: FastifyReply
+): Promise<boolean> => {
+  try {
+    await assertMembership(prisma, householdId, userId);
+    return true;
+  } catch {
+    await reply.code(403).send({ message: "You do not have access to this household." });
+    return false;
   }
 };
 

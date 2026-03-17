@@ -421,6 +421,7 @@ export const syncScheduleToSearchIndex = async (prisma: SearchPrisma, scheduleId
       description: true,
       nextDueAt: true,
       isActive: true,
+      deletedAt: true,
       asset: {
         select: {
           id: true,
@@ -432,7 +433,7 @@ export const syncScheduleToSearchIndex = async (prisma: SearchPrisma, scheduleId
     }
   });
 
-  if (!schedule || schedule.asset.deletedAt) {
+  if (!schedule || schedule.deletedAt || schedule.asset.deletedAt) {
     await deleteSearchIndexEntry(prisma, "schedule", scheduleId);
     return;
   }
@@ -461,6 +462,7 @@ export const syncLogToSearchIndex = async (prisma: SearchPrisma, logId: string):
       title: true,
       notes: true,
       completedAt: true,
+      deletedAt: true,
       asset: {
         select: {
           id: true,
@@ -472,7 +474,7 @@ export const syncLogToSearchIndex = async (prisma: SearchPrisma, logId: string):
     }
   });
 
-  if (!log || log.asset.deletedAt) {
+  if (!log || log.deletedAt || log.asset.deletedAt) {
     await deleteSearchIndexEntry(prisma, "log", logId);
     return;
   }
@@ -502,6 +504,7 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
       name: true,
       description: true,
       status: true,
+      deletedAt: true,
       parentProjectId: true,
       parentProject: {
         select: { name: true }
@@ -535,7 +538,7 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     }
   });
 
-  if (!project) {
+  if (!project || project.deletedAt) {
     await deleteSearchIndexEntry(prisma, "project", projectId);
     return;
   }
@@ -617,6 +620,7 @@ export const syncInventoryItemToSearchIndex = async (prisma: SearchPrisma, itemI
       category: true,
       quantityOnHand: true,
       unit: true,
+      deletedAt: true,
       hobbyLinks: {
         select: {
           hobby: {
@@ -631,7 +635,7 @@ export const syncInventoryItemToSearchIndex = async (prisma: SearchPrisma, itemI
     }
   });
 
-  if (!item) {
+  if (!item || item.deletedAt) {
     await deleteSearchIndexEntry(prisma, "inventory_item", itemId);
     return;
   }
@@ -663,6 +667,9 @@ export const syncCommentToSearchIndex = async (prisma: SearchPrisma, commentId: 
     where: { id: commentId },
     select: {
       id: true,
+      householdId: true,
+      entityType: true,
+      entityId: true,
       body: true,
       deletedAt: true,
       updatedAt: true,
@@ -673,25 +680,113 @@ export const syncCommentToSearchIndex = async (prisma: SearchPrisma, commentId: 
           householdId: true,
           deletedAt: true
         }
+      },
+      project: {
+        select: {
+          id: true,
+          name: true,
+          householdId: true,
+          deletedAt: true
+        }
+      },
+      hobby: {
+        select: {
+          id: true,
+          name: true,
+          householdId: true
+        }
+      },
+      inventoryItem: {
+        select: {
+          id: true,
+          name: true,
+          householdId: true,
+          deletedAt: true
+        }
       }
     }
   });
 
-  if (!comment || comment.deletedAt || comment.asset.deletedAt) {
+  if (!comment || comment.deletedAt) {
+    await deleteSearchIndexEntry(prisma, "comment", commentId);
+    return;
+  }
+
+  const target = (() => {
+    switch (comment.entityType) {
+      case "asset":
+        if (!comment.asset || comment.asset.deletedAt) {
+          return null;
+        }
+
+        const asset = comment.asset;
+
+        return {
+          householdId: asset.householdId,
+          parentEntityId: asset.id,
+          parentEntityName: asset.name,
+          entityUrl: `/assets/${asset.id}?tab=comments`
+        };
+      case "project":
+        if (!comment.project || comment.project.deletedAt) {
+          return null;
+        }
+
+        const project = comment.project;
+
+        return {
+          householdId: project.householdId,
+          parentEntityId: project.id,
+          parentEntityName: project.name,
+          entityUrl: `/projects/${project.id}?householdId=${project.householdId}`
+        };
+      case "hobby":
+        if (!comment.hobby) {
+          return null;
+        }
+
+        const hobby = comment.hobby;
+
+        return {
+          householdId: hobby.householdId,
+          parentEntityId: hobby.id,
+          parentEntityName: hobby.name,
+          entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`
+        };
+      case "inventory_item":
+        if (!comment.inventoryItem || comment.inventoryItem.deletedAt) {
+          return null;
+        }
+
+        const inventoryItem = comment.inventoryItem;
+
+        return {
+          householdId: inventoryItem.householdId,
+          parentEntityId: inventoryItem.id,
+          parentEntityName: inventoryItem.name,
+          entityUrl: `/inventory?householdId=${inventoryItem.householdId}&highlight=${inventoryItem.id}`
+        };
+      default:
+        return null;
+    }
+  })();
+
+  if (!target) {
     await deleteSearchIndexEntry(prisma, "comment", commentId);
     return;
   }
 
   await syncSearchIndexPayloads(prisma, "comment", comment.id, [{
-    householdId: comment.asset.householdId,
+    householdId: target.householdId,
     entityType: "comment",
     entityId: comment.id,
-    parentEntityId: comment.asset.id,
-    parentEntityName: comment.asset.name,
+    parentEntityId: target.parentEntityId,
+    parentEntityName: target.parentEntityName,
     title: excerptComment(comment.body),
     body: comment.body,
-    entityUrl: `/assets/${comment.asset.id}?tab=comments`,
+    entityUrl: target.entityUrl,
     entityMeta: {
+      entityType: comment.entityType,
       updatedAt: comment.updatedAt.toISOString()
     }
   }]);

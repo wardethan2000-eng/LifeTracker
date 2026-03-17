@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { buildRateLimitKey, enforceRateLimit } from "./lib/rate-limit.js";
 import { authPlugin } from "./plugins/auth.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
 import { prismaPlugin } from "./plugins/prisma.js";
@@ -52,14 +53,66 @@ import { hobbyLinkRoutes } from "./routes/hobbies/links.js";
 import { hobbyShoppingListRoutes } from "./routes/hobbies/shopping-list.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
+import { webhookRoutes } from "./routes/webhooks/index.js";
+
+const parseList = (value: string | undefined): string[] => value
+  ?.split(",")
+  .map((entry) => entry.trim())
+  .filter((entry) => entry.length > 0) ?? [];
+
+const normalizeOrigin = (value: string): string => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.trim().replace(/\/+$/, "");
+  }
+};
+
+const resolveAllowedCorsOrigins = (): Set<string> => {
+  const configuredOrigins = [
+    ...parseList(process.env.CORS_ALLOWED_ORIGINS),
+    process.env.APP_BASE_URL?.trim(),
+    ...parseList(process.env.CLERK_AUTHORIZED_PARTIES)
+  ].filter((origin): origin is string => Boolean(origin));
+
+  return new Set(configuredOrigins.map(normalizeOrigin));
+};
 
 export const buildApp = () => {
   const app = Fastify({
     logger: true
   });
+  const allowedCorsOrigins = resolveAllowedCorsOrigins();
+
+  if (process.env.NODE_ENV === "production" && allowedCorsOrigins.size === 0) {
+    throw new Error("Configure CORS_ALLOWED_ORIGINS or APP_BASE_URL before starting the API in production.");
+  }
 
   app.register(cors, {
-    origin: true
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, allowedCorsOrigins.has(normalizeOrigin(origin)));
+    }
+  });
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.method === "OPTIONS" || request.url === "/health") {
+      return;
+    }
+
+    if (await enforceRateLimit(reply, {
+      scope: "global",
+      key: buildRateLimitKey(request),
+      max: 300,
+      windowMs: 60_000,
+      message: "Too many requests. Try again shortly."
+    })) {
+      return reply;
+    }
   });
   app.register(prismaPlugin);
   app.register(publicShareRoutes);
@@ -106,6 +159,7 @@ export const buildApp = () => {
   app.register(barcodeRoutes);
   app.register(attachmentRoutes);
   app.register(shareLinkRoutes);
+  app.register(webhookRoutes);
   app.register(hobbyRoutes);
   app.register(hobbyRecipeRoutes);
   app.register(hobbySessionRoutes);

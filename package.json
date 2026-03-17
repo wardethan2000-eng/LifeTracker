@@ -8,6 +8,7 @@
     "benchmark:web": "pnpm --filter @lifekeeper/web benchmark",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "format": "turbo run format",
     "db:generate": "pnpm --filter @lifekeeper/api prisma:generate",

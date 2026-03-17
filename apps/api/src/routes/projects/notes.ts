@@ -28,7 +28,7 @@ const noteListQuerySchema = z.object({
 });
 
 const getProject = (app: FastifyInstance, householdId: string, projectId: string) => app.prisma.project.findFirst({
-  where: { id: projectId, householdId },
+  where: { id: projectId, householdId, deletedAt: null },
   select: { id: true, householdId: true, name: true }
 });
 

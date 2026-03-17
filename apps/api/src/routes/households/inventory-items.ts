@@ -9,6 +9,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
   applyInventoryTransaction,
   computeBulkSchedulePartsReadiness,
@@ -182,7 +183,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
 
     const items = await app.prisma.inventoryItem.findMany({
       where: {
-        householdId: params.householdId
+        householdId: params.householdId,
+        deletedAt: null
       },
       orderBy: [
         { category: "asc" },
@@ -283,6 +285,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           const duplicate = await tx.inventoryItem.findFirst({
             where: {
               householdId: params.householdId,
+              deletedAt: null,
               name: {
                 equals: item.name,
                 mode: "insensitive"
@@ -353,6 +356,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
 
     const where: Prisma.InventoryItemWhereInput = {
       householdId: params.householdId,
+      deletedAt: null,
       ...(query.category ? { category: query.category } : {}),
       ...(query.itemType ? { itemType: query.itemType } : {}),
       ...(query.search ? {
@@ -401,6 +405,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const items = await app.prisma.inventoryItem.findMany({
       where: {
         householdId: params.householdId,
+        deletedAt: null,
         itemType: "consumable",
         reorderThreshold: { not: null }
       },
@@ -425,7 +430,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const item = await app.prisma.inventoryItem.findFirst({
       where: {
         id: params.inventoryItemId,
-        householdId: params.householdId
+        householdId: params.householdId,
+        deletedAt: null
       },
       include: {
         transactions: {
@@ -544,8 +550,19 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Inventory item not found." });
     }
 
-    await app.prisma.inventoryItem.delete({
-      where: { id: existing.id }
+    await app.prisma.inventoryItem.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() }
+    });
+
+    await emitDomainEvent(app.prisma, {
+      householdId: params.householdId,
+      eventType: "inventory_item.deleted",
+      entityType: "inventory_item",
+      entityId: existing.id,
+      payload: {
+        name: existing.name
+      }
     });
 
     void removeSearchIndexEntry(app.prisma, "inventory_item", existing.id).catch(console.error);

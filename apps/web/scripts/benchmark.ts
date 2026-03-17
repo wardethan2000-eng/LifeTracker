@@ -1,5 +1,7 @@
-const DEMO_USER_ID = "clkeeperuser0000000000001";
-const DEMO_HOUSEHOLD_ID = "clkeeperhouse000000000001";
+import { devFixtureIds } from "@lifekeeper/types";
+
+const DEMO_USER_ID = devFixtureIds.ownerUserId;
+const DEMO_HOUSEHOLD_ID = devFixtureIds.householdId;
 
 const webBaseUrl = process.env.BENCHMARK_WEB_URL ?? "http://127.0.0.1:3000";
 const apiBaseUrl = process.env.LIFEKEEPER_API_BASE_URL ?? "http://127.0.0.1:4000";

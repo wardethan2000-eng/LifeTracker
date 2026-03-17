@@ -162,6 +162,19 @@ enum HobbyLogType {
   issue
 }
 
+enum CommentEntityType {
+  asset
+  project
+  hobby
+  inventory_item
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  delivered
+  failed
+}
+
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  CORE — USERS & HOUSEHOLDS                                      ║
 // ╚══════════════════════════════════════════════════════════════════╝
@@ -221,6 +234,9 @@ model Household {
   attachments      Attachment[]
   shareLinks       ShareLink[]
   hobbies          Hobby[]
+  comments         Comment[]
+  domainEvents     DomainEvent[]
+  webhookEndpoints WebhookEndpoint[]
 
   @@index([createdById])
 }
@@ -380,6 +396,7 @@ model MaintenanceSchedule {
   estimatedMinutes   Int?
   isActive           Boolean          @default(true)
   isRegulatory       Boolean          @default(false)
+  deletedAt          DateTime?
   lastCompletedAt    DateTime?
   nextDueAt          DateTime?
   nextDueMetricValue Float?
@@ -396,6 +413,7 @@ model MaintenanceSchedule {
 
   @@index([assetId, isActive])
   @@index([assetId, isActive, nextDueAt])
+  @@index([assetId, deletedAt])
   @@index([metricId])
   @@index([nextDueAt])
   @@index([assignedToId])
@@ -474,6 +492,7 @@ model MaintenanceLog {
   difficultyRating  Int?
   performedBy       String?
   metadata          Json                 @default("{}")
+  deletedAt         DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   asset             Asset                @relation(fields: [assetId], references: [id], onDelete: Cascade)
@@ -483,6 +502,7 @@ model MaintenanceLog {
   parts             MaintenanceLogPart[]
 
   @@index([assetId, completedAt])
+  @@index([assetId, deletedAt])
   @@index([scheduleId])
   @@index([completedById])
   @@index([serviceProviderId])
@@ -581,6 +601,7 @@ model Project {
   notes           String?
   parentProjectId String?          // Parent for nested projects and rollup views
   depth           Int              @default(0)
+  deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -594,8 +615,10 @@ model Project {
   expenses        ProjectExpense[]
   noteEntries     ProjectNote[]
   hobbyLinks       HobbyProject[]
+  comments         Comment[]
 
   @@index([householdId, status])
+  @@index([householdId, deletedAt])
   @@index([parentProjectId])
 }
 
@@ -623,6 +646,7 @@ model InventoryItem {
   unitCost           Float?
   storageLocation    String?
   notes              String?
+  deletedAt          DateTime?
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
   household          Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -635,8 +659,10 @@ model InventoryItem {
   hobbyLinks          HobbyInventoryItem[]
   hobbyRecipeIngredients HobbyRecipeIngredient[]
   hobbySessionIngredients HobbySessionIngredient[]
+  comments           Comment[]
 
   @@index([householdId])
+  @@index([householdId, deletedAt])
   @@index([householdId, category])
   @@index([householdId, partNumber])
   @@index([householdId, itemType])
@@ -967,6 +993,60 @@ model ActivityLog {
   @@index([entityType, entityId])
 }
 
+model DomainEvent {
+  id          String   @id @default(cuid())
+  householdId String
+  eventType   String
+  entityType  String
+  entityId    String
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now())
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([householdId, createdAt])
+  @@index([householdId, eventType])
+  @@index([entityType, entityId])
+}
+
+model WebhookEndpoint {
+  id                   String   @id @default(cuid())
+  householdId          String
+  label                String
+  url                  String
+  secret               String?
+  subscribedEventTypes String[] @default([])
+  isActive             Boolean  @default(true)
+  deletedAt            DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  household            Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  deliveries           WebhookDelivery[]
+
+  @@index([householdId])
+  @@index([householdId, deletedAt])
+  @@index([householdId, isActive])
+}
+
+model WebhookDelivery {
+  id                String                @id @default(cuid())
+  webhookEndpointId String
+  domainEventId     String
+  status            WebhookDeliveryStatus @default(pending)
+  responseStatus    Int?
+  responseBody      String?
+  attemptedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  webhookEndpoint   WebhookEndpoint       @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  domainEvent       DomainEvent           @relation(fields: [domainEventId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookEndpointId, domainEventId])
+  @@index([status, createdAt])
+  @@index([webhookEndpointId])
+  @@index([domainEventId])
+}
+
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  CORE — USERS & HOUSEHOLDS                                      ║
 // ╚══════════════════════════════════════════════════════════════════╝
@@ -996,10 +1076,16 @@ model HouseholdInvitation {
 // ║  COMMENTS                                                       ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
-// A threaded comment attached to an Asset, with optional parent-child nesting.
+// A threaded comment attached to an Asset, Project, Hobby, or InventoryItem.
 model Comment {
   id              String    @id @default(cuid())
-  assetId         String
+  householdId     String
+  entityType      CommentEntityType
+  entityId        String
+  assetId         String?
+  projectId       String?
+  hobbyId         String?
+  inventoryItemId String?
   authorId        String
   body            String
   parentCommentId String?
@@ -1007,12 +1093,20 @@ model Comment {
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-  asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  household       Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  asset           Asset?    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  hobby           Hobby?    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   author          User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   parentComment   Comment?  @relation("CommentThread", fields: [parentCommentId], references: [id], onDelete: SetNull)
   replies         Comment[] @relation("CommentThread")
 
+  @@index([householdId, entityType, entityId, createdAt])
   @@index([assetId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([hobbyId, createdAt])
+  @@index([inventoryItemId, createdAt])
   @@index([authorId])
   @@index([parentCommentId])
 }
@@ -1129,6 +1223,7 @@ model Hobby {
   inventoryLinks   HobbyInventoryItem[]
   projectLinks     HobbyProject[]
   inventoryCategories HobbyInventoryCategory[]
+  comments         Comment[]
 
   @@index([householdId, status])
   @@index([createdById])

@@ -61,6 +61,7 @@ Recommended local setup:
 3. Seed the database with `pnpm db:seed`.
 4. Call the API either with a real Clerk token or with `x-dev-user-id: clkeeperuser0000000000001`.
 5. For notification development, keep `NOTIFICATION_DELIVERY_MODE="log"`.
+6. Keep `CORS_ALLOWED_ORIGINS` aligned with the web and Expo origins you actually use locally.
 
 The development bypass is rejected in production.
 
@@ -73,6 +74,7 @@ Useful local defaults:
 1. Keep the API running at `http://127.0.0.1:4000` or set `LIFEKEEPER_API_BASE_URL` for the web app.
 2. Keep dev auth bypass enabled and use the seeded demo user `clkeeperuser0000000000001`, or set `LIFEKEEPER_DEV_USER_ID`.
 3. Open the web app and use the seeded household `clkeeperhouse000000000001` if you want immediate demo data.
+4. These seeded demo IDs are shared dev fixtures from `@lifekeeper/types` and should not be used as production identifiers.
 
 Current web flows include:
 

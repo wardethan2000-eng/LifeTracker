@@ -1,6 +1,7 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   completeMaintenanceScheduleSchema,
+  createOffsetPaginationQuerySchema,
   createMaintenanceScheduleSchema,
   maintenanceTriggerSchema,
   updateMaintenanceScheduleSchema
@@ -8,10 +9,12 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
   createMaintenanceLogPartWithInventory,
   InventoryError
 } from "../../lib/inventory.js";
+import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
 import {
   syncScheduleCompletionFromLogs,
@@ -24,6 +27,7 @@ import {
   updateScheduleDueState
 } from "../../lib/schedule-state.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { buildOffsetPage } from "../../lib/pagination.js";
 import { syncLogToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
@@ -34,8 +38,13 @@ const scheduleParamsSchema = assetParamsSchema.extend({
   scheduleId: z.string().cuid()
 });
 
+const listSchedulesQuerySchema = createOffsetPaginationQuerySchema({
+  defaultLimit: 25,
+  maxLimit: 100
+});
+
 const loadMetric = async (
-  prisma: { usageMetric: { findFirst: Function } },
+  prisma: PrismaClient,
   assetId: string,
   metricId: string | null
 ) => {
@@ -55,19 +64,18 @@ const loadMetric = async (
   });
 };
 
-const toInputJsonValue = (value: Record<string, unknown>): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
-
 export const scheduleRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/schedules", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);
+    const query = listSchedulesQuerySchema.parse(request.query);
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const schedules = await app.prisma.maintenanceSchedule.findMany({
-      where: { assetId: asset.id },
+    const scheduleQuery = {
+      where: { assetId: asset.id, deletedAt: null },
       include: {
         metric: {
           select: {
@@ -81,8 +89,27 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
           }
         }
       },
-      orderBy: { createdAt: "asc" }
-    });
+      orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }]
+    } satisfies Prisma.MaintenanceScheduleFindManyArgs;
+
+    if (query.paginated) {
+      const [schedules, total] = await Promise.all([
+        app.prisma.maintenanceSchedule.findMany({
+          ...scheduleQuery,
+          skip: query.offset,
+          take: query.limit
+        }),
+        app.prisma.maintenanceSchedule.count({ where: { assetId: asset.id, deletedAt: null } })
+      ]);
+
+      return buildOffsetPage(
+        schedules.map(toMaintenanceScheduleResponse),
+        total,
+        query
+      );
+    }
+
+    const schedules = await app.prisma.maintenanceSchedule.findMany(scheduleQuery);
 
     return schedules.map(toMaintenanceScheduleResponse);
   });
@@ -211,7 +238,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const schedule = await app.prisma.maintenanceSchedule.findFirst({
       where: {
         id: params.scheduleId,
-        assetId: asset.id
+        assetId: asset.id,
+        deletedAt: null
       },
       include: {
         metric: {
@@ -247,7 +275,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.maintenanceSchedule.findFirst({
       where: {
         id: params.scheduleId,
-        assetId: asset.id
+        assetId: asset.id,
+        deletedAt: null
       },
       include: {
         metric: {
@@ -535,7 +564,8 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.maintenanceSchedule.findFirst({
       where: {
         id: params.scheduleId,
-        assetId: asset.id
+        assetId: asset.id,
+        deletedAt: null
       }
     });
 
@@ -543,11 +573,25 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Maintenance schedule not found." });
     }
 
-    await app.prisma.maintenanceSchedule.delete({
-      where: { id: existing.id }
+    await app.prisma.maintenanceSchedule.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), isActive: false }
     });
 
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      enqueueNotificationScan({ householdId: asset.householdId }),
+      emitDomainEvent(app.prisma, {
+        householdId: asset.householdId,
+        eventType: "maintenance_schedule.deleted",
+        entityType: "schedule",
+        entityId: existing.id,
+        payload: {
+          assetId: asset.id,
+          assetName: asset.name,
+          name: existing.name
+        }
+      })
+    ]);
 
     void removeSearchIndexEntry(app.prisma, "schedule", existing.id).catch(console.error);
 

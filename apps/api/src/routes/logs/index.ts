@@ -6,6 +6,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
   createMaintenanceLogPartWithInventory,
   InventoryError
@@ -48,7 +49,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
         where: {
           id: query.scheduleId,
-          assetId: asset.id
+          assetId: asset.id,
+          deletedAt: null
         }
       });
 
@@ -60,6 +62,7 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     const logs = await app.prisma.maintenanceLog.findMany({
       where: {
         assetId: asset.id,
+        deletedAt: null,
         ...(query.scheduleId ? { scheduleId: query.scheduleId } : {})
       },
       include: { parts: true },
@@ -96,7 +99,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
         where: {
           id: input.scheduleId,
-          assetId: asset.id
+          assetId: asset.id,
+          deletedAt: null
         },
         select: {
           id: true,
@@ -237,7 +241,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     const log = await app.prisma.maintenanceLog.findFirst({
       where: {
         id: params.logId,
-        assetId: asset.id
+        assetId: asset.id,
+        deletedAt: null
       },
       include: { parts: true }
     });
@@ -261,7 +266,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.maintenanceLog.findFirst({
       where: {
         id: params.logId,
-        assetId: asset.id
+        assetId: asset.id,
+        deletedAt: null
       }
     });
 
@@ -356,7 +362,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.maintenanceLog.findFirst({
       where: {
         id: params.logId,
-        assetId: asset.id
+        assetId: asset.id,
+        deletedAt: null
       }
     });
 
@@ -364,13 +371,25 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Maintenance log not found." });
     }
 
-    await app.prisma.maintenanceLog.delete({
-      where: { id: existing.id }
+    await app.prisma.maintenanceLog.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() }
     });
 
     await Promise.all([
       existing.scheduleId ? syncScheduleCompletionFromLogs(app.prisma, existing.scheduleId) : Promise.resolve(),
-      enqueueNotificationScan({ householdId: asset.householdId })
+      enqueueNotificationScan({ householdId: asset.householdId }),
+      emitDomainEvent(app.prisma, {
+        householdId: asset.householdId,
+        eventType: "maintenance_log.deleted",
+        entityType: "log",
+        entityId: existing.id,
+        payload: {
+          assetId: asset.id,
+          assetName: asset.name,
+          title: existing.title
+        }
+      })
     ]);
 
     void Promise.all([

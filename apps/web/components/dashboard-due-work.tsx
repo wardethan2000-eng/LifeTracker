@@ -1,15 +1,16 @@
 import Link from "next/link";
+import type { HouseholdDashboard } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { getHouseholdPartsReadiness } from "../lib/api";
-import { getDashboardData } from "./dashboard-data";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
 
 type DashboardDueWorkProps = {
+  dashboardPromise: Promise<HouseholdDashboard>;
   householdId: string;
 };
 
-export async function DashboardDueWork({ householdId }: DashboardDueWorkProps): Promise<JSX.Element> {
-  const dashboard = await getDashboardData(householdId);
+export async function DashboardDueWork({ dashboardPromise, householdId }: DashboardDueWorkProps): Promise<JSX.Element> {
+  const dashboard = await dashboardPromise;
   const readiness = dashboard.dueWork.length > 0
     ? await getHouseholdPartsReadiness(householdId, dashboard.dueWork.map((item) => item.scheduleId))
     : null;

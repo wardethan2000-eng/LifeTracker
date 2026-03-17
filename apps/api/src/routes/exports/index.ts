@@ -2,6 +2,7 @@ import type { Asset, PrismaClient } from "@prisma/client";
 import {
   conditionEntrySchema,
   csvExportDatasetSchema,
+  householdDataExportSchema,
   type AssetTimelineItem
 } from "@lifekeeper/types";
 import {
@@ -10,7 +11,7 @@ import {
 } from "@lifekeeper/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership, getAccessibleAsset } from "../../lib/asset-access.js";
+import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";
 import { generateAssetHistoryPdf } from "../../lib/pdf-report.js";
 import { toTimelineItem } from "../../lib/serializers/index.js";
 
@@ -495,6 +496,30 @@ const toOptionalDateRange = (range: { since?: string | undefined; until?: string
   ...(range.until ? { until: range.until } : {})
 });
 
+const toExportValue = (value: unknown): unknown => {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => toExportValue(entry));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, toExportValue(entry)])
+    );
+  }
+
+  return value;
+};
+
+const toExportRecords = <T>(rows: T[]): Record<string, unknown>[] => rows.map((row) => toExportValue(row) as Record<string, unknown>);
+
 export const exportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/export/pdf", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);
@@ -704,10 +729,8 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const query = householdCsvQuerySchema.parse(request.query);
 
-    try {
-      await assertMembership(app.prisma, params.householdId, request.auth.userId);
-    } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     let csv = "";
@@ -847,5 +870,180 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     reply.header("content-type", "text/csv");
     reply.header("content-disposition", `attachment; filename=\"${query.dataset}-${sanitizeFileSegment(params.householdId)}.csv\"`);
     return csv;
+  });
+
+  app.get("/v1/households/:householdId/export/json", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const [
+      households,
+      members,
+      presetProfiles,
+      serviceProviders,
+      assets,
+      assetTransfers,
+      usageMetrics,
+      usageMetricEntries,
+      maintenanceSchedules,
+      maintenanceLogs,
+      maintenanceLogParts,
+      assetTimelineEntries,
+      notifications,
+      projects,
+      projectAssets,
+      projectTasks,
+      projectNotes,
+      projectExpenses,
+      projectPhases,
+      projectPhaseChecklistItems,
+      projectTaskChecklistItems,
+      projectBudgetCategories,
+      projectPhaseSupplies,
+      inventoryItems,
+      assetInventoryItems,
+      scheduleInventoryItems,
+      projectInventoryItems,
+      inventoryTransactions,
+      activityLogs,
+      comments,
+      attachments,
+      invitations,
+      shareLinks,
+      hobbies,
+      hobbyAssets,
+      hobbyInventoryItems,
+      hobbyProjects,
+      hobbyInventoryCategories,
+      hobbyRecipes,
+      hobbyRecipeIngredients,
+      hobbyRecipeSteps,
+      hobbySessions,
+      hobbySessionIngredients,
+      hobbySessionSteps,
+      hobbyMetricDefinitions,
+      hobbyMetricReadings,
+      hobbyLogs
+    ] = await Promise.all([
+      app.prisma.household.findMany({ where: { id: params.householdId } }),
+      app.prisma.householdMember.findMany({
+        where: { householdId: params.householdId },
+        include: {
+          user: true
+        }
+      }),
+      app.prisma.presetProfile.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.serviceProvider.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.asset.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.assetTransfer.findMany({
+        where: {
+          OR: [{ fromHouseholdId: params.householdId }, { toHouseholdId: params.householdId }]
+        }
+      }),
+      app.prisma.usageMetric.findMany({ where: { asset: { householdId: params.householdId } } }),
+      app.prisma.usageMetricEntry.findMany({ where: { metric: { asset: { householdId: params.householdId } } } }),
+      app.prisma.maintenanceSchedule.findMany({ where: { asset: { householdId: params.householdId } } }),
+      app.prisma.maintenanceLog.findMany({ where: { asset: { householdId: params.householdId } } }),
+      app.prisma.maintenanceLogPart.findMany({ where: { log: { asset: { householdId: params.householdId } } } }),
+      app.prisma.assetTimelineEntry.findMany({ where: { asset: { householdId: params.householdId } } }),
+      app.prisma.notification.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.project.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.projectAsset.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.projectTask.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.projectNote.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.projectExpense.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.projectPhase.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.projectPhaseChecklistItem.findMany({ where: { phase: { project: { householdId: params.householdId } } } }),
+      app.prisma.projectTaskChecklistItem.findMany({ where: { task: { project: { householdId: params.householdId } } } }),
+      app.prisma.projectBudgetCategory.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.projectPhaseSupply.findMany({ where: { phase: { project: { householdId: params.householdId } } } }),
+      app.prisma.inventoryItem.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.assetInventoryItem.findMany({ where: { inventoryItem: { householdId: params.householdId } } }),
+      app.prisma.scheduleInventoryItem.findMany({ where: { schedule: { asset: { householdId: params.householdId } } } }),
+      app.prisma.projectInventoryItem.findMany({ where: { project: { householdId: params.householdId } } }),
+      app.prisma.inventoryTransaction.findMany({ where: { inventoryItem: { householdId: params.householdId } } }),
+      app.prisma.activityLog.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.comment.findMany({ where: { asset: { householdId: params.householdId } } }),
+      app.prisma.attachment.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.householdInvitation.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.shareLink.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.hobby.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.hobbyAsset.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbyInventoryItem.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbyProject.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbyInventoryCategory.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbyRecipe.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbyRecipeIngredient.findMany({ where: { recipe: { hobby: { householdId: params.householdId } } } }),
+      app.prisma.hobbyRecipeStep.findMany({ where: { recipe: { hobby: { householdId: params.householdId } } } }),
+      app.prisma.hobbySession.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbySessionIngredient.findMany({ where: { session: { hobby: { householdId: params.householdId } } } }),
+      app.prisma.hobbySessionStep.findMany({ where: { session: { hobby: { householdId: params.householdId } } } }),
+      app.prisma.hobbyMetricDefinition.findMany({ where: { hobby: { householdId: params.householdId } } }),
+      app.prisma.hobbyMetricReading.findMany({ where: { metricDefinition: { hobby: { householdId: params.householdId } } } }),
+      app.prisma.hobbyLog.findMany({ where: { hobby: { householdId: params.householdId } } })
+    ]);
+
+    const exportPayload = householdDataExportSchema.parse({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      householdId: params.householdId,
+      sections: {
+        households: toExportRecords(households),
+        members: toExportRecords(members),
+        presetProfiles: toExportRecords(presetProfiles),
+        serviceProviders: toExportRecords(serviceProviders),
+        assets: toExportRecords(assets),
+        assetTransfers: toExportRecords(assetTransfers),
+        usageMetrics: toExportRecords(usageMetrics),
+        usageMetricEntries: toExportRecords(usageMetricEntries),
+        maintenanceSchedules: toExportRecords(maintenanceSchedules),
+        maintenanceLogs: toExportRecords(maintenanceLogs),
+        maintenanceLogParts: toExportRecords(maintenanceLogParts),
+        assetTimelineEntries: toExportRecords(assetTimelineEntries),
+        notifications: toExportRecords(notifications),
+        projects: toExportRecords(projects),
+        projectAssets: toExportRecords(projectAssets),
+        projectTasks: toExportRecords(projectTasks),
+        projectNotes: toExportRecords(projectNotes),
+        projectExpenses: toExportRecords(projectExpenses),
+        projectPhases: toExportRecords(projectPhases),
+        projectPhaseChecklistItems: toExportRecords(projectPhaseChecklistItems),
+        projectTaskChecklistItems: toExportRecords(projectTaskChecklistItems),
+        projectBudgetCategories: toExportRecords(projectBudgetCategories),
+        projectPhaseSupplies: toExportRecords(projectPhaseSupplies),
+        inventoryItems: toExportRecords(inventoryItems),
+        assetInventoryItems: toExportRecords(assetInventoryItems),
+        scheduleInventoryItems: toExportRecords(scheduleInventoryItems),
+        projectInventoryItems: toExportRecords(projectInventoryItems),
+        inventoryTransactions: toExportRecords(inventoryTransactions),
+        activityLogs: toExportRecords(activityLogs),
+        comments: toExportRecords(comments),
+        attachments: toExportRecords(attachments),
+        invitations: toExportRecords(invitations),
+        shareLinks: toExportRecords(shareLinks),
+        hobbies: toExportRecords(hobbies),
+        hobbyAssets: toExportRecords(hobbyAssets),
+        hobbyInventoryItems: toExportRecords(hobbyInventoryItems),
+        hobbyProjects: toExportRecords(hobbyProjects),
+        hobbyInventoryCategories: toExportRecords(hobbyInventoryCategories),
+        hobbyRecipes: toExportRecords(hobbyRecipes),
+        hobbyRecipeIngredients: toExportRecords(hobbyRecipeIngredients),
+        hobbyRecipeSteps: toExportRecords(hobbyRecipeSteps),
+        hobbySessions: toExportRecords(hobbySessions),
+        hobbySessionIngredients: toExportRecords(hobbySessionIngredients),
+        hobbySessionSteps: toExportRecords(hobbySessionSteps),
+        hobbyMetricDefinitions: toExportRecords(hobbyMetricDefinitions),
+        hobbyMetricReadings: toExportRecords(hobbyMetricReadings),
+        hobbyLogs: toExportRecords(hobbyLogs)
+      }
+    });
+
+    reply.header("content-type", "application/json; charset=utf-8");
+    reply.header("content-disposition", `attachment; filename=\"household-export-${sanitizeFileSegment(params.householdId)}.json\"`);
+
+    return exportPayload;
   });
 };

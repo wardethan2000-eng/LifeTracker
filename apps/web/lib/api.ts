@@ -15,6 +15,7 @@ import {
   costForecastSchema,
   completionCycleRecordSchema,
   customPresetProfileSchema,
+  devFixtureIds,
   dueWorkItemSchema,
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
@@ -482,7 +483,7 @@ const apiBaseUrl = process.env.LIFEKEEPER_API_BASE_URL
 
 const devUserId = process.env.LIFEKEEPER_DEV_USER_ID
   ?? process.env.NEXT_PUBLIC_LIFEKEEPER_DEV_USER_ID
-  ?? "clkeeperuser0000000000001";
+  ?? devFixtureIds.ownerUserId;
 
 const parseJson = async (response: Response): Promise<unknown> => {
   const text = await response.text();

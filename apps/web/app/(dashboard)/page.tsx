@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { HouseholdDashboard } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { createHouseholdAction, enqueueNotificationScanAction } from "../actions";
@@ -159,8 +160,8 @@ const DashboardAsideSkeleton = (): JSX.Element => (
   </>
 );
 
-async function DashboardStatsRow({ householdId }: { householdId: string }): Promise<JSX.Element> {
-  const dashboard = await getDashboardData(householdId);
+async function DashboardStatsRow({ dashboardPromise }: { dashboardPromise: Promise<HouseholdDashboard> }): Promise<JSX.Element> {
+  const dashboard = await dashboardPromise;
   const sortedAssets = [...dashboard.assets].sort(
     (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
   );
@@ -193,8 +194,8 @@ async function DashboardStatsRow({ householdId }: { householdId: string }): Prom
   );
 }
 
-async function DashboardAssetRegistry({ householdId }: { householdId: string }): Promise<JSX.Element> {
-  const dashboard = await getDashboardData(householdId);
+async function DashboardAssetRegistry({ dashboardPromise }: { dashboardPromise: Promise<HouseholdDashboard> }): Promise<JSX.Element> {
+  const dashboard = await dashboardPromise;
   const assetPreviewLimit = 10;
   const sortedAssets = [...dashboard.assets].sort(
     (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -271,8 +272,8 @@ async function DashboardAssetRegistry({ householdId }: { householdId: string }):
   );
 }
 
-async function DashboardAsidePanels({ householdId }: { householdId: string }): Promise<JSX.Element> {
-  const dashboard = await getDashboardData(householdId);
+async function DashboardAsidePanels({ dashboardPromise }: { dashboardPromise: Promise<HouseholdDashboard> }): Promise<JSX.Element> {
+  const dashboard = await dashboardPromise;
 
   return (
     <>
@@ -310,6 +311,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
+    const dashboardPromise = getDashboardData(selectedHousehold.id);
 
     return (
       <>
@@ -338,23 +340,23 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
         <div className="page-body">
           <Suspense fallback={<StatsRowSkeleton />}>
-            <DashboardStatsRow householdId={selectedHousehold.id} />
+            <DashboardStatsRow dashboardPromise={dashboardPromise} />
           </Suspense>
 
           <div className="dashboard-grid">
             <div className="dashboard-main">
               <Suspense fallback={<DueWorkSkeleton />}>
-                <DashboardDueWork householdId={selectedHousehold.id} />
+                <DashboardDueWork householdId={selectedHousehold.id} dashboardPromise={dashboardPromise} />
               </Suspense>
 
               <Suspense fallback={<AssetRegistrySkeleton />}>
-                <DashboardAssetRegistry householdId={selectedHousehold.id} />
+                <DashboardAssetRegistry dashboardPromise={dashboardPromise} />
               </Suspense>
             </div>
 
             <div className="dashboard-aside">
               <Suspense fallback={<DashboardAsideSkeleton />}>
-                <DashboardAsidePanels householdId={selectedHousehold.id} />
+                <DashboardAsidePanels dashboardPromise={dashboardPromise} />
               </Suspense>
             </div>
           </div>
