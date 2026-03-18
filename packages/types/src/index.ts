@@ -89,6 +89,7 @@ export const assetTimelineSourceTypeValues = [
 export const commentEntityTypeValues = ["asset", "project", "hobby", "inventory_item"] as const;
 export const entryEntityTypeValues = [
   "hobby",
+  "hobby_series",
   "hobby_session",
   "hobby_project",
   "hobby_project_milestone",
@@ -2825,7 +2826,8 @@ export const searchEntityTypeValues = [
   "comment",
   "entry",
   "invitation",
-  "hobby"
+  "hobby",
+  "hobby_series"
 ] as const;
 
 export const searchEntityTypeSchema = z.enum(searchEntityTypeValues);
@@ -3376,8 +3378,14 @@ export type AttachmentUploadResponse = z.infer<typeof attachmentUploadResponseSc
 export const hobbyStatusSchema = z.enum(["active", "paused", "archived"]);
 export type HobbyStatus = z.infer<typeof hobbyStatusSchema>;
 
+export const hobbyActivityModeSchema = z.enum(["session", "project", "practice", "collection"]);
+export type HobbyActivityMode = z.infer<typeof hobbyActivityModeSchema>;
+
 export const hobbySessionLifecycleModeSchema = z.enum(["binary", "pipeline"]);
 export type HobbySessionLifecycleMode = z.infer<typeof hobbySessionLifecycleModeSchema>;
+
+export const seriesStatusSchema = z.enum(["active", "completed", "archived"]);
+export type SeriesStatus = z.infer<typeof seriesStatusSchema>;
 
 export const hobbyRecipeSourceTypeSchema = z.enum(["preset", "user", "imported"]);
 export type HobbyRecipeSourceType = z.infer<typeof hobbyRecipeSourceTypeSchema>;
@@ -3392,6 +3400,7 @@ export const hobbySchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   status: hobbyStatusSchema,
+  activityMode: hobbyActivityModeSchema,
   hobbyType: z.string().nullable(),
   lifecycleMode: hobbySessionLifecycleModeSchema,
   customFields: z.record(z.unknown()),
@@ -3407,6 +3416,7 @@ export const createHobbyInputSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   status: hobbyStatusSchema.optional(),
+  activityMode: hobbyActivityModeSchema.optional(),
   hobbyType: z.string().max(100).optional(),
   lifecycleMode: hobbySessionLifecycleModeSchema.optional(),
   customFields: z.record(z.unknown()).optional(),
@@ -3746,6 +3756,8 @@ export const hobbySessionSchema = z.object({
   id: z.string().cuid(),
   hobbyId: z.string().cuid(),
   recipeId: z.string().cuid().nullable(),
+  seriesId: z.string().cuid().nullable(),
+  batchNumber: z.number().int().nullable(),
   name: z.string(),
   status: z.string(),
   startDate: z.string().datetime().nullable(),
@@ -3790,6 +3802,134 @@ export const hobbySessionSummarySchema = hobbySessionSchema.extend({
   recipeName: z.string().nullable(),
 });
 export type HobbySessionSummary = z.infer<typeof hobbySessionSummarySchema>;
+
+const hobbySeriesTagSchema = z.string().trim().min(1).max(80);
+
+export const hobbySeriesSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: seriesStatusSchema,
+  batchCount: z.number().int().min(0),
+  bestBatchSessionId: z.string().cuid().nullable(),
+  tags: z.array(hobbySeriesTagSchema),
+  notes: z.string().nullable(),
+  coverImageUrl: z.string().url().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbySeries = z.infer<typeof hobbySeriesSchema>;
+
+export const hobbySeriesSummarySchema = hobbySeriesSchema.extend({
+  bestBatchSessionName: z.string().nullable(),
+  lastSessionDate: z.string().datetime().nullable(),
+});
+export type HobbySeriesSummary = z.infer<typeof hobbySeriesSummarySchema>;
+
+export const createHobbySeriesInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  status: seriesStatusSchema.optional(),
+  sessionIds: z.array(z.string().cuid()).max(200).optional(),
+  tags: z.array(hobbySeriesTagSchema).max(50).optional(),
+  notes: z.string().max(10000).optional(),
+  coverImageUrl: z.string().url().max(2000).optional(),
+});
+export type CreateHobbySeriesInput = z.infer<typeof createHobbySeriesInputSchema>;
+
+export const updateHobbySeriesInputSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  status: seriesStatusSchema.optional(),
+  tags: z.array(hobbySeriesTagSchema).max(50).optional(),
+  notes: z.string().max(10000).nullable().optional(),
+  coverImageUrl: z.string().url().max(2000).nullable().optional(),
+  bestBatchSessionId: z.string().cuid().nullable().optional(),
+});
+export type UpdateHobbySeriesInput = z.infer<typeof updateHobbySeriesInputSchema>;
+
+export const hobbySeriesMetricReadingSchema = z.object({
+  id: z.string().cuid(),
+  metricDefinitionId: z.string().cuid(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  value: z.number(),
+  readingDate: z.string().datetime(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type HobbySeriesMetricReading = z.infer<typeof hobbySeriesMetricReadingSchema>;
+
+export const hobbySeriesSessionSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  recipeId: z.string().cuid().nullable(),
+  seriesId: z.string().cuid().nullable(),
+  batchNumber: z.number().int().nullable(),
+  name: z.string(),
+  date: z.string().datetime().nullable(),
+  status: z.string(),
+  rating: z.number().nullable(),
+  recipeName: z.string().nullable(),
+  metricReadings: z.array(hobbySeriesMetricReadingSchema),
+});
+export type HobbySeriesSession = z.infer<typeof hobbySeriesSessionSchema>;
+
+export const hobbySeriesDetailSchema = hobbySeriesSummarySchema.extend({
+  sessions: z.array(hobbySeriesSessionSchema),
+  entries: z.array(entrySchema),
+});
+export type HobbySeriesDetail = z.infer<typeof hobbySeriesDetailSchema>;
+
+export const hobbySeriesComparisonMetricValueSchema = z.object({
+  id: z.string().cuid(),
+  value: z.number(),
+  readingDate: z.string().datetime(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type HobbySeriesComparisonMetricValue = z.infer<typeof hobbySeriesComparisonMetricValueSchema>;
+
+export const hobbySeriesComparisonMetricGroupSchema = z.object({
+  metricDefinitionId: z.string().cuid(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  readings: z.array(hobbySeriesComparisonMetricValueSchema),
+});
+export type HobbySeriesComparisonMetricGroup = z.infer<typeof hobbySeriesComparisonMetricGroupSchema>;
+
+export const hobbySeriesComparisonSessionSchema = z.object({
+  sessionId: z.string().cuid(),
+  name: z.string(),
+  batchNumber: z.number().int().nullable(),
+  date: z.string().datetime().nullable(),
+  status: z.string(),
+  rating: z.number().nullable(),
+  recipeName: z.string().nullable(),
+  metricGroups: z.array(hobbySeriesComparisonMetricGroupSchema),
+  entries: z.array(entrySchema),
+});
+export type HobbySeriesComparisonSession = z.infer<typeof hobbySeriesComparisonSessionSchema>;
+
+export const hobbySeriesComparisonSchema = z.object({
+  series: hobbySeriesSummarySchema,
+  sessions: z.array(hobbySeriesComparisonSessionSchema),
+});
+export type HobbySeriesComparison = z.infer<typeof hobbySeriesComparisonSchema>;
+
+export const linkHobbySeriesSessionInputSchema = z.object({
+  sessionId: z.string().cuid(),
+});
+export type LinkHobbySeriesSessionInput = z.infer<typeof linkHobbySeriesSessionInputSchema>;
+
+export const updateHobbySeriesSessionInputSchema = z.object({
+  batchNumber: z.number().int().min(1),
+});
+export type UpdateHobbySeriesSessionInput = z.infer<typeof updateHobbySeriesSessionInputSchema>;
+
+export const hobbySeriesListSchema = z.array(hobbySeriesSummarySchema);
 
 // HobbySessionIngredient
 export const hobbySessionIngredientSchema = z.object({

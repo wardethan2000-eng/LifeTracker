@@ -35,6 +35,8 @@ const sessionRecord = {
   id: sessionId,
   hobbyId,
   recipeId,
+  seriesId: null,
+  batchNumber: null,
   name: "Spring IPA",
   status: "active",
   startDate: new Date("2026-03-17T00:00:00.000Z"),

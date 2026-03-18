@@ -54,6 +54,36 @@ export const validateEntryTarget = async (
           }
         : { status: "missing" };
     }
+    case "hobby_series": {
+      const series = await prisma.hobbySeries.findFirst({
+        where: { id: entityId, householdId },
+        select: {
+          id: true,
+          name: true,
+          hobby: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      return series
+        ? {
+            status: "ok",
+            context: buildContext({
+              entityType,
+              entityId: series.id,
+              label: series.name,
+              parentEntityType: "hobby",
+              parentEntityId: series.hobby.id,
+              parentLabel: series.hobby.name,
+              entityUrl: `/hobbies/${series.hobby.id}?householdId=${householdId}&seriesId=${series.id}`
+            })
+          }
+        : { status: "missing" };
+    }
     case "hobby_session": {
       const session = await prisma.hobbySession.findFirst({
         where: {
@@ -318,6 +348,35 @@ export const resolveEntryEntityContexts = async (
         parentEntityId: null,
         parentLabel: null,
         entityUrl: `/hobbies/${hobby.id}?householdId=${householdId}`
+      }));
+    }
+  }
+
+  const hobbySeriesIds = Array.from(byType.get("hobby_series") ?? []);
+  if (hobbySeriesIds.length > 0) {
+    const hobbySeries = await prisma.hobbySeries.findMany({
+      where: { id: { in: hobbySeriesIds }, householdId },
+      select: {
+        id: true,
+        name: true,
+        hobby: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    for (const series of hobbySeries) {
+      resolved.set(createEntryEntityKey("hobby_series", series.id), buildContext({
+        entityType: "hobby_series",
+        entityId: series.id,
+        label: series.name,
+        parentEntityType: "hobby",
+        parentEntityId: series.hobby.id,
+        parentLabel: series.hobby.name,
+        entityUrl: `/hobbies/${series.hobby.id}?householdId=${householdId}&seriesId=${series.id}`
       }));
     }
   }

@@ -48,6 +48,7 @@ import scheduleComplianceRoutes from "./routes/schedule-compliance/index.js";
 import { attachmentRoutes } from "./routes/attachments/index.js";
 import { barcodeRoutes } from "./routes/barcode.js";
 import { hobbyRoutes } from "./routes/hobbies/index.js";
+import { hobbySeriesRoutes } from "./routes/hobbies/series.js";
 import { hobbyRecipeRoutes } from "./routes/hobbies/recipes.js";
 import { hobbySessionRoutes } from "./routes/hobbies/sessions.js";
 import { hobbyMetricRoutes } from "./routes/hobbies/metrics.js";
@@ -98,6 +99,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   projectBudgetAnalyticsRoutes,
   webhookRoutes,
   hobbyRoutes,
+  hobbySeriesRoutes,
   hobbyRecipeRoutes,
   hobbySessionRoutes,
   hobbyMetricRoutes,

@@ -11,7 +11,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { syncHobbySeriesBatchCount } from "../../lib/hobby-series.js";
 import { applyInventoryTransaction } from "../../lib/inventory.js";
+import { syncHobbySeriesToSearchIndex } from "../../lib/search-index.js";
 import {
   toSessionIngredientResponse,
   toSessionResponse,
@@ -470,6 +472,10 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
+    if (session.seriesId) {
+      await syncHobbySeriesToSearchIndex(app.prisma, session.seriesId);
+    }
+
     if (input.status === "completed" || (existing.status !== "completed" && session.status === "completed")) {
       await logActivity(app.prisma, {
         householdId,
@@ -525,6 +531,10 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    if (updated.seriesId) {
+      await syncHobbySeriesToSearchIndex(app.prisma, updated.seriesId);
+    }
+
     await logActivity(app.prisma, {
       householdId,
       userId,
@@ -575,7 +585,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       }
 
       await tx.hobbySession.delete({ where: { id: sessionId } });
+
+      if (existing.seriesId) {
+        await syncHobbySeriesBatchCount(tx, existing.seriesId);
+      }
     });
+
+    if (existing.seriesId) {
+      await syncHobbySeriesToSearchIndex(app.prisma, existing.seriesId);
+    }
 
     await logActivity(app.prisma, {
       householdId,

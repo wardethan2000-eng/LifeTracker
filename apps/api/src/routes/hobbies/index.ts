@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import {
   createHobbyInputSchema,
+  hobbyActivityModeSchema,
   updateHobbyInputSchema,
   hobbyStatusSchema
 } from "@lifekeeper/types";
@@ -22,6 +23,7 @@ const hobbyParamsSchema = householdParamsSchema.extend({
 
 const listHobbiesQuerySchema = z.object({
   status: hobbyStatusSchema.optional(),
+  activityMode: hobbyActivityModeSchema.optional(),
   search: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().optional()
@@ -41,6 +43,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     const where: Prisma.HobbyWhereInput = {
       householdId,
       ...(query.status ? { status: query.status } : {}),
+      ...(query.activityMode ? { activityMode: query.activityMode } : {}),
       ...(query.search ? { name: { contains: query.search, mode: "insensitive" as const } } : {}),
       ...(query.cursor ? { id: { lt: query.cursor } } : {})
     };
@@ -93,6 +96,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
         name: input.name,
         description: input.description ?? null,
         status: input.status ?? "active",
+        activityMode: input.activityMode ?? "session",
         hobbyType: input.hobbyType ?? null,
         lifecycleMode: input.lifecycleMode ?? "binary",
         customFields: (input.customFields ?? {}) as Prisma.InputJsonValue,
@@ -271,6 +275,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.activityMode !== undefined ? { activityMode: input.activityMode } : {}),
         ...(input.hobbyType !== undefined ? { hobbyType: input.hobbyType } : {}),
         ...(input.lifecycleMode !== undefined ? { lifecycleMode: input.lifecycleMode } : {}),
         ...(input.customFields !== undefined ? { customFields: input.customFields as Prisma.InputJsonValue } : {}),

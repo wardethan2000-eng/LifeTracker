@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import {
   hobbyLogSchema,
+  hobbySeriesSchema,
+  hobbySeriesSummarySchema,
   hobbyDetailAssetLinkSchema,
   hobbyDetailInventoryLinkSchema,
   hobbyDetailProjectLinkSchema,
@@ -27,6 +29,7 @@ export const toHobbyResponse = (hobby: {
   name: string;
   description: string | null;
   status: string;
+  activityMode: string;
   hobbyType: string | null;
   lifecycleMode: string;
   customFields: Prisma.JsonValue;
@@ -41,6 +44,7 @@ export const toHobbyResponse = (hobby: {
   name: hobby.name,
   description: hobby.description,
   status: hobby.status,
+  activityMode: hobby.activityMode,
   hobbyType: hobby.hobbyType,
   lifecycleMode: hobby.lifecycleMode,
   customFields: hobby.customFields as Record<string, unknown>,
@@ -57,6 +61,7 @@ export const toHobbySummaryResponse = (hobby: {
   name: string;
   description: string | null;
   status: string;
+  activityMode: string;
   hobbyType: string | null;
   lifecycleMode: string;
   customFields: Prisma.JsonValue;
@@ -193,6 +198,8 @@ export const toSessionResponse = (session: {
   id: string;
   hobbyId: string;
   recipeId: string | null;
+  seriesId: string | null;
+  batchNumber: number | null;
   name: string;
   status: string;
   startDate: Date | null;
@@ -208,6 +215,8 @@ export const toSessionResponse = (session: {
   id: session.id,
   hobbyId: session.hobbyId,
   recipeId: session.recipeId,
+  seriesId: session.seriesId,
+  batchNumber: session.batchNumber,
   name: session.name,
   status: session.status,
   startDate: session.startDate?.toISOString() ?? null,
@@ -225,6 +234,8 @@ export const toSessionSummaryResponse = (session: {
   id: string;
   hobbyId: string;
   recipeId: string | null;
+  seriesId: string | null;
+  batchNumber: number | null;
   name: string;
   status: string;
   startDate: Date | null;
@@ -252,6 +263,62 @@ export const toSessionSummaryResponse = (session: {
   metricReadingCount: session._count.metricReadings,
   logCount: session._count.logs,
   recipeName: session.recipe?.name ?? null
+});
+
+export const toHobbySeriesResponse = (series: {
+  id: string;
+  hobbyId: string;
+  householdId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  batchCount: number;
+  bestBatchSessionId: string | null;
+  tags: Prisma.JsonValue;
+  notes: string | null;
+  coverImageUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbySeriesSchema.parse({
+  id: series.id,
+  hobbyId: series.hobbyId,
+  householdId: series.householdId,
+  name: series.name,
+  description: series.description,
+  status: series.status,
+  batchCount: series.batchCount,
+  bestBatchSessionId: series.bestBatchSessionId,
+  tags: Array.isArray(series.tags) ? series.tags : [],
+  notes: series.notes,
+  coverImageUrl: series.coverImageUrl,
+  createdAt: series.createdAt.toISOString(),
+  updatedAt: series.updatedAt.toISOString()
+});
+
+export const toHobbySeriesSummaryResponse = (series: {
+  id: string;
+  hobbyId: string;
+  householdId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  batchCount: number;
+  bestBatchSessionId: string | null;
+  tags: Prisma.JsonValue;
+  notes: string | null;
+  coverImageUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  bestBatchSession?: { name: string } | null;
+  sessions?: Array<{ completedDate: Date | null; startDate: Date | null; createdAt: Date }>;
+}) => hobbySeriesSummarySchema.parse({
+  ...toHobbySeriesResponse(series),
+  bestBatchSessionName: series.bestBatchSession?.name ?? null,
+  lastSessionDate: series.sessions && series.sessions.length > 0
+    ? series.sessions
+      .map((session) => session.completedDate ?? session.startDate ?? session.createdAt)
+      .sort((left, right) => right.getTime() - left.getTime())[0]?.toISOString() ?? null
+    : null
 });
 
 export const toSessionIngredientResponse = (ingredient: {
