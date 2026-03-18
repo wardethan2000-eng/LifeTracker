@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { SpaceDetailActions } from "../../../../../components/space-detail-actions";
 import { SpaceQuickPlace } from "../../../../../components/space-quick-place";
+import { SpaceViewLogger } from "../../../../../components/space-view-logger";
 import { TabNav } from "../../../../../components/tab-nav";
 import {
   ApiError,
@@ -91,6 +92,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
 
     return (
       <>
+        <SpaceViewLogger householdId={household.id} spaceId={space.id} />
         <header className="page-header">
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

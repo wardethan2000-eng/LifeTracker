@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../lib/asset-access.js";
+import { recordSpaceScanLog } from "../lib/space-scan-log.js";
 import {
   serializeSpace,
   toInventoryItemDetailResponse
@@ -69,6 +70,13 @@ export const scanDetailRoutes: FastifyPluginAsync = async (app) => {
     if (!await checkMembership(app.prisma, space.householdId, request.auth.userId)) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
+
+    await recordSpaceScanLog(app.prisma, {
+      householdId: space.householdId,
+      spaceId: space.id,
+      userId: request.auth.userId,
+      method: "qr_scan"
+    });
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, space.id);
     return serializeSpace(space, { breadcrumb });

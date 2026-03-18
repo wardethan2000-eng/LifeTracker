@@ -10,6 +10,7 @@ import {
   getHouseholdInventory,
   getHouseholdSpaces,
   getScanInventoryItemDetail,
+  getSpaceByShortCode,
   getSpace,
   resolveScanTag,
 } from "../lib/api";
@@ -195,6 +196,16 @@ export function SpaceQuickPlace({
       }
 
       try {
+        try {
+          const resolvedSpace = await getSpaceByShortCode(householdId, query.toUpperCase());
+          await activateDestination(resolvedSpace.id);
+          return;
+        } catch (lookupError) {
+          if (!(lookupError instanceof ApiError) || lookupError.status !== 404) {
+            throw lookupError;
+          }
+        }
+
         const response = await getHouseholdSpaces(householdId, { search: query.toUpperCase(), limit: 8 });
         const onlyMatch = response.items[0];
 

@@ -1,5 +1,10 @@
 import type { JSX } from "react";
-import { getHouseholdSpacesTree } from "../lib/api";
+import {
+  getHouseholdSpacesTree,
+  getRecentSpaceScans,
+  getSpaceOrphanCount,
+  getSpaceUtilization
+} from "../lib/api";
 import { SpacesSectionClient } from "./spaces-section-client";
 
 type SpacesSectionProps = {
@@ -7,6 +12,20 @@ type SpacesSectionProps = {
 };
 
 export async function SpacesSection({ householdId }: SpacesSectionProps): Promise<JSX.Element> {
-  const spaces = await getHouseholdSpacesTree(householdId);
-  return <SpacesSectionClient householdId={householdId} spaces={spaces} />;
+  const [spaces, orphanCount, utilization, recentScans] = await Promise.all([
+    getHouseholdSpacesTree(householdId),
+    getSpaceOrphanCount(householdId),
+    getSpaceUtilization(householdId),
+    getRecentSpaceScans(householdId, 12)
+  ]);
+
+  return (
+    <SpacesSectionClient
+      householdId={householdId}
+      spaces={spaces}
+      orphanCount={orphanCount.count}
+      utilization={utilization}
+      recentScans={recentScans}
+    />
+  );
 }

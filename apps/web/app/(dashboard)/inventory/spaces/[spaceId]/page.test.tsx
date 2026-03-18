@@ -5,6 +5,7 @@ const apiMocks = vi.hoisted(() => ({
   getHouseholdInventory: vi.fn(),
   getHouseholdSpacesTree: vi.fn(),
   getMe: vi.fn(),
+  logSpaceDirectNavigation: vi.fn(),
   getSpace: vi.fn(),
   getSpaceHistory: vi.fn()
 }));
@@ -26,6 +27,7 @@ vi.mock("../../../../../lib/api", () => ({
   getHouseholdInventory: apiMocks.getHouseholdInventory,
   getHouseholdSpacesTree: apiMocks.getHouseholdSpacesTree,
   getMe: apiMocks.getMe,
+  logSpaceDirectNavigation: apiMocks.logSpaceDirectNavigation,
   getSpace: apiMocks.getSpace,
   getSpaceHistory: apiMocks.getSpaceHistory
 }));
@@ -38,6 +40,7 @@ const spaceId = "clkeeperspace000000000001";
 describe("SpaceDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiMocks.logSpaceDirectNavigation.mockResolvedValue(undefined);
     apiMocks.getMe.mockResolvedValue({
       households: [{
         id: householdId,

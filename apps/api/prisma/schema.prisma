@@ -216,6 +216,12 @@ enum SpaceItemAction {
   quantity_changed
 }
 
+enum SpaceScanMethod {
+  qr_scan
+  manual_lookup
+  direct_navigation
+}
+
 // Lifecycle state for a hobby workspace.
 enum HobbyStatus {
   active
@@ -359,6 +365,7 @@ model User {
   createdHobbyCollectionItems HobbyCollectionItem[] @relation("HobbyCollectionItemCreator")
   createdEntries          Entry[]               @relation("EntryCreator")
   performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
+  spaceScanLogs          SpaceScanLog[]
 }
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
@@ -380,6 +387,7 @@ model Household {
   spaces           Space[]
   spaceGeneralItems SpaceGeneralItem[]
   spaceItemHistory SpaceItemHistory[]
+  spaceScanLogs    SpaceScanLog[]
   inventoryPurchases InventoryPurchase[]
   inventoryItemRevisions InventoryItemRevision[]
   activityLogs     ActivityLog[]
@@ -422,6 +430,7 @@ model Space {
   spaceItems     SpaceInventoryItem[]
   generalItems   SpaceGeneralItem[]
   itemHistory    SpaceItemHistory[]
+  scanLogs       SpaceScanLog[]
 
   @@unique([householdId, shortCode])
   @@index([householdId, parentSpaceId])
@@ -959,6 +968,22 @@ model SpaceItemHistory {
   @@index([spaceId, createdAt])
   @@index([inventoryItemId, createdAt])
   @@index([performedBy])
+}
+
+model SpaceScanLog {
+  id          String          @id @default(cuid())
+  householdId String
+  spaceId     String
+  userId      String
+  scannedAt   DateTime        @default(now())
+  method      SpaceScanMethod
+  household   Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  space       Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, scannedAt])
+  @@index([spaceId, scannedAt])
+  @@index([userId, scannedAt])
 }
 
 // Supplier-grouped purchase batch used for reorder carts and quick restocks.

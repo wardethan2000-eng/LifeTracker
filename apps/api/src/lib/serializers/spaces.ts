@@ -3,7 +3,9 @@ import {
   spaceGeneralItemSchema,
   spaceItemHistoryEntrySchema,
   spaceInventoryLinkDetailSchema,
+  spaceRecentScanEntrySchema,
   spaceResponseSchema,
+  spaceUtilizationEntrySchema,
   type SpaceResponse
 } from "@lifekeeper/types";
 import { toInventoryItemSummaryResponse } from "./inventory.js";
@@ -73,6 +75,20 @@ type SpaceHistoryRecord = {
     id: string;
     displayName: string | null;
   } | null;
+  space: SpaceParentRecord;
+};
+
+type SpaceRecentScanRecord = {
+  id: string;
+  householdId: string;
+  spaceId: string;
+  userId: string;
+  scannedAt: Date;
+  method: "qr_scan" | "manual_lookup" | "direct_navigation";
+  user: {
+    id: string;
+    displayName: string | null;
+  };
   space: SpaceParentRecord;
 };
 
@@ -240,4 +256,44 @@ export const serializeSpaceList = (
   return breadcrumb
     ? serializeSpace(space, { breadcrumb })
     : serializeSpace(space);
+});
+
+export const serializeSpaceUtilization = (
+  space: SpaceParentRecord & {
+    breadcrumb: Array<{ id: string; name: string; type: SpaceType }>;
+    itemCount: number;
+    generalItemCount: number;
+    totalItemCount: number;
+    lastActivityAt: Date | null;
+  }
+) => spaceUtilizationEntrySchema.parse({
+  spaceId: space.id,
+  shortCode: space.shortCode,
+  name: space.name,
+  type: space.type,
+  breadcrumb: space.breadcrumb,
+  itemCount: space.itemCount,
+  generalItemCount: space.generalItemCount,
+  totalItemCount: space.totalItemCount,
+  lastActivityAt: space.lastActivityAt?.toISOString() ?? null,
+  isEmpty: space.totalItemCount === 0
+});
+
+export const serializeSpaceRecentScan = (
+  entry: SpaceRecentScanRecord,
+  options: {
+    breadcrumb?: Array<{ id: string; name: string; type: SpaceType }>;
+  } = {}
+) => spaceRecentScanEntrySchema.parse({
+  id: entry.id,
+  householdId: entry.householdId,
+  spaceId: entry.spaceId,
+  userId: entry.userId,
+  scannedAt: entry.scannedAt.toISOString(),
+  method: entry.method,
+  actor: entry.user,
+  space: {
+    ...toSpaceReference(entry.space),
+    breadcrumb: options.breadcrumb ?? [{ id: entry.space.id, name: entry.space.name, type: entry.space.type }]
+  }
 });

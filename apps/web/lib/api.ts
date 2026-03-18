@@ -48,18 +48,23 @@ import {
   inventoryTransactionCorrectionResultSchema,
   inventoryTransactionSchema,
   inventoryItemDetailSchema,
+  inventoryItemListResponseSchema,
   inventoryItemSummarySchema,
   inventoryItemConsumptionSchema,
   inventoryPurchaseSchema,
   inventoryShoppingListSummarySchema,
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
+  importSpacesResultSchema,
   spaceGeneralItemSchema,
   spaceItemHistoryListResponseSchema,
   spaceInventoryLinkDetailSchema,
+  spaceOrphanCountSchema,
+  spaceRecentScanListSchema,
   spaceContentsResponseSchema,
   spaceListResponseSchema,
   spaceResponseSchema,
+  spaceUtilizationListSchema,
   memberContributionPayloadSchema,
   projectBudgetBurnPayloadSchema,
   projectPortfolioHealthPayloadSchema,
@@ -195,12 +200,16 @@ import {
   type InventoryTransactionCorrectionResult,
   type InventoryTransactionQuery,
   type InventoryItemDetail,
+  type InventoryItemListResponse,
   type SpaceContentsResponse,
   type SpaceGeneralItem,
   type SpaceGeneralItemInput,
   type SpaceItemHistoryListResponse,
   type SpaceListResponse,
+  type SpaceOrphanCount,
+  type SpaceRecentScanEntry,
   type SpaceResponse,
+  type SpaceUtilizationEntry,
   type UpdateInventoryItemInput,
   type UpdateSpaceGeneralItemInput,
   type UpdateSpaceInput,
@@ -281,6 +290,8 @@ import {
   type UpdateUsageMetricInput,
   type AllocateProjectInventoryInput,
   type MoveSpaceInput,
+  type ImportSpaceRow,
+  type ImportSpacesResult,
   regulatoryAssetOptionSchema,
   type RegulatoryAssetOption,
   type UsageMetric,
@@ -2299,6 +2310,77 @@ export const importHouseholdInventory = async (
   return importInventoryResultSchema.parse(payload);
 };
 
+export const exportHouseholdSpaces = async (householdId: string): Promise<string> => {
+  const path = `/v1/households/${householdId}/spaces/export`;
+  let response: Response;
+
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "GET",
+      cache: "no-store",
+      headers: getRequestHeaders(null)
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message
+      ? ` ${error.message}`
+      : "";
+
+    throw new ApiError(
+      `Unable to reach the API at ${apiBaseUrl}.${detail}`,
+      503
+    );
+  }
+
+  if (!response.ok) {
+    const payload = await parseJson(response);
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+
+    throw new ApiError(message, response.status);
+  }
+
+  return response.text();
+};
+
+export const importHouseholdSpaces = async (
+  householdId: string,
+  spaces: ImportSpaceRow[]
+): Promise<ImportSpacesResult> => {
+  const path = `/v1/households/${householdId}/spaces/import`;
+  let response: Response;
+
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "POST",
+      cache: "no-store",
+      headers: getRequestHeaders(),
+      body: JSON.stringify({ spaces })
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message
+      ? ` ${error.message}`
+      : "";
+
+    throw new ApiError(
+      `Unable to reach the API at ${apiBaseUrl}.${detail}`,
+      503
+    );
+  }
+
+  const payload = await parseJson(response);
+
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+
+    throw new ApiError(message, response.status);
+  }
+
+  return importSpacesResultSchema.parse(payload);
+};
+
 export const getHouseholdInventoryTransactions = async (
   householdId: string,
   options?: InventoryTransactionQuery
@@ -2430,6 +2512,70 @@ export const getHouseholdSpacesTree = async (householdId: string): Promise<Space
   schema: z.array(spaceResponseSchema)
 });
 
+export const getSpaceByShortCode = async (householdId: string, shortCode: string): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/lookup/${encodeURIComponent(shortCode)}`,
+  schema: spaceResponseSchema
+});
+
+export const getSpaceOrphanCount = async (householdId: string): Promise<SpaceOrphanCount> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/analytics/orphans/count`,
+  schema: spaceOrphanCountSchema
+});
+
+export const getSpaceOrphans = async (
+  householdId: string,
+  options?: {
+    category?: string;
+    search?: string;
+    itemType?: "consumable" | "equipment";
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<InventoryItemListResponse> => {
+  const query = new URLSearchParams();
+
+  if (options?.category) {
+    query.set("category", options.category);
+  }
+
+  if (options?.search) {
+    query.set("search", options.search);
+  }
+
+  if (options?.itemType) {
+    query.set("itemType", options.itemType);
+  }
+
+  if (options?.limit !== undefined) {
+    query.set("limit", String(options.limit));
+  }
+
+  if (options?.cursor) {
+    query.set("cursor", options.cursor);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/spaces/analytics/orphans${suffix}`,
+    schema: inventoryItemListResponseSchema
+  });
+};
+
+export const getSpaceUtilization = async (householdId: string): Promise<SpaceUtilizationEntry[]> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/analytics/utilization`,
+  schema: spaceUtilizationListSchema
+});
+
+export const getRecentSpaceScans = async (
+  householdId: string,
+  limit = 10
+): Promise<SpaceRecentScanEntry[]> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/recent-scans?limit=${encodeURIComponent(String(limit))}`,
+  schema: spaceRecentScanListSchema,
+  cacheOptions: { revalidate: 0 }
+});
+
 export const getSpace = async (householdId: string, spaceId: string): Promise<SpaceResponse> => apiRequest({
   path: `/v1/households/${householdId}/spaces/${spaceId}`,
   schema: spaceResponseSchema,
@@ -2531,6 +2677,13 @@ export const deleteGeneralItem = async (
   await apiRequest({
     path: `/v1/households/${householdId}/spaces/${spaceId}/general-items/${generalItemId}`,
     method: "DELETE"
+  });
+};
+
+export const logSpaceDirectNavigation = async (householdId: string, spaceId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/spaces/${spaceId}/view`,
+    method: "POST"
   });
 };
 
