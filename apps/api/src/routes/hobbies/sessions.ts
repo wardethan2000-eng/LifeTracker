@@ -47,6 +47,116 @@ const reorderStepsBodySchema = z.object({
   stepIds: z.array(z.string().cuid())
 });
 
+const syncSessionIngredientInventory = async (
+  tx: Prisma.TransactionClient,
+  options: {
+    existingInventoryItemId: string | null;
+    nextInventoryItemId: string | null;
+    existingQuantityUsed: number;
+    nextQuantityUsed: number;
+    userId: string;
+    sessionId: string;
+    sessionName: string;
+  }
+) => {
+  const {
+    existingInventoryItemId,
+    nextInventoryItemId,
+    existingQuantityUsed,
+    nextQuantityUsed,
+    userId,
+    sessionId,
+    sessionName
+  } = options;
+
+  if (existingInventoryItemId && nextInventoryItemId && existingInventoryItemId !== nextInventoryItemId) {
+    await applyInventoryTransaction(tx, {
+      inventoryItemId: existingInventoryItemId,
+      userId,
+      input: {
+        type: "adjust",
+        quantity: existingQuantityUsed,
+        referenceType: "hobby_session",
+        referenceId: sessionId,
+        notes: `Ingredient reassigned for hobby session: ${sessionName}`,
+      },
+      clampToZero: false,
+    });
+
+    await applyInventoryTransaction(tx, {
+      inventoryItemId: nextInventoryItemId,
+      userId,
+      input: {
+        type: "consume",
+        quantity: -nextQuantityUsed,
+        referenceType: "hobby_session",
+        referenceId: sessionId,
+        notes: `Consumed for hobby session: ${sessionName}`,
+      },
+      clampToZero: true,
+    });
+
+    return;
+  }
+
+  if (existingInventoryItemId && nextInventoryItemId === null) {
+    await applyInventoryTransaction(tx, {
+      inventoryItemId: existingInventoryItemId,
+      userId,
+      input: {
+        type: "adjust",
+        quantity: existingQuantityUsed,
+        referenceType: "hobby_session",
+        referenceId: sessionId,
+        notes: `Ingredient removed from hobby session: ${sessionName}`,
+      },
+      clampToZero: false,
+    });
+
+    return;
+  }
+
+  if (!existingInventoryItemId && nextInventoryItemId) {
+    await applyInventoryTransaction(tx, {
+      inventoryItemId: nextInventoryItemId,
+      userId,
+      input: {
+        type: "consume",
+        quantity: -nextQuantityUsed,
+        referenceType: "hobby_session",
+        referenceId: sessionId,
+        notes: `Consumed for hobby session: ${sessionName}`,
+      },
+      clampToZero: true,
+    });
+
+    return;
+  }
+
+  if (!nextInventoryItemId) {
+    return;
+  }
+
+  const delta = existingQuantityUsed - nextQuantityUsed;
+
+  if (delta === 0) {
+    return;
+  }
+
+  await applyInventoryTransaction(tx, {
+    inventoryItemId: nextInventoryItemId,
+    userId,
+    input: {
+      type: "adjust",
+      quantity: delta,
+      referenceType: "hobby_session",
+      referenceId: sessionId,
+      notes: `Ingredient quantity adjusted for hobby session: ${sessionName}`,
+    },
+    clampToZero: true,
+  });
+};
+
 export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/sessions";
 
@@ -167,6 +277,18 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
                 notes: ing.notes,
               }))
             });
+
+            for (const ingredient of recipe.ingredients) {
+              await syncSessionIngredientInventory(tx, {
+                existingInventoryItemId: null,
+                nextInventoryItemId: ingredient.inventoryItemId,
+                existingQuantityUsed: 0,
+                nextQuantityUsed: ingredient.quantity,
+                userId,
+                sessionId: created.id,
+                sessionName: created.name,
+              });
+            }
           }
 
           if (recipe.steps.length > 0) {
@@ -425,13 +547,35 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.hobbySession.findFirst({
-      where: { id: sessionId, hobbyId, hobby: { householdId } }
+      where: { id: sessionId, hobbyId, hobby: { householdId } },
+      include: {
+        ingredients: {
+          select: {
+            inventoryItemId: true,
+            quantityUsed: true,
+          }
+        }
+      }
     });
     if (!existing) {
       return reply.code(404).send({ message: "Session not found" });
     }
 
-    await app.prisma.hobbySession.delete({ where: { id: sessionId } });
+    await app.prisma.$transaction(async (tx) => {
+      for (const ingredient of existing.ingredients) {
+        await syncSessionIngredientInventory(tx, {
+          existingInventoryItemId: ingredient.inventoryItemId,
+          nextInventoryItemId: null,
+          existingQuantityUsed: ingredient.quantityUsed,
+          nextQuantityUsed: 0,
+          userId,
+          sessionId,
+          sessionName: existing.name,
+        });
+      }
+
+      await tx.hobbySession.delete({ where: { id: sessionId } });
+    });
 
     await logActivity(app.prisma, {
       householdId,
@@ -477,20 +621,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       });
 
       // Consume from inventory if linked
-      if (input.inventoryItemId) {
-        await applyInventoryTransaction(tx, {
-          inventoryItemId: input.inventoryItemId,
-          userId,
-          input: {
-            type: "consume",
-            quantity: -input.quantityUsed,
-            referenceType: "hobby_session",
-            referenceId: sessionId,
-            notes: `Consumed for hobby session: ${session.name}`,
-          },
-          clampToZero: true,
-        });
-      }
+      await syncSessionIngredientInventory(tx, {
+        existingInventoryItemId: null,
+        nextInventoryItemId: input.inventoryItemId ?? null,
+        existingQuantityUsed: 0,
+        nextQuantityUsed: input.quantityUsed,
+        userId,
+        sessionId,
+        sessionName: session.name,
+      });
 
       return created;
     });
@@ -509,7 +648,14 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.hobbySessionIngredient.findFirst({
-      where: { id: ingredientId, sessionId, session: { hobbyId, hobby: { householdId } } }
+      where: { id: ingredientId, sessionId, session: { hobbyId, hobby: { householdId } } },
+      include: {
+        session: {
+          select: {
+            name: true,
+          }
+        }
+      }
     });
     if (!existing) {
       return reply.code(404).send({ message: "Ingredient not found" });
@@ -528,24 +674,15 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
-      // Corrective inventory transaction if quantity changed and has inventory link
-      if (input.quantityUsed !== undefined && existing.inventoryItemId) {
-        const delta = existing.quantityUsed - input.quantityUsed;
-        if (delta !== 0) {
-          await applyInventoryTransaction(tx, {
-            inventoryItemId: existing.inventoryItemId,
-            userId,
-            input: {
-              type: "adjust",
-              quantity: delta,
-              referenceType: "hobby_session",
-              referenceId: sessionId,
-              notes: `Quantity adjustment for hobby session ingredient`,
-            },
-            clampToZero: true,
-          });
-        }
-      }
+      await syncSessionIngredientInventory(tx, {
+        existingInventoryItemId: existing.inventoryItemId,
+        nextInventoryItemId: input.inventoryItemId !== undefined ? input.inventoryItemId : existing.inventoryItemId,
+        existingQuantityUsed: existing.quantityUsed,
+        nextQuantityUsed: input.quantityUsed ?? existing.quantityUsed,
+        userId,
+        sessionId,
+        sessionName: existing.session.name,
+      });
 
       return updated;
     });
@@ -569,28 +706,19 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Ingredient not found" });
     }
 
-    if (existing.inventoryItemId) {
-      const inventoryItemId = existing.inventoryItemId;
-
-      await app.prisma.$transaction(async (tx) => {
-        await applyInventoryTransaction(tx, {
-          inventoryItemId,
-          userId,
-          input: {
-            type: "adjust",
-            quantity: existing.quantityUsed,
-            referenceType: "hobby_session",
-            referenceId: sessionId,
-            notes: "Session ingredient removed",
-          },
-          clampToZero: false,
-        });
-
-        await tx.hobbySessionIngredient.delete({ where: { id: ingredientId } });
+    await app.prisma.$transaction(async (tx) => {
+      await syncSessionIngredientInventory(tx, {
+        existingInventoryItemId: existing.inventoryItemId,
+        nextInventoryItemId: null,
+        existingQuantityUsed: existing.quantityUsed,
+        nextQuantityUsed: 0,
+        userId,
+        sessionId,
+        sessionName: existing.name,
       });
-    } else {
-      await app.prisma.hobbySessionIngredient.delete({ where: { id: ingredientId } });
-    }
+
+      await tx.hobbySessionIngredient.delete({ where: { id: ingredientId } });
+    });
 
     return reply.code(204).send();
   });
