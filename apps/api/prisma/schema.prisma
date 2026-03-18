@@ -666,6 +666,7 @@ model MaintenanceLogPart {
 }
 
 // A manual, user-authored event on an Asset timeline for history not covered by structured systems.
+// TODO(2026-06): Remove after all asset history read/write paths rely exclusively on Entry records.
 model AssetTimelineEntry {
   id          String    @id @default(cuid())
   assetId     String
@@ -1064,6 +1065,7 @@ model ProjectTaskDependency {
 }
 
 // A free-form note attached to a Project, optionally scoped to a single phase.
+// TODO(2026-06): Remove after project note attachment parity is handled on Entry and legacy backfill is complete.
 model ProjectNote {
   id             String        @id @default(cuid())
   projectId      String
@@ -1995,6 +1997,7 @@ model HobbyMetricReading {
 }
 
 // A dated journal entry for a Hobby, optionally attached to a particular session.
+// TODO(2026-06): Remove after hobby exports/session payloads stop depending on legacy HobbyLog rows.
 model HobbyLog {
   id        String        @id @default(cuid())
   hobbyId   String

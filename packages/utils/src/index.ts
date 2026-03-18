@@ -303,11 +303,8 @@ const dedupeStrings = (values: Array<string | null | undefined>): string[] => Ar
 ));
 
 const hostnameFromUrl = (value: string): string | null => {
-  try {
-    return new URL(value).hostname;
-  } catch {
-    return null;
-  }
+  const match = normalizeText(value).match(/^[a-z]+:\/\/([^/?#]+)/i);
+  return match?.[1] ?? null;
 };
 
 export const isLegacyImportedEntrySourceType = (sourceType: string | null | undefined): boolean => (
@@ -485,13 +482,17 @@ export const parseProjectEntryPayload = (input: {
   url: string | null;
 } => {
   const tags = input.tags ?? [];
+  const title = normalizeText(input.title);
   const categoryTag = tags.find((tag) => tag.startsWith(PROJECT_NOTE_CATEGORY_PREFIX));
   const category = categoryTag
     ? categoryTag.slice(PROJECT_NOTE_CATEGORY_PREFIX.length)
     : mapEntryTypeToProjectNoteCategory(input.entryType);
 
   return {
-    body: normalizeText(input.body),
+    body: (() => {
+      const body = normalizeText(input.body);
+      return body === title ? "" : body;
+    })(),
     category: (category || "general") as "research" | "reference" | "decision" | "measurement" | "general",
     isPinned: (input.flags ?? []).includes("pinned"),
     url: normalizeText(input.attachmentUrl) || null

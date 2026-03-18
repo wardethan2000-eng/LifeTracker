@@ -90,6 +90,7 @@ import {
   completeSchedule,
   createComment,
   createInventoryComment,
+  createEntry,
   createAssetTimelineEntry,
   createInvitation,
   createAssetTransfer,
@@ -123,6 +124,7 @@ import {
   cloneProject,
   deleteInventoryItem,
   deleteComment,
+  deleteEntry,
   deleteInventoryComment,
   deleteAssetTimelineEntry,
   deleteHobby,
@@ -156,6 +158,7 @@ import {
   updateAsset,
   updateComment,
   updateInventoryComment,
+  updateEntry,
   updateAssetTimelineEntry,
   updateHobby,
   updateHobbyRecipe,
@@ -179,6 +182,7 @@ import {
   updateMetric
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
+import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
 
 const getString = (formData: FormData, key: string): string => {
   const value = formData.get(key);
@@ -1555,7 +1559,32 @@ export async function createTimelineEntryAction(formData: FormData): Promise<voi
     input.tags = tags;
   }
 
-  await createAssetTimelineEntry(assetId, input);
+  if (!householdId) {
+    await createAssetTimelineEntry(assetId, input);
+  } else {
+    const entryDetails = buildAssetEntryDetails({
+      title: input.title,
+      ...(description !== undefined ? { description } : {}),
+      ...(category !== undefined ? { category } : {}),
+      ...(cost !== undefined ? { cost } : {}),
+      ...(vendor !== undefined ? { vendor } : {}),
+      ...(tags !== undefined ? { tags } : {})
+    });
+
+    await createEntry(householdId, {
+      title: input.title,
+      body: entryDetails.body,
+      entryDate: input.entryDate,
+      entityType: "asset",
+      entityId: assetId,
+      entryType: entryDetails.entryType,
+      measurements: entryDetails.measurements,
+      tags: entryDetails.tags,
+      flags: [],
+      attachmentName: entryDetails.attachmentName
+    });
+  }
+
   revalidateAssetPaths(assetId);
 
   if (householdId) {
@@ -1566,6 +1595,8 @@ export async function createTimelineEntryAction(formData: FormData): Promise<voi
 export async function updateTimelineEntryAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   const entryId = getRequiredString(formData, "entryId");
+  const householdId = getOptionalString(formData, "householdId");
+  const sourceSystem = getOptionalString(formData, "sourceSystem") ?? "legacy";
   const input: UpdateAssetTimelineEntryInput = {};
 
   const title = getOptionalString(formData, "title");
@@ -1607,16 +1638,56 @@ export async function updateTimelineEntryAction(formData: FormData): Promise<voi
     input.tags = tags;
   }
 
-  await updateAssetTimelineEntry(assetId, entryId, input);
+  if (sourceSystem === "entry") {
+    const entryDetails = buildAssetEntryDetails({
+      title: title ?? getRequiredString(formData, "title"),
+      ...(description !== undefined ? { description } : {}),
+      ...(category !== undefined ? { category } : {}),
+      ...(cost !== undefined ? { cost } : {}),
+      ...(vendor !== undefined ? { vendor } : {}),
+      ...(tags !== undefined ? { tags } : {})
+    });
+
+    if (!householdId) {
+      throw new Error("householdId is required to update entry-backed asset notes.");
+    }
+
+    await updateEntry(householdId, entryId, {
+      ...(title ? { title } : {}),
+      ...(entryDate ? { entryDate } : {}),
+      entryType: entryDetails.entryType,
+      body: entryDetails.body,
+      measurements: entryDetails.measurements,
+      tags: entryDetails.tags,
+      attachmentName: entryDetails.attachmentName
+    });
+  } else {
+    await updateAssetTimelineEntry(assetId, entryId, input);
+  }
+
   revalidateAssetPaths(assetId);
+
+  if (householdId) {
+    revalidateActivityPaths(householdId);
+  }
 }
 
 export async function deleteTimelineEntryAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   const entryId = getRequiredString(formData, "entryId");
   const householdId = getOptionalString(formData, "householdId");
+  const sourceSystem = getOptionalString(formData, "sourceSystem") ?? "legacy";
 
-  await deleteAssetTimelineEntry(assetId, entryId);
+  if (sourceSystem === "entry") {
+    if (!householdId) {
+      throw new Error("householdId is required to delete entry-backed asset notes.");
+    }
+
+    await deleteEntry(householdId, entryId);
+  } else {
+    await deleteAssetTimelineEntry(assetId, entryId);
+  }
+
   revalidateAssetPaths(assetId);
 
   if (householdId) {
@@ -2349,11 +2420,28 @@ export async function createProjectNoteAction(formData: FormData): Promise<void>
   const isPinnedRaw = getOptionalString(formData, "isPinned");
   const isPinned = isPinnedRaw === "true";
 
-  const input: CreateProjectNoteInput = { title, body, category, isPinned };
-  if (url) input.url = url;
-  if (phaseId) input.phaseId = phaseId;
+  const entryDetails = buildProjectEntryDetails({
+    title,
+    body,
+    category,
+    ...(url !== undefined ? { url } : {}),
+    isPinned
+  });
 
-  await createProjectNote(householdId, projectId, input);
+  await createEntry(householdId, {
+    title,
+    body: entryDetails.body,
+    entryDate: new Date().toISOString(),
+    entityType: phaseId ? "project_phase" : "project",
+    entityId: phaseId ?? projectId,
+    entryType: entryDetails.entryType,
+    measurements: [],
+    tags: entryDetails.tags,
+    flags: entryDetails.flags,
+    attachmentUrl: entryDetails.attachmentUrl,
+    attachmentName: entryDetails.attachmentName
+  });
+
   revalidateProjectPaths(householdId, projectId);
 }
 
@@ -2377,8 +2465,14 @@ export async function deleteProjectNoteAction(formData: FormData): Promise<void>
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
   const noteId = getRequiredString(formData, "noteId");
+  const sourceSystem = getOptionalString(formData, "sourceSystem") ?? "legacy";
 
-  await deleteProjectNote(householdId, projectId, noteId);
+  if (sourceSystem === "entry") {
+    await deleteEntry(householdId, noteId);
+  } else {
+    await deleteProjectNote(householdId, projectId, noteId);
+  }
+
   revalidateProjectPaths(householdId, projectId);
 }
 
@@ -2387,8 +2481,14 @@ export async function toggleProjectNotePinAction(formData: FormData): Promise<vo
   const projectId = getRequiredString(formData, "projectId");
   const noteId = getRequiredString(formData, "noteId");
   const isPinned = getRequiredString(formData, "isPinned") === "true";
+  const sourceSystem = getOptionalString(formData, "sourceSystem") ?? "legacy";
 
-  await updateProjectNote(householdId, projectId, noteId, { isPinned });
+  if (sourceSystem === "entry") {
+    await updateEntry(householdId, noteId, { flags: isPinned ? ["pinned"] : [] });
+  } else {
+    await updateProjectNote(householdId, projectId, noteId, { isPinned });
+  }
+
   revalidateProjectPaths(householdId, projectId);
 }
 

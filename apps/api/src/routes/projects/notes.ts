@@ -32,6 +32,7 @@ const getProject = (app: FastifyInstance, householdId: string, projectId: string
   select: { id: true, householdId: true, name: true }
 });
 
+// TODO(2026-06): Remove this legacy CRUD surface after project note attachments and edit flows are fully Entry-backed.
 export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/projects/:projectId/notes
   app.get("/v1/households/:householdId/projects/:projectId/notes", async (request, reply) => {

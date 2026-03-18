@@ -98,6 +98,8 @@ export function TimelineItem({ item, assetId, householdId, updateAction, deleteA
   const finalCategory = customCategory.trim() || selectedCategory;
   const vendor = getMetadataString(metadata, "vendor");
   const tags = getMetadataTags(metadata);
+  const sourceSystem = getMetadataString(metadata, "entrySystem") || "legacy";
+  const isImported = metadata?.importedFromLegacy === true;
 
   useEffect(() => {
     if (!item.description || isDescriptionExpanded) {
@@ -165,6 +167,8 @@ export function TimelineItem({ item, assetId, householdId, updateAction, deleteA
         </span>
         <span className="timeline-item__date">{formatDateTime(item.eventDate)}</span>
         {item.category ? <span className="pill">{item.category}</span> : null}
+        {isImported ? <span className="pill pill--warning">Imported</span> : null}
+        {sourceSystem === "legacy" ? <span className="pill pill--muted">Legacy</span> : null}
         {item.userName ? <span className="timeline-item__user">by {item.userName}</span> : null}
       </div>
 
@@ -210,6 +214,7 @@ export function TimelineItem({ item, assetId, householdId, updateAction, deleteA
           <input type="hidden" name="assetId" value={assetId} />
           <input type="hidden" name="entryId" value={item.sourceId} />
           <input type="hidden" name="householdId" value={householdId} />
+          <input type="hidden" name="sourceSystem" value={sourceSystem} />
           <span style={{ fontSize: "0.82rem", color: "var(--danger)" }}>Delete this entry?</span>
           <button type="button" className="button button--ghost button--sm" onClick={() => setShowDeleteConfirm(false)}>
             Cancel
@@ -223,6 +228,8 @@ export function TimelineItem({ item, assetId, householdId, updateAction, deleteA
           <form action={submitUpdate} className="form-grid">
             <input type="hidden" name="assetId" value={assetId} />
             <input type="hidden" name="entryId" value={item.sourceId} />
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="sourceSystem" value={sourceSystem} />
             <input type="hidden" name="category" value={finalCategory} />
 
             <label className="field field--full">

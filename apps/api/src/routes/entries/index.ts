@@ -109,12 +109,12 @@ const buildEntryFilterClauses = (
   const entityId = target?.entityId ?? query.entityId;
 
   if (entityType && entityId) {
-    conditions.push(Prisma.sql`e."entityType" = ${entityType}`);
+    conditions.push(Prisma.sql`e."entityType"::text = ${entityType}`);
     conditions.push(Prisma.sql`e."entityId" = ${entityId}`);
   }
 
   if (query.entryType) {
-    conditions.push(Prisma.sql`e."entryType" = ${query.entryType}`);
+    conditions.push(Prisma.sql`e."entryType"::text = ${query.entryType}`);
   }
 
   if (query.createdById) {

@@ -27,6 +27,7 @@ const listTimelineEntriesQuerySchema = z.object({
   cursor: z.string().cuid().optional()
 });
 
+// TODO(2026-06): Remove this legacy CRUD surface after all asset timeline writes and attachments are fully Entry-backed.
 export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/timeline-entries", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);

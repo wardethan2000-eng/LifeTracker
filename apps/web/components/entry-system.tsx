@@ -11,6 +11,7 @@ import type {
   EntryType,
   UpdateEntryInput
 } from "@lifekeeper/types";
+import { isLegacyImportedEntrySourceType } from "@lifekeeper/utils";
 import Link from "next/link";
 import {
   useDeferredValue,
@@ -820,6 +821,8 @@ export function EntryTimeline({
       });
   }, [deferredSearchText, endDate, entries, hasMeasurementsOnly, includeArchived, selectedFlags, selectedTags, selectedTypes, startDate]);
 
+  const hasImportedLegacyEntries = entries.some((entry) => isLegacyImportedEntrySourceType(entry.sourceType));
+
   const toggleFlagFilter = (flag: EntryFlag): void => {
     setSelectedFlags((current) => current.includes(flag) ? current.filter((value) => value !== flag) : [...current, flag]);
   };
@@ -882,6 +885,10 @@ export function EntryTimeline({
       </div>
 
       <div className="panel__body--padded entry-timeline-panel__body">
+        {hasImportedLegacyEntries ? (
+          <p className="note">Older entries were imported from the previous system.</p>
+        ) : null}
+
         {trendSeries.length > 0 ? (
           <section className="entry-trends">
             {trendSeries.map((series) => <EntryMeasurementSparkline key={series.key} series={series} />)}

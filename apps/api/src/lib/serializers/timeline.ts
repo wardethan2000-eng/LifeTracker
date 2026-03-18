@@ -2,6 +2,7 @@ import type {
   ActivityLog,
   AssetTimelineEntry,
   Comment,
+  Entry,
   MaintenanceLog,
   MaintenanceLogPart,
   Prisma,
@@ -10,8 +11,11 @@ import type {
 import {
   assetTimelineEntrySchema,
   assetTimelineItemSchema,
+  entryMeasurementSchema,
+  entrySchema,
   type AssetTimelineSourceType
 } from "@lifekeeper/types";
+import { LEGACY_ENTRY_SOURCE_TYPES, parseAssetEntryPayload } from "@lifekeeper/utils";
 
 type TimelineUserInfo = {
   id: string | null;
@@ -144,6 +148,43 @@ export const toAssetTimelineEntryResponse = (
   updatedAt: entry.updatedAt.toISOString()
 });
 
+export const toEntryBackedTimelineItem = (
+  entry: Pick<Entry, "id" | "entityId" | "createdById" | "title" | "body" | "entryDate" | "entryType" | "measurements" | "tags" | "attachmentName" | "sourceType" | "createdAt">,
+  userInfo?: TimelineUserInfo | null
+) => {
+  const details = parseAssetEntryPayload({
+    title: entry.title,
+    body: entry.body,
+    entryType: entry.entryType,
+    tags: entrySchema.shape.tags.parse(entry.tags ?? []),
+    measurements: entryMeasurementSchema.array().parse(entry.measurements ?? []),
+    attachmentName: entry.attachmentName
+  });
+
+  return assetTimelineItemSchema.parse({
+    id: `entry_record_${entry.id}`,
+    sourceType: "timeline_entry",
+    sourceId: entry.id,
+    assetId: entry.entityId,
+    title: entry.title ?? "Asset entry",
+    description: details.description,
+    eventDate: entry.entryDate.toISOString(),
+    category: details.category,
+    cost: details.cost,
+    userId: entry.createdById,
+    userName: toDisplayName(userInfo),
+    metadata: {
+      vendor: details.vendor,
+      tags: details.tags,
+      entrySystem: "entry",
+      importedFromLegacy: entry.sourceType === LEGACY_ENTRY_SOURCE_TYPES.assetTimelineEntry,
+      legacySourceType: entry.sourceType ?? null
+    },
+    isEditable: true,
+    createdAt: entry.createdAt.toISOString()
+  });
+};
+
 export const toTimelineItem = (
   sourceType: AssetTimelineSourceType,
   raw: unknown,
@@ -207,6 +248,8 @@ export const toTimelineItem = (
         metadata: {
           vendor: entry.vendor ?? null,
           tags: asStringArray(entry.tags),
+          entrySystem: "legacy",
+          importedFromLegacy: false,
           ...(asRecord(entry.metadata))
         },
         isEditable: true,

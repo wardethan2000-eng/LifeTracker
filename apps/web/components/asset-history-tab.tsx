@@ -31,6 +31,10 @@ export async function AssetHistoryTab({ detail, assetId, searchParams, historyTi
   const cursor = getSearchParamValue(searchParams.cursor);
   const showAddForm = getSearchParamValue(searchParams.showAddForm) === "true";
   const items = historyTimeline.items;
+  const hasLegacyOrImportedEntries = items.some((item) => {
+    const metadata = typeof item.metadata === "object" && item.metadata !== null ? item.metadata as Record<string, unknown> : null;
+    return metadata?.entrySystem === "legacy" || metadata?.importedFromLegacy === true;
+  });
   const maintenanceLogCount = items.filter((item) => item.sourceType === "maintenance_log").length;
   const manualEntryCount = items.filter((item) => item.sourceType === "timeline_entry").length;
   const totalCost = items.reduce((sum, item) => sum + (item.cost ?? 0), 0);
@@ -79,6 +83,12 @@ export async function AssetHistoryTab({ detail, assetId, searchParams, historyTi
               ...(until ? { until } : {})
             }}
           />
+
+          {hasLegacyOrImportedEntries ? (
+            <p className="note">
+              Older entries were imported from the previous system.
+            </p>
+          ) : null}
 
           {showAddForm ? (
             <TimelineEntryForm

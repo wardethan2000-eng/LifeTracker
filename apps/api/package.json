@@ -11,6 +11,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
+    "entries:migrate-legacy": "tsx src/scripts/migrate-legacy-entries.ts",
     "notifications:scan": "tsx src/scripts/enqueue-notification-scan.ts",
     "notifications:scan:now": "tsx src/scripts/run-notification-scan.ts",
     "notifications:worker": "tsx src/workers/notifications.ts",

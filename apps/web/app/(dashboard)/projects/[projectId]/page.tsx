@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type {
+  Entry,
   InventoryItemSummary,
+  ProjectNote,
   ProjectPhaseProgress,
   ProjectPhaseSummary,
   ProjectPhaseSupply
 } from "@lifekeeper/types";
+import { isLegacyImportedEntrySourceType, parseProjectEntryPayload } from "@lifekeeper/utils";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import {
@@ -52,6 +55,7 @@ import {
 } from "../../../actions";
 import {
   ApiError,
+  getEntries,
   getHouseholdAssets,
   getHouseholdInventory,
   getHouseholdMembers,
@@ -288,7 +292,6 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           <EntryTipsSurface
             householdId={household.id}
             queries={[{ entityType: "project", entityId: project.id }]}
-            entryHrefBuilder={(entry) => `${projectEntriesHref}#entry-${entry.id}`}
           />
 
           {view === "entries" ? (
@@ -298,7 +301,6 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               entityId={project.id}
               title="Project Entries"
               quickAddLabel="Entry"
-              entryHrefBuilder={(entry) => `${projectEntriesHref}#entry-${entry.id}`}
             />
           ) : (
           <>
@@ -837,7 +839,102 @@ async function ProjectNotesPanel({
   householdId: string;
   project: Awaited<ReturnType<typeof getProjectDetail>>;
 }): Promise<JSX.Element> {
-  const projectNotes = await getProjectNotes(householdId, project.id);
+  const [projectNotes, projectEntries, phaseEntryResponses] = await Promise.all([
+    getProjectNotes(householdId, project.id),
+    getEntries(householdId, {
+      entityType: "project",
+      entityId: project.id,
+      includeArchived: true,
+      limit: 100
+    }),
+    Promise.all(project.phases.map((phase) => getEntries(householdId, {
+      entityType: "project_phase",
+      entityId: phase.id,
+      includeArchived: true,
+      limit: 100
+    })))
+  ]);
+
+  type ProjectNoteCard = {
+    id: string;
+    title: string;
+    body: string;
+    category: string;
+    url: string | null;
+    phaseName: string | null;
+    isPinned: boolean;
+    createdAt: string;
+    createdByName: string;
+    sourceSystem: "legacy" | "entry";
+    isImported: boolean;
+    canManageAttachments: boolean;
+  };
+
+  const entryCards = [...projectEntries.items, ...phaseEntryResponses.flatMap((response) => response.items)]
+    .filter((entry) => entry.sourceType === "project_note" || entry.tags.some((tag) => tag.startsWith("lk:project-note-category:")))
+    .map((entry): ProjectNoteCard => {
+      const parsed = parseProjectEntryPayload({
+        title: entry.title,
+        body: entry.body,
+        entryType: entry.entryType,
+        tags: entry.tags,
+        flags: entry.flags,
+        attachmentUrl: entry.attachmentUrl
+      });
+
+      return {
+        id: entry.id,
+        title: entry.title ?? "Project note",
+        body: parsed.body,
+        category: parsed.category,
+        url: parsed.url,
+        phaseName: entry.entityType === "project_phase" ? entry.resolvedEntity.label : null,
+        isPinned: parsed.isPinned,
+        createdAt: entry.createdAt,
+        createdByName: entry.createdBy.displayName ?? "Unknown",
+        sourceSystem: "entry",
+        isImported: isLegacyImportedEntrySourceType(entry.sourceType),
+        canManageAttachments: false
+      };
+    });
+
+  const migratedLegacyProjectNoteIds = new Set(
+    entryCards.filter((entry) => entry.isImported).map((entry) => {
+      const source = [...projectEntries.items, ...phaseEntryResponses.flatMap((response) => response.items)]
+        .find((candidate) => candidate.id === entry.id);
+      return source?.sourceId ?? "";
+    }).filter(Boolean)
+  );
+
+  const legacyCards = projectNotes.map((note): ProjectNoteCard => ({
+    id: note.id,
+    title: note.title,
+    body: note.body,
+    category: note.category,
+    url: note.url ?? null,
+    phaseName: note.phaseName ?? null,
+    isPinned: note.isPinned,
+    createdAt: note.createdAt,
+    createdByName: note.createdBy?.displayName ?? "Unknown",
+    sourceSystem: "legacy",
+    isImported: false,
+    canManageAttachments: true
+  })).filter((note) => !migratedLegacyProjectNoteIds.has(note.id));
+
+  const mergedNotes = [...entryCards, ...legacyCards]
+    .sort((left, right) => {
+      const leftPinned = left.isPinned ? 1 : 0;
+      const rightPinned = right.isPinned ? 1 : 0;
+
+      if (leftPinned !== rightPinned) {
+        return rightPinned - leftPinned;
+      }
+
+      return right.createdAt.localeCompare(left.createdAt);
+    });
+
+  const importedCount = mergedNotes.filter((note) => note.isImported).length;
+  const legacyCount = mergedNotes.filter((note) => note.sourceSystem === "legacy").length;
 
   return (
     <ExpandableCard
@@ -845,12 +942,18 @@ async function ProjectNotesPanel({
       modalTitle="Research & Notes"
       previewContent={
         <span className="data-table__secondary">
-          {projectNotes.length} note{projectNotes.length !== 1 ? "s" : ""}
-          {projectNotes.filter((note) => note.isPinned).length > 0 ? ` · ${projectNotes.filter((note) => note.isPinned).length} pinned` : ""}
+          {mergedNotes.length} note{mergedNotes.length !== 1 ? "s" : ""}
+          {mergedNotes.filter((note) => note.isPinned).length > 0 ? ` · ${mergedNotes.filter((note) => note.isPinned).length} pinned` : ""}
         </span>
       }
     >
       <div>
+        {(importedCount > 0 || legacyCount > 0) ? (
+          <p className="note" style={{ marginBottom: 12 }}>
+            Older entries were imported from the previous system.
+            {legacyCount > 0 ? ` ${legacyCount} legacy note${legacyCount === 1 ? " is" : "s are"} still shown for compatibility.` : ""}
+          </p>
+        ) : null}
         <details style={{ marginBottom: 16 }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
           <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
@@ -894,9 +997,9 @@ async function ProjectNotesPanel({
             </div>
           </form>
         </details>
-        {projectNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
+        {mergedNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
         <div className="schedule-stack">
-          {projectNotes.map((note) => (
+          {mergedNotes.map((note) => (
             <div
               key={note.id}
               className="schedule-card"
@@ -907,6 +1010,8 @@ async function ProjectNotesPanel({
                   <span className="pill">{({ research: "Research", reference: "Reference", decision: "Decision", measurement: "Measurement", general: "General" } as Record<string, string>)[note.category] ?? note.category}</span>
                   {note.phaseName ? <span className="pill pill--muted">{note.phaseName}</span> : null}
                   {note.isPinned ? <span className="pill pill--accent">PINNED</span> : null}
+                  {note.isImported ? <span className="pill pill--warning">Imported</span> : null}
+                  {note.sourceSystem === "legacy" ? <span className="pill pill--muted">Legacy</span> : null}
                 </div>
                 <div className="data-table__primary">{note.title}</div>
                 {note.body ? (
@@ -920,7 +1025,7 @@ async function ProjectNotesPanel({
                   </a>
                 ) : null}
                 <div className="data-table__secondary" style={{ marginTop: 8 }}>
-                  {note.createdBy?.displayName ?? "Unknown"} · {formatDate(note.createdAt)}
+                  {note.createdByName} · {formatDate(note.createdAt)}
                 </div>
               </div>
               <div className="inline-actions" style={{ marginTop: 8 }}>
@@ -928,6 +1033,7 @@ async function ProjectNotesPanel({
                   <input type="hidden" name="householdId" value={householdId} />
                   <input type="hidden" name="projectId" value={project.id} />
                   <input type="hidden" name="noteId" value={note.id} />
+                  <input type="hidden" name="sourceSystem" value={note.sourceSystem} />
                   <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
                   <button type="submit" className="button button--ghost button--small">
                     {note.isPinned ? "Unpin" : "Pin"}
@@ -937,16 +1043,19 @@ async function ProjectNotesPanel({
                   <input type="hidden" name="householdId" value={householdId} />
                   <input type="hidden" name="projectId" value={project.id} />
                   <input type="hidden" name="noteId" value={note.id} />
+                  <input type="hidden" name="sourceSystem" value={note.sourceSystem} />
                   <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
                 </form>
               </div>
-              <AttachmentSection
-                householdId={householdId}
-                entityType="project_note"
-                entityId={note.id}
-                compact
-                label=""
-              />
+              {note.canManageAttachments ? (
+                <AttachmentSection
+                  householdId={householdId}
+                  entityType="project_note"
+                  entityId={note.id}
+                  compact
+                  label=""
+                />
+              ) : null}
             </div>
           ))}
         </div>

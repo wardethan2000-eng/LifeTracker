@@ -2,7 +2,7 @@ import { assetTimelineQuerySchema, conditionEntrySchema } from "@lifekeeper/type
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, getAccessibleAsset } from "../../lib/asset-access.js";
-import { toTimelineItem } from "../../lib/serializers/index.js";
+import { toEntryBackedTimelineItem, toTimelineItem } from "../../lib/serializers/index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -85,6 +85,32 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
       ? app.prisma.assetTimelineEntry.findMany({
           where: {
             assetId: asset.id,
+            ...(query.since || query.until
+              ? {
+                  entryDate: {
+                    ...(query.since ? { gte: new Date(query.since) } : {}),
+                    ...(query.until ? { lte: new Date(query.until) } : {})
+                  }
+                }
+              : {})
+          },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                displayName: true
+              }
+            }
+          }
+        })
+      : Promise.resolve([]);
+
+    const assetEntriesPromise = includesSource(query.sourceType, "timeline_entry")
+      ? app.prisma.entry.findMany({
+          where: {
+            householdId: asset.householdId,
+            entityType: "asset",
+            entityId: asset.id,
             ...(query.since || query.until
               ? {
                   entryDate: {
@@ -259,14 +285,23 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
         })
       : Promise.resolve([]);
 
-    const [maintenanceLogs, timelineEntries, projectEvents, scheduleActivities, comments, usageReadings] = await Promise.all([
+    const [maintenanceLogs, timelineEntries, assetEntries, projectEvents, scheduleActivities, comments, usageReadings] = await Promise.all([
       maintenanceLogsPromise,
       timelineEntriesPromise,
+      assetEntriesPromise,
       projectEventsPromise,
       scheduleActivitiesPromise,
       commentsPromise,
       usageReadingsPromise
     ]);
+
+    const migratedLegacyTimelineIds = new Set(
+      assetEntries
+        .filter((entry) => entry.sourceType === "asset_timeline_entry" && entry.sourceId)
+        .flatMap((entry) => entry.sourceId ? [entry.sourceId] : [])
+    );
+
+    const visibleTimelineEntries = timelineEntries.filter((entry) => !migratedLegacyTimelineIds.has(entry.id));
 
     const normalizedItems = [
       ...maintenanceLogs.map((log) => {
@@ -291,8 +326,15 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
           }
         );
       }),
-      ...timelineEntries.map((entry) => toTimelineItem(
+      ...visibleTimelineEntries.map((entry) => toTimelineItem(
         "timeline_entry",
+        entry,
+        {
+          id: entry.createdBy.id,
+          displayName: entry.createdBy.displayName
+        }
+      )),
+      ...assetEntries.map((entry) => toEntryBackedTimelineItem(
         entry,
         {
           id: entry.createdBy.id,
