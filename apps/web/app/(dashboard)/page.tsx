@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { HouseholdDashboard } from "@lifekeeper/types";
+import type { Entry, HouseholdDashboard } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { createHouseholdAction } from "../actions";
@@ -276,6 +276,28 @@ async function DashboardAssetRegistry({ dashboardPromise }: { dashboardPromise: 
 async function DashboardAsidePanels({ dashboardPromise }: { dashboardPromise: Promise<HouseholdDashboard> }): Promise<JSX.Element> {
   const dashboard = await dashboardPromise;
   const householdId = dashboard.household.id;
+  const actionableEntryHref = (entry: Entry): string | null => {
+    switch (entry.resolvedEntity.entityType) {
+      case "asset":
+        return `/assets/${entry.resolvedEntity.entityId}/entries#entry-${entry.id}`;
+      case "project":
+        return `/projects/${entry.resolvedEntity.entityId}?householdId=${householdId}&view=entries#entry-${entry.id}`;
+      case "project_phase":
+        return entry.resolvedEntity.parentEntityId
+          ? `/projects/${entry.resolvedEntity.parentEntityId}?householdId=${householdId}&view=entries#entry-${entry.id}`
+          : null;
+      case "hobby":
+        return `/hobbies/${entry.resolvedEntity.entityId}?tab=entries#entry-${entry.id}`;
+      case "hobby_session":
+        return entry.resolvedEntity.parentEntityId
+          ? `/hobbies/${entry.resolvedEntity.parentEntityId}/sessions/${entry.resolvedEntity.entityId}#entry-${entry.id}`
+          : null;
+      case "inventory_item":
+        return `/inventory/${entry.resolvedEntity.entityId}`;
+      default:
+        return null;
+    }
+  };
 
   return (
     <>
@@ -297,7 +319,7 @@ async function DashboardAsidePanels({ dashboardPromise }: { dashboardPromise: Pr
         </div>
       </section>
 
-      <EntryActionableList householdId={householdId} title="Entry Action Items" compact />
+      <EntryActionableList householdId={householdId} title="Entry Action Items" compact entryHrefBuilder={actionableEntryHref} />
 
       <DashboardNotificationsAside notifications={dashboard.notifications} />
     </>

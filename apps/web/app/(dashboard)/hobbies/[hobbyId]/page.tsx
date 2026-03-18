@@ -24,7 +24,6 @@ import {
   getHobbySessions,
   getHobbyMetrics,
   getHobbyMetricReadings,
-  getHobbyLogs,
   getMe,
 } from "../../../../lib/api";
 import {
@@ -87,11 +86,10 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const hobby = await getHobbyDetail(household.id, hobbyId);
 
-    const [recipes, sessions, metrics, logs, assets, inventoryCatalog, projects] = await Promise.all([
+    const [recipes, sessions, metrics, assets, inventoryCatalog, projects] = await Promise.all([
       getHobbyRecipes(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbyMetrics(household.id, hobbyId),
-      getHobbyLogs(household.id, hobbyId),
       getHouseholdAssets(household.id),
       getHouseholdInventory(household.id, { limit: 100 }),
       getHouseholdProjects(household.id),
@@ -384,7 +382,6 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         entityId={hobbyId}
         title="Hobby Entries"
         quickAddLabel="Entry"
-        initialComposerOpen={tab === "entries" && typeof searchParams === "object" && false}
         entryHrefBuilder={(entry) => `/hobbies/${hobbyId}?tab=entries#entry-${entry.id}`}
       />
     );

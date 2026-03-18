@@ -297,7 +297,6 @@ import {
   hobbySessionStepSchema,
   hobbyMetricDefinitionSchema,
   hobbyMetricReadingSchema,
-  hobbyLogSchema,
   hobbyRecipeShoppingListSchema,
   type Hobby,
   type HobbySummary,
@@ -322,7 +321,6 @@ import {
   type HobbySessionStep,
   type HobbyMetricDefinition,
   type HobbyMetricReading,
-  type HobbyLog,
   type HobbyRecipeShoppingList,
   type CreateHobbyInput,
   type UpdateHobbyInput,
@@ -341,8 +339,6 @@ import {
   type CreateHobbyMetricDefinitionInput,
   type UpdateHobbyMetricDefinitionInput,
   type CreateHobbyMetricReadingInput,
-  type CreateHobbyLogInput,
-  type UpdateHobbyLogInput,
   type CreateHobbyAssetInput,
   type CreateHobbyInventoryItemInput,
   type CreateHobbyProjectLinkInput,
@@ -359,7 +355,6 @@ import {
   type UpdateHobbyProjectInventoryItemInput,
   type CreateHobbyInventoryCategoryInput,
   type HobbyStatus,
-  type HobbyLogType,
   hobbyDetailSchema,
   hobbySessionDetailSchema,
   type HobbyDetail,
@@ -3661,61 +3656,6 @@ export const deleteHobbyMetricReading = async (
 ): Promise<void> => {
   await apiRequest({
     path: `/v1/households/${householdId}/hobbies/${hobbyId}/metrics/${metricId}/readings/${readingId}`,
-    method: "DELETE",
-  });
-};
-
-// ── Hobby Logs ───────────────────────────────────────────────────────
-
-export const getHobbyLogs = async (
-  householdId: string,
-  hobbyId: string,
-  options?: { sessionId?: string; logType?: HobbyLogType; from?: string; to?: string; limit?: number; offset?: number }
-): Promise<HobbyLog[]> => {
-  const params = new URLSearchParams();
-  if (options?.sessionId) params.set("sessionId", options.sessionId);
-  if (options?.logType) params.set("logType", options.logType);
-  if (options?.from) params.set("from", options.from);
-  if (options?.to) params.set("to", options.to);
-  if (options?.limit != null) params.set("limit", String(options.limit));
-  if (options?.offset != null) params.set("offset", String(options.offset));
-  const query = params.toString();
-  const result = await apiRequest<{ items: HobbyLog[]; nextCursor: string | null }>({
-    path: `/v1/households/${householdId}/hobbies/${hobbyId}/logs${query ? `?${query}` : ""}`,
-  });
-  return result.items.map((item) => hobbyLogSchema.parse(item));
-};
-
-export const createHobbyLog = async (
-  householdId: string,
-  hobbyId: string,
-  input: CreateHobbyLogInput
-): Promise<HobbyLog> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/logs`,
-  method: "POST",
-  body: input,
-  schema: hobbyLogSchema,
-});
-
-export const updateHobbyLog = async (
-  householdId: string,
-  hobbyId: string,
-  logId: string,
-  input: UpdateHobbyLogInput
-): Promise<HobbyLog> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/logs/${logId}`,
-  method: "PATCH",
-  body: input,
-  schema: hobbyLogSchema,
-});
-
-export const deleteHobbyLog = async (
-  householdId: string,
-  hobbyId: string,
-  logId: string
-): Promise<void> => {
-  await apiRequest({
-    path: `/v1/households/${householdId}/hobbies/${hobbyId}/logs/${logId}`,
     method: "DELETE",
   });
 };

@@ -301,6 +301,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               entryHrefBuilder={(entry) => `${projectEntriesHref}#entry-${entry.id}`}
             />
           ) : (
+          <>
           {project.treeStats && (
             <div className="note" style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", marginBottom: "12px" }}>
               <span><strong>Tree totals:</strong></span>
@@ -409,8 +410,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     </div>
                   </div>
                 }
-                )}
-              </div>
+              >
                 <div>
                   <form action={updateProjectAction} className="workbench-form">
                     <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
@@ -658,6 +658,8 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               ) : null}
             </div>
           </div>
+          </>
+          )}
         </div>
       </>
     );

@@ -51,14 +51,14 @@ type EntryTimelineProps = {
   emptyMessage?: string;
   quickAddLabel?: string;
   initialComposerOpen?: boolean;
-  entryHrefBuilder?: (entry: Entry) => string;
+  entryHrefBuilder?: (entry: Entry) => string | null;
 };
 
 type EntryTipsSurfaceProps = {
   householdId: string;
   queries: EntrySurfaceQuery[];
   title?: string;
-  entryHrefBuilder?: (entry: Entry) => string;
+  entryHrefBuilder?: (entry: Entry) => string | null;
   defaultOpen?: boolean;
 };
 
@@ -66,7 +66,7 @@ type EntryActionableListProps = {
   householdId: string;
   title?: string;
   compact?: boolean;
-  entryHrefBuilder?: (entry: Entry) => string;
+  entryHrefBuilder?: (entry: Entry) => string | null;
 };
 
 type EntryDraft = {
@@ -280,6 +280,13 @@ function EntryMeasurementSparkline({ series }: { series: TrendSeries }): JSX.Ele
   const width = 180;
   const height = 44;
   const padding = 4;
+  const latest = series.points[series.points.length - 1];
+  const previous = series.points[series.points.length - 2];
+
+  if (!latest) {
+    return <></>;
+  }
+
   const values = series.points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -290,8 +297,6 @@ function EntryMeasurementSparkline({ series }: { series: TrendSeries }): JSX.Ele
     const y = height - padding - ((point.value - min) / range) * (height - padding * 2);
     return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
   }).join(" ");
-  const latest = series.points[series.points.length - 1];
-  const previous = series.points[series.points.length - 2];
   const trendDirection = previous
     ? latest.value > previous.value
       ? "up"
@@ -990,6 +995,7 @@ export function EntryTimeline({
           {filteredEntries.map((entry) => {
             const isExpanded = expandedEntryId === entry.id;
             const isEditing = editingEntryId === entry.id;
+            const entryHref = entryHrefBuilder?.(entry) ?? null;
 
             return (
               <article
@@ -1095,8 +1101,8 @@ export function EntryTimeline({
                               <span>{option.label}</span>
                             </button>
                           ))}
-                          {entryHrefBuilder ? (
-                            <Link href={entryHrefBuilder(entry)} className="button button--ghost button--sm">Open Context</Link>
+                          {entryHref ? (
+                            <Link href={entryHref} className="button button--ghost button--sm">Open Context</Link>
                           ) : null}
                         </div>
                       </>
@@ -1204,6 +1210,7 @@ export function EntryTipsSurface({
       {open ? (
         <div className="panel__body--padded entry-surface__body">
           {entries.map((entry) => {
+            const href = entryHrefBuilder?.(entry) ?? null;
             const content = (
               <>
                 <div className="entry-surface__item-topline">
@@ -1216,8 +1223,8 @@ export function EntryTipsSurface({
               </>
             );
 
-            return entryHrefBuilder ? (
-              <Link key={entry.id} href={entryHrefBuilder(entry)} className="entry-surface__item">
+            return href ? (
+              <Link key={entry.id} href={href} className="entry-surface__item">
                 {content}
               </Link>
             ) : (
@@ -1332,29 +1339,33 @@ export function EntryActionableList({
             </div>
 
             <div className="entry-actionable-group__items">
-              {group.items.map((entry) => (
-                <article key={entry.id} className={`entry-actionable-item${compact ? " entry-actionable-item--compact" : ""}`}>
-                  <div className="entry-actionable-item__main">
-                    <div className="entry-actionable-item__topline">
-                      <EntryTypeBadge entryType={entry.entryType} />
-                      {entry.flags.includes("warning") ? <FlagPill flag="warning" /> : null}
+              {group.items.map((entry) => {
+                const href = entryHrefBuilder?.(entry) ?? null;
+
+                return (
+                  <article key={entry.id} className={`entry-actionable-item${compact ? " entry-actionable-item--compact" : ""}`}>
+                    <div className="entry-actionable-item__main">
+                      <div className="entry-actionable-item__topline">
+                        <EntryTypeBadge entryType={entry.entryType} />
+                        {entry.flags.includes("warning") ? <FlagPill flag="warning" /> : null}
+                      </div>
+                      <strong>{getEntryTitle(entry)}</strong>
+                      <p>{truncate(entry.body, compact ? 120 : 180)}</p>
+                      <div className="entry-actionable-item__meta">
+                        <span>{entry.resolvedEntity.label}</span>
+                        <span>•</span>
+                        <span>{formatDateTime(entry.entryDate)}</span>
+                      </div>
                     </div>
-                    <strong>{getEntryTitle(entry)}</strong>
-                    <p>{truncate(entry.body, compact ? 120 : 180)}</p>
-                    <div className="entry-actionable-item__meta">
-                      <span>{entry.resolvedEntity.label}</span>
-                      <span>•</span>
-                      <span>{formatDateTime(entry.entryDate)}</span>
+                    <div className="entry-actionable-item__actions">
+                      {href ? <Link href={href} className="button button--ghost button--sm">Open</Link> : null}
+                      <button type="button" className="button button--primary button--sm" onClick={() => { void markResolved(entry); }}>
+                        Mark Resolved
+                      </button>
                     </div>
-                  </div>
-                  <div className="entry-actionable-item__actions">
-                    {entryHrefBuilder ? <Link href={entryHrefBuilder(entry)} className="button button--ghost button--sm">Open</Link> : null}
-                    <button type="button" className="button button--primary button--sm" onClick={() => { void markResolved(entry); }}>
-                      Mark Resolved
-                    </button>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </section>
         ))}

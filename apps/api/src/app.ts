@@ -52,7 +52,6 @@ import { hobbySeriesRoutes } from "./routes/hobbies/series.js";
 import { hobbyRecipeRoutes } from "./routes/hobbies/recipes.js";
 import { hobbySessionRoutes } from "./routes/hobbies/sessions.js";
 import { hobbyMetricRoutes } from "./routes/hobbies/metrics.js";
-import { hobbyLogRoutes } from "./routes/hobbies/logs.js";
 import { hobbyLinkRoutes } from "./routes/hobbies/links.js";
 import { hobbyProjectRoutes } from "./routes/hobbies/projects.js";
 import { hobbyGoalRoutes } from "./routes/hobbies/goals.js";
@@ -107,7 +106,6 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   hobbyRecipeRoutes,
   hobbySessionRoutes,
   hobbyMetricRoutes,
-  hobbyLogRoutes,
   hobbyLinkRoutes,
   hobbyProjectRoutes,
   hobbyGoalRoutes,

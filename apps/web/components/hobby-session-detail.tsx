@@ -2,8 +2,6 @@
 
 import type {
   HobbyDetail,
-  HobbyLog,
-  HobbyLogType,
   HobbySession,
   HobbySessionDetail,
   HobbySessionDetailIngredient,
@@ -24,13 +22,10 @@ import {
   resolveBrewDayData,
 } from "../lib/hobby-brewing";
 import {
-  createHobbyLog,
   createHobbyMetricReading,
   createHobbySessionIngredient,
-  deleteHobbyLog,
   deleteHobbyMetricReading,
   deleteHobbySessionIngredient,
-  updateHobbyLog,
   updateHobbySession,
   updateHobbySessionStep,
 } from "../lib/api";
@@ -61,13 +56,6 @@ type MetricFormState = {
   notes: string;
 };
 
-type LogFormState = {
-  title: string;
-  content: string;
-  logDate: string;
-  logType: HobbyLogType;
-};
-
 const todayInputValue = (): string => new Date().toISOString().slice(0, 10);
 
 const defaultIngredientForm = (): IngredientFormState => ({
@@ -83,13 +71,6 @@ const defaultMetricForm = (): MetricFormState => ({
   value: "",
   readingDate: todayInputValue(),
   notes: "",
-});
-
-const defaultLogForm = (): LogFormState => ({
-  title: "",
-  content: "",
-  logDate: todayInputValue(),
-  logType: "note",
 });
 
 const brewDayNumericFields: Array<{ key: keyof BrewDayData; label: string; step?: string; min?: number }> = [
@@ -238,13 +219,6 @@ export function HobbySessionDetail({
   const [notesSaved, setNotesSaved] = useState(false);
   const [statusPending, setStatusPending] = useState(false);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
-  const [logFormOpen, setLogFormOpen] = useState(false);
-  const [logForm, setLogForm] = useState<LogFormState>(defaultLogForm);
-  const [addingLog, setAddingLog] = useState(false);
-  const [editingLogId, setEditingLogId] = useState<string | null>(null);
-  const [logDrafts, setLogDrafts] = useState<Record<string, LogFormState>>({});
-  const [savingLogId, setSavingLogId] = useState<string | null>(null);
-  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const [isAdvancePending, startAdvanceTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
 
@@ -294,10 +268,6 @@ export function HobbySessionDetail({
   const sortedSteps = useMemo(
     () => [...sessionState.steps].sort((left, right) => left.sortOrder - right.sortOrder),
     [sessionState.steps],
-  );
-  const sessionLogs = useMemo(
-    () => sessionState.logs.filter((entry) => entry.sessionId === sessionState.id),
-    [sessionState.id, sessionState.logs],
   );
   const completedSteps = sortedSteps.filter((step) => step.isCompleted).length;
   const progressPercent = sortedSteps.length > 0 ? (completedSteps / sortedSteps.length) * 100 : 0;
@@ -614,108 +584,6 @@ export function HobbySessionDetail({
       setErrorMessage(error instanceof Error ? error.message : "Failed to update rating.");
     } finally {
       setRatingPending(null);
-    }
-  };
-
-  const handleLogSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAddingLog(true);
-    setErrorMessage(null);
-
-    try {
-      const created = await createHobbyLog(householdId, hobbyId, {
-        sessionId: sessionState.id,
-        content: logForm.content,
-        logDate: toIsoDate(logForm.logDate),
-        logType: logForm.logType,
-        ...(logForm.title ? { title: logForm.title } : {}),
-      });
-      setSessionState((previous) => ({
-        ...previous,
-        logs: [created, ...previous.logs],
-      }));
-      setLogForm(defaultLogForm());
-      setLogFormOpen(false);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to add journal entry.");
-    } finally {
-      setAddingLog(false);
-    }
-  };
-
-  const startLogEdit = (entry: HobbyLog) => {
-    setEditingLogId(entry.id);
-    setLogDrafts((previous) => ({
-      ...previous,
-      [entry.id]: {
-        title: entry.title ?? "",
-        content: entry.content,
-        logDate: entry.logDate.slice(0, 10),
-        logType: entry.logType,
-      },
-    }));
-  };
-
-  const handleLogDraftChange = (logId: string, key: keyof LogFormState, value: string) => {
-    setLogDrafts((previous) => ({
-      ...previous,
-      [logId]: {
-        ...(previous[logId] ?? defaultLogForm()),
-        [key]: value,
-      },
-    }));
-  };
-
-  const handleLogSave = async (logId: string) => {
-    const draft = logDrafts[logId];
-    if (!draft || savingLogId === logId) {
-      return;
-    }
-
-    setSavingLogId(logId);
-    setErrorMessage(null);
-
-    try {
-      const updated = await updateHobbyLog(householdId, hobbyId, logId, {
-        title: draft.title ? draft.title : null,
-        content: draft.content,
-        logDate: toIsoDate(draft.logDate),
-        logType: draft.logType,
-        sessionId: sessionState.id,
-      });
-      setSessionState((previous) => ({
-        ...previous,
-        logs: previous.logs.map((entry) => entry.id === logId ? updated : entry),
-      }));
-      setEditingLogId(null);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to save journal entry.");
-    } finally {
-      setSavingLogId(null);
-    }
-  };
-
-  const handleLogDelete = async (logId: string) => {
-    if (deletingLogId === logId) {
-      return;
-    }
-
-    setDeletingLogId(logId);
-    setErrorMessage(null);
-
-    try {
-      await deleteHobbyLog(householdId, hobbyId, logId);
-      setSessionState((previous) => ({
-        ...previous,
-        logs: previous.logs.filter((entry) => entry.id !== logId),
-      }));
-      if (editingLogId === logId) {
-        setEditingLogId(null);
-      }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to delete journal entry.");
-    } finally {
-      setDeletingLogId(null);
     }
   };
 
@@ -1210,6 +1078,15 @@ export function HobbySessionDetail({
             })}
           </div>
         </Card>
+
+        <EntryTimeline
+          householdId={householdId}
+          entityType="hobby_session"
+          entityId={sessionState.id}
+          title="Entry Timeline"
+          quickAddLabel="Entry"
+          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/sessions/${sessionState.id}#entry-${entry.id}`}
+        />
       </div>
 
       <aside className="resource-layout__aside session-aside-stack">
@@ -1300,177 +1177,6 @@ export function HobbySessionDetail({
           </div>
         </Card>
 
-        <Card
-          title="Journal Entries"
-          actions={
-            <button
-              type="button"
-              className="button button--secondary button--sm"
-              onClick={() => setLogFormOpen((previous) => !previous)}
-            >
-              {logFormOpen ? "Cancel" : "Add Entry"}
-            </button>
-          }
-        >
-          <div className="session-section-stack">
-            <div className={`session-inline-form${logFormOpen ? " session-inline-form--open" : ""}`}>
-              <form onSubmit={handleLogSubmit}>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Title</span>
-                    <input
-                      type="text"
-                      value={logForm.title}
-                      onChange={(event) => setLogForm((previous) => ({ ...previous, title: event.target.value }))}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      value={logForm.logDate}
-                      onChange={(event) => setLogForm((previous) => ({ ...previous, logDate: event.target.value }))}
-                      required
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Type</span>
-                    <select
-                      value={logForm.logType}
-                      onChange={(event) => setLogForm((previous) => ({ ...previous, logType: event.target.value as HobbyLogType }))}
-                    >
-                      <option value="note">Note</option>
-                      <option value="tasting">Tasting</option>
-                      <option value="progress">Progress</option>
-                      <option value="issue">Issue</option>
-                    </select>
-                  </label>
-                  <label className="field field--full">
-                    <span>Content</span>
-                    <textarea
-                      rows={4}
-                      value={logForm.content}
-                      onChange={(event) => setLogForm((previous) => ({ ...previous, content: event.target.value }))}
-                      required
-                    />
-                  </label>
-                </div>
-                <div className="session-inline-actions" style={{ marginTop: 12 }}>
-                  <button type="submit" className="button" disabled={addingLog}>
-                    {addingLog ? "Saving..." : "Save Entry"}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {sessionLogs.length === 0 ? <p className="panel__empty">No journal entries for this session yet.</p> : null}
-
-            <div className="session-log-list">
-              {sessionLogs.map((entry) => {
-                const isEditing = editingLogId === entry.id;
-                const draft = logDrafts[entry.id];
-                return (
-                  <div key={entry.id} className={`session-log-entry session-log-entry--${entry.logType}`}>
-                    {isEditing && draft ? (
-                      <div className="session-section-stack">
-                        <label className="field">
-                          <span>Title</span>
-                          <input
-                            type="text"
-                            value={draft.title}
-                            onChange={(event) => handleLogDraftChange(entry.id, "title", event.target.value)}
-                          />
-                        </label>
-                        <label className="field">
-                          <span>Date</span>
-                          <input
-                            type="date"
-                            value={draft.logDate}
-                            onChange={(event) => handleLogDraftChange(entry.id, "logDate", event.target.value)}
-                          />
-                        </label>
-                        <label className="field">
-                          <span>Type</span>
-                          <select
-                            value={draft.logType}
-                            onChange={(event) => handleLogDraftChange(entry.id, "logType", event.target.value)}
-                          >
-                            <option value="note">Note</option>
-                            <option value="tasting">Tasting</option>
-                            <option value="progress">Progress</option>
-                            <option value="issue">Issue</option>
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>Content</span>
-                          <textarea
-                            rows={4}
-                            value={draft.content}
-                            onChange={(event) => handleLogDraftChange(entry.id, "content", event.target.value)}
-                          />
-                        </label>
-                        <div className="session-inline-actions">
-                          <button
-                            type="button"
-                            className="button button--secondary button--sm"
-                            onClick={() => void handleLogSave(entry.id)}
-                            disabled={savingLogId === entry.id}
-                          >
-                            {savingLogId === entry.id ? "Saving..." : "Save"}
-                          </button>
-                          <button
-                            type="button"
-                            className="button button--ghost button--sm"
-                            onClick={() => setEditingLogId(null)}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="session-log-entry__topline">
-                          <div className="session-step__title-group">
-                            {entry.title ? <strong>{entry.title}</strong> : <strong>{titleCase(entry.logType)}</strong>}
-                            <span className="pill">{entry.logType}</span>
-                          </div>
-                          <span>{formatDate(entry.logDate)}</span>
-                        </div>
-                        <p className="session-log-entry__content">{entry.content}</p>
-                        <div className="session-inline-actions">
-                          <button
-                            type="button"
-                            className="button button--ghost button--sm"
-                            onClick={() => startLogEdit(entry)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="button button--ghost button--sm"
-                            onClick={() => void handleLogDelete(entry.id)}
-                            disabled={deletingLogId === entry.id}
-                          >
-                            {deletingLogId === entry.id ? "Deleting..." : "Delete"}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Card>
-
-        <EntryTimeline
-          householdId={householdId}
-          entityType="hobby_session"
-          entityId={sessionState.id}
-          title="Entry Timeline"
-          quickAddLabel="Entry"
-          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/sessions/${sessionState.id}#entry-${entry.id}`}
-        />
       </aside>
     </div>
     </>
