@@ -4,7 +4,9 @@ import {
   createInventoryItemSchema,
   createMaintenanceLogPartSchema,
   createMaintenanceLogSchema,
+  createSpaceInputSchema,
   createProjectSchema,
+  spaceTypeSchema,
   updateInventoryItemSchema
 } from "@lifekeeper/types";
 import { z } from "zod";
@@ -169,6 +171,15 @@ export const inventoryItemFormSchema = updateInventoryItemSchema.extend({
   }
 });
 
+export const spaceFormSchema = createSpaceInputSchema.extend({
+  name: createSpaceInputSchema.shape.name,
+  type: spaceTypeSchema,
+  parentSpaceId: z.string().cuid().or(z.literal("")),
+  description: optionalTrimmedText(createSpaceInputSchema.shape.description.unwrap()),
+  notes: optionalTrimmedText(createSpaceInputSchema.shape.notes.unwrap()),
+  sortOrder: optionalNumberInput(z.number().int())
+});
+
 export const maintenanceLogPartFormSchema = createMaintenanceLogPartSchema.extend({
   name: z.string(),
   partNumber: optionalTrimmedText(createMaintenanceLogPartSchema.shape.partNumber.unwrap()),
@@ -266,6 +277,8 @@ export type HobbySessionFormValues = z.input<typeof hobbySessionFormSchema>;
 export type HobbySessionResolvedValues = z.output<typeof hobbySessionFormSchema>;
 export type InventoryItemFormValues = z.input<typeof inventoryItemFormSchema>;
 export type InventoryItemResolvedValues = z.output<typeof inventoryItemFormSchema>;
+export type SpaceFormValues = z.input<typeof spaceFormSchema>;
+export type SpaceFormResolvedValues = z.output<typeof spaceFormSchema>;
 export type MaintenanceLogFormValues = z.input<typeof maintenanceLogFormSchema>;
 export type MaintenanceLogResolvedValues = z.output<typeof maintenanceLogFormSchema>;
 export type MaintenanceLogPartFormValues = z.input<typeof maintenanceLogPartFormSchema>;

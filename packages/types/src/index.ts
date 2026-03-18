@@ -61,6 +61,7 @@ export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", 
 export const inventoryPurchaseStatusValues = ["draft", "ordered", "received"] as const;
 export const inventoryPurchaseSourceValues = ["reorder", "quick_restock", "manual"] as const;
 export const inventoryPurchaseLineStatusValues = ["draft", "ordered", "received"] as const;
+export const spaceTypeValues = ["building", "room", "area", "shelf", "cabinet", "drawer", "tub", "bin", "other"] as const;
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
 export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
@@ -139,6 +140,7 @@ export const inventoryTransactionTypeSchema = z.enum(inventoryTransactionTypeVal
 export const inventoryPurchaseStatusSchema = z.enum(inventoryPurchaseStatusValues);
 export const inventoryPurchaseSourceSchema = z.enum(inventoryPurchaseSourceValues);
 export const inventoryPurchaseLineStatusSchema = z.enum(inventoryPurchaseLineStatusValues);
+export const spaceTypeSchema = z.enum(spaceTypeValues);
 export const inventoryItemTypeSchema = z.enum(["consumable", "equipment"]);
 export const inventoryConditionStatusSchema = z.enum(["good", "fair", "needs_repair", "needs_replacement"]).nullable().optional();
 export const scheduleStatusSchema = z.enum(scheduleStatusValues);
@@ -1334,6 +1336,145 @@ export const inventoryItemSummarySchema = inventoryItemSchema.extend({
   lowStock: z.boolean()
 });
 
+export const spaceBreadcrumbSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  type: spaceTypeSchema
+});
+
+export const spaceSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  shortCode: z.string().min(4).max(6),
+  scanTag: z.string().min(1),
+  name: z.string(),
+  type: spaceTypeSchema,
+  parentSpaceId: z.string().cuid().nullable(),
+  description: z.string().nullable(),
+  notes: z.string().nullable(),
+  sortOrder: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  deletedAt: z.string().datetime().nullable().default(null)
+});
+
+export const createSpaceInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  type: spaceTypeSchema,
+  parentSpaceId: z.string().cuid().optional(),
+  description: z.string().max(4000).optional(),
+  notes: z.string().max(8000).optional(),
+  sortOrder: z.number().int().optional()
+});
+
+export const updateSpaceInputSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  type: spaceTypeSchema.optional(),
+  parentSpaceId: z.string().cuid().nullable().optional(),
+  description: z.string().max(4000).nullable().optional(),
+  notes: z.string().max(8000).nullable().optional(),
+  sortOrder: z.number().int().optional()
+});
+
+export const moveSpaceInputSchema = z.object({
+  newParentSpaceId: z.string().cuid().nullable()
+});
+
+export const spaceInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  spaceId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  quantity: z.number().nullable(),
+  notes: z.string().nullable(),
+  placedAt: z.string().datetime(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const addSpaceItemInputSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  quantity: z.number().min(0).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const spaceGeneralItemSchema = z.object({
+  id: z.string().cuid(),
+  spaceId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  deletedAt: z.string().datetime().nullable().default(null)
+});
+
+export const spaceGeneralItemInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(4000).optional(),
+  notes: z.string().max(8000).optional()
+});
+
+export const updateSpaceGeneralItemInputSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(4000).nullable().optional(),
+  notes: z.string().max(8000).nullable().optional()
+});
+
+export const spaceReferenceSchema = spaceSchema.extend({
+  breadcrumb: z.array(spaceBreadcrumbSchema).optional(),
+  itemCount: z.number().int().min(0).optional(),
+  generalItemCount: z.number().int().min(0).optional(),
+  totalItemCount: z.number().int().min(0).optional()
+});
+
+export const spaceInventoryLinkDetailSchema = spaceInventoryItemSchema.extend({
+  inventoryItem: inventoryItemSummarySchema,
+  space: spaceReferenceSchema.optional()
+});
+
+export const inventoryItemSpaceLinkSchema = spaceInventoryItemSchema.extend({
+  space: spaceReferenceSchema.extend({
+    breadcrumb: z.array(spaceBreadcrumbSchema).default([])
+  })
+});
+
+type SpaceResponseValue = z.infer<typeof spaceSchema> & {
+  parent?: z.infer<typeof spaceReferenceSchema> | null;
+  children?: SpaceResponseValue[];
+  breadcrumb: Array<z.infer<typeof spaceBreadcrumbSchema>>;
+  spaceItems?: Array<z.infer<typeof spaceInventoryLinkDetailSchema>>;
+  generalItems?: Array<z.infer<typeof spaceGeneralItemSchema>>;
+  itemCount?: number;
+  generalItemCount?: number;
+  totalItemCount?: number;
+};
+
+export const spaceResponseSchema: z.ZodType<SpaceResponseValue> = z.lazy(() => spaceSchema.extend({
+  parent: spaceReferenceSchema.nullable().optional(),
+  children: z.array(spaceResponseSchema).optional(),
+  breadcrumb: z.array(spaceBreadcrumbSchema),
+  spaceItems: z.array(spaceInventoryLinkDetailSchema).optional(),
+  generalItems: z.array(spaceGeneralItemSchema).optional(),
+  itemCount: z.number().int().min(0).optional(),
+  generalItemCount: z.number().int().min(0).optional(),
+  totalItemCount: z.number().int().min(0).optional()
+}));
+
+export const spaceListResponseSchema = z.object({
+  items: z.array(spaceResponseSchema),
+  nextCursor: z.string().cuid().nullable()
+});
+
+export const spaceContentsResponseSchema = z.object({
+  inventoryItems: z.array(spaceInventoryLinkDetailSchema),
+  generalItems: z.array(spaceGeneralItemSchema),
+  childSpaces: z.object({
+    count: z.number().int().min(0),
+    names: z.array(z.string())
+  })
+});
+
 export const inventoryItemRevisionValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 export const inventoryItemRevisionChangeSchema = z.object({
@@ -1630,6 +1771,7 @@ export const inventoryItemDetailSchema = inventoryItemSummarySchema.extend({
   assets: z.array(assetInventoryItemSchema.extend({
     asset: shallowAssetSchema
   })),
+  spaceLinks: z.array(inventoryItemSpaceLinkSchema),
   projects: z.array(projectInventoryItemSchema.extend({
     quantityRemaining: z.number(),
     project: z.object({
@@ -3123,8 +3265,25 @@ export type PurchaseCondition = z.infer<typeof purchaseConditionSchema>;
 export type DisposalMethod = z.infer<typeof disposalMethodSchema>;
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 export type InventoryItemType = z.infer<typeof inventoryItemTypeSchema>;
+export type SpaceType = z.infer<typeof spaceTypeSchema>;
 export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
+export type Space = z.infer<typeof spaceSchema>;
+export type SpaceBreadcrumb = z.infer<typeof spaceBreadcrumbSchema>;
+export type CreateSpaceInput = z.infer<typeof createSpaceInputSchema>;
+export type UpdateSpaceInput = z.infer<typeof updateSpaceInputSchema>;
+export type MoveSpaceInput = z.infer<typeof moveSpaceInputSchema>;
+export type SpaceInventoryItem = z.infer<typeof spaceInventoryItemSchema>;
+export type AddSpaceItemInput = z.infer<typeof addSpaceItemInputSchema>;
+export type SpaceGeneralItem = z.infer<typeof spaceGeneralItemSchema>;
+export type SpaceGeneralItemInput = z.infer<typeof spaceGeneralItemInputSchema>;
+export type UpdateSpaceGeneralItemInput = z.infer<typeof updateSpaceGeneralItemInputSchema>;
+export type SpaceReference = z.infer<typeof spaceReferenceSchema>;
+export type SpaceInventoryLinkDetail = z.infer<typeof spaceInventoryLinkDetailSchema>;
+export type InventoryItemSpaceLink = z.infer<typeof inventoryItemSpaceLinkSchema>;
+export type SpaceResponse = SpaceResponseValue;
+export type SpaceListResponse = z.infer<typeof spaceListResponseSchema>;
+export type SpaceContentsResponse = z.infer<typeof spaceContentsResponseSchema>;
 export type MergeInventoryItemsInput = z.infer<typeof mergeInventoryItemsSchema>;
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
 export type InventoryItemRevisionValue = z.infer<typeof inventoryItemRevisionValueSchema>;

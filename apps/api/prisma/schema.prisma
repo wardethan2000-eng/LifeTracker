@@ -196,6 +196,18 @@ enum InventoryItemType {
   equipment
 }
 
+enum SpaceType {
+  building
+  room
+  area
+  shelf
+  cabinet
+  drawer
+  tub
+  bin
+  other
+}
+
 // Lifecycle state for a hobby workspace.
 enum HobbyStatus {
   active
@@ -356,6 +368,8 @@ model Household {
   projects         Project[]
   projectTemplates ProjectTemplate[]
   inventoryItems   InventoryItem[]
+  spaces           Space[]
+  spaceGeneralItems SpaceGeneralItem[]
   inventoryPurchases InventoryPurchase[]
   inventoryItemRevisions InventoryItemRevision[]
   activityLogs     ActivityLog[]
@@ -376,6 +390,31 @@ model Household {
   webhookEndpoints WebhookEndpoint[]
 
   @@index([createdById])
+}
+
+model Space {
+  id             String                @id @default(cuid())
+  householdId    String
+  shortCode      String
+  scanTag        String                @unique
+  name           String
+  type           SpaceType
+  parentSpaceId  String?
+  description    String?
+  notes          String?
+  sortOrder      Int                   @default(0)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  deletedAt      DateTime?
+  household      Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  parent         Space?                @relation("SpaceHierarchy", fields: [parentSpaceId], references: [id], onDelete: SetNull)
+  children       Space[]               @relation("SpaceHierarchy")
+  spaceItems     SpaceInventoryItem[]
+  generalItems   SpaceGeneralItem[]
+
+  @@unique([householdId, shortCode])
+  @@index([householdId, parentSpaceId])
+  @@index([householdId, deletedAt])
 }
 
 // Join table linking a User to a Household with role-based membership.
@@ -830,6 +869,7 @@ model InventoryItem {
   updatedAt          DateTime                @updatedAt
   household          Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
   assetLinks         AssetInventoryItem[]
+  spaceLinks         SpaceInventoryItem[]
   scheduleLinks      ScheduleInventoryItem[]
   projectLinks       ProjectInventoryItem[]
   projectPhaseSupplies ProjectPhaseSupply[]
@@ -848,6 +888,39 @@ model InventoryItem {
   @@index([householdId, category])
   @@index([householdId, partNumber])
   @@index([householdId, itemType])
+}
+
+model SpaceInventoryItem {
+  id              String        @id @default(cuid())
+  spaceId         String
+  inventoryItemId String
+  quantity        Float?
+  notes           String?
+  placedAt        DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  space           Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([spaceId, inventoryItemId])
+  @@index([inventoryItemId])
+}
+
+model SpaceGeneralItem {
+  id          String      @id @default(cuid())
+  spaceId     String
+  householdId String
+  name        String
+  description String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  space       Space       @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  household   Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, deletedAt])
+  @@index([householdId, deletedAt])
 }
 
 // Supplier-grouped purchase batch used for reorder carts and quick restocks.

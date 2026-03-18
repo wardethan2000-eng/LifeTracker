@@ -16,6 +16,7 @@ export * from "./projects.js";
 export * from "./schedule-compliance.js";
 export * from "./share-links.js";
 export * from "./service-providers.js";
+export * from "./spaces.js";
 export * from "./timeline.js";
 export * from "./usage-analytics.js";
 export * from "./usage-metrics.js";

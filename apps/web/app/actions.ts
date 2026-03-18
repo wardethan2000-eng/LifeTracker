@@ -15,6 +15,7 @@ import type {
   CreateConditionAssessmentInput,
   CreateInvitationInput,
   CreateInventoryItemInput,
+  CreateSpaceInput,
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
   CreateProjectAssetInput,
@@ -67,6 +68,12 @@ import type {
   UpdateHobbyRecipeInput,
   UpdateInventoryItemInput,
   UpdateInventoryPurchaseLineInput,
+  UpdateSpaceGeneralItemInput,
+  AddSpaceItemInput,
+  MoveSpaceInput,
+  SpaceContentsResponse,
+  SpaceGeneralItemInput,
+  UpdateSpaceInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
 import {
@@ -121,6 +128,7 @@ import {
   createHobbySeries,
   createHobbySession,
   createInventoryItem,
+  createSpace as createSpaceRequest,
   createQuickRestockBatch,
   createMaintenanceLog,
   createPresetProfile,
@@ -129,6 +137,8 @@ import {
   createServiceProvider,
   cloneProject,
   deleteInventoryItem,
+  deleteGeneralItem as deleteGeneralItemRequest,
+  deleteSpace as deleteSpaceRequest,
   deleteComment,
   deleteEntry,
   deleteInventoryComment,
@@ -152,6 +162,7 @@ import {
   deleteServiceProvider,
   deleteSchedule,
   generateInventoryShoppingList,
+  getSpaceContents as getSpaceContentsRequest,
   markNotificationRead,
   markNotificationUnread,
   recordConditionAssessment,
@@ -159,10 +170,13 @@ import {
   reorderProjectPhases,
   revokeInvitation,
   restoreAsset,
+  restoreSpace as restoreSpaceRequest,
   softDeleteAsset,
   unarchiveAsset,
   updateAsset,
+  updateGeneralItem as updateGeneralItemRequest,
   updateInventoryItem,
+  updateSpace as updateSpaceRequest,
   updateComment,
   updateInventoryComment,
   updateEntry,
@@ -186,7 +200,11 @@ import {
   promoteTask,
   updateSchedule,
   updateServiceProvider,
-  updateMetric
+  updateMetric,
+  addGeneralItemToSpace as addGeneralItemToSpaceRequest,
+  addItemToSpace as addItemToSpaceRequest,
+  moveSpace as moveSpaceRequest,
+  removeItemFromSpace as removeItemFromSpaceRequest
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
@@ -838,6 +856,17 @@ const revalidateInventoryDetailPath = (inventoryItemId: string): void => {
   revalidatePath(`/inventory/${inventoryItemId}`);
 };
 
+const revalidateSpacePaths = (householdId: string, spaceId?: string): void => {
+  revalidateInventoryPaths(householdId);
+  revalidatePath(`/inventory?householdId=${householdId}&tab=spaces`);
+  revalidatePath("/inventory");
+
+  if (spaceId) {
+    revalidatePath(`/inventory/spaces/${spaceId}`);
+    revalidatePath(`/inventory/spaces/${spaceId}?householdId=${householdId}`);
+  }
+};
+
 const revalidateServiceProviderDetailPath = (providerId: string): void => {
   revalidatePath(`/service-providers/${providerId}`);
 };
@@ -1027,6 +1056,75 @@ export async function deleteInventoryItemAction(formData: FormData): Promise<voi
   revalidateInventoryPaths(householdId);
   revalidateInventoryDetailPath(inventoryItemId);
   redirect(redirectTo ?? `/inventory?householdId=${householdId}`);
+}
+
+export async function createSpace(householdId: string, data: CreateSpaceInput) {
+  const space = await createSpaceRequest(householdId, data);
+  revalidateSpacePaths(householdId, space.id);
+  return space;
+}
+
+export async function updateSpace(householdId: string, spaceId: string, data: UpdateSpaceInput) {
+  const space = await updateSpaceRequest(householdId, spaceId, data);
+  revalidateSpacePaths(householdId, space.id);
+  return space;
+}
+
+export async function deleteSpace(householdId: string, spaceId: string): Promise<void> {
+  await deleteSpaceRequest(householdId, spaceId);
+  revalidateSpacePaths(householdId, spaceId);
+}
+
+export async function restoreSpace(householdId: string, spaceId: string) {
+  const space = await restoreSpaceRequest(householdId, spaceId);
+  revalidateSpacePaths(householdId, space.id);
+  return space;
+}
+
+export async function moveSpace(householdId: string, spaceId: string, newParentSpaceId: string | null) {
+  const input: MoveSpaceInput = { newParentSpaceId };
+  const space = await moveSpaceRequest(householdId, spaceId, input);
+  revalidateSpacePaths(householdId, space.id);
+  return space;
+}
+
+export async function addItemToSpace(householdId: string, spaceId: string, data: AddSpaceItemInput) {
+  const link = await addItemToSpaceRequest(householdId, spaceId, data);
+  revalidateSpacePaths(householdId, spaceId);
+  revalidateInventoryDetailPath(data.inventoryItemId);
+  return link;
+}
+
+export async function removeItemFromSpace(householdId: string, spaceId: string, inventoryItemId: string): Promise<void> {
+  await removeItemFromSpaceRequest(householdId, spaceId, inventoryItemId);
+  revalidateSpacePaths(householdId, spaceId);
+  revalidateInventoryDetailPath(inventoryItemId);
+}
+
+export async function addGeneralItemToSpace(householdId: string, spaceId: string, data: SpaceGeneralItemInput) {
+  const item = await addGeneralItemToSpaceRequest(householdId, spaceId, data);
+  revalidateSpacePaths(householdId, spaceId);
+  return item;
+}
+
+export async function updateGeneralItem(
+  householdId: string,
+  spaceId: string,
+  generalItemId: string,
+  data: UpdateSpaceGeneralItemInput
+) {
+  const item = await updateGeneralItemRequest(householdId, spaceId, generalItemId, data);
+  revalidateSpacePaths(householdId, spaceId);
+  return item;
+}
+
+export async function deleteGeneralItem(householdId: string, spaceId: string, generalItemId: string): Promise<void> {
+  await deleteGeneralItemRequest(householdId, spaceId, generalItemId);
+  revalidateSpacePaths(householdId, spaceId);
+}
+
+export async function getSpaceContents(householdId: string, spaceId: string): Promise<SpaceContentsResponse> {
+  return getSpaceContentsRequest(householdId, spaceId);
 }
 
 export async function generateInventoryShoppingListAction(formData: FormData): Promise<void> {

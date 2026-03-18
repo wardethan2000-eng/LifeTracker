@@ -4,9 +4,11 @@ import { AttachmentSection } from "../../../../components/attachment-section";
 import { InventoryCommentsPanel } from "../../../../components/inventory-comments-panel";
 import { InventoryDangerActions } from "../../../../components/inventory-danger-actions";
 import { InventoryItemDetailEditor } from "../../../../components/inventory-item-detail-editor";
+import { InventoryItemLocationsPanel } from "../../../../components/inventory-item-locations-panel";
 import { InventoryTransactionHistory } from "../../../../components/inventory-transaction-history";
 import {
   ApiError,
+  getHouseholdSpacesTree,
   getInventoryItemComments,
   getInventoryItemConsumption,
   getInventoryItemDetail,
@@ -79,10 +81,11 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
       );
     }
 
-    const [item, analytics, comments] = await Promise.all([
+    const [item, analytics, comments, spaces] = await Promise.all([
       getInventoryItemDetail(household.id, inventoryItemId, { transactionLimit: 20 }),
       getInventoryItemConsumption(household.id, inventoryItemId),
-      getInventoryItemComments(household.id, inventoryItemId)
+      getInventoryItemComments(household.id, inventoryItemId),
+      getHouseholdSpacesTree(household.id)
     ]);
     const backHref = `/inventory?householdId=${household.id}`;
     const linkedEntityCount = item.assets.length + item.projects.length + item.hobbyLinks.length;
@@ -180,6 +183,8 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                   )}
                 </div>
               </section>
+
+              <InventoryItemLocationsPanel householdId={household.id} item={item} spaces={spaces} />
 
               <section className="panel">
                 <div className="panel__header">

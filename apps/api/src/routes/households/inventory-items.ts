@@ -20,6 +20,7 @@ import {
   InventoryError,
   mergeHouseholdInventoryItems
 } from "../../lib/inventory.js";
+import { getSpaceBreadcrumb } from "../../lib/spaces.js";
 import { toMaintenanceScheduleResponse } from "../../lib/schedule-state.js";
 import {
   toInventoryItemDetailResponse,
@@ -581,6 +582,33 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           },
           orderBy: { createdAt: "desc" }
         },
+        spaceLinks: {
+          include: {
+            space: {
+              select: {
+                id: true,
+                householdId: true,
+                shortCode: true,
+                scanTag: true,
+                name: true,
+                type: true,
+                parentSpaceId: true,
+                description: true,
+                notes: true,
+                sortOrder: true,
+                createdAt: true,
+                updatedAt: true,
+                deletedAt: true
+              }
+            }
+          },
+          where: {
+            space: {
+              deletedAt: null
+            }
+          },
+          orderBy: { createdAt: "desc" }
+        },
         projectLinks: {
           include: {
             project: {
@@ -610,6 +638,16 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     if (!item) {
       return reply.code(404).send({ message: "Inventory item not found." });
     }
+
+    const spaceBreadcrumbs = await Promise.all(item.spaceLinks.map((link) => getSpaceBreadcrumb(app.prisma, link.space.id)));
+
+    item.spaceLinks = item.spaceLinks.map((link, index) => ({
+      ...link,
+      space: {
+        ...link.space,
+        breadcrumb: spaceBreadcrumbs[index]
+      }
+    }));
 
     return toInventoryItemDetailResponse(item);
   });

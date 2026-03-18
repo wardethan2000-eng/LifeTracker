@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { z } from "zod";
 import {
   activityLogSchema,
   assetComparisonPayloadSchema,
@@ -51,6 +52,11 @@ import {
   inventoryShoppingListSummarySchema,
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
+  spaceGeneralItemSchema,
+  spaceInventoryLinkDetailSchema,
+  spaceContentsResponseSchema,
+  spaceListResponseSchema,
+  spaceResponseSchema,
   memberContributionPayloadSchema,
   projectBudgetBurnPayloadSchema,
   projectPortfolioHealthPayloadSchema,
@@ -171,7 +177,9 @@ import {
   type InventoryItemConsumption,
   type InventoryPurchase,
   type InventoryShoppingListSummary,
+  type AddSpaceItemInput,
   type CreateInventoryItemInput,
+  type CreateSpaceInput,
   type CreateQuickRestockInput,
   type InventoryReorderForecast,
   type InventoryTurnover,
@@ -182,7 +190,14 @@ import {
   type InventoryTransactionCorrectionResult,
   type InventoryTransactionQuery,
   type InventoryItemDetail,
+  type SpaceContentsResponse,
+  type SpaceGeneralItem,
+  type SpaceGeneralItemInput,
+  type SpaceListResponse,
+  type SpaceResponse,
   type UpdateInventoryItemInput,
+  type UpdateSpaceGeneralItemInput,
+  type UpdateSpaceInput,
   type UpdateInventoryPurchaseLineInput,
   type InventoryItemSummary,
   type AssetPartsConsumption,
@@ -259,6 +274,7 @@ import {
   type UpdateServiceProviderInput,
   type UpdateUsageMetricInput,
   type AllocateProjectInventoryInput,
+  type MoveSpaceInput,
   regulatoryAssetOptionSchema,
   type RegulatoryAssetOption,
   type UsageMetric,
@@ -2306,6 +2322,166 @@ export const deleteInventoryItem = async (householdId: string, inventoryItemId: 
     method: "DELETE"
   });
 };
+
+export const getHouseholdSpaces = async (
+  householdId: string,
+  options?: {
+    parentSpaceId?: string | null;
+    type?: string;
+    search?: string;
+    includeDeleted?: boolean;
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<SpaceListResponse> => {
+  const query = new URLSearchParams();
+
+  if (options?.parentSpaceId !== undefined) {
+    query.set("parentSpaceId", options.parentSpaceId ?? "null");
+  }
+
+  if (options?.type) {
+    query.set("type", options.type);
+  }
+
+  if (options?.search) {
+    query.set("search", options.search);
+  }
+
+  if (options?.includeDeleted !== undefined) {
+    query.set("includeDeleted", String(options.includeDeleted));
+  }
+
+  if (options?.limit !== undefined) {
+    query.set("limit", String(options.limit));
+  }
+
+  if (options?.cursor) {
+    query.set("cursor", options.cursor);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/spaces${suffix}`,
+    schema: spaceListResponseSchema
+  });
+};
+
+export const getHouseholdSpacesTree = async (householdId: string): Promise<SpaceResponse[]> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/tree`,
+  schema: z.array(spaceResponseSchema)
+});
+
+export const getSpace = async (householdId: string, spaceId: string): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}`,
+  schema: spaceResponseSchema,
+  cacheOptions: { revalidate: 30 }
+});
+
+export const createSpace = async (householdId: string, input: CreateSpaceInput): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces`,
+  method: "POST",
+  body: input,
+  schema: spaceResponseSchema
+});
+
+export const updateSpace = async (
+  householdId: string,
+  spaceId: string,
+  input: UpdateSpaceInput
+): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}`,
+  method: "PATCH",
+  body: input,
+  schema: spaceResponseSchema
+});
+
+export const deleteSpace = async (householdId: string, spaceId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/spaces/${spaceId}`,
+    method: "DELETE"
+  });
+};
+
+export const restoreSpace = async (householdId: string, spaceId: string): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}/restore`,
+  method: "POST",
+  schema: spaceResponseSchema
+});
+
+export const moveSpace = async (
+  householdId: string,
+  spaceId: string,
+  input: MoveSpaceInput
+): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}/move`,
+  method: "POST",
+  body: input,
+  schema: spaceResponseSchema
+});
+
+export const addItemToSpace = async (
+  householdId: string,
+  spaceId: string,
+  input: AddSpaceItemInput
+) => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}/items`,
+  method: "POST",
+  body: input,
+  schema: spaceInventoryLinkDetailSchema
+});
+
+export const removeItemFromSpace = async (
+  householdId: string,
+  spaceId: string,
+  inventoryItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/spaces/${spaceId}/items/${inventoryItemId}`,
+    method: "DELETE"
+  });
+};
+
+export const addGeneralItemToSpace = async (
+  householdId: string,
+  spaceId: string,
+  input: SpaceGeneralItemInput
+): Promise<SpaceGeneralItem> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}/general-items`,
+  method: "POST",
+  body: input,
+  schema: spaceGeneralItemSchema
+});
+
+export const updateGeneralItem = async (
+  householdId: string,
+  spaceId: string,
+  generalItemId: string,
+  input: UpdateSpaceGeneralItemInput
+): Promise<SpaceGeneralItem> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}/general-items/${generalItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: spaceGeneralItemSchema
+});
+
+export const deleteGeneralItem = async (
+  householdId: string,
+  spaceId: string,
+  generalItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/spaces/${spaceId}/general-items/${generalItemId}`,
+    method: "DELETE"
+  });
+};
+
+export const getSpaceContents = async (householdId: string, spaceId: string): Promise<SpaceContentsResponse> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/${spaceId}/contents`,
+  schema: spaceContentsResponseSchema,
+  cacheOptions: { revalidate: 30 }
+});
 
 export const updateInventoryPurchaseLine = async (
   householdId: string,

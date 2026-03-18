@@ -9,6 +9,8 @@ import type {
   MaintenanceLogPart,
   Project,
   ProjectInventoryItem,
+  Space,
+  SpaceInventoryItem,
   ScheduleInventoryItem
 } from "@prisma/client";
 import {
@@ -17,6 +19,7 @@ import {
   householdInventoryAnalyticsSchema,
   inventoryItemConsumptionSchema,
   inventoryItemRevisionSchema,
+  inventoryItemSpaceLinkSchema,
   inventoryPurchaseLineSchema,
   inventoryPurchaseSchema,
   inventoryShoppingListSummarySchema,
@@ -391,6 +394,11 @@ export const toInventoryItemDetailResponse = (
         status: string;
       };
     }>;
+    spaceLinks: (Pick<SpaceInventoryItem, "id" | "spaceId" | "inventoryItemId" | "quantity" | "notes" | "placedAt" | "createdAt" | "updatedAt"> & {
+      space: Pick<Space, "id" | "householdId" | "shortCode" | "scanTag" | "name" | "type" | "parentSpaceId" | "description" | "notes" | "sortOrder" | "createdAt" | "updatedAt" | "deletedAt"> & {
+        breadcrumb: Array<{ id: string; name: string; type: Space["type"] }>;
+      };
+    })[];
     revisions: InventoryItemRevisionRecord[];
   }
 ) => inventoryItemDetailSchema.parse({
@@ -413,6 +421,32 @@ export const toInventoryItemDetailResponse = (
     hobbyStatus: link.hobby.status,
     role: null,
     notes: link.notes ?? null
+  })),
+  spaceLinks: item.spaceLinks.map((link) => inventoryItemSpaceLinkSchema.parse({
+    id: link.id,
+    spaceId: link.spaceId,
+    inventoryItemId: link.inventoryItemId,
+    quantity: link.quantity ?? null,
+    notes: link.notes ?? null,
+    placedAt: link.placedAt.toISOString(),
+    createdAt: link.createdAt.toISOString(),
+    updatedAt: link.updatedAt.toISOString(),
+    space: {
+      id: link.space.id,
+      householdId: link.space.householdId,
+      shortCode: link.space.shortCode,
+      scanTag: link.space.scanTag,
+      name: link.space.name,
+      type: link.space.type,
+      parentSpaceId: link.space.parentSpaceId,
+      description: link.space.description ?? null,
+      notes: link.space.notes ?? null,
+      sortOrder: link.space.sortOrder,
+      createdAt: link.space.createdAt.toISOString(),
+      updatedAt: link.space.updatedAt.toISOString(),
+      deletedAt: link.space.deletedAt?.toISOString() ?? null,
+      breadcrumb: link.space.breadcrumb
+    }
   })),
   revisions: item.revisions.map(toInventoryItemRevisionResponse)
 });
