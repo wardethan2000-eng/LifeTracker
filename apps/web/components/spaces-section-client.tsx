@@ -7,6 +7,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { getHouseholdSpaces } from "../lib/api";
 import { formatSpaceBreadcrumb, getSpaceTypeBadge, getSpaceTypeLabel } from "../lib/spaces";
+import { SpaceQuickPlace } from "./space-quick-place";
 import { SpaceForm } from "./space-form";
 
 type SpacesSectionClientProps = {
@@ -186,6 +187,7 @@ export function SpacesSectionClient({ householdId, spaces }: SpacesSectionClient
           <div className="data-table__secondary">Track buildings, rooms, bins, and other storage locations in a household hierarchy.</div>
         </div>
         <div className="panel__header-actions">
+          <SpaceQuickPlace householdId={householdId} spaces={spaces} triggerLabel="Quick Place Items" triggerClassName="button button--ghost button--sm" />
           <button
             type="button"
             className="button button--ghost button--sm"

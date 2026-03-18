@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { SpaceDetailActions } from "../../../../../components/space-detail-actions";
+import { SpaceQuickPlace } from "../../../../../components/space-quick-place";
 import { TabNav } from "../../../../../components/tab-nav";
 import {
   ApiError,
@@ -74,6 +75,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
             </p>
           </div>
           <div className="page-header__actions">
+            <SpaceQuickPlace householdId={household.id} spaces={spaces} initialSpaceId={space.id} triggerLabel="Quick Place Items" triggerClassName="button button--primary button--sm" />
             <Link href={`/inventory?householdId=${household.id}&tab=spaces`} className="button button--ghost button--sm">Back to Spaces</Link>
           </div>
         </header>

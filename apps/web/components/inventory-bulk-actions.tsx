@@ -1,8 +1,10 @@
 "use client";
 
+import type { InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { addItemToSpace } from "../app/actions";
 import {
   ApiError,
   exportHouseholdInventory,
@@ -11,9 +13,28 @@ import {
 } from "../lib/api";
 import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { InlineError } from "./inline-error";
+import { SpacePickerField } from "./space-picker-field";
+import { useToast } from "./toast-provider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 type InventoryBulkActionsProps = {
   householdId: string;
+  selectedItems: InventoryItemSummary[];
+  spaces: SpaceResponse[];
+  onBulkAssigned?: () => void;
+};
+
+type AssignResult = {
+  completed: number;
+  failed: Array<{ itemName: string; message: string }>;
+  spaceName: string;
 };
 
 const expectedFields = [
@@ -107,11 +128,17 @@ const normalizeImportItems = (rows: Array<Record<string, string>>): Array<Record
   }, {});
 });
 
-export function InventoryBulkActions({ householdId }: InventoryBulkActionsProps): JSX.Element {
+export function InventoryBulkActions({ householdId, selectedItems, spaces, onBulkAssigned }: InventoryBulkActionsProps): JSX.Element {
   const router = useRouter();
+  const { pushToast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [selectedSpaceId, setSelectedSpaceId] = useState("");
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignProgress, setAssignProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [assignResult, setAssignResult] = useState<AssignResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportInventoryResult | null>(null);
 
@@ -122,6 +149,14 @@ export function InventoryBulkActions({ householdId }: InventoryBulkActionsProps)
 
     return importResult.skipped > 0 || importResult.errors.length > 0 ? "warning" : "success";
   }, [importResult]);
+
+  const assignResultTone = useMemo(() => {
+    if (!assignResult) {
+      return null;
+    }
+
+    return assignResult.failed.length > 0 ? "warning" : "success";
+  }, [assignResult]);
 
   const handleExport = async (): Promise<void> => {
     try {
@@ -170,59 +205,186 @@ export function InventoryBulkActions({ householdId }: InventoryBulkActionsProps)
     }
   };
 
-  return (
-    <div className="inventory-bulk-actions">
-      <button
-        type="button"
-        className="button button--secondary button--sm"
-        onClick={() => {
-          void handleExport();
-        }}
-        disabled={isExporting}
-      >
-        {isExporting ? "Exporting..." : "Export CSV"}
-      </button>
+  const handleAssign = async (): Promise<void> => {
+    if (!selectedSpaceId) {
+      setErrorMessage("Choose a destination space.");
+      return;
+    }
 
-      <div className="inventory-bulk-actions__import">
-        <input
-          className="inventory-bulk-actions__file"
-          type="file"
-          accept=".csv,text/csv"
-          onChange={(event) => {
-            setSelectedFile(event.target.files?.[0] ?? null);
-            setErrorMessage(null);
-            setImportResult(null);
-          }}
-        />
+    const destinationSpace = spaces.flatMap((space) => [space, ...(space.children ?? [])]).find((space) => space.id === selectedSpaceId)
+      ?? spaces.find((space) => space.id === selectedSpaceId)
+      ?? null;
+
+    try {
+      setIsAssigning(true);
+      setErrorMessage(null);
+      setAssignResult(null);
+      setAssignProgress({ completed: 0, total: selectedItems.length });
+
+      const failed: AssignResult["failed"] = [];
+
+      for (const [index, item] of selectedItems.entries()) {
+        try {
+          await addItemToSpace(householdId, selectedSpaceId, {
+            inventoryItemId: item.id,
+            quantity: item.quantityOnHand,
+          });
+        } catch (error) {
+          failed.push({
+            itemName: item.name,
+            message: error instanceof Error ? error.message : "Unable to assign item to the selected space.",
+          });
+        } finally {
+          setAssignProgress({ completed: index + 1, total: selectedItems.length });
+        }
+      }
+
+      setAssignResult({
+        completed: selectedItems.length - failed.length,
+        failed,
+        spaceName: destinationSpace?.name ?? "the selected space",
+      });
+      router.refresh();
+
+      if (failed.length === 0) {
+        pushToast({ message: `Assigned ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} to ${destinationSpace?.name ?? "the selected space"}.` });
+        onBulkAssigned?.();
+      } else {
+        pushToast({ message: `Assigned ${selectedItems.length - failed.length} item${selectedItems.length - failed.length === 1 ? "" : "s"}; ${failed.length} failed.`, tone: "danger" });
+      }
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="inventory-bulk-actions">
         <button
           type="button"
           className="button button--secondary button--sm"
           onClick={() => {
-            void handleImport();
+            void handleExport();
           }}
-          disabled={!selectedFile || isImporting}
+          disabled={isExporting}
         >
-          {isImporting ? "Importing..." : "Import"}
+          {isExporting ? "Exporting..." : "Export CSV"}
         </button>
+
+        <button
+          type="button"
+          className="button button--secondary button--sm"
+          disabled={selectedItems.length === 0}
+          onClick={() => {
+            setAssignOpen(true);
+            setErrorMessage(null);
+          }}
+        >
+          Assign to Space{selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+        </button>
+
+        <div className="inventory-bulk-actions__import">
+          <input
+            className="inventory-bulk-actions__file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedFile(event.target.files?.[0] ?? null);
+              setErrorMessage(null);
+              setImportResult(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button button--secondary button--sm"
+            onClick={() => {
+              void handleImport();
+            }}
+            disabled={!selectedFile || isImporting}
+          >
+            {isImporting ? "Importing..." : "Import"}
+          </button>
+        </div>
+
+        <InlineError message={errorMessage} className="inventory-bulk-actions__error" />
+
+        {importResult && resultTone && (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${resultTone}`}>
+            <p>
+              Created {importResult.created} items, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}
+              {importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}
+            </p>
+            {importResult.errors.length > 0 && (
+              <ul>
+                {importResult.errors.map((entry: ImportInventoryResult["errors"][number]) => (
+                  <li key={`${entry.index}-${entry.message}`}>Row {entry.index + 2}: {entry.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {assignResult && assignResultTone && (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${assignResultTone}`}>
+            <p>
+              Assigned {assignResult.completed} item{assignResult.completed === 1 ? "" : "s"} to {assignResult.spaceName}
+              {assignResult.failed.length === 0 ? "." : `, with ${assignResult.failed.length} failure${assignResult.failed.length === 1 ? "" : "s"}.`}
+            </p>
+            {assignResult.failed.length > 0 ? (
+              <ul>
+                {assignResult.failed.map((entry) => (
+                  <li key={`${entry.itemName}-${entry.message}`}>{entry.itemName}: {entry.message}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        )}
       </div>
 
-      <InlineError message={errorMessage} className="inventory-bulk-actions__error" />
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent style={{ width: "min(560px, calc(100vw - 32px))" }}>
+          <DialogHeader>
+            <DialogTitle>Assign to Space</DialogTitle>
+            <DialogDescription>
+              Assign {selectedItems.length} selected inventory item{selectedItems.length === 1 ? "" : "s"} to a single destination space.
+            </DialogDescription>
+          </DialogHeader>
 
-      {importResult && resultTone && (
-        <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${resultTone}`}>
-          <p>
-            Created {importResult.created} items, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}
-            {importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}
-          </p>
-          {importResult.errors.length > 0 && (
-            <ul>
-              {importResult.errors.map((entry: ImportInventoryResult["errors"][number]) => (
-                <li key={`${entry.index}-${entry.message}`}>Row {entry.index + 2}: {entry.message}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+          <div style={{ display: "grid", gap: 16 }}>
+            <SpacePickerField
+              label="Destination Space"
+              spaces={spaces}
+              value={selectedSpaceId}
+              onChange={setSelectedSpaceId}
+              placeholder="Choose a space"
+              fullWidth
+              disabled={isAssigning}
+            />
+
+            {assignProgress ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div className="data-table__secondary">Progress: {assignProgress.completed} of {assignProgress.total}</div>
+                <progress value={assignProgress.completed} max={assignProgress.total} />
+              </div>
+            ) : null}
+
+            {assignResult ? (
+              <div style={{ display: "grid", gap: 6, padding: 12, border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface-alt)" }}>
+                <strong>Latest run</strong>
+                <span>{assignResult.completed} assigned successfully.</span>
+                <span>{assignResult.failed.length} failed.</span>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <button type="button" className="button button--ghost" disabled={isAssigning} onClick={() => setAssignOpen(false)}>Close</button>
+            <button type="button" className="button button--primary" disabled={isAssigning || selectedItems.length === 0 || !selectedSpaceId} onClick={() => { void handleAssign(); }}>
+              {isAssigning ? "Assigning..." : "Assign Selected Items"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1373,6 +1373,15 @@ export const spaceBreadcrumbSchema = z.object({
   type: spaceTypeSchema
 });
 
+export const scanSpaceSummarySchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  shortCode: z.string().min(4).max(6),
+  scanTag: z.string().min(1),
+  type: spaceTypeSchema,
+  breadcrumb: z.array(spaceBreadcrumbSchema)
+});
+
 export const spaceSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
@@ -3214,6 +3223,7 @@ export type ScanResolutionAsset = z.infer<typeof scanResolutionAssetSchema>;
 export type ScanResolutionSpace = z.infer<typeof scanResolutionSpaceSchema>;
 export type ScanResolutionInventoryItem = z.infer<typeof scanResolutionInventoryItemSchema>;
 export type ScanResolutionResponse = z.infer<typeof scanResolutionResponseSchema>;
+export type ScanSpaceSummary = z.infer<typeof scanSpaceSummarySchema>;
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateHouseholdInput = z.infer<typeof createHouseholdSchema>;

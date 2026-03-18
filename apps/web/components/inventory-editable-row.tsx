@@ -16,6 +16,7 @@ type InventoryEditableRowProps = {
   className?: string;
   defaultOpen?: boolean;
   analytics?: InventoryItemConsumption | null;
+  columnCount?: number;
   children: ReactNode;
 };
 
@@ -37,9 +38,7 @@ const getAnalyticsLink = (householdId: string): string => {
   return `/inventory?${query.toString()}`;
 };
 
-const inventoryRowColumnCount = 7;
-
-export function InventoryEditableRow({ householdId, item, className, defaultOpen = false, analytics = null, children }: InventoryEditableRowProps): JSX.Element {
+export function InventoryEditableRow({ householdId, item, className, defaultOpen = false, analytics = null, columnCount = 7, children }: InventoryEditableRowProps): JSX.Element {
   const [editing, setEditing] = useState(defaultOpen);
   const router = useRouter();
 
@@ -80,7 +79,7 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
       </tr>
       {editing && (
         <tr>
-          <td colSpan={inventoryRowColumnCount} style={{ padding: "12px 0 0" }}>
+          <td colSpan={columnCount} style={{ padding: "12px 0 0" }}>
             <ExpandableCard
               title={`Edit ${item.name}`}
               modalTitle={`Edit ${item.name}`}

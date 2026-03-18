@@ -1,13 +1,11 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
-import { InventoryBulkActions } from "../../../components/inventory-bulk-actions";
-import { InventoryEditableRow } from "../../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
+import { InventoryListWorkspace } from "../../../components/inventory-list-workspace";
 import { InventoryQuickRestock } from "../../../components/inventory-quick-restock";
 import { RealtimeRefreshBoundary } from "../../../components/realtime-refresh-boundary";
 import { InventoryValuationReportButton } from "../../../components/report-download-actions";
-import { InventorySection } from "../../../components/inventory-section";
 import { InventoryShoppingListSection } from "../../../components/inventory-shopping-list-section";
 import { InventoryTransactionHistory } from "../../../components/inventory-transaction-history";
 import { SpacesSection } from "../../../components/spaces-section";
@@ -17,6 +15,7 @@ import {
   getHouseholdInventory,
   getInventoryItemConsumption,
   getHouseholdLowStockInventory,
+  getHouseholdSpacesTree,
   getInventoryShoppingList,
   getMe
 } from "../../../lib/api";
@@ -114,10 +113,11 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     const analyticsViewHref = `/analytics?tab=inventory&householdId=${household.id}`;
     const inventoryRedirectHref = `/inventory?householdId=${household.id}`;
 
-    const [{ items }, lowStockItems, shoppingList] = await Promise.all([
+    const [{ items }, lowStockItems, shoppingList, spaces] = await Promise.all([
       getHouseholdInventory(household.id, { limit: 100, ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}) }),
       getHouseholdLowStockInventory(household.id),
-      getInventoryShoppingList(household.id)
+      getInventoryShoppingList(household.id),
+      getHouseholdSpacesTree(household.id)
     ]);
 
     const highlightedItem = highlightId ? items.find((item) => item.id === highlightId) ?? null : null;
@@ -290,82 +290,19 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               </section>
               )}
 
-              <InventorySection
+              <InventoryListWorkspace
                 householdId={household.id}
                 totalCount={items.length}
                 categoryOptions={categoryOptions}
-                actions={<InventoryBulkActions householdId={household.id} />}
-              >
-                {items.length === 0 ? (
-                  <p className="panel__empty">No inventory items found for this household yet.</p>
-                ) : (
-                  <div className="inventory-groups">
-                    {groupedItems.map(([categoryLabel, categoryItems]) => (
-                      <section key={categoryLabel} className="inventory-group">
-                        <div className="inventory-group__header">
-                          <div>
-                            <h3>{categoryLabel}</h3>
-                            <p>{categoryItems.length} item{categoryItems.length === 1 ? "" : "s"} in this category</p>
-                          </div>
-                        </div>
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              <th>Item</th>
-                              <th>{isEquipmentView ? "Count" : "On Hand"}</th>
-                              <th>{isEquipmentView ? "Condition" : "Reorder Rule"}</th>
-                              <th>Last Price</th>
-                              <th>Supplier</th>
-                              <th>Status</th>
-                              <th>Location</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {categoryItems.map((item) => (
-                              <InventoryEditableRow
-                                key={item.id}
-                                householdId={household.id}
-                                item={item}
-                                className={[item.lowStock ? "row--due" : null, item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ") || ""}
-                                defaultOpen={item.id === highlightId && highlightedAnalytics !== null}
-                                analytics={item.id === highlightId ? highlightedAnalytics : null}
-                              >
-                                <td>
-                                  <div className="data-table__primary">
-                                    <Link href={buildInventoryItemHref(household.id, item.id)} className="data-table__link">{item.name}</Link>
-                                  </div>
-                                  <div className="data-table__secondary">
-                                    {[item.partNumber, item.manufacturer].filter(Boolean).join(" • ") || "No part number or maker recorded"}
-                                  </div>
-                                </td>
-                                <td>{item.itemType === "equipment" ? `${item.quantityOnHand} unit${item.quantityOnHand === 1 ? "" : "s"}` : formatStockAmount(item.quantityOnHand, item.unit)}</td>
-                                <td>
-                                  {item.itemType === "equipment" ? (
-                                    <div className="data-table__primary">{item.conditionStatus ? item.conditionStatus.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "No condition set"}</div>
-                                  ) : (
-                                    <>
-                                      <div className="data-table__primary">{formatReorderPoint(item.reorderThreshold, item.unit)}</div>
-                                      <div className="data-table__secondary">{formatRestockPlan(item.reorderQuantity, item.unit)}</div>
-                                    </>
-                                  )}
-                                </td>
-                                <td>{formatCurrency(item.unitCost, "No recent price")}</td>
-                                <td>{item.preferredSupplier ?? "—"}</td>
-                                <td>
-                                  <span className={`status-chip status-chip--${item.lowStock ? "due" : "upcoming"}`}>
-                                    {item.lowStock ? "Needs reorder" : "OK"}
-                                  </span>
-                                </td>
-                                <td>{item.storageLocation ?? "—"}</td>
-                              </InventoryEditableRow>
-                            ))}
-                          </tbody>
-                        </table>
-                      </section>
-                    ))}
-                  </div>
-                )}
-              </InventorySection>
+                groupedItems={groupedItems.map(([label, groupedCategoryItems]) => ({
+                  label,
+                  items: groupedCategoryItems,
+                }))}
+                isEquipmentView={isEquipmentView}
+                highlightId={highlightId}
+                highlightedAnalytics={highlightedAnalytics}
+                spaces={spaces}
+              />
 
               <InventoryTransactionHistory householdId={household.id} />
             </>

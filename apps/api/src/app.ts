@@ -51,6 +51,7 @@ import scheduleComplianceRoutes from "./routes/schedule-compliance/index.js";
 import { attachmentRoutes } from "./routes/attachments/index.js";
 import { barcodeRoutes } from "./routes/barcode.js";
 import { scanRoutes } from "./routes/scan.js";
+import { scanDetailRoutes } from "./routes/scan-details.js";
 import { hobbyRoutes } from "./routes/hobbies/index.js";
 import { hobbySeriesRoutes } from "./routes/hobbies/series.js";
 import { hobbyRecipeRoutes } from "./routes/hobbies/recipes.js";
@@ -83,7 +84,8 @@ const accountRoutePlugins: FastifyPluginAsync[] = [
   notificationRoutes,
   dashboardRoutes,
   searchRoutes,
-  barcodeRoutes
+  barcodeRoutes,
+  scanDetailRoutes
 ];
 
 const householdRoutePlugins: FastifyPluginAsync[] = [

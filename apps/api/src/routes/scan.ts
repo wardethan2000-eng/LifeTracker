@@ -1,8 +1,13 @@
-import { scanResolutionResponseSchema } from "@lifekeeper/types";
+import { scanResolutionResponseSchema, scanSpaceSummarySchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { getSpaceBreadcrumb } from "../lib/spaces.js";
 
 const scanResolveQuerySchema = z.object({
+  tag: z.string().trim().min(1).max(120)
+});
+
+const scanTagParamsSchema = z.object({
   tag: z.string().trim().min(1).max(120)
 });
 
@@ -77,5 +82,38 @@ export const scanRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return reply.code(404).send({ message: "Scan tag not found." });
+  });
+
+  app.get("/v1/scan/spaces/:tag/summary", async (request, reply) => {
+    const params = scanTagParamsSchema.parse(request.params);
+
+    const space = await app.prisma.space.findFirst({
+      where: {
+        scanTag: params.tag,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        name: true,
+        shortCode: true,
+        scanTag: true,
+        type: true
+      }
+    });
+
+    if (!space) {
+      return reply.code(404).send({ message: "Space not found." });
+    }
+
+    const breadcrumb = await getSpaceBreadcrumb(app.prisma, space.id);
+
+    return scanSpaceSummarySchema.parse({
+      id: space.id,
+      name: space.name,
+      shortCode: space.shortCode,
+      scanTag: space.scanTag,
+      type: space.type,
+      breadcrumb
+    });
   });
 };

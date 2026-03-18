@@ -8,6 +8,7 @@ import {
   assetTransferListSchema,
   assetLabelDataSchema,
   scanResolutionResponseSchema,
+  scanSpaceSummarySchema,
   assetTimelineEntrySchema,
   assetTimelineItemSchema,
   assetSchema,
@@ -118,6 +119,7 @@ import {
   type AssetDetailResponse,
   type AssetLabelData,
   type ScanResolutionResponse,
+  type ScanSpaceSummary,
   type AssetTimelineEntry,
   type AssetTimelineItem,
   type AssetTimelineQuery,
@@ -979,6 +981,37 @@ export const resolveScanTag = async (tag: string): Promise<ScanResolutionRespons
   return apiRequest({
     path: `/v1/scan/resolve?${query.toString()}`,
     schema: scanResolutionResponseSchema,
+    cacheOptions: "no-store"
+  });
+};
+
+export const getScanSpaceSummary = async (tag: string): Promise<ScanSpaceSummary> => apiRequest({
+  path: `/v1/scan/spaces/${encodeURIComponent(tag)}/summary`,
+  schema: scanSpaceSummarySchema,
+  cacheOptions: "no-store"
+});
+
+export const getScanSpaceDetail = async (tag: string): Promise<SpaceResponse> => apiRequest({
+  path: `/v1/scan/spaces/${encodeURIComponent(tag)}/detail`,
+  schema: spaceResponseSchema,
+  cacheOptions: "no-store"
+});
+
+export const getScanInventoryItemDetail = async (
+  tag: string,
+  options?: { transactionLimit?: number }
+): Promise<InventoryItemDetail> => {
+  const query = new URLSearchParams();
+
+  if (options?.transactionLimit !== undefined) {
+    query.set("transactionLimit", String(options.transactionLimit));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/scan/inventory-items/${encodeURIComponent(tag)}/detail${suffix}`,
+    schema: inventoryItemDetailSchema,
     cacheOptions: "no-store"
   });
 };
