@@ -1529,6 +1529,157 @@ p { margin: 0; color: var(--ink-light); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   ═══ 17b. Launch Pad
+   ═══════════════════════════════════════════════════════════════════ */
+
+.launch-pad {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--density-card-padding);
+  box-shadow: var(--shadow-sm);
+}
+
+.launch-pad__header {
+  margin-bottom: 16px;
+}
+
+.launch-pad__header h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.launch-pad__header p {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.launch-pad__grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.launch-pad__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--ink);
+  transition: all 180ms ease;
+  cursor: pointer;
+}
+
+.launch-pad__card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.launch-pad__icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.launch-pad__title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.launch-pad__desc {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-light);
+}
+
+/* Tone variants */
+.launch-pad__card--ideate .launch-pad__icon {
+  background: #faf5ff;
+  color: #7c3aed;
+}
+.launch-pad__card--ideate:hover {
+  border-color: #c4b5fd;
+}
+
+.launch-pad__card--create .launch-pad__icon {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.launch-pad__card--create:hover {
+  border-color: #93c5fd;
+}
+
+.launch-pad__card--plan .launch-pad__icon {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.launch-pad__card--plan:hover {
+  border-color: #86efac;
+}
+
+.launch-pad__card--maintain .launch-pad__icon {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.launch-pad__card--maintain:hover {
+  border-color: var(--warning-border);
+}
+
+.launch-pad__card--pursue .launch-pad__icon {
+  background: #fef3f2;
+  color: #dc2626;
+}
+.launch-pad__card--pursue:hover {
+  border-color: #fca5a5;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .launch-pad__card--ideate .launch-pad__icon {
+  background: rgba(124, 58, 237, 0.12);
+}
+[data-theme="dark"] .launch-pad__card--create .launch-pad__icon {
+  background: rgba(37, 99, 235, 0.12);
+}
+[data-theme="dark"] .launch-pad__card--plan .launch-pad__icon {
+  background: rgba(22, 163, 74, 0.12);
+}
+[data-theme="dark"] .launch-pad__card--maintain .launch-pad__icon {
+  background: rgba(217, 119, 6, 0.12);
+}
+[data-theme="dark"] .launch-pad__card--pursue .launch-pad__icon {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+/* Responsive: stack on smaller screens */
+@media (max-width: 900px) {
+  .launch-pad__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .launch-pad__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    ═══ 18. Notification Feed
    ═══════════════════════════════════════════════════════════════════ */
 

@@ -16,7 +16,8 @@
       "activity": "Activity",
       "notifications": "Notifications",
       "invitations": "Invitations",
-      "providers": "Providers"
+      "providers": "Providers",
+      "ideas": "Ideas"
     },
     "actions": {
       "cancel": "Cancel",
@@ -124,6 +125,15 @@
     "markVisibleRead": "Mark Visible Read",
     "undoVisibleRead": "Undo Visible Read",
     "backgroundNote": "Recurring background jobs keep notifications, low-stock alerts, and compliance checks up to date."
+  },
+  "ideas": {
+    "pageTitle": "Ideas",
+    "pageSubtitle": "Capture thoughts, concepts, and materials before they become plans or projects.",
+    "newPageTitle": "Capture an Idea",
+    "newPageSubtitle": "Jot it down now — escalate to a project, asset, or hobby later.",
+    "empty": "No ideas captured yet.",
+    "emptyLink": "Capture your first idea",
+    "emptySuffix": "to get started."
   },
   "dashboard": {
     "connectionError": "Connection error",

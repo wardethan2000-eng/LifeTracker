@@ -11,6 +11,7 @@ import { ThemeToggle } from "../../components/theme-toggle";
 
 const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
+  { href: "/ideas", label: "Ideas", translationKey: "ideas", icon: "lightbulb" },
   { href: "/assets", label: "Assets", translationKey: "assets", icon: "box" },
   { href: "/inventory", label: "Inventory", translationKey: "inventory", icon: "layers" },
   { href: "/assets/new", label: "Add Asset", translationKey: "addAsset", icon: "plus" },
@@ -25,6 +26,7 @@ const navItems: Array<SidebarNavItem & { translationKey: string }> = [
 ];
 
 const prefetchedRoutes = [
+  "/ideas",
   "/assets",
   "/projects",
   "/hobbies",
