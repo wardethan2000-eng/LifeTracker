@@ -122,6 +122,45 @@ enum NoteCategory {
   general
 }
 
+// Polymorphic target type for universal structured entries.
+enum EntryEntityType {
+  hobby
+  hobby_session
+  hobby_project
+  hobby_project_milestone
+  hobby_collection_item
+  project
+  project_phase
+  asset
+  schedule
+  maintenance_log
+  inventory_item
+}
+
+// High-level classification for a universal entry.
+enum EntryType {
+  note
+  observation
+  measurement
+  lesson
+  decision
+  issue
+  milestone
+  reference
+  comparison
+}
+
+// Behavioral flags that affect how entries are surfaced and filtered.
+enum EntryFlag {
+  important
+  actionable
+  resolved
+  pinned
+  tip
+  warning
+  archived
+}
+
 // Lifecycle state of a household invitation token.
 enum InvitationStatus {
   pending
@@ -233,6 +272,7 @@ model User {
   attachments             Attachment[]          @relation("AttachmentUploader")
   createdShareLinks       ShareLink[]           @relation("ShareLinkCreator")
   createdHobbies          Hobby[]               @relation("HobbyCreator")
+  createdEntries          Entry[]               @relation("EntryCreator")
 }
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
@@ -261,6 +301,7 @@ model Household {
   hobbies          Hobby[]
   comments         Comment[]
   domainEvents     DomainEvent[]
+  entries          Entry[]
   webhookEndpoints WebhookEndpoint[]
 
   @@index([createdById])
@@ -577,6 +618,46 @@ model AssetTimelineEntry {
 }
 
 // A generated alert for a user about asset or schedule activity within a household.
+// A universal structured entry that can be attached to any major household entity.
+model Entry {
+  id             String          @id @default(cuid())
+  householdId    String
+  createdById    String
+  title          String?         @db.VarChar(500)
+  body           String          @db.VarChar(20000)
+  entryDate      DateTime
+  entityType     EntryEntityType
+  entityId       String
+  entryType      EntryType       @default(note)
+  measurements   Json            @default("[]")
+  tags           Json            @default("[]")
+  attachmentUrl  String?
+  attachmentName String?
+  sourceType     String?
+  sourceId       String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  household      Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy      User            @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  flags          EntryFlagEntry[]
+
+  @@index([householdId, entityType, entityId])
+  @@index([householdId, entryType])
+  @@index([householdId, entryDate])
+  @@index([householdId, createdById])
+}
+
+// Join table that assigns behavioral flags to entries.
+model EntryFlagEntry {
+  entryId    String
+  flag       EntryFlag
+  createdAt  DateTime @default(now())
+  entry      Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, flag])
+  @@index([flag])
+}
+
 model Notification {
   id              String               @id @default(cuid())
   userId          String

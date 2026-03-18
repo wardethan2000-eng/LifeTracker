@@ -87,6 +87,32 @@ export const assetTimelineSourceTypeValues = [
   "usage_reading"
 ] as const;
 export const commentEntityTypeValues = ["asset", "project", "hobby", "inventory_item"] as const;
+export const entryEntityTypeValues = [
+  "hobby",
+  "hobby_session",
+  "hobby_project",
+  "hobby_project_milestone",
+  "hobby_collection_item",
+  "project",
+  "project_phase",
+  "asset",
+  "schedule",
+  "maintenance_log",
+  "inventory_item"
+] as const;
+export const entryTypeValues = [
+  "note",
+  "observation",
+  "measurement",
+  "lesson",
+  "decision",
+  "issue",
+  "milestone",
+  "reference",
+  "comparison"
+] as const;
+export const entryFlagValues = ["important", "actionable", "resolved", "pinned", "tip", "warning", "archived"] as const;
+export const entrySortByValues = ["entryDate", "createdAt", "title"] as const;
 export const webhookDeliveryStatusValues = ["pending", "delivered", "failed"] as const;
 
 export const assetCategorySchema = z.enum(assetCategoryValues);
@@ -95,6 +121,10 @@ export const householdRoleSchema = z.enum(householdRoleValues);
 export const projectAssetRelationshipSchema = z.enum(projectAssetRelationshipValues);
 export const assetTimelineSourceTypeSchema = z.enum(assetTimelineSourceTypeValues);
 export const commentEntityTypeSchema = z.enum(commentEntityTypeValues);
+export const entryEntityTypeSchema = z.enum(entryEntityTypeValues);
+export const entryTypeSchema = z.enum(entryTypeValues);
+export const entryFlagSchema = z.enum(entryFlagValues);
+export const entrySortBySchema = z.enum(entrySortByValues);
 export const webhookDeliveryStatusSchema = z.enum(webhookDeliveryStatusValues);
 export const authSourceSchema = z.enum(authSourceValues);
 export const notificationTypeSchema = z.enum(notificationTypeValues);
@@ -2473,6 +2503,193 @@ export const createAssetTimelineEntrySchema = z.object({
   entryDate: z.string().datetime(),
   category: z.string().max(100).optional(),
   cost: z.number().min(0).optional(),
+// -- Entry Schemas ---------------------------------------------------
+
+const normalizedEntryStringSchema = z.string().trim().min(1);
+const optionalEntryTitleSchema = z.string().trim().max(500);
+const entryTagSchema = normalizedEntryStringSchema.max(50);
+
+export const entryMeasurementSchema = z.object({
+  name: normalizedEntryStringSchema.max(100),
+  value: z.number().finite(),
+  unit: normalizedEntryStringSchema.max(50)
+});
+
+export const entryResolvedEntitySchema = z.object({
+  entityType: entryEntityTypeSchema,
+  entityId: z.string().min(1),
+  label: z.string().min(1),
+  parentEntityType: entryEntityTypeSchema.nullable().default(null),
+  parentEntityId: z.string().nullable().default(null),
+  parentLabel: z.string().nullable().default(null)
+});
+
+export const entrySchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  title: z.string().nullable().default(null),
+  body: z.string(),
+  entryDate: z.string().datetime(),
+  entityType: entryEntityTypeSchema,
+  entityId: z.string().min(1),
+  entryType: entryTypeSchema,
+  measurements: z.array(entryMeasurementSchema).default([]),
+  tags: z.array(entryTagSchema).max(20).default([]),
+  attachmentUrl: z.string().url().nullable().default(null),
+  attachmentName: z.string().nullable().default(null),
+  sourceType: z.string().nullable().default(null),
+  sourceId: z.string().nullable().default(null),
+  flags: z.array(entryFlagSchema).default([]),
+  createdBy: shallowUserSchema,
+  resolvedEntity: entryResolvedEntitySchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const entryListResponseSchema = z.object({
+  items: z.array(entrySchema),
+  nextCursor: z.string().cuid().nullable().default(null)
+});
+
+export const actionableEntryGroupSchema = z.object({
+  entityType: entryEntityTypeSchema,
+  items: z.array(entrySchema)
+});
+
+export const actionableEntryGroupListSchema = z.array(actionableEntryGroupSchema);
+
+const entryFlagsInputSchema = z.array(entryFlagSchema)
+  .default([])
+  .transform((flags) => Array.from(new Set(flags)));
+
+const entryTagsInputSchema = z.array(entryTagSchema)
+  .max(20)
+  .default([])
+  .transform((tags) => Array.from(new Set(tags)));
+
+export const createEntrySchema = z.object({
+  title: optionalEntryTitleSchema.optional().nullable(),
+  body: z.string().trim().min(1).max(20000),
+  entryDate: z.string().datetime(),
+  entityType: entryEntityTypeSchema,
+  entityId: z.string().trim().min(1).max(191),
+  entryType: entryTypeSchema.default("note"),
+  measurements: z.array(entryMeasurementSchema).default([]),
+  tags: entryTagsInputSchema,
+  attachmentUrl: z.string().url().max(2000).optional().nullable(),
+  attachmentName: z.string().trim().max(500).optional().nullable(),
+  sourceType: z.string().trim().max(120).optional().nullable(),
+  sourceId: z.string().trim().max(191).optional().nullable(),
+  flags: entryFlagsInputSchema
+});
+
+export const updateEntrySchema = z.object({
+  title: optionalEntryTitleSchema.optional().nullable(),
+  body: z.string().trim().min(1).max(20000).optional(),
+  entryDate: z.string().datetime().optional(),
+  entryType: entryTypeSchema.optional(),
+  measurements: z.array(entryMeasurementSchema).optional(),
+  tags: entryTagsInputSchema.optional(),
+  attachmentUrl: z.string().url().max(2000).optional().nullable(),
+  attachmentName: z.string().trim().max(500).optional().nullable(),
+  flags: entryFlagsInputSchema.optional()
+});
+
+const commaSeparatedStringsSchema = z.union([z.string(), z.array(z.string())]).optional();
+
+const parseCommaSeparatedValues = <T extends string>(
+  value: string | string[] | undefined,
+  values: readonly T[],
+  path: string,
+  context: z.RefinementCtx
+): T[] | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const rawValues = Array.isArray(value)
+    ? value.flatMap((entry) => entry.split(","))
+    : value.split(",");
+
+  const normalized = rawValues
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  const parsed: T[] = [];
+
+  for (const entry of normalized) {
+    if (!values.includes(entry as T)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [path],
+        message: `Unsupported value: ${entry}`
+      });
+
+      return z.NEVER;
+    }
+
+    if (!parsed.includes(entry as T)) {
+      parsed.push(entry as T);
+    }
+  }
+
+  return parsed;
+};
+
+const parseCommaSeparatedStrings = (
+  value: string | string[] | undefined
+): string[] | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const rawValues = Array.isArray(value)
+    ? value.flatMap((entry) => entry.split(","))
+    : value.split(",");
+
+  const normalized = rawValues
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+};
+
+export const entryListQuerySchema = z.object({
+  entityType: entryEntityTypeSchema.optional(),
+  entityId: z.string().trim().min(1).max(191).optional(),
+  entryType: entryTypeSchema.optional(),
+  flags: commaSeparatedStringsSchema.transform((value, context) => parseCommaSeparatedValues(value, entryFlagValues, "flags", context)),
+  excludeFlags: commaSeparatedStringsSchema.transform((value, context) => parseCommaSeparatedValues(value, entryFlagValues, "excludeFlags", context)),
+  tags: commaSeparatedStringsSchema.transform((value) => parseCommaSeparatedStrings(value)),
+  search: z.string().trim().min(1).max(200).optional(),
+  createdById: z.string().cuid().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  hasMeasurements: z.coerce.boolean().optional(),
+  measurementName: normalizedEntryStringSchema.max(100).optional(),
+  sortBy: entrySortBySchema.default("entryDate"),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().cuid().optional(),
+  includeArchived: z.coerce.boolean().default(false)
+}).superRefine((value, context) => {
+  if ((value.entityType && !value.entityId) || (!value.entityType && value.entityId)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["entityId"],
+      message: "entityType and entityId must be provided together."
+    });
+  }
+});
+
+export const entrySurfaceQuerySchema = z.object({
+  entityType: entryEntityTypeSchema,
+  entityId: z.string().trim().min(1).max(191)
+});
   vendor: z.string().max(500).optional(),
   tags: z.array(z.string().max(100)).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional()
@@ -2606,6 +2823,7 @@ export const searchQuerySchema = z.object({
     return parsed;
   })
 });
+  "entry",
 
 export const searchResponseSchema = z.object({
   query: z.string(),
@@ -2992,6 +3210,19 @@ export type BarcodeLookupResult = z.infer<typeof barcodeLookupResultSchema>;
 
 // ── Attachment Schemas ───────────────────────────────────────────────
 
+export type EntryEntityType = z.infer<typeof entryEntityTypeSchema>;
+export type EntryType = z.infer<typeof entryTypeSchema>;
+export type EntryFlag = z.infer<typeof entryFlagSchema>;
+export type EntrySortBy = z.infer<typeof entrySortBySchema>;
+export type EntryMeasurement = z.infer<typeof entryMeasurementSchema>;
+export type EntryResolvedEntity = z.infer<typeof entryResolvedEntitySchema>;
+export type Entry = z.infer<typeof entrySchema>;
+export type EntryListResponse = z.infer<typeof entryListResponseSchema>;
+export type ActionableEntryGroup = z.infer<typeof actionableEntryGroupSchema>;
+export type CreateEntryInput = z.infer<typeof createEntrySchema>;
+export type UpdateEntryInput = z.infer<typeof updateEntrySchema>;
+export type EntryListQuery = z.infer<typeof entryListQuerySchema>;
+export type EntrySurfaceQuery = z.infer<typeof entrySurfaceQuerySchema>;
 export const attachmentEntityTypeValues = [
   "maintenance_log",
   "asset",

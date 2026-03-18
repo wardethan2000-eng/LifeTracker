@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import type { SearchEntityType, SearchResponse, SearchResult, SearchResultGroup } from "@lifekeeper/types";
+import { validateEntryTarget } from "./entries.js";
 
 type SearchPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -43,6 +44,7 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   service_provider: "Service Providers",
   inventory_item: "Inventory Items",
   comment: "Comments",
+  entry: "Entries",
   invitation: "Invitations",
   hobby: "Hobbies"
 };
@@ -57,6 +59,7 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "service_provider",
   "inventory_item",
   "comment",
+  "entry",
   "invitation",
   "hobby"
 ];
@@ -113,6 +116,17 @@ const joinText = (...values: Array<string | null | undefined>): string | null =>
 const excerptComment = (body: string): string => {
   const normalized = normalizeText(body) ?? "Comment";
   return normalized.length <= 80 ? normalized : `${normalized.slice(0, 77).trimEnd()}...`;
+};
+
+const excerptEntryTitle = (title: string | null, body: string): string => {
+  const normalizedTitle = normalizeText(title);
+
+  if (normalizedTitle) {
+    return normalizedTitle;
+  }
+
+  const normalizedBody = normalizeText(body) ?? "Entry";
+  return normalizedBody.length <= 100 ? normalizedBody : `${normalizedBody.slice(0, 97).trimEnd()}...`;
 };
 
 const formatTransferTitle = (assetName: string, transferType: "reassignment" | "household_transfer"): string => (
@@ -792,6 +806,74 @@ export const syncCommentToSearchIndex = async (prisma: SearchPrisma, commentId: 
   }]);
 };
 
+export const syncEntryToSearchIndex = async (prisma: SearchPrisma, entryId: string): Promise<void> => {
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+    select: {
+      id: true,
+      householdId: true,
+      title: true,
+      body: true,
+      entityType: true,
+      entityId: true,
+      entryType: true,
+      tags: true,
+      measurements: true,
+      flags: {
+        select: { flag: true },
+        orderBy: [{ createdAt: "asc" }, { flag: "asc" }]
+      }
+    }
+  });
+
+  if (!entry) {
+    await deleteSearchIndexEntry(prisma, "entry", entryId);
+    return;
+  }
+
+  const target = await validateEntryTarget(prisma, entry.householdId, entry.entityType, entry.entityId);
+
+  if (target.status !== "ok") {
+    await deleteSearchIndexEntry(prisma, "entry", entryId);
+    return;
+  }
+
+  const measurements = Array.isArray(entry.measurements)
+    ? entry.measurements
+    : [];
+  const measurementText = measurements
+    .flatMap((measurement) => {
+      if (!measurement || typeof measurement !== "object" || Array.isArray(measurement)) {
+        return [];
+      }
+
+      const value = measurement as Record<string, unknown>;
+      return [value.name, value.value, value.unit].flatMap(flattenSearchValues);
+    })
+    .join(" ");
+  const flags = entry.flags.map((flag) => flag.flag);
+  const tags = Array.isArray(entry.tags) ? entry.tags.flatMap(flattenSearchValues) : [];
+
+  await syncSearchIndexPayloads(prisma, "entry", entry.id, [{
+    householdId: entry.householdId,
+    entityType: "entry",
+    entityId: entry.id,
+    parentEntityId: target.context.entityId,
+    parentEntityName: target.context.label,
+    title: excerptEntryTitle(entry.title, entry.body),
+    subtitle: entry.entryType,
+    body: joinText(entry.body, measurementText, tags.join(" ")),
+    entityUrl: target.context.entityUrl,
+    entityMeta: {
+      entryType: entry.entryType,
+      flags,
+      tags,
+      parentEntityType: target.context.entityType,
+      parentEntityId: target.context.entityId
+    }
+  }]);
+};
+
 export const syncInvitationToSearchIndex = async (prisma: SearchPrisma, invitationId: string): Promise<void> => {
   const invitation = await prisma.householdInvitation.findUnique({
     where: { id: invitationId },
@@ -1139,7 +1221,7 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
     WHERE "householdId" = ${householdId}
   `;
 
-  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments, invitations] = await Promise.all([
+  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments, invitations, entries] = await Promise.all([
     prisma.asset.findMany({
       where: { householdId },
       select: { id: true }
@@ -1187,6 +1269,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
     prisma.householdInvitation.findMany({
       where: { householdId },
       select: { id: true }
+    }),
+    prisma.entry.findMany({
+      where: { householdId },
+      select: { id: true }
     })
   ]);
 
@@ -1224,6 +1310,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const comment of comments) {
     await syncCommentToSearchIndex(prisma, comment.id);
+  }
+
+  for (const entry of entries) {
+    await syncEntryToSearchIndex(prisma, entry.id);
   }
 
   for (const invitation of invitations) {
