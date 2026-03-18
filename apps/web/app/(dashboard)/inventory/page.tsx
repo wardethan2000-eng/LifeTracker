@@ -3,13 +3,16 @@ import type { JSX } from "react";
 import { InventoryBulkActions } from "../../../components/inventory-bulk-actions";
 import { InventoryEditableRow } from "../../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
+import { InventoryQuickRestock } from "../../../components/inventory-quick-restock";
 import { InventorySection } from "../../../components/inventory-section";
+import { InventoryShoppingListSection } from "../../../components/inventory-shopping-list-section";
 import { InventoryTransactionHistory } from "../../../components/inventory-transaction-history";
 import {
   ApiError,
   getHouseholdInventory,
   getInventoryItemConsumption,
   getHouseholdLowStockInventory,
+  getInventoryShoppingList,
   getMe
 } from "../../../lib/api";
 import { formatCurrency } from "../../../lib/formatters";
@@ -101,10 +104,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
     const inventoryViewHref = buildInventoryHref(household.id, itemTypeFilter ? { itemType: itemTypeFilter } : undefined);
     const analyticsViewHref = `/analytics?tab=inventory&householdId=${household.id}`;
+    const inventoryRedirectHref = `/inventory?householdId=${household.id}`;
 
-    const [{ items }, lowStockItems] = await Promise.all([
+    const [{ items }, lowStockItems, shoppingList] = await Promise.all([
       getHouseholdInventory(household.id, { limit: 100, ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}) }),
-      getHouseholdLowStockInventory(household.id)
+      getHouseholdLowStockInventory(household.id),
+      getInventoryShoppingList(household.id)
     ]);
 
     const highlightedItem = highlightId ? items.find((item) => item.id === highlightId) ?? null : null;
@@ -190,6 +195,18 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </section>
 
           <InventoryFilterBar currentFilter={itemTypeFilter ?? "all"} />
+
+          {!isEquipmentView ? (
+            <>
+              <InventoryShoppingListSection householdId={household.id} shoppingList={shoppingList} redirectTo={inventoryRedirectHref} />
+              <InventoryQuickRestock
+                householdId={household.id}
+                items={items.filter((item) => item.itemType === "consumable")}
+                lowStockItemIds={lowStockItems.map((item) => item.id)}
+                redirectTo={inventoryRedirectHref}
+              />
+            </>
+          ) : null}
 
           {!isEquipmentView && (
           <section className="panel">

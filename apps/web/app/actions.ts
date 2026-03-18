@@ -44,6 +44,7 @@ import type {
   PresetUsageMetricTemplate,
   ProjectStatus,
   ProjectTaskStatus,
+  CreateQuickRestockInput,
   UpdateCommentInput,
   UpdateAssetTimelineEntryInput,
   UpdateProjectBudgetCategoryInput,
@@ -59,6 +60,7 @@ import type {
   UpdateProjectTaskInput,
   UpdateHobbyInput,
   UpdateHobbyRecipeInput,
+  UpdateInventoryPurchaseLineInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
 import {
@@ -103,6 +105,7 @@ import {
   createHobbyRecipe,
   createHobbySession,
   createInventoryItem,
+  createQuickRestockBatch,
   createMaintenanceLog,
   createPresetProfile,
   createProjectInventoryItem,
@@ -119,6 +122,7 @@ import {
   deleteProjectBudgetCategory,
   deleteProjectExpense,
   deleteProjectNote,
+  updateInventoryPurchaseLine,
   deleteProjectPhase,
   deleteProjectInventoryItem,
   deletePhaseChecklistItem,
@@ -127,6 +131,7 @@ import {
   deleteTaskChecklistItem,
   deleteServiceProvider,
   deleteSchedule,
+  generateInventoryShoppingList,
   markNotificationRead,
   markNotificationUnread,
   recordConditionAssessment,
@@ -879,6 +884,103 @@ export async function deleteInventoryItemAction(formData: FormData): Promise<voi
   redirect(redirectTo ?? `/inventory?householdId=${householdId}`);
 }
 
+export async function generateInventoryShoppingListAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+
+  await generateInventoryShoppingList(householdId);
+  revalidateInventoryPaths(householdId);
+  revalidatePath("/analytics");
+  redirect(`/inventory?householdId=${householdId}`);
+}
+
+export async function updateInventoryPurchaseLineAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const purchaseId = getRequiredString(formData, "purchaseId");
+  const lineId = getRequiredString(formData, "lineId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const status = getOptionalString(formData, "status");
+  const redirectTo = getOptionalString(formData, "redirectTo") ?? `/inventory?householdId=${householdId}`;
+
+  const input: UpdateInventoryPurchaseLineInput = {};
+  const plannedQuantity = getOptionalNumber(formData, "plannedQuantity");
+  const orderedQuantity = getOptionalNumber(formData, "orderedQuantity");
+  const receivedQuantity = getOptionalNumber(formData, "receivedQuantity");
+  const unitCost = getOptionalNumber(formData, "unitCost");
+  const notes = getOptionalString(formData, "notes");
+
+  if (plannedQuantity !== undefined) {
+    input.plannedQuantity = plannedQuantity;
+  }
+
+  if (orderedQuantity !== undefined) {
+    input.orderedQuantity = orderedQuantity;
+  }
+
+  if (receivedQuantity !== undefined) {
+    input.receivedQuantity = receivedQuantity;
+  }
+
+  if (unitCost !== undefined) {
+    input.unitCost = unitCost;
+  }
+
+  if (notes !== undefined) {
+    input.notes = notes;
+  }
+
+  if (status === "draft" || status === "ordered" || status === "received") {
+    input.status = status;
+  }
+
+  await updateInventoryPurchaseLine(householdId, purchaseId, lineId, input);
+  revalidateInventoryPaths(householdId);
+  revalidateInventoryDetailPath(inventoryItemId);
+  revalidatePath("/analytics");
+  redirect(redirectTo);
+}
+
+export async function createQuickRestockAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const redirectTo = getOptionalString(formData, "redirectTo") ?? `/inventory?householdId=${householdId}`;
+  const itemsPayload = getRequiredString(formData, "itemsPayload");
+  const parsedItems = JSON.parse(itemsPayload) as CreateQuickRestockInput["items"];
+
+  const input: CreateQuickRestockInput = {
+    items: parsedItems
+  };
+
+  const supplierName = getOptionalString(formData, "supplierName");
+  const supplierUrl = getOptionalNormalizedUrl(formData, "supplierUrl");
+  const notes = getOptionalString(formData, "notes");
+  const receivedAt = toIsoString(getOptionalString(formData, "receivedAt"));
+
+  if (supplierName) {
+    input.supplierName = supplierName;
+  }
+
+  if (supplierUrl) {
+    input.supplierUrl = supplierUrl;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  if (receivedAt) {
+    input.receivedAt = receivedAt;
+  }
+
+  const purchase = await createQuickRestockBatch(householdId, input);
+  revalidateInventoryPaths(householdId);
+  revalidatePath("/analytics");
+
+  for (const line of purchase.lines) {
+    revalidateInventoryDetailPath(line.inventoryItemId);
+  }
+
+  redirect(redirectTo);
+}
+
 export async function createAssetAction(formData: FormData): Promise<void> {
   let profile: AssetProfilePayload;
   let input: CreateAssetInput;
@@ -1196,6 +1298,7 @@ export async function completeScheduleAction(formData: FormData): Promise<void> 
 export async function createLogAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   const input: CreateMaintenanceLogInput = {
+    applyLinkedParts: getOptionalString(formData, "applyLinkedParts") !== "false",
     metadata: {}
   };
 

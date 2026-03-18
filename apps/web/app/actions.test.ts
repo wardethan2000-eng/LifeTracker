@@ -8,6 +8,7 @@ const nextMocks = vi.hoisted(() => ({
 const apiMocks = vi.hoisted(() => ({
   createInventoryItem: vi.fn(),
   completeSchedule: vi.fn(),
+  createMaintenanceLog: vi.fn(),
   createSchedule: vi.fn()
 }));
 
@@ -35,6 +36,7 @@ vi.mock("../lib/api", async (importOriginal) => {
     ...actual,
     createInventoryItem: apiMocks.createInventoryItem,
     completeSchedule: apiMocks.completeSchedule,
+    createMaintenanceLog: apiMocks.createMaintenanceLog,
     createSchedule: apiMocks.createSchedule
   };
 });
@@ -42,6 +44,7 @@ vi.mock("../lib/api", async (importOriginal) => {
 import {
   completeScheduleAction,
   createInventoryItemAction,
+  createLogAction,
   createScheduleAction
 } from "./actions";
 
@@ -143,6 +146,30 @@ describe("server actions", () => {
       },
       estimatedCost: 89.5,
       estimatedMinutes: 45
+    });
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/assets/clkeeperasset0000000000001");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/maintenance");
+  });
+
+  it("creates schedule-linked logs with linked-parts auto-apply enabled by default", async () => {
+    const formData = new FormData();
+    formData.set("assetId", "clkeeperasset0000000000001");
+    formData.set("scheduleId", "clkeeperschedule000000000001");
+    formData.set("title", "Oil change completed");
+    formData.set("completedAt", "2026-03-17T10:00:00.000Z");
+    formData.set("usageValue", "9500");
+    formData.set("cost", "99.99");
+
+    await createLogAction(formData);
+
+    expect(apiMocks.createMaintenanceLog).toHaveBeenCalledWith("clkeeperasset0000000000001", {
+      scheduleId: "clkeeperschedule000000000001",
+      title: "Oil change completed",
+      completedAt: "2026-03-17T10:00:00.000Z",
+      usageValue: 9500,
+      cost: 99.99,
+      applyLinkedParts: true,
+      metadata: {}
     });
     expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/assets/clkeeperasset0000000000001");
     expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/maintenance");

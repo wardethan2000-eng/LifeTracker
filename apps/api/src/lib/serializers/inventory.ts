@@ -2,6 +2,8 @@ import type {
   Asset,
   AssetInventoryItem,
   InventoryItem,
+  InventoryPurchase,
+  InventoryPurchaseLine,
   InventoryTransaction,
   MaintenanceLogPart,
   Project,
@@ -13,6 +15,9 @@ import {
   assetPartsConsumptionSchema,
   householdInventoryAnalyticsSchema,
   inventoryItemConsumptionSchema,
+  inventoryPurchaseLineSchema,
+  inventoryPurchaseSchema,
+  inventoryShoppingListSummarySchema,
   scheduleInventoryItemSchema,
   scheduleInventoryLinkDetailSchema,
   inventoryAssetLinkDetailSchema,
@@ -75,6 +80,43 @@ type InventoryTransactionRecord = Pick<
 > & {
   correctionOfTransaction?: Pick<InventoryTransaction, "id" | "type" | "quantity" | "createdAt"> | null;
   correctedByTransactions?: Array<Pick<InventoryTransaction, "id" | "type" | "quantity" | "createdAt">>;
+};
+
+type InventoryPurchaseLineRecord = Pick<
+  InventoryPurchaseLine,
+  | "id"
+  | "purchaseId"
+  | "inventoryItemId"
+  | "status"
+  | "plannedQuantity"
+  | "orderedQuantity"
+  | "receivedQuantity"
+  | "unitCost"
+  | "notes"
+  | "orderedAt"
+  | "receivedAt"
+  | "createdAt"
+  | "updatedAt"
+> & {
+  inventoryItem: InventorySummaryRecord;
+};
+
+type InventoryPurchaseRecord = Pick<
+  InventoryPurchase,
+  | "id"
+  | "householdId"
+  | "createdById"
+  | "supplierName"
+  | "supplierUrl"
+  | "source"
+  | "status"
+  | "notes"
+  | "orderedAt"
+  | "receivedAt"
+  | "createdAt"
+  | "updatedAt"
+> & {
+  lines: InventoryPurchaseLineRecord[];
 };
 
 type MaintenanceLogPartRecord = Pick<
@@ -152,6 +194,74 @@ export const toInventoryTransactionWithItemResponse = (
   itemName: transaction.inventoryItem.name,
   itemPartNumber: transaction.inventoryItem.partNumber ?? null
 });
+
+export const toInventoryPurchaseLineResponse = (line: InventoryPurchaseLineRecord) => inventoryPurchaseLineSchema.parse({
+  id: line.id,
+  purchaseId: line.purchaseId,
+  inventoryItemId: line.inventoryItemId,
+  status: line.status,
+  plannedQuantity: line.plannedQuantity,
+  orderedQuantity: line.orderedQuantity ?? null,
+  receivedQuantity: line.receivedQuantity ?? null,
+  unitCost: line.unitCost ?? null,
+  notes: line.notes ?? null,
+  orderedAt: line.orderedAt?.toISOString() ?? null,
+  receivedAt: line.receivedAt?.toISOString() ?? null,
+  createdAt: line.createdAt.toISOString(),
+  updatedAt: line.updatedAt.toISOString(),
+  inventoryItem: toInventoryItemSummaryResponse(line.inventoryItem)
+});
+
+export const toInventoryPurchaseResponse = (purchase: InventoryPurchaseRecord) => {
+  const lines = purchase.lines.map(toInventoryPurchaseLineResponse);
+  const totalEstimatedCost = lines.reduce<number | null>((sum, line) => {
+    if (line.unitCost === null) {
+      return sum;
+    }
+
+    const quantity = line.receivedQuantity ?? line.orderedQuantity ?? line.plannedQuantity;
+    return (sum ?? 0) + (quantity * line.unitCost);
+  }, 0);
+
+  return inventoryPurchaseSchema.parse({
+    id: purchase.id,
+    householdId: purchase.householdId,
+    createdById: purchase.createdById,
+    supplierName: purchase.supplierName ?? null,
+    supplierUrl: purchase.supplierUrl ?? null,
+    source: purchase.source,
+    status: purchase.status,
+    notes: purchase.notes ?? null,
+    orderedAt: purchase.orderedAt?.toISOString() ?? null,
+    receivedAt: purchase.receivedAt?.toISOString() ?? null,
+    createdAt: purchase.createdAt.toISOString(),
+    updatedAt: purchase.updatedAt.toISOString(),
+    lineCount: lines.length,
+    totalEstimatedCost,
+    lines
+  });
+};
+
+export const toInventoryShoppingListResponse = (purchases: InventoryPurchaseRecord[]) => {
+  const serialized = purchases.map(toInventoryPurchaseResponse);
+  const supplierCount = new Set(serialized.map((purchase) => `${purchase.supplierName ?? ""}::${purchase.supplierUrl ?? ""}`)).size;
+  const lineCount = serialized.reduce((sum, purchase) => sum + purchase.lineCount, 0);
+  const totalEstimatedCost = serialized.reduce<number | null>((sum, purchase) => {
+    if (purchase.totalEstimatedCost === null) {
+      return sum;
+    }
+
+    return (sum ?? 0) + purchase.totalEstimatedCost;
+  }, 0);
+
+  return inventoryShoppingListSummarySchema.parse({
+    purchaseCount: serialized.length,
+    supplierCount,
+    lineCount,
+    totalEstimatedCost,
+    purchases: serialized
+  });
+};
 
 export const toMaintenanceLogPartWithInventoryResponse = (part: MaintenanceLogPartRecord) => maintenanceLogPartSchema.parse({
   ...part,

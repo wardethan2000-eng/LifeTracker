@@ -55,6 +55,9 @@ export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
 export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", "correction", "return", "transfer", "project_supply_allocation"] as const;
+export const inventoryPurchaseStatusValues = ["draft", "ordered", "received"] as const;
+export const inventoryPurchaseSourceValues = ["reorder", "quick_restock", "manual"] as const;
+export const inventoryPurchaseLineStatusValues = ["draft", "ordered", "received"] as const;
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
 export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
@@ -99,6 +102,9 @@ export const triggerTypeSchema = z.enum(triggerTypeValues);
 export const notificationChannelSchema = z.enum(notificationChannelValues);
 export const notificationStatusSchema = z.enum(notificationStatusValues);
 export const inventoryTransactionTypeSchema = z.enum(inventoryTransactionTypeValues);
+export const inventoryPurchaseStatusSchema = z.enum(inventoryPurchaseStatusValues);
+export const inventoryPurchaseSourceSchema = z.enum(inventoryPurchaseSourceValues);
+export const inventoryPurchaseLineStatusSchema = z.enum(inventoryPurchaseLineStatusValues);
 export const inventoryItemTypeSchema = z.enum(["consumable", "equipment"]);
 export const inventoryConditionStatusSchema = z.enum(["good", "fair", "needs_repair", "needs_replacement"]).nullable().optional();
 export const scheduleStatusSchema = z.enum(scheduleStatusValues);
@@ -952,6 +958,7 @@ export const createMaintenanceLogSchema = z.object({
   laborRate: z.number().min(0).optional(),
   difficultyRating: z.number().int().min(1).max(5).optional(),
   performedBy: z.string().min(1).max(200).optional(),
+  applyLinkedParts: z.boolean().default(true),
   metadata: maintenanceLogMetadataSchema.default({}),
   parts: z.array(createMaintenanceLogPartSchema).optional()
 });
@@ -1350,6 +1357,73 @@ export const inventoryTransactionListSchema = z.object({
 export const inventoryTransactionCorrectionResultSchema = z.object({
   transaction: inventoryTransactionSchema,
   inventoryItem: inventoryItemSummarySchema
+});
+
+export const inventoryPurchaseLineSchema = z.object({
+  id: z.string().cuid(),
+  purchaseId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  status: inventoryPurchaseLineStatusSchema,
+  plannedQuantity: z.number(),
+  orderedQuantity: z.number().nullable(),
+  receivedQuantity: z.number().nullable(),
+  unitCost: z.number().nullable(),
+  notes: z.string().nullable(),
+  orderedAt: z.string().datetime().nullable(),
+  receivedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  inventoryItem: inventoryItemSummarySchema
+});
+
+export const inventoryPurchaseSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  supplierName: z.string().nullable(),
+  supplierUrl: z.string().nullable(),
+  source: inventoryPurchaseSourceSchema,
+  status: inventoryPurchaseStatusSchema,
+  notes: z.string().nullable(),
+  orderedAt: z.string().datetime().nullable(),
+  receivedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  lineCount: z.number().int().min(0),
+  totalEstimatedCost: z.number().nullable(),
+  lines: z.array(inventoryPurchaseLineSchema)
+});
+
+export const inventoryShoppingListSummarySchema = z.object({
+  purchaseCount: z.number().int().min(0),
+  supplierCount: z.number().int().min(0),
+  lineCount: z.number().int().min(0),
+  totalEstimatedCost: z.number().nullable(),
+  purchases: z.array(inventoryPurchaseSchema)
+});
+
+export const updateInventoryPurchaseLineSchema = z.object({
+  plannedQuantity: z.number().positive().optional(),
+  orderedQuantity: z.number().positive().optional(),
+  receivedQuantity: z.number().positive().optional(),
+  unitCost: z.number().min(0).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  status: inventoryPurchaseLineStatusSchema.optional()
+});
+
+export const quickRestockLineSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  quantity: z.number().positive(),
+  unitCost: z.number().min(0).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const createQuickRestockSchema = z.object({
+  supplierName: z.string().max(200).optional(),
+  supplierUrl: z.string().url().max(1000).optional(),
+  notes: z.string().max(2000).optional(),
+  receivedAt: z.string().datetime().optional(),
+  items: z.array(quickRestockLineSchema).min(1).max(100)
 });
 
 export const assetInventoryItemSchema = z.object({
@@ -2680,10 +2754,19 @@ export type InventoryItemType = z.infer<typeof inventoryItemTypeSchema>;
 export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
-export type CreateInventoryTransactionCorrectionInput = z.infer<typeof createInventoryTransactionCorrectionSchema>;
-export type InventoryTransactionCorrectionResult = z.infer<typeof inventoryTransactionCorrectionResultSchema>;
 export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
 export type CreateInventoryTransactionInput = z.infer<typeof createInventoryTransactionSchema>;
+export type CreateInventoryTransactionCorrectionInput = z.infer<typeof createInventoryTransactionCorrectionSchema>;
+export type InventoryTransactionCorrectionResult = z.infer<typeof inventoryTransactionCorrectionResultSchema>;
+export type InventoryPurchaseStatus = z.infer<typeof inventoryPurchaseStatusSchema>;
+export type InventoryPurchaseSource = z.infer<typeof inventoryPurchaseSourceSchema>;
+export type InventoryPurchaseLineStatus = z.infer<typeof inventoryPurchaseLineStatusSchema>;
+export type InventoryPurchaseLine = z.infer<typeof inventoryPurchaseLineSchema>;
+export type InventoryPurchase = z.infer<typeof inventoryPurchaseSchema>;
+export type InventoryShoppingListSummary = z.infer<typeof inventoryShoppingListSummarySchema>;
+export type UpdateInventoryPurchaseLineInput = z.infer<typeof updateInventoryPurchaseLineSchema>;
+export type QuickRestockLineInput = z.infer<typeof quickRestockLineSchema>;
+export type CreateQuickRestockInput = z.infer<typeof createQuickRestockSchema>;
 export type InventoryItemConsumption = z.infer<typeof inventoryItemConsumptionSchema>;
 export type AssetPartsConsumption = z.infer<typeof assetPartsConsumptionSchema>;
 export type PartCommonality = z.infer<typeof partCommonalitySchema>;

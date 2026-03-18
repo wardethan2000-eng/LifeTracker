@@ -11,8 +11,7 @@ import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
-  createMaintenanceLogPartWithInventory,
-  InventoryError
+  createScheduleLinkedLogParts
 } from "../../lib/inventory.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
@@ -343,34 +342,12 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       const log = await tx.maintenanceLog.create({ data: logData });
 
       if (input.applyLinkedParts && existing.inventoryItems.length > 0) {
-        for (const schedulePart of existing.inventoryItems) {
-          try {
-            const result = await createMaintenanceLogPartWithInventory(tx, {
-              householdId: asset.householdId,
-              logId: log.id,
-              userId: request.auth.userId,
-              input: {
-                inventoryItemId: schedulePart.inventoryItemId,
-                name: schedulePart.inventoryItem.name,
-                partNumber: schedulePart.inventoryItem.partNumber ?? undefined,
-                quantity: schedulePart.quantityPerService,
-                unitCost: schedulePart.inventoryItem.unitCost ?? undefined,
-                supplier: schedulePart.inventoryItem.preferredSupplier ?? undefined,
-                notes: schedulePart.notes ?? undefined
-              }
-            });
-
-            if (result.warning) {
-              inventoryWarnings.push(`${schedulePart.inventoryItem.name}: ${result.warning}`);
-            }
-          } catch (error) {
-            if (error instanceof InventoryError && error.code === "INVENTORY_ITEM_NOT_FOUND") {
-              throw new Error(error.message);
-            }
-
-            throw error;
-          }
-        }
+        inventoryWarnings.push(...await createScheduleLinkedLogParts(tx, {
+          householdId: asset.householdId,
+          logId: log.id,
+          userId: request.auth.userId,
+          scheduleInventoryItems: existing.inventoryItems
+        }));
       }
 
       const logWithParts = await tx.maintenanceLog.findUniqueOrThrow({

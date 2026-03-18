@@ -16,6 +16,7 @@ import { healthRoutes } from "./routes/health.js";
 import { householdRoutes } from "./routes/households/index.js";
 import { householdInventoryAnalyticsRoutes } from "./routes/households/inventory-analytics.js";
 import { householdInventoryItemRoutes } from "./routes/households/inventory-items.js";
+import { householdInventoryPurchaseRoutes } from "./routes/households/inventory-purchases.js";
 import { householdProjectInventoryRollupRoutes } from "./routes/households/project-inventory-rollups.js";
 import { householdInventoryTransactionRoutes } from "./routes/households/inventory-transactions.js";
 import { householdLinkPreviewRoutes } from "./routes/households/link-preview.js";
@@ -79,6 +80,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   householdRoutes,
   householdInventoryAnalyticsRoutes,
   householdInventoryItemRoutes,
+  householdInventoryPurchaseRoutes,
   householdProjectInventoryRollupRoutes,
   householdInventoryTransactionRoutes,
   householdLinkPreviewRoutes,

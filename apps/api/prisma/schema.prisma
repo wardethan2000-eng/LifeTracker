@@ -83,6 +83,27 @@ enum NotificationStatus {
   read
 }
 
+// Workflow state for household inventory purchase batches.
+enum InventoryPurchaseStatus {
+  draft
+  ordered
+  received
+}
+
+// Indicates whether a purchase batch came from reorder generation or manual restocking.
+enum InventoryPurchaseSource {
+  reorder
+  quick_restock
+  manual
+}
+
+// Workflow state for a single purchase line inside a batch.
+enum InventoryPurchaseLineStatus {
+  draft
+  ordered
+  received
+}
+
 // High-level lifecycle state for a project.
 enum ProjectStatus {
   planning
@@ -202,6 +223,7 @@ model User {
   outgoingAssetTransfers  AssetTransfer[]       @relation("AssetTransferFromUser")
   incomingAssetTransfers  AssetTransfer[]       @relation("AssetTransferToUser")
   inventoryTransactions   InventoryTransaction[]
+  inventoryPurchases      InventoryPurchase[]   @relation("InventoryPurchaseCreator")
   sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
   authoredComments        Comment[]             @relation("CommentAuthor")
@@ -227,6 +249,7 @@ model Household {
   serviceProviders ServiceProvider[]
   projects         Project[]
   inventoryItems   InventoryItem[]
+  inventoryPurchases InventoryPurchase[]
   activityLogs     ActivityLog[]
   outgoingAssetTransfers AssetTransfer[]        @relation("AssetTransferFromHousehold")
   incomingAssetTransfers AssetTransfer[]        @relation("AssetTransferToHousehold")
@@ -655,6 +678,7 @@ model InventoryItem {
   projectLinks       ProjectInventoryItem[]
   projectPhaseSupplies ProjectPhaseSupply[]
   transactions       InventoryTransaction[]
+  purchaseLines      InventoryPurchaseLine[]
   maintenanceLogParts MaintenanceLogPart[]
   hobbyLinks          HobbyInventoryItem[]
   hobbyRecipeIngredients HobbyRecipeIngredient[]
@@ -666,6 +690,51 @@ model InventoryItem {
   @@index([householdId, category])
   @@index([householdId, partNumber])
   @@index([householdId, itemType])
+}
+
+// Supplier-grouped purchase batch used for reorder carts and quick restocks.
+model InventoryPurchase {
+  id           String                  @id @default(cuid())
+  householdId  String
+  createdById  String
+  supplierName String?
+  supplierUrl  String?
+  source       InventoryPurchaseSource @default(manual)
+  status       InventoryPurchaseStatus @default(draft)
+  notes        String?
+  orderedAt    DateTime?
+  receivedAt   DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  household    Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy    User                    @relation("InventoryPurchaseCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  lines        InventoryPurchaseLine[]
+
+  @@index([householdId, status])
+  @@index([createdById])
+}
+
+// A single inventory item within a purchase batch.
+model InventoryPurchaseLine {
+  id               String                      @id @default(cuid())
+  purchaseId       String
+  inventoryItemId  String
+  status           InventoryPurchaseLineStatus @default(draft)
+  plannedQuantity  Float
+  orderedQuantity  Float?
+  receivedQuantity Float?
+  unitCost         Float?
+  notes            String?
+  orderedAt        DateTime?
+  receivedAt       DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  purchase         InventoryPurchase           @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  inventoryItem    InventoryItem               @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([purchaseId, inventoryItemId])
+  @@index([purchaseId, status])
+  @@index([inventoryItemId, status])
 }
 
 // Join table linking an Asset to the inventory items it uses or recommends.

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
+  createScheduleLinkedLogParts,
   createMaintenanceLogPartWithInventory,
   InventoryError
 } from "../../lib/inventory.js";
@@ -93,6 +94,19 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
     }
 
     let scheduleName: string | undefined;
+    let linkedScheduleInventoryItems:
+      | Array<{
+        inventoryItemId: string;
+        quantityPerService: number;
+        notes: string | null;
+        inventoryItem: {
+          name: string;
+          partNumber: string | null;
+          unitCost: number | null;
+          preferredSupplier: string | null;
+        };
+      }>
+      | undefined;
 
     if (input.scheduleId) {
       const schedule = await app.prisma.maintenanceSchedule.findFirst({
@@ -103,7 +117,19 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
         },
         select: {
           id: true,
-          name: true
+          name: true,
+          inventoryItems: {
+            include: {
+              inventoryItem: {
+                select: {
+                  name: true,
+                  partNumber: true,
+                  unitCost: true,
+                  preferredSupplier: true
+                }
+              }
+            }
+          }
         }
       });
 
@@ -112,6 +138,8 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       }
 
       scheduleName = schedule.name;
+
+      linkedScheduleInventoryItems = schedule.inventoryItems;
     }
 
     if (!input.title && !scheduleName) {
@@ -175,6 +203,17 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     const log = await app.prisma.$transaction(async (tx) => {
       const createdLog = await tx.maintenanceLog.create({ data });
+
+      if (input.applyLinkedParts && linkedScheduleInventoryItems && linkedScheduleInventoryItems.length > 0) {
+        const linkedPartWarnings = await createScheduleLinkedLogParts(tx, {
+          householdId: asset.householdId,
+          logId: createdLog.id,
+          userId: request.auth.userId,
+          scheduleInventoryItems: linkedScheduleInventoryItems
+        });
+
+        inventoryWarnings.push(...linkedPartWarnings);
+      }
 
       if (input.parts && input.parts.length > 0) {
         for (const part of input.parts) {

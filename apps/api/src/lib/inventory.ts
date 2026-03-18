@@ -60,6 +60,18 @@ type ScheduleInventoryReadinessRecord = {
   };
 };
 
+type ScheduleInventoryConsumptionRecord = {
+  inventoryItemId: string;
+  quantityPerService: number;
+  notes: string | null;
+  inventoryItem: {
+    name: string;
+    partNumber: string | null;
+    unitCost: number | null;
+    preferredSupplier: string | null;
+  };
+};
+
 const buildSchedulePartsReadiness = (
   scheduleId: string,
   links: ScheduleInventoryReadinessRecord[]
@@ -329,4 +341,47 @@ export const createMaintenanceLogPartWithInventory = async (
     part,
     warning
   };
+};
+
+export const createScheduleLinkedLogParts = async (
+  prisma: Prisma.TransactionClient,
+  options: {
+    householdId: string;
+    logId: string;
+    userId: string;
+    scheduleInventoryItems: ScheduleInventoryConsumptionRecord[];
+  }
+) => {
+  const warnings: string[] = [];
+
+  for (const schedulePart of options.scheduleInventoryItems) {
+    try {
+      const result = await createMaintenanceLogPartWithInventory(prisma, {
+        householdId: options.householdId,
+        logId: options.logId,
+        userId: options.userId,
+        input: {
+          inventoryItemId: schedulePart.inventoryItemId,
+          name: schedulePart.inventoryItem.name,
+          partNumber: schedulePart.inventoryItem.partNumber ?? undefined,
+          quantity: schedulePart.quantityPerService,
+          unitCost: schedulePart.inventoryItem.unitCost ?? undefined,
+          supplier: schedulePart.inventoryItem.preferredSupplier ?? undefined,
+          notes: schedulePart.notes ?? undefined
+        }
+      });
+
+      if (result.warning) {
+        warnings.push(`${schedulePart.inventoryItem.name}: ${result.warning}`);
+      }
+    } catch (error) {
+      if (error instanceof InventoryError && error.code === "INVENTORY_ITEM_NOT_FOUND") {
+        throw new Error(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  return warnings;
 };

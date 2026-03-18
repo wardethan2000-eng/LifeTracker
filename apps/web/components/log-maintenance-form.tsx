@@ -2,7 +2,7 @@
 
 import type { BarcodeLookupResult } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { BarcodeLookupField } from "./barcode-lookup-field";
 
 type LogMaintenanceFormProps = {
@@ -31,6 +31,13 @@ const createEmptyPart = (): LogPartDraft => ({
 
 export function LogMaintenanceForm({ assetId, schedules, createLogAction }: LogMaintenanceFormProps): JSX.Element {
   const [parts, setParts] = useState<LogPartDraft[]>([createEmptyPart()]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState("");
+  const [applyLinkedParts, setApplyLinkedParts] = useState(true);
+
+  const selectedSchedule = useMemo(
+    () => schedules.find((schedule) => schedule.id === selectedScheduleId) ?? null,
+    [schedules, selectedScheduleId]
+  );
 
   const updatePart = useCallback((index: number, field: keyof LogPartDraft, value: string) => {
     setParts((current) => current.map((part, partIndex) => (
@@ -72,15 +79,39 @@ export function LogMaintenanceForm({ assetId, schedules, createLogAction }: LogM
   return (
     <form action={createLogAction} className="form-grid">
       <input type="hidden" name="assetId" value={assetId} />
+      <input type="hidden" name="applyLinkedParts" value={applyLinkedParts ? "true" : "false"} />
       <label className="field field--full">
         <span>Schedule</span>
-        <select name="scheduleId" defaultValue="">
+        <select name="scheduleId" value={selectedScheduleId} onChange={(event) => {
+          const nextScheduleId = event.target.value;
+          setSelectedScheduleId(nextScheduleId);
+
+          if (!nextScheduleId) {
+            setApplyLinkedParts(false);
+            return;
+          }
+
+          setApplyLinkedParts(true);
+        }}>
           <option value="">No linked schedule</option>
           {schedules.map((schedule) => (
             <option key={schedule.id} value={schedule.id}>{schedule.name}</option>
           ))}
         </select>
       </label>
+      {selectedSchedule ? (
+        <div className="field field--full schedule-card__linked-parts">
+          <label className="schedule-card__linked-parts-toggle">
+            <input
+              type="checkbox"
+              checked={applyLinkedParts}
+              onChange={(event) => setApplyLinkedParts(event.target.checked)}
+            />
+            <span>Auto-consume inventory linked to {selectedSchedule.name}</span>
+          </label>
+          <p className="data-table__secondary">When enabled, schedule-linked parts are added to the log and deducted from inventory automatically.</p>
+        </div>
+      ) : null}
       <label className="field field--full">
         <span>Title</span>
         <input type="text" name="title" placeholder="Brake inspection" required />
