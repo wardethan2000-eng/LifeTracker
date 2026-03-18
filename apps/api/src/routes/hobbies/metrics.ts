@@ -6,11 +6,13 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { recalculatePracticeGoalsForHobby } from "../../lib/hobby-practice.js";
 import {
   toHobbyMetricDefinitionResponse,
   toHobbyMetricReadingPageResponse,
   toHobbyMetricReadingResponse
 } from "../../lib/serializers/index.js";
+import { syncEntryToSearchIndex } from "../../lib/search-index.js";
 
 const hobbyParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -190,15 +192,33 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Metric definition not found" });
     }
 
-    const reading = await app.prisma.hobbyMetricReading.create({
-      data: {
-        metricDefinitionId: metricId,
-        sessionId: input.sessionId ?? null,
-        value: input.value,
-        readingDate: new Date(input.readingDate),
-        notes: input.notes ?? null,
+    if (input.sessionId) {
+      const session = await app.prisma.hobbySession.findFirst({
+        where: { id: input.sessionId, hobbyId, hobby: { householdId } },
+        select: { id: true },
+      });
+      if (!session) {
+        return reply.code(400).send({ message: "Session must belong to this hobby." });
       }
+    }
+
+    let createdEntryIds: string[] = [];
+    const reading = await app.prisma.$transaction(async (tx) => {
+      const created = await tx.hobbyMetricReading.create({
+        data: {
+          metricDefinitionId: metricId,
+          sessionId: input.sessionId ?? null,
+          value: input.value,
+          readingDate: new Date(input.readingDate),
+          notes: input.notes ?? null,
+        }
+      });
+
+      createdEntryIds = await recalculatePracticeGoalsForHobby(tx, hobbyId);
+      return created;
     });
+
+    await Promise.all(createdEntryIds.map((entryId) => syncEntryToSearchIndex(app.prisma, entryId)));
 
     return reply.code(201).send(toHobbyMetricReadingResponse(reading));
   });
@@ -223,7 +243,13 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Reading not found" });
     }
 
-    await app.prisma.hobbyMetricReading.delete({ where: { id: readingId } });
+    let createdEntryIds: string[] = [];
+    await app.prisma.$transaction(async (tx) => {
+      await tx.hobbyMetricReading.delete({ where: { id: readingId } });
+      createdEntryIds = await recalculatePracticeGoalsForHobby(tx, hobbyId);
+    });
+
+    await Promise.all(createdEntryIds.map((entryId) => syncEntryToSearchIndex(app.prisma, entryId)));
 
     return reply.code(204).send();
   });

@@ -48,7 +48,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const where: Prisma.ProjectNoteWhereInput = { projectId: project.id };
+    const where: Prisma.ProjectNoteWhereInput = { projectId: project.id, deletedAt: null };
 
     if (query.category) {
       where.category = query.category as import("@prisma/client").NoteCategory;
@@ -89,7 +89,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const note = await app.prisma.projectNote.findFirst({
-      where: { id: params.noteId, projectId: project.id },
+      where: { id: params.noteId, projectId: project.id, deletedAt: null },
       include: {
         createdBy: { select: { id: true, displayName: true } },
         phase: { select: { name: true } }
@@ -120,7 +120,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: project.id },
+        where: { id: input.phaseId, projectId: project.id, deletedAt: null },
         select: { id: true }
       });
 
@@ -176,7 +176,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.projectNote.findFirst({
-      where: { id: params.noteId, projectId: project.id }
+      where: { id: params.noteId, projectId: project.id, deletedAt: null }
     });
 
     if (!existing) {
@@ -185,7 +185,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId !== undefined && input.phaseId !== null) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: project.id },
+        where: { id: input.phaseId, projectId: project.id, deletedAt: null },
         select: { id: true }
       });
 
@@ -241,14 +241,17 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.projectNote.findFirst({
-      where: { id: params.noteId, projectId: project.id }
+      where: { id: params.noteId, projectId: project.id, deletedAt: null }
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Project note not found." });
     }
 
-    await app.prisma.projectNote.delete({ where: { id: existing.id } });
+    await app.prisma.projectNote.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() }
+    });
 
     await logActivity(app.prisma, {
       householdId: params.householdId,

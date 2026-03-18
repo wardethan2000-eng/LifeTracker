@@ -9,6 +9,16 @@ const activityMocks = vi.hoisted(() => ({
   logActivity: vi.fn(async () => ({ id: "clkeeperactivity00000000001" })),
 }));
 
+const practiceMocks = vi.hoisted(() => ({
+  recalculatePracticeGoalsForHobby: vi.fn(async () => []),
+  recalculatePracticeRoutine: vi.fn(async () => undefined),
+}));
+
+const searchMocks = vi.hoisted(() => ({
+  syncEntryToSearchIndex: vi.fn(async () => undefined),
+  syncHobbySeriesToSearchIndex: vi.fn(async () => undefined),
+}));
+
 vi.mock("../src/lib/inventory.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/inventory.js")>();
 
@@ -21,6 +31,10 @@ vi.mock("../src/lib/inventory.js", async (importOriginal) => {
 vi.mock("../src/lib/activity-log.js", () => ({
   logActivity: activityMocks.logActivity,
 }));
+
+vi.mock("../src/lib/hobby-practice.js", () => practiceMocks);
+
+vi.mock("../src/lib/search-index.js", () => searchMocks);
 
 import { hobbySessionRoutes } from "../src/routes/hobbies/sessions.js";
 

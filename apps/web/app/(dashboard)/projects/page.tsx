@@ -1,4 +1,4 @@
-import type { ProjectStatus, ProjectSummary } from "@lifekeeper/types";
+import type { ProjectStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
@@ -70,22 +70,7 @@ const buildProjectsHref = ({ householdId, status, query, sort }: ProjectsPageHre
   return `/projects?${params.toString()}`;
 };
 
-const normalizeSearchValue = (value: string): string => value.trim().toLowerCase();
-
-const matchesProjectSearch = (project: ProjectSummary, query: string): boolean => {
-  if (query.length === 0) {
-    return true;
-  }
-
-  const haystack = [
-    project.name,
-    project.description ?? "",
-    project.notes ?? "",
-    projectStatusLabels[project.status]
-  ].join(" ").toLowerCase();
-
-  return haystack.includes(query);
-};
+const normalizeSearchValue = (value: string): string => value.trim();
 
 const ProjectStatsSkeleton = (): JSX.Element => (
   <section className="stats-row">
@@ -181,10 +166,16 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       );
     }
 
-    const projectStatusCountsPromise = getHouseholdProjectStatusCounts(household.id);
+    const projectStatusCountsPromise = getHouseholdProjectStatusCounts(
+      household.id,
+      searchQuery.length > 0 ? { q: searchQuery } : undefined
+    );
     const visiblePortfolioProjectsPromise = getHouseholdProjectPortfolio(
       household.id,
-      selectedStatus ? { status: selectedStatus } : undefined
+      {
+        ...(selectedStatus ? { status: selectedStatus } : {}),
+        ...(searchQuery.length > 0 ? { q: searchQuery } : {})
+      }
     );
 
     const [projectStatusCounts, statusScopedProjects] = await Promise.all([projectStatusCountsPromise, visiblePortfolioProjectsPromise]);
@@ -192,7 +183,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
     const depthFilteredProjects = searchQuery.length > 0
       ? statusScopedProjects
       : statusScopedProjects.filter((project) => project.depth === 0);
-    const filteredProjects = depthFilteredProjects.filter((project) => matchesProjectSearch(project, searchQuery));
+    const filteredProjects = depthFilteredProjects;
     const projectCountByStatus = new Map(projectStatusCounts.map((entry) => [entry.status, entry.count]));
     const statusCounts = projectStatusValues.map((status) => ({
       status,

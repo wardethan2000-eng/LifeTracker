@@ -5,6 +5,7 @@ import {
   createProjectPurchaseRequestSchema,
   createProjectSchema,
   createProjectTemplateSchema,
+  noteCategoryValues,
   projectStatusCountListSchema,
   projectStatusValues,
   instantiateProjectTemplateSchema,
@@ -84,7 +85,8 @@ const listProjectsQuerySchema = createOffsetPaginationQuerySchema({
 });
 
 const projectPortfolioQuerySchema = z.object({
-  status: projectStatusSchema.optional()
+  status: projectStatusSchema.optional(),
+  q: z.string().trim().min(1).max(200).optional()
 });
 
 const projectTemplateParamsSchema = householdParamsSchema.extend({
@@ -123,6 +125,112 @@ const activeProjectWhere = (
   deletedAt: null,
   ...(projectId ? { id: projectId } : {})
 });
+
+const buildProjectPortfolioWhere = (
+  householdId: string,
+  filters: z.infer<typeof projectPortfolioQuerySchema>
+): Prisma.ProjectWhereInput => {
+  const baseWhere: Prisma.ProjectWhereInput = {
+    householdId,
+    deletedAt: null
+  };
+
+  if (filters.status !== undefined) {
+    baseWhere.status = filters.status;
+  }
+
+  const searchText = filters.q?.trim();
+  const normalizedSearchText = searchText?.toLowerCase() ?? "";
+  const matchingProjectStatuses = projectStatusValues.filter((status) => (
+    status.includes(normalizedSearchText) || status.replace(/_/g, " ").includes(normalizedSearchText)
+  ));
+
+  if (!searchText) {
+    return baseWhere;
+  }
+
+  const normalizedStatusSearch = searchText.toLowerCase().replace(/\s+/g, "_");
+
+  return {
+    ...baseWhere,
+    OR: [
+      { name: { contains: searchText, mode: "insensitive" } },
+      { description: { contains: searchText, mode: "insensitive" } },
+      { notes: { contains: searchText, mode: "insensitive" } },
+      ...(matchingProjectStatuses.length > 0 ? [{ status: { in: matchingProjectStatuses } }] : []),
+      {
+        phases: {
+          some: {
+            deletedAt: null,
+            OR: [
+              { name: { contains: searchText, mode: "insensitive" } },
+              { description: { contains: searchText, mode: "insensitive" } },
+              { notes: { contains: searchText, mode: "insensitive" } },
+              { status: { contains: normalizedStatusSearch, mode: "insensitive" } }
+            ]
+          }
+        }
+      },
+      {
+        tasks: {
+          some: {
+            deletedAt: null,
+            OR: [
+              { title: { contains: searchText, mode: "insensitive" } },
+              { description: { contains: searchText, mode: "insensitive" } },
+              { status: { contains: normalizedStatusSearch, mode: "insensitive" } },
+              { taskType: { contains: searchText, mode: "insensitive" } }
+            ]
+          }
+        }
+      },
+      {
+        noteEntries: {
+          some: {
+            deletedAt: null,
+            OR: [
+              { title: { contains: searchText, mode: "insensitive" } },
+              { body: { contains: searchText, mode: "insensitive" } },
+              { url: { contains: searchText, mode: "insensitive" } },
+              { attachmentName: { contains: searchText, mode: "insensitive" } }
+            ]
+          }
+        }
+      },
+      {
+        expenses: {
+          some: {
+            deletedAt: null,
+            OR: [
+              { description: { contains: searchText, mode: "insensitive" } },
+              { category: { contains: searchText, mode: "insensitive" } },
+              { notes: { contains: searchText, mode: "insensitive" } }
+            ]
+          }
+        }
+      },
+      {
+        phases: {
+          some: {
+            deletedAt: null,
+            supplies: {
+              some: {
+                deletedAt: null,
+                OR: [
+                  { name: { contains: searchText, mode: "insensitive" } },
+                  { description: { contains: searchText, mode: "insensitive" } },
+                  { supplier: { contains: searchText, mode: "insensitive" } },
+                  { supplierUrl: { contains: searchText, mode: "insensitive" } },
+                  { notes: { contains: searchText, mode: "insensitive" } }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  };
+};
 
 const isProjectSummaryTaskCompleted = (task: {
   status: string;
@@ -423,11 +531,11 @@ const getProjectTreeStats = async (
     FROM project_tree pt
     JOIN "Project" proj ON proj.id = pt.id
     LEFT JOIN LATERAL (
-      SELECT SUM(amount) as total FROM "ProjectExpense" WHERE "projectId" = pt.id
+      SELECT SUM(amount) as total FROM "ProjectExpense" WHERE "projectId" = pt.id AND "deletedAt" IS NULL
     ) exp_agg ON true
     LEFT JOIN LATERAL (
       SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'completed') as completed
-      FROM "ProjectTask" WHERE "projectId" = pt.id
+      FROM "ProjectTask" WHERE "projectId" = pt.id AND "deletedAt" IS NULL
     ) task_agg ON true
   `;
 
@@ -457,6 +565,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/v1/households/:householdId/projects/status-counts", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
+    const query = projectPortfolioQuerySchema.parse(request.query);
 
     if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
       return;
@@ -464,10 +573,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const grouped = await app.prisma.project.groupBy({
       by: ["status"],
-      where: {
-        householdId: params.householdId,
-        deletedAt: null
-      },
+      where: buildProjectPortfolioWhere(params.householdId, query),
       _count: {
         _all: true
       }
@@ -501,9 +607,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const projectQuery = {
       where,
       include: {
-        expenses: { select: { amount: true } },
-        tasks: { select: projectTaskSummarySelect },
+        expenses: { where: { deletedAt: null }, select: { amount: true } },
+        tasks: { where: { deletedAt: null }, select: projectTaskSummarySelect },
         phases: {
+          where: { deletedAt: null },
           select: {
             id: true,
             name: true,
@@ -547,15 +654,12 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const projects = await app.prisma.project.findMany({
-      where: {
-        householdId: params.householdId,
-        deletedAt: null,
-        ...(query.status ? { status: query.status } : {})
-      },
+      where: buildProjectPortfolioWhere(params.householdId, query),
       include: {
-        expenses: { select: { amount: true } },
-        tasks: { select: projectTaskSummarySelect },
+        expenses: { where: { deletedAt: null }, select: { amount: true } },
+        tasks: { where: { deletedAt: null }, select: projectTaskSummarySelect },
         phases: {
+          where: { deletedAt: null },
           select: {
             id: true,
             name: true,
@@ -682,18 +786,21 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
           }
         },
         tasks: {
+          where: { deletedAt: null },
           include: projectTaskDetailInclude,
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         },
         expenses: {
+          where: { deletedAt: null },
           orderBy: { createdAt: "desc" }
         },
         phases: {
+          where: { deletedAt: null },
           include: {
-            tasks: { select: projectTaskSummarySelect },
+            tasks: { where: { deletedAt: null }, select: projectTaskSummarySelect },
             checklistItems: { select: { isCompleted: true } },
-            supplies: { select: { isProcured: true } },
-            expenses: { select: { amount: true } }
+            supplies: { where: { deletedAt: null }, select: { isProcured: true } },
+            expenses: { where: { deletedAt: null }, select: { amount: true } }
           },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         },
@@ -715,8 +822,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       app.prisma.project.findMany({
         where: { parentProjectId: project.id, householdId: params.householdId, deletedAt: null },
         include: {
-          tasks: { select: projectTaskSummarySelect },
-          expenses: { select: { amount: true } },
+          tasks: { where: { deletedAt: null }, select: projectTaskSummarySelect },
+          expenses: { where: { deletedAt: null }, select: { amount: true } },
           _count: { select: { childProjects: true } }
         },
         orderBy: { createdAt: "asc" }
@@ -1422,7 +1529,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const tasks = await app.prisma.projectTask.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, deletedAt: null },
       include: projectTaskDetailInclude,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
@@ -1477,7 +1584,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: project.id },
+        where: { id: input.phaseId, projectId: project.id, deletedAt: null },
         select: { id: true }
       });
 
@@ -1503,7 +1610,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.predecessorTaskIds && input.predecessorTaskIds.length > 0) {
       const projectTasks = await app.prisma.projectTask.findMany({
-        where: { projectId: project.id },
+        where: { projectId: project.id, deletedAt: null },
         select: {
           id: true,
           predecessorLinks: { select: { predecessorTaskId: true, successorTaskId: true } }
@@ -1589,6 +1696,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectTask.findFirst({
       where: {
         id: params.taskId,
+        deletedAt: null,
         project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
@@ -1609,7 +1717,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId !== undefined && input.phaseId !== null) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: params.projectId },
+        where: { id: input.phaseId, projectId: params.projectId, deletedAt: null },
         select: { id: true }
       });
 
@@ -1635,7 +1743,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.predecessorTaskIds !== undefined) {
       const projectTasks = await app.prisma.projectTask.findMany({
-        where: { projectId: params.projectId },
+        where: { projectId: params.projectId, deletedAt: null },
         select: {
           id: true,
           predecessorLinks: { select: { predecessorTaskId: true, successorTaskId: true } }
@@ -1801,6 +1909,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectTask.findFirst({
       where: {
         id: params.taskId,
+        deletedAt: null,
         project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
@@ -1810,7 +1919,18 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.$transaction(async (tx) => {
-      await tx.projectTask.delete({ where: { id: existing.id } });
+      await tx.projectTask.update({
+        where: { id: existing.id },
+        data: { deletedAt: new Date() }
+      });
+      await tx.projectTaskDependency.deleteMany({
+        where: {
+          OR: [
+            { predecessorTaskId: existing.id },
+            { successorTaskId: existing.id }
+          ]
+        }
+      });
       await syncProjectDerivedStatuses(tx, params.projectId);
     });
 
@@ -1842,7 +1962,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: project.id },
+        where: { id: input.phaseId, projectId: project.id, deletedAt: null },
         select: { id: true }
       });
 
@@ -1981,7 +2101,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const expenses = await app.prisma.projectExpense.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, deletedAt: null },
       orderBy: { createdAt: "desc" }
     });
 
@@ -2009,7 +2129,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.taskId) {
       const task = await app.prisma.projectTask.findFirst({
-        where: { id: input.taskId, projectId: project.id },
+        where: { id: input.taskId, projectId: project.id, deletedAt: null },
         select: { id: true }
       });
 
@@ -2020,7 +2140,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: project.id },
+        where: { id: input.phaseId, projectId: project.id, deletedAt: null },
         select: { id: true }
       });
 
@@ -2084,6 +2204,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectExpense.findFirst({
       where: {
         id: params.expenseId,
+        deletedAt: null,
         project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
@@ -2094,7 +2215,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.taskId !== undefined && input.taskId !== null) {
       const task = await app.prisma.projectTask.findFirst({
-        where: { id: input.taskId, projectId: params.projectId },
+        where: { id: input.taskId, projectId: params.projectId, deletedAt: null },
         select: { id: true }
       });
 
@@ -2105,7 +2226,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.phaseId !== undefined && input.phaseId !== null) {
       const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: params.projectId },
+        where: { id: input.phaseId, projectId: params.projectId, deletedAt: null },
         select: { id: true }
       });
 
@@ -2170,6 +2291,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.projectExpense.findFirst({
       where: {
         id: params.expenseId,
+        deletedAt: null,
         project: { id: params.projectId, householdId: params.householdId, deletedAt: null }
       }
     });
@@ -2178,7 +2300,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project expense not found." });
     }
 
-    await app.prisma.projectExpense.delete({ where: { id: existing.id } });
+    await app.prisma.projectExpense.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() }
+    });
 
     refreshProjectArtifacts(params.householdId, params.projectId);
 
@@ -2209,8 +2334,10 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const supplies = await app.prisma.projectPhaseSupply.findMany({
       where: {
+        deletedAt: null,
         isProcured: false,
         phase: {
+          deletedAt: null,
           projectId: { in: treeProjectIds }
         }
       },
@@ -2327,7 +2454,9 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const supplies = await app.prisma.projectPhaseSupply.findMany({
       where: {
+        deletedAt: null,
         phase: {
+          deletedAt: null,
           projectId: { in: treeProjectIds }
         },
         ...(input.supplyIds ? { id: { in: input.supplyIds } } : {})

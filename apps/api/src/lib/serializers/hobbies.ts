@@ -1,6 +1,17 @@
 import type { Prisma } from "@prisma/client";
 import {
   hobbyLogSchema,
+  hobbyCollectionItemDetailSchema,
+  hobbyCollectionItemMetricReadingSchema,
+  hobbyCollectionItemSchema,
+  hobbyCollectionItemSessionSchema,
+  hobbyPracticeGoalDetailSchema,
+  hobbyPracticeGoalProgressPointSchema,
+  hobbyPracticeGoalSchema,
+  hobbyPracticeGoalSummarySchema,
+  hobbyPracticeRoutineComplianceSummarySchema,
+  hobbyPracticeRoutineSchema,
+  hobbyPracticeRoutineSummarySchema,
   hobbyProjectDetailSchema,
   hobbyProjectEntryCountSchema,
   hobbyProjectInventoryItemSchema,
@@ -208,11 +219,14 @@ export const toSessionResponse = (session: {
   hobbyId: string;
   recipeId: string | null;
   seriesId: string | null;
+  routineId?: string | null;
+  collectionItemId?: string | null;
   batchNumber: number | null;
   name: string;
   status: string;
   startDate: Date | null;
   completedDate: Date | null;
+  durationMinutes?: number | null;
   pipelineStepId: string | null;
   customFields: Prisma.JsonValue;
   totalCost: number | null;
@@ -225,11 +239,14 @@ export const toSessionResponse = (session: {
   hobbyId: session.hobbyId,
   recipeId: session.recipeId,
   seriesId: session.seriesId,
+  routineId: session.routineId ?? null,
+  collectionItemId: session.collectionItemId ?? null,
   batchNumber: session.batchNumber,
   name: session.name,
   status: session.status,
   startDate: session.startDate?.toISOString() ?? null,
   completedDate: session.completedDate?.toISOString() ?? null,
+  durationMinutes: session.durationMinutes ?? null,
   pipelineStepId: session.pipelineStepId,
   customFields: session.customFields as Record<string, unknown>,
   totalCost: session.totalCost,
@@ -667,6 +684,242 @@ export const toHobbyProjectDetailResponse = (
   completedMilestoneCount: detail.completedMilestoneCount,
   milestoneCompletionPercentage: detail.milestoneCompletionPercentage,
   entryCountsByType: detail.entryCountsByType.map(toHobbyProjectEntryCountResponse)
+});
+
+export const toHobbyPracticeGoalResponse = (goal: {
+  id: string;
+  hobbyId: string;
+  householdId: string;
+  createdById: string;
+  name: string;
+  description: string | null;
+  goalType: string;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  metricDefinitionId: string | null;
+  startDate: Date | null;
+  targetDate: Date | null;
+  status: string;
+  tags: Prisma.JsonValue;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyPracticeGoalSchema.parse({
+  id: goal.id,
+  hobbyId: goal.hobbyId,
+  householdId: goal.householdId,
+  createdById: goal.createdById,
+  name: goal.name,
+  description: goal.description,
+  goalType: goal.goalType,
+  targetValue: goal.targetValue,
+  currentValue: goal.currentValue,
+  unit: goal.unit,
+  metricDefinitionId: goal.metricDefinitionId,
+  startDate: goal.startDate?.toISOString() ?? null,
+  targetDate: goal.targetDate?.toISOString() ?? null,
+  status: goal.status,
+  tags: Array.isArray(goal.tags) ? goal.tags : [],
+  createdAt: goal.createdAt.toISOString(),
+  updatedAt: goal.updatedAt.toISOString(),
+});
+
+export const toHobbyPracticeGoalSummaryResponse = (
+  goal: Parameters<typeof toHobbyPracticeGoalResponse>[0],
+  progressPercentage: number,
+) => hobbyPracticeGoalSummarySchema.parse({
+  ...toHobbyPracticeGoalResponse(goal),
+  progressPercentage,
+});
+
+export const toHobbyPracticeGoalProgressPointResponse = (point: {
+  value: number;
+  date: string;
+  sourceType: "metric" | "session" | "manual";
+  sourceId: string | null;
+  label: string | null;
+}) => hobbyPracticeGoalProgressPointSchema.parse(point);
+
+export const toHobbyPracticeGoalDetailResponse = (
+  goal: Parameters<typeof toHobbyPracticeGoalResponse>[0],
+  detail: {
+    progressPercentage: number;
+    progressHistory: Array<Parameters<typeof toHobbyPracticeGoalProgressPointResponse>[0]>;
+  },
+) => hobbyPracticeGoalDetailSchema.parse({
+  ...toHobbyPracticeGoalResponse(goal),
+  progressPercentage: detail.progressPercentage,
+  progressHistory: detail.progressHistory.map(toHobbyPracticeGoalProgressPointResponse),
+});
+
+export const toHobbyPracticeRoutineResponse = (routine: {
+  id: string;
+  hobbyId: string;
+  householdId: string;
+  createdById: string;
+  name: string;
+  description: string | null;
+  targetDurationMinutes: number | null;
+  targetFrequency: string;
+  targetSessionsPerPeriod: number;
+  isActive: boolean;
+  currentStreak: number;
+  longestStreak: number;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyPracticeRoutineSchema.parse({
+  id: routine.id,
+  hobbyId: routine.hobbyId,
+  householdId: routine.householdId,
+  createdById: routine.createdById,
+  name: routine.name,
+  description: routine.description,
+  targetDurationMinutes: routine.targetDurationMinutes,
+  targetFrequency: routine.targetFrequency,
+  targetSessionsPerPeriod: routine.targetSessionsPerPeriod,
+  isActive: routine.isActive,
+  currentStreak: routine.currentStreak,
+  longestStreak: routine.longestStreak,
+  notes: routine.notes,
+  createdAt: routine.createdAt.toISOString(),
+  updatedAt: routine.updatedAt.toISOString(),
+});
+
+export const toHobbyPracticeRoutineSummaryResponse = (
+  routine: Parameters<typeof toHobbyPracticeRoutineResponse>[0],
+  detail: {
+    adherenceRate: number;
+    nextExpectedSessionDate: string | null;
+  },
+) => hobbyPracticeRoutineSummarySchema.parse({
+  ...toHobbyPracticeRoutineResponse(routine),
+  adherenceRate: detail.adherenceRate,
+  nextExpectedSessionDate: detail.nextExpectedSessionDate,
+});
+
+export const toHobbyPracticeRoutineComplianceSummaryResponse = (summary: {
+  routineId: string;
+  startDate: string;
+  endDate: string;
+  periods: Array<{
+    periodStart: string;
+    periodEnd: string;
+    expectedSessions: number;
+    completedSessions: number;
+    metTarget: boolean;
+  }>;
+  totalExpectedSessions: number;
+  totalCompletedSessions: number;
+  adherenceRate: number;
+}) => hobbyPracticeRoutineComplianceSummarySchema.parse(summary);
+
+export const toHobbyCollectionItemResponse = (item: {
+  id: string;
+  hobbyId: string;
+  householdId: string;
+  createdById: string;
+  name: string;
+  description: string | null;
+  status: string;
+  acquiredDate: Date | null;
+  retiredDate: Date | null;
+  coverImageUrl: string | null;
+  location: string | null;
+  customFields: Prisma.JsonValue;
+  quantity: number;
+  tags: Prisma.JsonValue;
+  notes: string | null;
+  parentItemId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyCollectionItemSchema.parse({
+  id: item.id,
+  hobbyId: item.hobbyId,
+  householdId: item.householdId,
+  createdById: item.createdById,
+  name: item.name,
+  description: item.description,
+  status: item.status,
+  acquiredDate: item.acquiredDate?.toISOString() ?? null,
+  retiredDate: item.retiredDate?.toISOString() ?? null,
+  coverImageUrl: item.coverImageUrl,
+  location: item.location,
+  customFields: item.customFields as Record<string, unknown>,
+  quantity: item.quantity,
+  tags: Array.isArray(item.tags) ? item.tags : [],
+  notes: item.notes,
+  parentItemId: item.parentItemId,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString(),
+});
+
+export const toHobbyCollectionItemSessionResponse = (session: {
+  id: string;
+  hobbyId: string;
+  recipeId: string | null;
+  seriesId: string | null;
+  routineId: string | null;
+  collectionItemId: string | null;
+  batchNumber: number | null;
+  name: string;
+  status: string;
+  startDate: Date | null;
+  completedDate: Date | null;
+  durationMinutes: number | null;
+  pipelineStepId: string | null;
+  customFields: Prisma.JsonValue;
+  totalCost: number | null;
+  rating: number | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  recipeName: string | null;
+  routineName: string | null;
+}) => hobbyCollectionItemSessionSchema.parse({
+  ...toSessionResponse(session),
+  recipeName: session.recipeName,
+  routineName: session.routineName,
+});
+
+export const toHobbyCollectionItemMetricReadingResponse = (reading: {
+  id: string;
+  metricDefinitionId: string;
+  sessionId: string | null;
+  value: number;
+  readingDate: Date;
+  notes: string | null;
+  createdAt: Date;
+  metricName: string;
+  metricUnit: string;
+  sessionName: string | null;
+}) => hobbyCollectionItemMetricReadingSchema.parse({
+  id: reading.id,
+  metricDefinitionId: reading.metricDefinitionId,
+  sessionId: reading.sessionId,
+  value: reading.value,
+  readingDate: reading.readingDate.toISOString(),
+  notes: reading.notes,
+  createdAt: reading.createdAt.toISOString(),
+  metricName: reading.metricName,
+  metricUnit: reading.metricUnit,
+  sessionName: reading.sessionName,
+});
+
+export const toHobbyCollectionItemDetailResponse = (
+  item: Parameters<typeof toHobbyCollectionItemResponse>[0],
+  detail: {
+    childItems: Parameters<typeof toHobbyCollectionItemResponse>[0][];
+    sessionHistory: Parameters<typeof toHobbyCollectionItemSessionResponse>[0][];
+    entryTimeline: unknown[];
+    metricReadings: Parameters<typeof toHobbyCollectionItemMetricReadingResponse>[0][];
+  },
+) => hobbyCollectionItemDetailSchema.parse({
+  ...toHobbyCollectionItemResponse(item),
+  childItems: detail.childItems.map(toHobbyCollectionItemResponse),
+  sessionHistory: detail.sessionHistory.map(toHobbyCollectionItemSessionResponse),
+  entryTimeline: detail.entryTimeline,
+  metricReadings: detail.metricReadings.map(toHobbyCollectionItemMetricReadingResponse),
 });
 
 export const toHobbyInventoryCategoryResponse = (category: {

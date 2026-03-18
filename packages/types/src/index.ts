@@ -2855,7 +2855,8 @@ export const searchEntityTypeValues = [
   "entry",
   "invitation",
   "hobby",
-  "hobby_series"
+  "hobby_series",
+  "hobby_collection_item"
 ] as const;
 
 export const searchEntityTypeSchema = z.enum(searchEntityTypeValues);
@@ -3416,6 +3417,18 @@ export type HobbyActivityMode = z.infer<typeof hobbyActivityModeSchema>;
 export const hobbyProjectStatusSchema = z.enum(["planned", "active", "paused", "completed", "abandoned"]);
 export type HobbyProjectStatus = z.infer<typeof hobbyProjectStatusSchema>;
 
+export const hobbyPracticeGoalTypeSchema = z.enum(["metric_target", "session_count", "duration_total", "custom"]);
+export type HobbyPracticeGoalType = z.infer<typeof hobbyPracticeGoalTypeSchema>;
+
+export const hobbyPracticeGoalStatusSchema = z.enum(["active", "achieved", "abandoned", "paused"]);
+export type HobbyPracticeGoalStatus = z.infer<typeof hobbyPracticeGoalStatusSchema>;
+
+export const hobbyPracticeRoutineFrequencySchema = z.enum(["daily", "weekly", "biweekly", "monthly"]);
+export type HobbyPracticeRoutineFrequency = z.infer<typeof hobbyPracticeRoutineFrequencySchema>;
+
+export const hobbyCollectionItemStatusSchema = z.enum(["active", "dormant", "retired", "lost", "deceased"]);
+export type HobbyCollectionItemStatus = z.infer<typeof hobbyCollectionItemStatusSchema>;
+
 export const milestoneStatusSchema = z.enum(["pending", "in_progress", "completed", "skipped"]);
 export type MilestoneStatus = z.infer<typeof milestoneStatusSchema>;
 
@@ -3732,6 +3745,300 @@ export const hobbyProjectDetailSchema = hobbyProjectSchema.extend({
 });
 export type HobbyProjectDetail = z.infer<typeof hobbyProjectDetailSchema>;
 
+const hobbyPracticeTagSchema = z.string().trim().min(1).max(80);
+
+export const hobbyPracticeGoalProgressPointSchema = z.object({
+  value: z.number(),
+  date: z.string().datetime(),
+  sourceType: z.enum(["metric", "session", "manual"]),
+  sourceId: z.string().nullable(),
+  label: z.string().nullable(),
+});
+export type HobbyPracticeGoalProgressPoint = z.infer<typeof hobbyPracticeGoalProgressPointSchema>;
+
+export const hobbyPracticeGoalSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  goalType: hobbyPracticeGoalTypeSchema,
+  targetValue: z.number(),
+  currentValue: z.number(),
+  unit: z.string(),
+  metricDefinitionId: z.string().cuid().nullable(),
+  startDate: z.string().datetime().nullable(),
+  targetDate: z.string().datetime().nullable(),
+  status: hobbyPracticeGoalStatusSchema,
+  tags: z.array(hobbyPracticeTagSchema),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyPracticeGoal = z.infer<typeof hobbyPracticeGoalSchema>;
+
+export const hobbyPracticeGoalSummarySchema = hobbyPracticeGoalSchema.extend({
+  progressPercentage: z.number().min(0),
+});
+export type HobbyPracticeGoalSummary = z.infer<typeof hobbyPracticeGoalSummarySchema>;
+
+export const hobbyPracticeGoalDetailSchema = hobbyPracticeGoalSummarySchema.extend({
+  progressHistory: z.array(hobbyPracticeGoalProgressPointSchema),
+});
+export type HobbyPracticeGoalDetail = z.infer<typeof hobbyPracticeGoalDetailSchema>;
+
+export const hobbyPracticeGoalListQuerySchema = z.object({
+  status: hobbyPracticeGoalStatusSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional(),
+});
+export type HobbyPracticeGoalListQuery = z.infer<typeof hobbyPracticeGoalListQuerySchema>;
+
+export const hobbyPracticeGoalListResponseSchema = z.object({
+  items: z.array(hobbyPracticeGoalSummarySchema),
+  nextCursor: z.string().cuid().nullable(),
+});
+export type HobbyPracticeGoalListResponse = z.infer<typeof hobbyPracticeGoalListResponseSchema>;
+
+export const createHobbyPracticeGoalInputSchema = z.object({
+  name: z.string().trim().min(1).max(300),
+  description: z.string().max(2000).optional(),
+  goalType: hobbyPracticeGoalTypeSchema,
+  targetValue: z.number(),
+  currentValue: z.number().optional(),
+  unit: z.string().trim().min(1).max(100),
+  metricDefinitionId: z.string().cuid().optional(),
+  startDate: z.string().datetime().optional(),
+  targetDate: z.string().datetime().optional(),
+  status: hobbyPracticeGoalStatusSchema.optional(),
+  tags: z.array(hobbyPracticeTagSchema).max(50).optional(),
+});
+export const updateHobbyPracticeGoalInputSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  goalType: hobbyPracticeGoalTypeSchema.optional(),
+  targetValue: z.number().optional(),
+  currentValue: z.number().optional(),
+  unit: z.string().trim().min(1).max(100).optional(),
+  metricDefinitionId: z.string().cuid().nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  targetDate: z.string().datetime().nullable().optional(),
+  status: hobbyPracticeGoalStatusSchema.optional(),
+  tags: z.array(hobbyPracticeTagSchema).max(50).optional(),
+});
+export type CreateHobbyPracticeGoalInput = z.infer<typeof createHobbyPracticeGoalInputSchema>;
+export type UpdateHobbyPracticeGoalInput = z.infer<typeof updateHobbyPracticeGoalInputSchema>;
+
+export const hobbyPracticeRoutineSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  targetDurationMinutes: z.number().int().nullable(),
+  targetFrequency: hobbyPracticeRoutineFrequencySchema,
+  targetSessionsPerPeriod: z.number().int().min(1),
+  isActive: z.boolean(),
+  currentStreak: z.number().int().min(0),
+  longestStreak: z.number().int().min(0),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyPracticeRoutine = z.infer<typeof hobbyPracticeRoutineSchema>;
+
+export const hobbyPracticeRoutineSummarySchema = hobbyPracticeRoutineSchema.extend({
+  adherenceRate: z.number().min(0),
+  nextExpectedSessionDate: z.string().datetime().nullable(),
+});
+export type HobbyPracticeRoutineSummary = z.infer<typeof hobbyPracticeRoutineSummarySchema>;
+
+export const hobbyPracticeRoutineListQuerySchema = z.object({
+  isActive: z.coerce.boolean().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional(),
+});
+export type HobbyPracticeRoutineListQuery = z.infer<typeof hobbyPracticeRoutineListQuerySchema>;
+
+export const hobbyPracticeRoutineListResponseSchema = z.object({
+  items: z.array(hobbyPracticeRoutineSummarySchema),
+  nextCursor: z.string().cuid().nullable(),
+});
+export type HobbyPracticeRoutineListResponse = z.infer<typeof hobbyPracticeRoutineListResponseSchema>;
+
+export const hobbyPracticeRoutineCompliancePeriodSchema = z.object({
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+  expectedSessions: z.number().int().min(0),
+  completedSessions: z.number().int().min(0),
+  metTarget: z.boolean(),
+});
+export type HobbyPracticeRoutineCompliancePeriod = z.infer<typeof hobbyPracticeRoutineCompliancePeriodSchema>;
+
+export const hobbyPracticeRoutineComplianceSummarySchema = z.object({
+  routineId: z.string().cuid(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  periods: z.array(hobbyPracticeRoutineCompliancePeriodSchema),
+  totalExpectedSessions: z.number().int().min(0),
+  totalCompletedSessions: z.number().int().min(0),
+  adherenceRate: z.number().min(0),
+});
+export type HobbyPracticeRoutineComplianceSummary = z.infer<typeof hobbyPracticeRoutineComplianceSummarySchema>;
+
+export const hobbyPracticeRoutineComplianceQuerySchema = z.object({
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+});
+export type HobbyPracticeRoutineComplianceQuery = z.infer<typeof hobbyPracticeRoutineComplianceQuerySchema>;
+
+export const createHobbyPracticeRoutineInputSchema = z.object({
+  name: z.string().trim().min(1).max(300),
+  description: z.string().max(2000).optional(),
+  targetDurationMinutes: z.number().int().min(1).optional(),
+  targetFrequency: hobbyPracticeRoutineFrequencySchema,
+  targetSessionsPerPeriod: z.number().int().min(1).optional(),
+  isActive: z.boolean().optional(),
+  notes: z.string().max(20000).optional(),
+});
+export const updateHobbyPracticeRoutineInputSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  targetDurationMinutes: z.number().int().min(1).nullable().optional(),
+  targetFrequency: hobbyPracticeRoutineFrequencySchema.optional(),
+  targetSessionsPerPeriod: z.number().int().min(1).optional(),
+  isActive: z.boolean().optional(),
+  notes: z.string().max(20000).nullable().optional(),
+});
+export type CreateHobbyPracticeRoutineInput = z.infer<typeof createHobbyPracticeRoutineInputSchema>;
+export type UpdateHobbyPracticeRoutineInput = z.infer<typeof updateHobbyPracticeRoutineInputSchema>;
+
+export const hobbyCollectionItemSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: hobbyCollectionItemStatusSchema,
+  acquiredDate: z.string().datetime().nullable(),
+  retiredDate: z.string().datetime().nullable(),
+  coverImageUrl: z.string().nullable(),
+  location: z.string().nullable(),
+  customFields: z.record(z.unknown()),
+  quantity: z.number().int().min(0),
+  tags: z.array(hobbyPracticeTagSchema),
+  notes: z.string().nullable(),
+  parentItemId: z.string().cuid().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyCollectionItem = z.infer<typeof hobbyCollectionItemSchema>;
+
+export const hobbyCollectionItemSessionSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  recipeId: z.string().cuid().nullable(),
+  seriesId: z.string().cuid().nullable(),
+  routineId: z.string().cuid().nullable(),
+  collectionItemId: z.string().cuid().nullable(),
+  batchNumber: z.number().int().nullable(),
+  name: z.string(),
+  status: z.string(),
+  startDate: z.string().datetime().nullable(),
+  completedDate: z.string().datetime().nullable(),
+  durationMinutes: z.number().int().nullable(),
+  pipelineStepId: z.string().cuid().nullable(),
+  customFields: z.record(z.unknown()),
+  totalCost: z.number().nullable(),
+  rating: z.number().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  recipeName: z.string().nullable(),
+  routineName: z.string().nullable(),
+});
+export type HobbyCollectionItemSession = z.infer<typeof hobbyCollectionItemSessionSchema>;
+
+export const hobbyCollectionItemMetricReadingSchema = z.object({
+  id: z.string().cuid(),
+  metricDefinitionId: z.string().cuid(),
+  sessionId: z.string().cuid().nullable(),
+  value: z.number(),
+  readingDate: z.string().datetime(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  sessionName: z.string().nullable(),
+});
+export type HobbyCollectionItemMetricReading = z.infer<typeof hobbyCollectionItemMetricReadingSchema>;
+
+export const hobbyCollectionItemDetailSchema = hobbyCollectionItemSchema.extend({
+  childItems: z.array(hobbyCollectionItemSchema),
+  sessionHistory: z.array(hobbyCollectionItemSessionSchema),
+  entryTimeline: z.array(entrySchema),
+  metricReadings: z.array(hobbyCollectionItemMetricReadingSchema),
+});
+export type HobbyCollectionItemDetail = z.infer<typeof hobbyCollectionItemDetailSchema>;
+
+export const hobbyCollectionItemListQuerySchema = z.object({
+  status: hobbyCollectionItemStatusSchema.optional(),
+  location: z.string().max(200).optional(),
+  tag: hobbyPracticeTagSchema.optional(),
+  search: z.string().max(300).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional(),
+});
+export type HobbyCollectionItemListQuery = z.infer<typeof hobbyCollectionItemListQuerySchema>;
+
+export const hobbyCollectionItemListResponseSchema = z.object({
+  items: z.array(hobbyCollectionItemSchema),
+  nextCursor: z.string().cuid().nullable(),
+});
+export type HobbyCollectionItemListResponse = z.infer<typeof hobbyCollectionItemListResponseSchema>;
+
+export const createHobbyCollectionItemInputSchema = z.object({
+  name: z.string().trim().min(1).max(300),
+  description: z.string().max(2000).optional(),
+  status: hobbyCollectionItemStatusSchema.optional(),
+  acquiredDate: z.string().datetime().optional(),
+  retiredDate: z.string().datetime().optional(),
+  coverImageUrl: z.string().max(2000).optional(),
+  location: z.string().max(200).optional(),
+  customFields: z.record(z.unknown()).optional(),
+  quantity: z.number().int().min(0).optional(),
+  tags: z.array(hobbyPracticeTagSchema).max(50).optional(),
+  notes: z.string().max(20000).optional(),
+  parentItemId: z.string().cuid().optional(),
+});
+export const updateHobbyCollectionItemInputSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  status: hobbyCollectionItemStatusSchema.optional(),
+  acquiredDate: z.string().datetime().nullable().optional(),
+  retiredDate: z.string().datetime().nullable().optional(),
+  coverImageUrl: z.string().max(2000).nullable().optional(),
+  location: z.string().max(200).nullable().optional(),
+  customFields: z.record(z.unknown()).optional(),
+  quantity: z.number().int().min(0).optional(),
+  tags: z.array(hobbyPracticeTagSchema).max(50).optional(),
+  notes: z.string().max(20000).nullable().optional(),
+  parentItemId: z.string().cuid().nullable().optional(),
+});
+export type CreateHobbyCollectionItemInput = z.infer<typeof createHobbyCollectionItemInputSchema>;
+export type UpdateHobbyCollectionItemInput = z.infer<typeof updateHobbyCollectionItemInputSchema>;
+
+export const bulkUpdateHobbyCollectionItemStatusInputSchema = z.object({
+  status: hobbyCollectionItemStatusSchema,
+  location: z.string().max(200).optional(),
+  itemIds: z.array(z.string().cuid()).max(500).optional(),
+}).refine((value) => Boolean(value.location || (value.itemIds && value.itemIds.length > 0)), {
+  message: "Provide location or itemIds to select collection items.",
+});
+export type BulkUpdateHobbyCollectionItemStatusInput = z.infer<typeof bulkUpdateHobbyCollectionItemStatusInputSchema>;
+
 export const hobbyProjectListQuerySchema = z.object({
   status: hobbyProjectStatusSchema.optional(),
   sortBy: z.enum(["updatedAt", "startDate"]).default("updatedAt"),
@@ -4007,11 +4314,14 @@ export const hobbySessionSchema = z.object({
   hobbyId: z.string().cuid(),
   recipeId: z.string().cuid().nullable(),
   seriesId: z.string().cuid().nullable(),
+  routineId: z.string().cuid().nullable(),
+  collectionItemId: z.string().cuid().nullable(),
   batchNumber: z.number().int().nullable(),
   name: z.string(),
   status: z.string(),
   startDate: z.string().datetime().nullable(),
   completedDate: z.string().datetime().nullable(),
+  durationMinutes: z.number().int().nullable(),
   pipelineStepId: z.string().cuid().nullable(),
   customFields: z.record(z.unknown()),
   totalCost: z.number().nullable(),
@@ -4024,9 +4334,13 @@ export type HobbySession = z.infer<typeof hobbySessionSchema>;
 
 export const createHobbySessionInputSchema = z.object({
   recipeId: z.string().cuid().optional(),
+  routineId: z.string().cuid().optional(),
+  collectionItemId: z.string().cuid().optional(),
   name: z.string().min(1).max(200),
   status: z.string().max(100).optional(),
   startDate: z.string().datetime().optional(),
+  completedDate: z.string().datetime().optional(),
+  durationMinutes: z.number().int().min(0).optional(),
   customFields: z.record(z.unknown()).optional(),
   totalCost: z.number().min(0).optional(),
   notes: z.string().max(5000).optional(),
@@ -4034,6 +4348,9 @@ export const createHobbySessionInputSchema = z.object({
 
 export const updateHobbySessionInputSchema = createHobbySessionInputSchema.partial().extend({
   completedDate: z.string().datetime().nullable().optional(),
+  routineId: z.string().cuid().nullable().optional(),
+  collectionItemId: z.string().cuid().nullable().optional(),
+  durationMinutes: z.number().int().min(0).nullable().optional(),
   totalCost: z.number().min(0).nullable().optional(),
   rating: z.number().int().min(1).max(5).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),

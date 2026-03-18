@@ -115,7 +115,7 @@ export const getPhaseCompletionSummary = async (
   phaseId: string
 ): Promise<PhaseCompletionSummary | null> => {
   const phase = await prisma.projectPhase.findUnique({
-    where: { id: phaseId },
+    where: { id: phaseId, deletedAt: null },
     select: {
       id: true,
       projectId: true,
@@ -123,6 +123,7 @@ export const getPhaseCompletionSummary = async (
       status: true,
       actualEndDate: true,
       tasks: {
+        where: { deletedAt: null },
         select: {
           status: true,
           taskType: true,
@@ -130,6 +131,7 @@ export const getPhaseCompletionSummary = async (
         }
       },
       supplies: {
+        where: { deletedAt: null },
         select: {
           isProcured: true
         }
@@ -152,17 +154,19 @@ export const getProjectCompletionSummary = async (
   projectId: string
 ): Promise<ProjectCompletionSummary | null> => {
   const project = await prisma.project.findUnique({
-    where: { id: projectId },
+    where: { id: projectId, deletedAt: null },
     select: {
       id: true,
       name: true,
       phases: {
+        where: { deletedAt: null },
         select: {
           id: true,
           name: true,
           status: true,
           actualEndDate: true,
           tasks: {
+            where: { deletedAt: null },
             select: {
               status: true,
               taskType: true,
@@ -170,6 +174,7 @@ export const getProjectCompletionSummary = async (
             }
           },
           supplies: {
+            where: { deletedAt: null },
             select: {
               isProcured: true
             }
@@ -177,7 +182,7 @@ export const getProjectCompletionSummary = async (
         }
       },
       tasks: {
-        where: { phaseId: null },
+        where: { phaseId: null, deletedAt: null },
         select: {
           status: true,
           taskType: true,
@@ -217,18 +222,20 @@ export const syncProjectDerivedStatuses = async (
   now = new Date()
 ): Promise<ProjectStatusSyncResult | null> => {
   const project = await prisma.project.findUnique({
-    where: { id: projectId },
+    where: { id: projectId, deletedAt: null },
     select: {
       id: true,
       status: true,
       actualEndDate: true,
       phases: {
+        where: { deletedAt: null },
         select: {
           id: true,
           name: true,
           status: true,
           actualEndDate: true,
           tasks: {
+            where: { deletedAt: null },
             select: {
               status: true,
               taskType: true,
@@ -236,6 +243,7 @@ export const syncProjectDerivedStatuses = async (
             }
           },
           supplies: {
+            where: { deletedAt: null },
             select: {
               isProcured: true
             }
@@ -243,7 +251,7 @@ export const syncProjectDerivedStatuses = async (
         }
       },
       tasks: {
-        where: { phaseId: null },
+        where: { phaseId: null, deletedAt: null },
         select: {
           status: true,
           taskType: true,

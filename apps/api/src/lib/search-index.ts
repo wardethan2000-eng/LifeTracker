@@ -48,7 +48,8 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   entry: "Entries",
   invitation: "Invitations",
   hobby: "Hobbies",
-  hobby_series: "Hobby Series"
+  hobby_series: "Hobby Series",
+  hobby_collection_item: "Hobby Collection Items"
 };
 
 const SEARCH_GROUP_ORDER: SearchEntityType[] = [
@@ -65,7 +66,8 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "entry",
   "invitation",
   "hobby",
-  "hobby_series"
+  "hobby_series",
+  "hobby_collection_item"
 ];
 
 const normalizeText = (value: string | null | undefined): string | null => {
@@ -515,7 +517,7 @@ export const syncLogToSearchIndex = async (prisma: SearchPrisma, logId: string):
 
 export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: string): Promise<void> => {
   const project = await prisma.project.findUnique({
-    where: { id: projectId },
+    where: { id: projectId, deletedAt: null },
     select: {
       id: true,
       householdId: true,
@@ -528,10 +530,13 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
         select: { name: true }
       },
       phases: {
+        where: { deletedAt: null },
         select: {
           name: true,
           description: true,
+          status: true,
           supplies: {
+            where: { deletedAt: null },
             select: {
               name: true,
               description: true,
@@ -539,6 +544,33 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
               notes: true
             }
           }
+        }
+      },
+      tasks: {
+        where: { deletedAt: null },
+        select: {
+          title: true,
+          description: true,
+          status: true,
+          taskType: true
+        }
+      },
+      noteEntries: {
+        where: { deletedAt: null },
+        select: {
+          title: true,
+          body: true,
+          category: true,
+          attachmentName: true,
+          url: true
+        }
+      },
+      expenses: {
+        where: { deletedAt: null },
+        select: {
+          description: true,
+          category: true,
+          notes: true
         }
       },
       hobbyLinks: {
@@ -564,8 +596,12 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
   const phaseText = project.phases.flatMap((phase) => [
     phase.name,
     phase.description,
+    phase.status,
     ...phase.supplies.flatMap((supply) => [supply.name, supply.description, supply.supplier, supply.notes])
   ]).filter(Boolean).join(" ");
+  const taskText = project.tasks.flatMap((task) => [task.title, task.description, task.status, task.taskType]).filter(Boolean).join(" ");
+  const noteText = project.noteEntries.flatMap((note) => [note.title, note.body, note.category, note.attachmentName, note.url]).filter(Boolean).join(" ");
+  const expenseText = project.expenses.flatMap((expense) => [expense.description, expense.category, expense.notes]).filter(Boolean).join(" ");
   const hobbyText = project.hobbyLinks.flatMap((link) => [
     link.hobby.name,
     link.hobby.hobbyType,
@@ -581,7 +617,7 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     parentEntityName: project.parentProject?.name ?? null,
     title: project.name,
     subtitle: project.status,
-    body: joinText(project.description, phaseText, hobbyText),
+    body: joinText(project.description, phaseText, taskText, noteText, expenseText, hobbyText),
     entityUrl: `/projects/${project.id}?householdId=${project.householdId}`,
     entityMeta: {
       status: project.status
@@ -1385,13 +1421,95 @@ export const syncHobbySeriesToSearchIndex = async (prisma: SearchPrisma, seriesI
   }]);
 };
 
+export const syncHobbyCollectionItemToSearchIndex = async (prisma: SearchPrisma, itemId: string): Promise<void> => {
+  const item = await prisma.hobbyCollectionItem.findUnique({
+    where: { id: itemId },
+    select: {
+      id: true,
+      hobbyId: true,
+      householdId: true,
+      name: true,
+      description: true,
+      status: true,
+      location: true,
+      customFields: true,
+      quantity: true,
+      tags: true,
+      notes: true,
+      parentItemId: true,
+      hobby: {
+        select: {
+          name: true,
+          hobbyType: true,
+        },
+      },
+      parentItem: {
+        select: {
+          name: true,
+        },
+      },
+      childItems: {
+        select: {
+          name: true,
+        },
+      },
+      sessions: {
+        select: {
+          name: true,
+          notes: true,
+        },
+      },
+    },
+  });
+
+  if (!item) {
+    await deleteSearchIndexEntry(prisma, "hobby_collection_item", itemId);
+    return;
+  }
+
+  const tagText = Array.isArray(item.tags) ? item.tags.flatMap(flattenSearchValues).join(" ") : "";
+  const customFieldText = flattenSearchValues(item.customFields).join(" ");
+  const childText = item.childItems.map((child) => child.name).join(" ");
+  const sessionText = item.sessions.flatMap((session) => [session.name, session.notes]).filter(Boolean).join(" ");
+
+  await syncSearchIndexPayloads(prisma, "hobby_collection_item", item.id, [{
+    householdId: item.householdId,
+    entityType: "hobby_collection_item",
+    entityId: item.id,
+    parentEntityId: item.hobbyId,
+    parentEntityName: item.hobby.name,
+    title: item.name,
+    subtitle: joinText(item.hobby.name, item.location, item.status),
+    body: joinText(
+      item.description,
+      item.notes,
+      item.hobby.hobbyType,
+      item.location,
+      item.parentItem?.name,
+      tagText,
+      customFieldText,
+      childText,
+      sessionText,
+      String(item.quantity)
+    ),
+    entityUrl: `/hobbies/${item.hobbyId}?householdId=${item.householdId}&collectionItemId=${item.id}`,
+    entityMeta: {
+      status: item.status,
+      hobbyId: item.hobbyId,
+      location: item.location,
+      quantity: item.quantity,
+      parentItemId: item.parentItemId,
+    },
+  }]);
+};
+
 export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: string): Promise<void> => {
   await prisma.$executeRaw`
     DELETE FROM "SearchIndex"
     WHERE "householdId" = ${householdId}
   `;
 
-  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments, invitations, entries, hobbySeries] = await Promise.all([
+  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments, invitations, entries, hobbySeries, hobbyCollectionItems] = await Promise.all([
     prisma.asset.findMany({
       where: { householdId },
       select: { id: true }
@@ -1445,6 +1563,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
       select: { id: true }
     }),
     prisma.hobbySeries.findMany({
+      where: { householdId },
+      select: { id: true }
+    }),
+    prisma.hobbyCollectionItem.findMany({
       where: { householdId },
       select: { id: true }
     })
@@ -1505,6 +1627,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const series of hobbySeries) {
     await syncHobbySeriesToSearchIndex(prisma, series.id);
+  }
+
+  for (const item of hobbyCollectionItems) {
+    await syncHobbyCollectionItemToSearchIndex(prisma, item.id);
   }
 };
 

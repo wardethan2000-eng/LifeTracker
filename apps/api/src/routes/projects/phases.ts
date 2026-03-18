@@ -80,7 +80,7 @@ const getProject = (app: FastifyInstance, householdId: string, projectId: string
 });
 
 const getPhase = (app: FastifyInstance, projectId: string, phaseId: string) => app.prisma.projectPhase.findFirst({
-  where: { id: phaseId, projectId, project: { deletedAt: null } }
+  where: { id: phaseId, projectId, deletedAt: null, project: { deletedAt: null } }
 });
 
 const getNextSortOrder = async (
@@ -119,6 +119,7 @@ const activePurchaseRequestInclude = {
 
 const projectPhaseDetailInclude = {
   tasks: {
+    where: { deletedAt: null },
     include: {
       assignedTo: { select: { id: true, displayName: true } },
       predecessorLinks: { select: { predecessorTaskId: true } },
@@ -129,6 +130,7 @@ const projectPhaseDetailInclude = {
   },
   checklistItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
   supplies: {
+    where: { deletedAt: null },
     include: {
       inventoryItem: {
         select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
@@ -137,7 +139,7 @@ const projectPhaseDetailInclude = {
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
   },
-  expenses: { orderBy: { createdAt: "desc" } }
+  expenses: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } }
 } satisfies Prisma.ProjectPhaseInclude;
 
 export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
@@ -162,9 +164,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const phases = await app.prisma.projectPhase.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, deletedAt: null },
       include: {
         tasks: {
+          where: { deletedAt: null },
           select: {
             id: true,
             status: true,
@@ -176,8 +179,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
           }
         },
         checklistItems: { select: { isCompleted: true } },
-        supplies: { select: { isProcured: true } },
-        expenses: { select: { amount: true } }
+        supplies: { where: { deletedAt: null }, select: { isProcured: true } },
+        expenses: { where: { deletedAt: null }, select: { amount: true } }
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
@@ -225,6 +228,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         where: { id: createdPhase.id },
         include: {
           tasks: {
+            where: { deletedAt: null },
             select: {
               id: true,
               status: true,
@@ -236,8 +240,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
             }
           },
           checklistItems: { select: { isCompleted: true } },
-          supplies: { select: { isProcured: true } },
-          expenses: { select: { amount: true } }
+          supplies: { where: { deletedAt: null }, select: { isProcured: true } },
+          expenses: { where: { deletedAt: null }, select: { amount: true } }
         }
       });
     });
@@ -270,7 +274,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const phase = await app.prisma.projectPhase.findFirst({
-      where: { id: params.phaseId, projectId: project.id },
+      where: { id: params.phaseId, projectId: project.id, deletedAt: null },
       include: projectPhaseDetailInclude
     });
 
@@ -301,7 +305,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const phases = await app.prisma.projectPhase.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, deletedAt: null },
       include: projectPhaseDetailInclude,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
@@ -351,6 +355,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         where: { id: phase.id },
         include: {
           tasks: {
+            where: { deletedAt: null },
             select: {
               id: true,
               status: true,
@@ -362,8 +367,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
             }
           },
           checklistItems: { select: { isCompleted: true } },
-          supplies: { select: { isProcured: true } },
-          expenses: { select: { amount: true } }
+          supplies: { where: { deletedAt: null }, select: { isProcured: true } },
+          expenses: { where: { deletedAt: null }, select: { amount: true } }
         }
       });
     });
@@ -398,7 +403,40 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.$transaction(async (tx) => {
-      await tx.projectPhase.delete({ where: { id: phase.id } });
+      const deletedAt = new Date();
+      const phaseTasks = await tx.projectTask.findMany({
+        where: { phaseId: phase.id, deletedAt: null },
+        select: { id: true }
+      });
+
+      await tx.projectPhase.update({
+        where: { id: phase.id },
+        data: { deletedAt }
+      });
+      await tx.projectTask.updateMany({
+        where: { phaseId: phase.id, deletedAt: null },
+        data: { deletedAt }
+      });
+      await tx.projectTaskDependency.deleteMany({
+        where: {
+          OR: [
+            { predecessorTaskId: { in: phaseTasks.map((task) => task.id) } },
+            { successorTaskId: { in: phaseTasks.map((task) => task.id) } }
+          ]
+        }
+      });
+      await tx.projectExpense.updateMany({
+        where: { phaseId: phase.id, deletedAt: null },
+        data: { deletedAt }
+      });
+      await tx.projectNote.updateMany({
+        where: { phaseId: phase.id, deletedAt: null },
+        data: { deletedAt }
+      });
+      await tx.projectPhaseSupply.updateMany({
+        where: { phaseId: phase.id, deletedAt: null },
+        data: { deletedAt }
+      });
       await syncProjectDerivedStatuses(tx, params.projectId);
     });
 
@@ -431,7 +469,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.projectPhase.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, deletedAt: null },
       select: { id: true }
     });
 
@@ -509,7 +547,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const item = await app.prisma.projectPhaseChecklistItem.findFirst({
       where: {
         id: params.checklistItemId,
-        phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+        phase: { id: params.phaseId, projectId: params.projectId, deletedAt: null, project: { deletedAt: null } }
       }
     });
 
@@ -545,7 +583,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const item = await app.prisma.projectPhaseChecklistItem.findFirst({
       where: {
         id: params.checklistItemId,
-        phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+        phase: { id: params.phaseId, projectId: params.projectId, deletedAt: null, project: { deletedAt: null } }
       }
     });
 
@@ -566,7 +604,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const task = await app.prisma.projectTask.findFirst({
-      where: { id: params.taskId, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
+      where: { id: params.taskId, deletedAt: null, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
     });
 
     if (!task) {
@@ -590,7 +628,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const task = await app.prisma.projectTask.findFirst({
-      where: { id: params.taskId, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
+      where: { id: params.taskId, deletedAt: null, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
     });
 
     if (!task) {
@@ -624,7 +662,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const item = await app.prisma.projectTaskChecklistItem.findFirst({
       where: {
         id: params.checklistItemId,
-        task: { id: params.taskId, projectId: params.projectId, project: { deletedAt: null } }
+        task: { id: params.taskId, deletedAt: null, projectId: params.projectId, project: { deletedAt: null } }
       }
     });
 
@@ -658,7 +696,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const item = await app.prisma.projectTaskChecklistItem.findFirst({
       where: {
         id: params.checklistItemId,
-        task: { id: params.taskId, projectId: params.projectId, project: { deletedAt: null } }
+        task: { id: params.taskId, deletedAt: null, projectId: params.projectId, project: { deletedAt: null } }
       }
     });
 
@@ -687,7 +725,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const categories = await app.prisma.projectBudgetCategory.findMany({
       where: { projectId: project.id },
       include: {
-        expenses: { select: { amount: true } }
+        expenses: { where: { deletedAt: null }, select: { amount: true } }
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
@@ -718,7 +756,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         notes: input.notes ?? null
       },
       include: {
-        expenses: { select: { amount: true } }
+        expenses: { where: { deletedAt: null }, select: { amount: true } }
       }
     });
 
@@ -760,7 +798,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       where: { id: category.id },
       data,
       include: {
-        expenses: { select: { amount: true } }
+        expenses: { where: { deletedAt: null }, select: { amount: true } }
       }
     });
 
@@ -810,7 +848,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const supplies = await app.prisma.projectPhaseSupply.findMany({
-      where: { phaseId: phase.id },
+      where: { phaseId: phase.id, deletedAt: null },
       include: {
         inventoryItem: {
           select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
@@ -936,7 +974,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const supply = await app.prisma.projectPhaseSupply.findFirst({
-      where: { id: params.supplyId, phaseId: phase.id },
+      where: { id: params.supplyId, phaseId: phase.id, deletedAt: null },
       include: {
         inventoryItem: {
           select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
@@ -1061,7 +1099,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const supply = await app.prisma.projectPhaseSupply.findFirst({
       where: {
         id: params.supplyId,
-        phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+        deletedAt: null,
+        phase: { id: params.phaseId, projectId: params.projectId, deletedAt: null, project: { deletedAt: null } }
       },
       include: {
         purchaseLines: activePurchaseRequestInclude
@@ -1077,7 +1116,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.$transaction(async (tx) => {
-      await tx.projectPhaseSupply.delete({ where: { id: supply.id } });
+      await tx.projectPhaseSupply.update({
+        where: { id: supply.id },
+        data: { deletedAt: new Date() }
+      });
       await syncProjectDerivedStatuses(tx, params.projectId);
     });
 
@@ -1101,7 +1143,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const supply = await app.prisma.projectPhaseSupply.findFirst({
-      where: { id: params.supplyId, phaseId: phase.id },
+      where: { id: params.supplyId, phaseId: phase.id, deletedAt: null },
       include: {
         inventoryItem: {
           select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true, householdId: true }

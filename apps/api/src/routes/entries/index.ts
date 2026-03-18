@@ -48,6 +48,10 @@ const hobbySessionParamsSchema = hobbyParamsSchema.extend({
   sessionId: z.string().cuid()
 });
 
+const hobbyCollectionItemParamsSchema = hobbyParamsSchema.extend({
+  collectionItemId: z.string().cuid()
+});
+
 const projectParamsSchema = householdParamsSchema.extend({
   projectId: z.string().cuid()
 });
@@ -994,6 +998,64 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "hobby_session", entityId: sessionId });
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(201).send(result.entry);
+  });
+
+  app.get("/v1/households/:householdId/hobbies/:hobbyId/collection/:collectionItemId/entries", async (request, reply) => {
+    const { householdId, hobbyId, collectionItemId } = hobbyCollectionItemParamsSchema.parse(request.params);
+    const query = entryListQuerySchema.parse(request.query);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_collection_item", entityId: collectionItemId }, hobbyId);
+    if (!target) {
+      return reply.code(404).send({ message: "Hobby collection item not found." });
+    }
+
+    if ((query.entityType && query.entityType !== "hobby_collection_item") || (query.entityId && query.entityId !== collectionItemId)) {
+      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+    }
+
+    try {
+      const { ids, nextCursor } = await listEntryIds(app.prisma, householdId, query, { entityType: "hobby_collection_item", entityId: collectionItemId });
+      const records = await fetchOrderedEntries(app.prisma, householdId, ids);
+      const items = await serializeEntries(app.prisma, records);
+      return entryListResponseSchema.parse({ items, nextCursor });
+    } catch (error) {
+      if (error instanceof Error && error.message === "INVALID_CURSOR") {
+        return reply.code(400).send({ message: "Invalid entry cursor." });
+      }
+
+      throw error;
+    }
+  });
+
+  app.post("/v1/households/:householdId/hobbies/:hobbyId/collection/:collectionItemId/entries", async (request, reply) => {
+    const { householdId, hobbyId, collectionItemId } = hobbyCollectionItemParamsSchema.parse(request.params);
+    const input = scopedCreateEntrySchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    if ((input.entityType && input.entityType !== "hobby_collection_item") || (input.entityId && input.entityId !== collectionItemId)) {
+      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+    }
+
+    const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_collection_item", entityId: collectionItemId }, hobbyId);
+    if (!target) {
+      return reply.code(404).send({ message: "Hobby collection item not found." });
+    }
+
+    const result = await createEntry(app, householdId, userId, input, { entityType: "hobby_collection_item", entityId: collectionItemId });
     if ("error" in result) {
       return reply.code(result.error.code).send({ message: result.error.message });
     }

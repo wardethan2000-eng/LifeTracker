@@ -110,7 +110,9 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
           const [taskIds, phaseIds] = await Promise.all([
             app.prisma.projectTask.findMany({
               where: {
+                deletedAt: null,
                 project: {
+                  deletedAt: null,
                   assets: {
                     some: {
                       assetId: asset.id
@@ -122,7 +124,9 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
             }),
             app.prisma.projectPhase.findMany({
               where: {
+                deletedAt: null,
                 project: {
+                  deletedAt: null,
                   assets: {
                     some: {
                       assetId: asset.id

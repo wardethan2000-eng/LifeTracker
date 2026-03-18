@@ -848,20 +848,37 @@ export const getHouseholdProjects = async (
   });
 };
 
-export const getHouseholdProjectStatusCounts = async (householdId: string): Promise<ProjectStatusCount[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/status-counts`,
-  schema: projectStatusCountListSchema,
-  cachePolicy: { next: { revalidate: 30 } }
-});
+export const getHouseholdProjectStatusCounts = async (
+  householdId: string,
+  options?: { q?: string }
+): Promise<ProjectStatusCount[]> => {
+  const params = new URLSearchParams();
+
+  if (options?.q && options.q.trim().length > 0) {
+    params.set("q", options.q.trim());
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/projects/status-counts${suffix}`,
+    schema: projectStatusCountListSchema,
+    cachePolicy: { next: { revalidate: 30 } }
+  });
+};
 
 export const getHouseholdProjectPortfolio = async (
   householdId: string,
-  options?: { status?: ProjectStatus }
+  options?: { status?: ProjectStatus; q?: string }
 ): Promise<ProjectPortfolioItem[]> => {
   const params = new URLSearchParams();
 
   if (options?.status) {
     params.set("status", options.status);
+  }
+
+  if (options?.q && options.q.trim().length > 0) {
+    params.set("q", options.q.trim());
   }
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";

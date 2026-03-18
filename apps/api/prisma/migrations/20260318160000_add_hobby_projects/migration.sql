@@ -1,7 +1,7 @@
 ALTER TABLE "HobbyProject" RENAME TO "HobbyProjectLink";
 
 ALTER TABLE "HobbyProjectLink" RENAME CONSTRAINT "HobbyProject_pkey" TO "HobbyProjectLink_pkey";
-ALTER TABLE "HobbyProjectLink" RENAME CONSTRAINT "HobbyProject_hobbyId_projectId_key" TO "HobbyProjectLink_hobbyId_projectId_key";
+ALTER INDEX "HobbyProject_hobbyId_projectId_key" RENAME TO "HobbyProjectLink_hobbyId_projectId_key";
 ALTER INDEX "HobbyProject_hobbyId_idx" RENAME TO "HobbyProjectLink_hobbyId_idx";
 ALTER INDEX "HobbyProject_projectId_idx" RENAME TO "HobbyProjectLink_projectId_idx";
 

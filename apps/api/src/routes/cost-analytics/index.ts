@@ -372,7 +372,8 @@ const buildHouseholdServiceProviderSpend = async (
       ? prisma.projectExpense.findMany({
           where: {
             serviceProviderId: { in: providerIds },
-            project: { householdId }
+            deletedAt: null,
+            project: { householdId, deletedAt: null }
           },
           orderBy: { createdAt: "asc" }
         })

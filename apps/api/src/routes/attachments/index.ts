@@ -59,28 +59,28 @@ const validateEntityOwnership = async (
     }
     case "project_note": {
       const note = await prisma.projectNote.findFirst({
-        where: { id: entityId, project: { householdId } },
+        where: { id: entityId, deletedAt: null, project: { householdId, deletedAt: null } },
         select: { id: true },
       });
       return note !== null;
     }
     case "project_expense": {
       const expense = await prisma.projectExpense.findFirst({
-        where: { id: entityId, project: { householdId } },
+        where: { id: entityId, deletedAt: null, project: { householdId, deletedAt: null } },
         select: { id: true },
       });
       return expense !== null;
     }
     case "project_phase": {
       const phase = await prisma.projectPhase.findFirst({
-        where: { id: entityId, project: { householdId } },
+        where: { id: entityId, deletedAt: null, project: { householdId, deletedAt: null } },
         select: { id: true },
       });
       return phase !== null;
     }
     case "project_task": {
       const task = await prisma.projectTask.findFirst({
-        where: { id: entityId, project: { householdId } },
+        where: { id: entityId, deletedAt: null, project: { householdId, deletedAt: null } },
         select: { id: true },
       });
       return task !== null;

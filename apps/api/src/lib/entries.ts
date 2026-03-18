@@ -184,6 +184,39 @@ export const validateEntryTarget = async (
           }
         : { status: "missing" };
     }
+    case "hobby_collection_item": {
+      const item = await prisma.hobbyCollectionItem.findFirst({
+        where: {
+          id: entityId,
+          householdId,
+        },
+        select: {
+          id: true,
+          name: true,
+          hobby: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return item
+        ? {
+            status: "ok",
+            context: buildContext({
+              entityType,
+              entityId: item.id,
+              label: item.name,
+              parentEntityType: "hobby",
+              parentEntityId: item.hobby.id,
+              parentLabel: item.hobby.name,
+              entityUrl: `/hobbies/${item.hobby.id}?householdId=${householdId}&collectionItemId=${item.id}`,
+            }),
+          }
+        : { status: "missing" };
+    }
     case "project": {
       const project = await prisma.project.findFirst({
         where: { id: entityId, householdId, deletedAt: null },
@@ -209,6 +242,7 @@ export const validateEntryTarget = async (
       const phase = await prisma.projectPhase.findFirst({
         where: {
           id: entityId,
+          deletedAt: null,
           project: { householdId, deletedAt: null }
         },
         select: {
@@ -348,9 +382,6 @@ export const validateEntryTarget = async (
           }
         : { status: "missing" };
     }
-    case "hobby_project_milestone":
-    case "hobby_collection_item":
-      return { status: "unsupported", message: unsupportedEntryTargetMessage(entityType) };
     default:
       return { status: "unsupported", message: unsupportedEntryTargetMessage(entityType) };
   }
@@ -447,24 +478,47 @@ export const resolveEntryEntityContexts = async (
     const hobbyProjects = await prisma.hobbyProject.findMany({
       where: {
         id: { in: hobbyProjectIds },
-        hobby: { householdId },
-        project: { householdId, deletedAt: null }
+        householdId,
       },
       select: {
         id: true,
+        name: true,
         hobby: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } }
       }
     });
-    for (const link of hobbyProjects) {
-      resolved.set(createEntryEntityKey("hobby_project", link.id), buildContext({
+    for (const project of hobbyProjects) {
+      resolved.set(createEntryEntityKey("hobby_project", project.id), buildContext({
         entityType: "hobby_project",
-        entityId: link.id,
-        label: `${link.hobby.name} / ${link.project.name}`,
+        entityId: project.id,
+        label: project.name,
         parentEntityType: "hobby",
-        parentEntityId: link.hobby.id,
-        parentLabel: link.hobby.name,
-        entityUrl: `/hobbies/${link.hobby.id}?householdId=${householdId}`
+        parentEntityId: project.hobby.id,
+        parentLabel: project.hobby.name,
+        entityUrl: `/hobbies/${project.hobby.id}?householdId=${householdId}&projectId=${project.id}`
+      }));
+    }
+  }
+
+  const hobbyCollectionItemIds = Array.from(byType.get("hobby_collection_item") ?? []);
+  if (hobbyCollectionItemIds.length > 0) {
+    const items = await prisma.hobbyCollectionItem.findMany({
+      where: { id: { in: hobbyCollectionItemIds }, householdId },
+      select: {
+        id: true,
+        name: true,
+        hobby: { select: { id: true, name: true } },
+      },
+    });
+
+    for (const item of items) {
+      resolved.set(createEntryEntityKey("hobby_collection_item", item.id), buildContext({
+        entityType: "hobby_collection_item",
+        entityId: item.id,
+        label: item.name,
+        parentEntityType: "hobby",
+        parentEntityId: item.hobby.id,
+        parentLabel: item.hobby.name,
+        entityUrl: `/hobbies/${item.hobby.id}?householdId=${householdId}&collectionItemId=${item.id}`,
       }));
     }
   }
@@ -491,7 +545,7 @@ export const resolveEntryEntityContexts = async (
   const phaseIds = Array.from(byType.get("project_phase") ?? []);
   if (phaseIds.length > 0) {
     const phases = await prisma.projectPhase.findMany({
-      where: { id: { in: phaseIds }, project: { householdId, deletedAt: null } },
+      where: { id: { in: phaseIds }, deletedAt: null, project: { householdId, deletedAt: null } },
       select: {
         id: true,
         name: true,

@@ -137,7 +137,9 @@ export const buildAssetTimeline = async (
   const [taskIds, phaseIds] = await Promise.all([
     prisma.projectTask.findMany({
       where: {
+        deletedAt: null,
         project: {
+          deletedAt: null,
           assets: {
             some: {
               assetId: asset.id
@@ -149,7 +151,9 @@ export const buildAssetTimeline = async (
     }),
     prisma.projectPhase.findMany({
       where: {
+        deletedAt: null,
         project: {
+          deletedAt: null,
           assets: {
             some: {
               assetId: asset.id
@@ -954,16 +958,16 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       app.prisma.maintenanceLogPart.findMany({ where: { log: { asset: { householdId: params.householdId } } } }),
       app.prisma.assetTimelineEntry.findMany({ where: { asset: { householdId: params.householdId } } }),
       app.prisma.notification.findMany({ where: { householdId: params.householdId } }),
-      app.prisma.project.findMany({ where: { householdId: params.householdId } }),
-      app.prisma.projectAsset.findMany({ where: { project: { householdId: params.householdId } } }),
-      app.prisma.projectTask.findMany({ where: { project: { householdId: params.householdId } } }),
-      app.prisma.projectNote.findMany({ where: { project: { householdId: params.householdId } } }),
-      app.prisma.projectExpense.findMany({ where: { project: { householdId: params.householdId } } }),
-      app.prisma.projectPhase.findMany({ where: { project: { householdId: params.householdId } } }),
-      app.prisma.projectPhaseChecklistItem.findMany({ where: { phase: { project: { householdId: params.householdId } } } }),
-      app.prisma.projectTaskChecklistItem.findMany({ where: { task: { project: { householdId: params.householdId } } } }),
-      app.prisma.projectBudgetCategory.findMany({ where: { project: { householdId: params.householdId } } }),
-      app.prisma.projectPhaseSupply.findMany({ where: { phase: { project: { householdId: params.householdId } } } }),
+      app.prisma.project.findMany({ where: { householdId: params.householdId, deletedAt: null } }),
+      app.prisma.projectAsset.findMany({ where: { project: { householdId: params.householdId, deletedAt: null } } }),
+      app.prisma.projectTask.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
+      app.prisma.projectNote.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
+      app.prisma.projectExpense.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
+      app.prisma.projectPhase.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
+      app.prisma.projectPhaseChecklistItem.findMany({ where: { phase: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } } }),
+      app.prisma.projectTaskChecklistItem.findMany({ where: { task: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } } }),
+      app.prisma.projectBudgetCategory.findMany({ where: { project: { householdId: params.householdId, deletedAt: null } } }),
+      app.prisma.projectPhaseSupply.findMany({ where: { deletedAt: null, phase: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } } }),
       app.prisma.inventoryItem.findMany({ where: { householdId: params.householdId } }),
       app.prisma.assetInventoryItem.findMany({ where: { inventoryItem: { householdId: params.householdId } } }),
       app.prisma.scheduleInventoryItem.findMany({ where: { schedule: { asset: { householdId: params.householdId } } } }),

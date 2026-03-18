@@ -1,5 +1,6 @@
 CREATE TYPE "EntryEntityType" AS ENUM (
   'hobby',
+  'hobby_series',
   'hobby_session',
   'hobby_project',
   'hobby_project_milestone',

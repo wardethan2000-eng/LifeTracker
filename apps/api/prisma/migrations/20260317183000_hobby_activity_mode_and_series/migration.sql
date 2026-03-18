@@ -2,7 +2,16 @@ CREATE TYPE "HobbyActivityMode" AS ENUM ('session', 'project', 'practice', 'coll
 
 CREATE TYPE "SeriesStatus" AS ENUM ('active', 'completed', 'archived');
 
-ALTER TYPE "EntryEntityType" ADD VALUE IF NOT EXISTS 'hobby_series';
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_type
+    WHERE typname = 'EntryEntityType'
+  ) THEN
+    ALTER TYPE "EntryEntityType" ADD VALUE IF NOT EXISTS 'hobby_series';
+  END IF;
+END $$;
 
 ALTER TABLE "Hobby"
   ADD COLUMN "activityMode" "HobbyActivityMode" NOT NULL DEFAULT 'session';
