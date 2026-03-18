@@ -7,6 +7,7 @@ import { DashboardDueWork } from "../../components/dashboard-due-work";
 import { getDashboardData } from "../../components/dashboard-data";
 import { EntryActionableList } from "../../components/entry-system";
 import { DashboardNotificationsAside } from "../../components/dashboard-notifications-aside";
+import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
 import { ApiError, getApiBaseUrl, getDevUserId, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDateTime } from "../../lib/formatters";
@@ -364,6 +365,8 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
         </header>
 
         <div className="page-body">
+          <LaunchPad />
+
           <Suspense fallback={<StatsRowSkeleton />}>
             <DashboardStatsRow dashboardPromise={dashboardPromise} />
           </Suspense>
