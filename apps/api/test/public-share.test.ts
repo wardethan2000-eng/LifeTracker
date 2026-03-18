@@ -1,7 +1,6 @@
-import assert from "node:assert/strict";
-import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
+import { expect, test } from "vitest";
 import { publicShareRoutes } from "../src/routes/share-links/public.js";
 import { resetRateLimitState } from "../src/lib/rate-limit.js";
 
@@ -65,63 +64,63 @@ const createPublicShareApp = async () => {
   return { app, updatedViews };
 };
 
-test("public share returns a serialized asset report and increments views", async (t) => {
+test("public share returns a serialized asset report and increments views", async () => {
   process.env.RATE_LIMIT_STORE = "memory";
   await resetRateLimitState();
   const { app, updatedViews } = await createPublicShareApp();
-  t.after(async () => {
-    await app.close();
-    await resetRateLimitState();
-  });
-
-  const response = await app.inject({
-    method: "GET",
-    url: `/v1/public/share/${shareLinkRecord.token}`
-  });
-
-  assert.equal(response.statusCode, 200);
-  assert.equal(updatedViews.length, 1);
-  assert.deepEqual(response.json(), {
-    assetName: "Primary Vehicle",
-    assetCategory: "vehicle",
-    assetMake: "Ford",
-    assetModel: "F-150",
-    assetYear: null,
-    timelineItems: [],
-    costSummary: {
-      lifetimeCost: 0,
-      logCount: 0
-    },
-    generatedAt: response.json().generatedAt,
-    dateRangeStart: null,
-    dateRangeEnd: null
-  });
-  assert.ok(typeof response.json().generatedAt === "string");
-});
-
-test("public share enforces the route rate limit", async (t) => {
-  process.env.RATE_LIMIT_STORE = "memory";
-  await resetRateLimitState();
-  const { app } = await createPublicShareApp();
-  t.after(async () => {
-    await app.close();
-    await resetRateLimitState();
-  });
-
-  for (let index = 0; index < 30; index += 1) {
+  try {
     const response = await app.inject({
       method: "GET",
       url: `/v1/public/share/${shareLinkRecord.token}`
     });
 
-    assert.equal(response.statusCode, 200);
+    expect(response.statusCode).toBe(200);
+    expect(updatedViews).toHaveLength(1);
+    expect(response.json()).toEqual({
+      assetName: "Primary Vehicle",
+      assetCategory: "vehicle",
+      assetMake: "Ford",
+      assetModel: "F-150",
+      assetYear: null,
+      timelineItems: [],
+      costSummary: {
+        lifetimeCost: 0,
+        logCount: 0
+      },
+      generatedAt: response.json().generatedAt,
+      dateRangeStart: null,
+      dateRangeEnd: null
+    });
+    expect(typeof response.json().generatedAt).toBe("string");
+  } finally {
+    await app.close();
+    await resetRateLimitState();
   }
+});
 
-  const limitedResponse = await app.inject({
-    method: "GET",
-    url: `/v1/public/share/${shareLinkRecord.token}`
-  });
+test("public share enforces the route rate limit", async () => {
+  process.env.RATE_LIMIT_STORE = "memory";
+  await resetRateLimitState();
+  const { app } = await createPublicShareApp();
+  try {
+    for (let index = 0; index < 30; index += 1) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/public/share/${shareLinkRecord.token}`
+      });
 
-  assert.equal(limitedResponse.statusCode, 429);
-  assert.equal(limitedResponse.json().message, "Share link rate limit exceeded. Try again shortly.");
+      expect(response.statusCode).toBe(200);
+    }
+
+    const limitedResponse = await app.inject({
+      method: "GET",
+      url: `/v1/public/share/${shareLinkRecord.token}`
+    });
+
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.json().message).toBe("Share link rate limit exceeded. Try again shortly.");
+  } finally {
+    await app.close();
+    await resetRateLimitState();
+  }
 });

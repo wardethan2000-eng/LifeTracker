@@ -62,6 +62,14 @@ Recommended local setup:
 4. Call the API either with a real Clerk token or with `x-dev-user-id: clkeeperuser0000000000001`.
 5. For notification development, keep `NOTIFICATION_DELIVERY_MODE="log"`.
 6. Keep `CORS_ALLOWED_ORIGINS` aligned with the web and Expo origins you actually use locally.
+7. Keep `GLOBAL_RATE_LIMIT_MAX`, `GLOBAL_RATE_LIMIT_WINDOW_MS`, and `API_BODY_LIMIT_BYTES` aligned with the traffic and payload sizes you actually expect.
+
+For production, start with tighter defaults unless a route has a demonstrated need for more headroom:
+
+1. `API_BODY_LIMIT_BYTES="262144"`
+2. `API_MAX_PARAM_LENGTH="120"`
+3. `GLOBAL_RATE_LIMIT_MAX="120"`
+4. `GLOBAL_RATE_LIMIT_WINDOW_MS="60000"`
 
 The development bypass is rejected in production.
 
