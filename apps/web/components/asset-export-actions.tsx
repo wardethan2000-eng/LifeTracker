@@ -8,6 +8,7 @@ import {
   createShareLink,
   downloadAssetCsv,
   downloadAssetPdf,
+  downloadComplianceAuditPdf,
   downloadHouseholdCsv,
   getShareLinks,
   revokeShareLink
@@ -67,6 +68,7 @@ const buildDownloadOptions = (since?: string, until?: string): { since?: string;
 export function AssetExportActions({ assetId, assetTag, assetName, householdId }: AssetExportActionsProps): JSX.Element {
   const searchParams = useSearchParams();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingCompliancePdf, setIsExportingCompliancePdf] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isShareFormVisible, setIsShareFormVisible] = useState(false);
   const [shareLinks, setShareLinks] = useState<ShareLink[]>([]);
@@ -114,6 +116,18 @@ export function AssetExportActions({ assetId, assetTag, assetName, householdId }
       setErrorMessage(error instanceof Error ? error.message : "Unable to export the CSV report.");
     } finally {
       setIsExportingCsv(false);
+    }
+  };
+
+  const handleExportCompliancePdf = async (): Promise<void> => {
+    try {
+      setErrorMessage(null);
+      setIsExportingCompliancePdf(true);
+      await downloadComplianceAuditPdf(assetId, buildDownloadOptions(since, until));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to export the compliance audit PDF report.");
+    } finally {
+      setIsExportingCompliancePdf(false);
     }
   };
 
@@ -174,6 +188,9 @@ export function AssetExportActions({ assetId, assetTag, assetName, householdId }
       <div className="export-actions">
         <button type="button" className="button button--primary button--sm" onClick={() => { void handleExportPdf(); }} disabled={isExportingPdf}>
           {isExportingPdf ? "Exporting PDF..." : "Export PDF"}
+        </button>
+        <button type="button" className="button button--ghost button--sm" onClick={() => { void handleExportCompliancePdf(); }} disabled={isExportingCompliancePdf}>
+          {isExportingCompliancePdf ? "Exporting Compliance..." : "Compliance Report"}
         </button>
         <button type="button" className="button button--ghost button--sm" onClick={() => { void handleExportCsv(); }} disabled={isExportingCsv}>
           {isExportingCsv ? "Exporting CSV..." : "Export CSV"}

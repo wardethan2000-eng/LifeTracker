@@ -1,9 +1,13 @@
-import type { Asset, PrismaClient } from "@prisma/client";
+import type { Asset, Prisma, PrismaClient } from "@prisma/client";
 import {
+  maintenanceTriggerSchema,
   conditionEntrySchema,
   csvExportDatasetSchema,
   householdDataExportSchema,
-  type AssetTimelineItem
+  type AnnualCostPdfInput,
+  type AssetTimelineItem,
+  type ComplianceAuditPdfInput,
+  type InventoryValuationPdfInput
 } from "@lifekeeper/types";
 import {
   aggregateCostsByPeriod,
@@ -12,8 +16,18 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";
-import { generateAssetHistoryPdf } from "../../lib/pdf-report.js";
+import {
+  filterReportCyclesInRange,
+  summarizeCycles
+} from "../../lib/compliance-analytics.js";
+import {
+  generateAnnualCostPdf,
+  generateAssetHistoryPdf,
+  generateComplianceAuditPdf,
+  generateInventoryValuationPdf
+} from "../../lib/pdf-report.js";
 import { toTimelineItem } from "../../lib/serializers/index.js";
+import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -40,6 +54,10 @@ const householdCsvDatasetSchema = z.enum([
 
 const householdCsvQuerySchema = dateRangeQuerySchema.extend({
   dataset: householdCsvDatasetSchema
+});
+
+const annualCostPdfQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100)
 });
 
 type TimelineAsset = Pick<Asset, "id" | "householdId" | "conditionHistory">;
@@ -86,6 +104,66 @@ const formatCsvDate = (value: string | Date): string => new Date(value).toISOStr
 const formatCurrency = (value: number | null | undefined): string => typeof value === "number"
   ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
   : "";
+
+const formatPercent = (value: number): string => `${value.toFixed(1)}%`;
+
+const formatMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+
+const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
+
+const formatMonthLabel = (date: Date): string => monthLabelFormatter.format(date);
+
+const categoryLabel = (value: string): string => ({
+  vehicle: "Vehicle",
+  home: "Home",
+  marine: "Marine",
+  aircraft: "Aircraft",
+  yard: "Yard",
+  workshop: "Workshop",
+  appliance: "Appliance",
+  hvac: "HVAC",
+  technology: "Technology",
+  other: "Other"
+}[value] ?? value);
+
+const triggerTypeLabel = (value: string): string => ({
+  interval: "Interval",
+  usage: "Usage",
+  seasonal: "Seasonal",
+  compound: "Compound",
+  one_time: "One-Time"
+}[value] ?? value);
+
+const getIntervalLabel = (triggerConfig: Prisma.JsonValue): string => {
+  const trigger = maintenanceTriggerSchema.parse(triggerConfig);
+
+  switch (trigger.type) {
+    case "interval":
+      return `${trigger.intervalDays} day${trigger.intervalDays === 1 ? "" : "s"}`;
+    case "usage":
+      return `${trigger.intervalValue} units`;
+    case "seasonal":
+      return `Seasonal (${trigger.month}/${trigger.day})`;
+    case "compound":
+      return `${trigger.intervalDays} days or ${trigger.intervalValue} units`;
+    case "one_time":
+      return `One time (${new Date(trigger.dueAt).toISOString().slice(0, 10)})`;
+    default:
+      return "Custom";
+  }
+};
+
+const getEffectiveExpenseDate = (expense: { date: Date | null; createdAt: Date }): Date => expense.date ?? expense.createdAt;
+
+const getYearBounds = (year: number): { start: Date; end: Date } => ({
+  start: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)),
+  end: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999))
+});
+
+const toDisplayCategory = (value: string | null | undefined): string => {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : "Uncategorized";
+};
 
 const matchesDateRange = (isoDate: string, since?: string, until?: string): boolean => {
   const value = new Date(isoDate).getTime();
@@ -495,6 +573,648 @@ export const buildAssetCostSummary = async (
   };
 };
 
+export const buildComplianceAuditData = async (
+  prisma: PrismaClient,
+  asset: Pick<Asset, "id" | "householdId" | "name" | "category" | "manufacturer" | "model" | "assetTag" | "conditionHistory">,
+  range: { since?: string | undefined; until?: string | undefined }
+): Promise<ComplianceAuditPdfInput> => {
+  const [household, schedules, usageReadings] = await Promise.all([
+    prisma.household.findUnique({
+      where: { id: asset.householdId },
+      select: { name: true }
+    }),
+    prisma.maintenanceSchedule.findMany({
+      where: {
+        assetId: asset.id,
+        deletedAt: null
+      },
+      include: {
+        logs: {
+          where: { deletedAt: null },
+          include: {
+            parts: {
+              select: {
+                quantity: true,
+                unitCost: true
+              }
+            }
+          },
+          orderBy: {
+            completedAt: "asc"
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    }),
+    prisma.usageMetricEntry.findMany({
+      where: {
+        metric: {
+          assetId: asset.id
+        },
+        ...(range.since || range.until
+          ? {
+              recordedAt: {
+                ...(range.since ? { gte: new Date(range.since) } : {}),
+                ...(range.until ? { lte: new Date(range.until) } : {})
+              }
+            }
+          : {})
+      },
+      include: {
+        metric: {
+          select: {
+            name: true,
+            unit: true
+          }
+        }
+      },
+      orderBy: {
+        recordedAt: "desc"
+      }
+    })
+  ]);
+
+  const startDate = range.since ? new Date(range.since) : undefined;
+  const endDate = range.until ? new Date(range.until) : undefined;
+  const now = new Date();
+  const cycleLedger = schedules.length > 0
+    ? await buildCompletionCycleLedger(prisma, {
+        scheduleIds: schedules.map((schedule) => schedule.id),
+        includeOpenCycles: true
+      })
+    : [];
+  const filteredCycles = filterReportCyclesInRange(cycleLedger, startDate, endDate);
+  const conditionHistory = conditionEntrySchema.array().safeParse(
+    Array.isArray(asset.conditionHistory) ? asset.conditionHistory : []
+  );
+  const filteredConditions = conditionHistory.success
+    ? conditionHistory.data
+        .filter((entry) => matchesDateRange(entry.assessedAt, range.since, range.until))
+        .sort((left, right) => new Date(right.assessedAt).getTime() - new Date(left.assessedAt).getTime())
+    : [];
+
+  let completedOnTime = 0;
+  let completedLate = 0;
+  let missedOrOverdue = 0;
+
+  const scheduleSections = schedules.map((schedule) => {
+    const scheduleCycles = filteredCycles.filter((cycle) => cycle.scheduleId === schedule.id);
+    let completedLogIndex = 0;
+    const scheduleLogs = schedule.logs;
+    const reportableRecords = scheduleCycles
+      .filter((cycle) => cycle.completedAt !== null || (cycle.dueDate !== null && new Date(cycle.dueDate) <= now))
+      .sort((left, right) => {
+        const leftDate = new Date(left.dueDate ?? left.completedAt ?? 0).getTime();
+        const rightDate = new Date(right.dueDate ?? right.completedAt ?? 0).getTime();
+        return leftDate - rightDate;
+      })
+      .map((cycle) => {
+        if (cycle.completedAt && cycle.deltaInDays !== null && cycle.deltaInDays <= 0) {
+          completedOnTime += 1;
+        } else if (cycle.completedAt && cycle.deltaInDays !== null && cycle.deltaInDays > 0) {
+          completedLate += 1;
+        } else if (!cycle.completedAt) {
+          missedOrOverdue += 1;
+        }
+
+        const matchingLog = cycle.completedAt
+          ? scheduleLogs[completedLogIndex++] ?? null
+          : null;
+
+        const status: "On Time" | "Late" | "Missed" = cycle.completedAt
+          ? (cycle.deltaInDays !== null && cycle.deltaInDays <= 0 ? "On Time" : "Late")
+          : "Missed";
+
+        return {
+          dueDate: cycle.dueDate,
+          completedDate: cycle.completedAt,
+          deltaDays: cycle.completedAt
+            ? cycle.deltaInDays
+            : cycle.dueDate
+              ? Math.max(0, Math.floor((now.getTime() - new Date(cycle.dueDate).getTime()) / (24 * 60 * 60 * 1000)))
+              : null,
+          status,
+          cost: matchingLog ? computeLogTotalCost(matchingLog).totalCost : null,
+          notes: matchingLog?.notes ?? null
+        };
+      });
+    const scheduleSummary = summarizeCycles(scheduleCycles);
+
+    return {
+      scheduleName: schedule.name,
+      category: categoryLabel(asset.category),
+      triggerType: triggerTypeLabel(schedule.triggerType),
+      intervalLabel: getIntervalLabel(schedule.triggerConfig),
+      isRegulatory: schedule.isRegulatory,
+      evidenceSummary: filteredConditions.length > 0 || usageReadings.length > 0
+        ? `Supplementary evidence in range: ${filteredConditions.length} condition assessment${filteredConditions.length === 1 ? "" : "s"}, ${usageReadings.length} usage reading${usageReadings.length === 1 ? "" : "s"}.`
+        : null,
+      records: reportableRecords,
+      summary: scheduleSummary
+    };
+  });
+
+  const regulatorySections = scheduleSections.filter((section) => section.isRegulatory);
+  const regulatoryCycles = filteredCycles.filter((cycle) => regulatorySections.some((section) => section.scheduleName === cycle.scheduleName));
+  const regulatorySummary = summarizeCycles(regulatoryCycles);
+
+  return {
+    householdName: household?.name ?? "Household",
+    generatedAt: new Date(),
+    asset: {
+      name: asset.name,
+      category: asset.category,
+      make: asset.manufacturer,
+      model: asset.model,
+      year: null,
+      assetTag: asset.assetTag
+    },
+    dateRangeStart: startDate ?? null,
+    dateRangeEnd: endDate ?? null,
+    summary: {
+      totalScheduledMaintenanceItems: schedules.length,
+      completedOnTime,
+      completedLate,
+      missedOrOverdue,
+      overallOnTimeRate: summarizeCycles(filteredCycles).onTimeRate,
+      regulatorySchedulesTracked: regulatorySections.length,
+      regulatoryOnTimeRate: regulatorySummary.onTimeRate,
+      regulatoryBreakdown: regulatorySections
+        .map((section) => ({
+          scheduleName: section.scheduleName,
+          onTimeRate: section.summary.onTimeRate,
+          totalCycles: section.summary.totalCycles
+        }))
+        .sort((left, right) => right.onTimeRate - left.onTimeRate || left.scheduleName.localeCompare(right.scheduleName)),
+      supplementaryEvidence: {
+        conditionAssessmentCount: filteredConditions.length,
+        usageReadingCount: usageReadings.length,
+        latestConditionAssessments: filteredConditions.slice(0, 5).map((entry) => ({
+          assessedAt: entry.assessedAt,
+          score: entry.score,
+          ...(entry.notes ? { notes: entry.notes } : {})
+        })),
+        latestUsageReadings: usageReadings.slice(0, 5).map((reading) => ({
+          metricName: reading.metric.name,
+          value: reading.value,
+          unit: reading.metric.unit,
+          recordedAt: reading.recordedAt.toISOString(),
+          notes: reading.notes
+        }))
+      }
+    },
+    schedules: scheduleSections.map(({ summary: _summary, ...section }) => section)
+  };
+};
+
+type AnnualCostRawData = {
+  householdName: string;
+  maintenanceLogs: Array<{
+    assetId: string;
+    assetName: string;
+    assetCategory: string;
+    completedAt: Date;
+    totalCost: number;
+    providerName: string | null;
+  }>;
+  projectExpenses: Array<{
+    projectName: string;
+    amount: number;
+    date: Date;
+    providerName: string | null;
+    assets: Array<{ id: string; name: string; category: string }>;
+  }>;
+  inventoryPurchases: Array<{
+    itemName: string;
+    amount: number;
+    createdAt: Date;
+  }>;
+};
+
+const loadAnnualCostRawData = async (
+  prisma: PrismaClient,
+  householdId: string,
+  year: number
+): Promise<AnnualCostRawData> => {
+  const { start, end } = getYearBounds(year);
+  const [household, maintenanceLogs, projectExpenses, inventoryTransactions] = await Promise.all([
+    prisma.household.findUnique({
+      where: { id: householdId },
+      select: { name: true }
+    }),
+    prisma.maintenanceLog.findMany({
+      where: {
+        deletedAt: null,
+        asset: { householdId },
+        completedAt: { gte: start, lte: end }
+      },
+      include: {
+        asset: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        },
+        parts: {
+          select: {
+            quantity: true,
+            unitCost: true
+          }
+        },
+        serviceProvider: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        completedAt: "asc"
+      }
+    }),
+    prisma.projectExpense.findMany({
+      where: {
+        deletedAt: null,
+        project: { householdId, deletedAt: null },
+        OR: [
+          { date: { gte: start, lte: end } },
+          {
+            date: null,
+            createdAt: { gte: start, lte: end }
+          }
+        ]
+      },
+      include: {
+        project: {
+          select: {
+            name: true,
+            assets: {
+              select: {
+                asset: {
+                  select: {
+                    id: true,
+                    name: true,
+                    category: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        serviceProvider: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    }),
+    prisma.inventoryTransaction.findMany({
+      where: {
+        type: "purchase",
+        createdAt: { gte: start, lte: end },
+        inventoryItem: {
+          householdId,
+          deletedAt: null
+        }
+      },
+      include: {
+        inventoryItem: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    })
+  ]);
+
+  return {
+    householdName: household?.name ?? "Household",
+    maintenanceLogs: maintenanceLogs.map((log) => ({
+      assetId: log.asset.id,
+      assetName: log.asset.name,
+      assetCategory: log.asset.category,
+      completedAt: log.completedAt,
+      totalCost: computeLogTotalCost(log).totalCost,
+      providerName: log.serviceProvider?.name ?? null
+    })),
+    projectExpenses: projectExpenses.map((expense) => ({
+      projectName: expense.project.name,
+      amount: expense.amount,
+      date: getEffectiveExpenseDate(expense),
+      providerName: expense.serviceProvider?.name ?? null,
+      assets: expense.project.assets.map((entry) => ({
+        id: entry.asset.id,
+        name: entry.asset.name,
+        category: entry.asset.category
+      }))
+    })),
+    inventoryPurchases: inventoryTransactions.map((transaction) => ({
+      itemName: transaction.inventoryItem.name,
+      amount: transaction.unitCost !== null && transaction.quantity > 0 ? transaction.quantity * transaction.unitCost : 0,
+      createdAt: transaction.createdAt
+    }))
+  };
+};
+
+export const buildAnnualCostData = async (
+  prisma: PrismaClient,
+  householdId: string,
+  year: number
+): Promise<AnnualCostPdfInput> => {
+  const [currentYearData, priorYearData] = await Promise.all([
+    loadAnnualCostRawData(prisma, householdId, year),
+    loadAnnualCostRawData(prisma, householdId, year - 1)
+  ]);
+  const assetBuckets = new Map<string, {
+    assetName: string;
+    category: string;
+    maintenanceCost: number;
+    projectCost: number;
+  }>();
+  const maintenanceCategoryMap = new Map<string, { eventCount: number; totalCost: number }>();
+  const providerMap = new Map<string, { providerName: string; eventCount: number; totalSpend: number; assetsServiced: Set<string> }>();
+  const monthlyMap = Array.from({ length: 12 }, (_, monthIndex) => {
+    const date = new Date(Date.UTC(year, monthIndex, 1));
+    return {
+      month: formatMonthLabel(date),
+      key: formatMonthKey(date),
+      maintenanceCost: 0,
+      projectCost: 0,
+      inventoryCost: 0,
+      totalCost: 0
+    };
+  });
+  const monthlyByKey = new Map(monthlyMap.map((entry) => [entry.key, entry]));
+
+  currentYearData.maintenanceLogs.forEach((log) => {
+    const existing = assetBuckets.get(log.assetId) ?? {
+      assetName: log.assetName,
+      category: categoryLabel(log.assetCategory),
+      maintenanceCost: 0,
+      projectCost: 0
+    };
+    existing.maintenanceCost += log.totalCost;
+    assetBuckets.set(log.assetId, existing);
+
+    const categoryEntry = maintenanceCategoryMap.get(log.assetCategory) ?? { eventCount: 0, totalCost: 0 };
+    categoryEntry.eventCount += 1;
+    categoryEntry.totalCost += log.totalCost;
+    maintenanceCategoryMap.set(log.assetCategory, categoryEntry);
+
+    const monthEntry = monthlyByKey.get(formatMonthKey(log.completedAt));
+    if (monthEntry) {
+      monthEntry.maintenanceCost += log.totalCost;
+      monthEntry.totalCost += log.totalCost;
+    }
+
+    if (log.providerName) {
+      const providerEntry = providerMap.get(log.providerName) ?? {
+        providerName: log.providerName,
+        eventCount: 0,
+        totalSpend: 0,
+        assetsServiced: new Set<string>()
+      };
+      providerEntry.eventCount += 1;
+      providerEntry.totalSpend += log.totalCost;
+      providerEntry.assetsServiced.add(log.assetName);
+      providerMap.set(log.providerName, providerEntry);
+    }
+  });
+
+  currentYearData.projectExpenses.forEach((expense) => {
+    const assets = expense.assets.length > 0
+      ? expense.assets
+      : [{ id: "household-unassigned", name: "Household / Unassigned", category: "other" }];
+    const allocation = assets.length > 0 ? expense.amount / assets.length : expense.amount;
+
+    assets.forEach((assetEntry) => {
+      const existing = assetBuckets.get(assetEntry.id) ?? {
+        assetName: assetEntry.name,
+        category: categoryLabel(assetEntry.category),
+        maintenanceCost: 0,
+        projectCost: 0
+      };
+      existing.projectCost += allocation;
+      assetBuckets.set(assetEntry.id, existing);
+    });
+
+    const monthEntry = monthlyByKey.get(formatMonthKey(expense.date));
+    if (monthEntry) {
+      monthEntry.projectCost += expense.amount;
+      monthEntry.totalCost += expense.amount;
+    }
+
+    if (expense.providerName) {
+      const providerEntry = providerMap.get(expense.providerName) ?? {
+        providerName: expense.providerName,
+        eventCount: 0,
+        totalSpend: 0,
+        assetsServiced: new Set<string>()
+      };
+      providerEntry.eventCount += 1;
+      providerEntry.totalSpend += expense.amount;
+      (expense.assets.length > 0 ? expense.assets : [{ id: expense.projectName, name: expense.projectName, category: "other" }]).forEach((assetEntry) => {
+        providerEntry.assetsServiced.add(assetEntry.name);
+      });
+      providerMap.set(expense.providerName, providerEntry);
+    }
+  });
+
+  currentYearData.inventoryPurchases.forEach((purchase) => {
+    const monthEntry = monthlyByKey.get(formatMonthKey(purchase.createdAt));
+    if (monthEntry) {
+      monthEntry.inventoryCost += purchase.amount;
+      monthEntry.totalCost += purchase.amount;
+    }
+  });
+
+  const totalMaintenanceCost = currentYearData.maintenanceLogs.reduce((sum, log) => sum + log.totalCost, 0);
+  const totalProjectExpenses = currentYearData.projectExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalInventoryPurchases = currentYearData.inventoryPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+  const grandTotal = totalMaintenanceCost + totalProjectExpenses + totalInventoryPurchases;
+  const priorGrandTotal = priorYearData.maintenanceLogs.reduce((sum, log) => sum + log.totalCost, 0)
+    + priorYearData.projectExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+    + priorYearData.inventoryPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+
+  return {
+    householdName: currentYearData.householdName,
+    year,
+    generatedAt: new Date(),
+    summary: {
+      totalMaintenanceCost,
+      totalProjectExpenses,
+      totalInventoryPurchases,
+      grandTotal,
+      assetsMaintainedCount: new Set(currentYearData.maintenanceLogs.map((log) => log.assetId)).size,
+      maintenanceEventCount: currentYearData.maintenanceLogs.length,
+      averageCostPerMaintenanceEvent: currentYearData.maintenanceLogs.length > 0 ? totalMaintenanceCost / currentYearData.maintenanceLogs.length : 0,
+      yearOverYear: priorGrandTotal > 0 || grandTotal > 0
+        ? {
+            priorYear: year - 1,
+            deltaPercent: priorGrandTotal === 0 ? 100 : ((grandTotal - priorGrandTotal) / priorGrandTotal) * 100,
+            deltaAmount: grandTotal - priorGrandTotal
+          }
+        : null
+    },
+    assetRows: Array.from(assetBuckets.values())
+      .map((entry) => ({
+        assetName: entry.assetName,
+        category: entry.category,
+        maintenanceCost: entry.maintenanceCost,
+        projectCost: entry.projectCost,
+        totalCost: entry.maintenanceCost + entry.projectCost,
+        percentOfGrandTotal: grandTotal > 0 ? ((entry.maintenanceCost + entry.projectCost) / grandTotal) * 100 : 0
+      }))
+      .sort((left, right) => right.totalCost - left.totalCost || left.assetName.localeCompare(right.assetName)),
+    monthlyRows: monthlyMap.map(({ key: _key, ...entry }) => entry),
+    categoryRows: Array.from(maintenanceCategoryMap.entries())
+      .map(([category, entry]) => ({
+        category: categoryLabel(category),
+        eventCount: entry.eventCount,
+        totalCost: entry.totalCost,
+        averageCost: entry.eventCount > 0 ? entry.totalCost / entry.eventCount : 0,
+        percentOfMaintenanceTotal: totalMaintenanceCost > 0 ? (entry.totalCost / totalMaintenanceCost) * 100 : 0
+      }))
+      .sort((left, right) => right.totalCost - left.totalCost || left.category.localeCompare(right.category)),
+    providerRows: Array.from(providerMap.values())
+      .map((entry) => ({
+        providerName: entry.providerName,
+        eventCount: entry.eventCount,
+        totalSpend: entry.totalSpend,
+        assetsServiced: Array.from(entry.assetsServiced).sort((left, right) => left.localeCompare(right))
+      }))
+      .sort((left, right) => right.totalSpend - left.totalSpend || left.providerName.localeCompare(right.providerName))
+  };
+};
+
+export const buildInventoryValuationData = async (
+  prisma: PrismaClient,
+  householdId: string
+): Promise<InventoryValuationPdfInput> => {
+  const [household, items, purchaseTransactions] = await Promise.all([
+    prisma.household.findUnique({
+      where: { id: householdId },
+      select: { name: true }
+    }),
+    prisma.inventoryItem.findMany({
+      where: {
+        householdId,
+        deletedAt: null
+      },
+      orderBy: [
+        { category: "asc" },
+        { name: "asc" }
+      ]
+    }),
+    prisma.inventoryTransaction.findMany({
+      where: {
+        type: "purchase",
+        unitCost: { not: null },
+        inventoryItem: {
+          householdId,
+          deletedAt: null
+        }
+      },
+      select: {
+        inventoryItemId: true,
+        unitCost: true,
+        createdAt: true
+      },
+      orderBy: [
+        { inventoryItemId: "asc" },
+        { createdAt: "desc" }
+      ]
+    })
+  ]);
+
+  const latestUnitCostByItem = new Map<string, number>();
+  purchaseTransactions.forEach((transaction) => {
+    if (!latestUnitCostByItem.has(transaction.inventoryItemId) && transaction.unitCost !== null) {
+      latestUnitCostByItem.set(transaction.inventoryItemId, transaction.unitCost);
+    }
+  });
+
+  const categoryMap = new Map<string, {
+    category: string;
+    subtotalValue: number;
+    items: InventoryValuationPdfInput["categories"][number]["items"];
+  }>();
+  const reorderAlerts: InventoryValuationPdfInput["reorderAlerts"] = [];
+  let totalQuantityOnHand = 0;
+  let estimatedTotalValue = 0;
+  let itemsBelowReorderPoint = 0;
+
+  items.forEach((item) => {
+    const category = toDisplayCategory(item.category);
+    const unitCost = latestUnitCostByItem.get(item.id) ?? item.unitCost ?? 0;
+    const totalValue = item.quantityOnHand * unitCost;
+    const status = item.quantityOnHand <= 0
+      ? "Out"
+      : item.reorderThreshold !== null && item.quantityOnHand < item.reorderThreshold
+        ? "Low"
+        : "OK";
+    const categoryEntry = categoryMap.get(category) ?? {
+      category,
+      subtotalValue: 0,
+      items: []
+    };
+
+    categoryEntry.subtotalValue += totalValue;
+    categoryEntry.items.push({
+      itemName: item.name,
+      quantity: item.quantityOnHand,
+      unit: item.unit,
+      unitCost,
+      totalValue,
+      reorderPoint: item.reorderThreshold,
+      status
+    });
+    categoryMap.set(category, categoryEntry);
+
+    totalQuantityOnHand += item.quantityOnHand;
+    estimatedTotalValue += totalValue;
+
+    if (item.reorderThreshold !== null && item.quantityOnHand < item.reorderThreshold) {
+      itemsBelowReorderPoint += 1;
+      reorderAlerts.push({
+        itemName: item.name,
+        currentQuantity: item.quantityOnHand,
+        reorderPoint: item.reorderThreshold,
+        deficit: Math.max(0, item.reorderThreshold - item.quantityOnHand)
+      });
+    }
+  });
+
+  return {
+    householdName: household?.name ?? "Household",
+    asOf: new Date(),
+    generatedAt: new Date(),
+    summary: {
+      totalUniqueItems: items.length,
+      totalQuantityOnHand,
+      estimatedTotalValue,
+      itemsBelowReorderPoint,
+      categoriesTracked: categoryMap.size
+    },
+    reorderAlerts: reorderAlerts.sort((left, right) => right.deficit - left.deficit || left.itemName.localeCompare(right.itemName)),
+    categories: Array.from(categoryMap.values())
+      .map((entry) => ({
+        category: entry.category,
+        subtotalValue: entry.subtotalValue,
+        items: entry.items.sort((left, right) => left.itemName.localeCompare(right.itemName))
+      }))
+      .sort((left, right) => left.category.localeCompare(right.category))
+  };
+};
+
 const toOptionalDateRange = (range: { since?: string | undefined; until?: string | undefined }): { since?: string; until?: string } => ({
   ...(range.since ? { since: range.since } : {}),
   ...(range.until ? { until: range.until } : {})
@@ -558,6 +1278,28 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     reply.hijack();
     reply.raw.setHeader("content-type", "application/pdf");
     reply.raw.setHeader("content-disposition", `attachment; filename=\"asset-history-${assetFileTag}.pdf\"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
+  });
+
+  app.get("/v1/assets/:assetId/export/compliance-pdf", async (request, reply) => {
+    const params = assetParamsSchema.parse(request.params);
+    const query = dateRangeQuerySchema.parse(request.query);
+    const range = toOptionalDateRange(query);
+    const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+
+    if (!asset) {
+      return reply.code(404).send({ message: "Asset not found." });
+    }
+
+    const report = await buildComplianceAuditData(app.prisma, asset, range);
+    const doc = generateComplianceAuditPdf(report);
+    const assetFileTag = sanitizeFileSegment(asset.assetTag ?? asset.id);
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `attachment; filename=\"compliance-audit-${assetFileTag}.pdf\"`);
     doc.pipe(reply.raw);
     doc.end();
     return reply;
@@ -874,6 +1616,43 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     reply.header("content-type", "text/csv");
     reply.header("content-disposition", `attachment; filename=\"${query.dataset}-${sanitizeFileSegment(params.householdId)}.csv\"`);
     return csv;
+  });
+
+  app.get("/v1/households/:householdId/export/annual-cost-pdf", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const query = annualCostPdfQuerySchema.parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const report = await buildAnnualCostData(app.prisma, params.householdId, query.year);
+    const doc = generateAnnualCostPdf(report);
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `attachment; filename=\"annual-cost-${query.year}-${sanitizeFileSegment(params.householdId)}.pdf\"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
+  });
+
+  app.get("/v1/households/:householdId/export/inventory-valuation-pdf", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const report = await buildInventoryValuationData(app.prisma, params.householdId);
+    const doc = generateInventoryValuationPdf(report);
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `attachment; filename=\"inventory-valuation-${sanitizeFileSegment(params.householdId)}.pdf\"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
   });
 
   app.get("/v1/households/:householdId/export/json", async (request, reply) => {

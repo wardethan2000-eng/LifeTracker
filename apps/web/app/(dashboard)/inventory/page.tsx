@@ -4,6 +4,7 @@ import { InventoryBulkActions } from "../../../components/inventory-bulk-actions
 import { InventoryEditableRow } from "../../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
 import { InventoryQuickRestock } from "../../../components/inventory-quick-restock";
+import { InventoryValuationReportButton } from "../../../components/report-download-actions";
 import { InventorySection } from "../../../components/inventory-section";
 import { InventoryShoppingListSection } from "../../../components/inventory-shopping-list-section";
 import { InventoryTransactionHistory } from "../../../components/inventory-transaction-history";
@@ -165,6 +166,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             <p style={{ marginTop: 6 }}>Universal household stock across assets, projects, and standalone supplies.</p>
           </div>
           <div className="page-header__actions">
+            <InventoryValuationReportButton householdId={household.id} />
             <Link href={inventoryViewHref} className="button button--primary button--sm">Inventory</Link>
             <Link href={analyticsViewHref} className="button button--ghost button--sm">Analytics Hub</Link>
           </div>

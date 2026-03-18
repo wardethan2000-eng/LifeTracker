@@ -1175,6 +1175,24 @@ export const downloadAssetPdf = async (
   await downloadFileFromProxy(`/v1/assets/${assetId}/export/pdf${suffix}`, `asset-history-${assetId}.pdf`);
 };
 
+export const downloadComplianceAuditPdf = async (
+  assetId: string,
+  options?: { since?: string; until?: string }
+): Promise<void> => {
+  const params = new URLSearchParams();
+
+  if (options?.since) {
+    params.set("since", options.since);
+  }
+
+  if (options?.until) {
+    params.set("until", options.until);
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  await downloadFileFromProxy(`/v1/assets/${assetId}/export/compliance-pdf${suffix}`, `compliance-audit-${assetId}.pdf`);
+};
+
 export const downloadAssetCsv = async (
   assetId: string,
   dataset: CsvExportDataset,
@@ -1209,6 +1227,15 @@ export const downloadHouseholdCsv = async (
   }
 
   await downloadFileFromProxy(`/v1/households/${householdId}/export/csv?${params.toString()}`, `${dataset}-${householdId}.csv`);
+};
+
+export const downloadAnnualCostPdf = async (householdId: string, year: number): Promise<void> => {
+  const params = new URLSearchParams({ year: String(year) });
+  await downloadFileFromProxy(`/v1/households/${householdId}/export/annual-cost-pdf?${params.toString()}`, `annual-cost-${year}-${householdId}.pdf`);
+};
+
+export const downloadInventoryValuationPdf = async (householdId: string): Promise<void> => {
+  await downloadFileFromProxy(`/v1/households/${householdId}/export/inventory-valuation-pdf`, `inventory-valuation-${householdId}.pdf`);
 };
 
 export const createShareLink = async (

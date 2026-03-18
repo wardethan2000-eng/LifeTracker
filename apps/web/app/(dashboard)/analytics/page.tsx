@@ -7,6 +7,7 @@ import { InventoryAnalyticsCommonality } from "../../../components/inventory-ana
 import { InventoryAnalyticsReorder } from "../../../components/inventory-analytics-reorder";
 import { InventoryAnalyticsSummary } from "../../../components/inventory-analytics-summary";
 import { InventoryAnalyticsTurnover } from "../../../components/inventory-analytics-turnover";
+import { AnnualCostReportButton } from "../../../components/report-download-actions";
 import { LkBarChart, LkDonutChart, LkLineChart } from "../../../components/charts";
 import {
   getHouseholdCostOverview,
@@ -584,6 +585,11 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             {tab === "costs" && costDashboard ? ` • ${formatDate(costDashboard.periodStart)} through ${formatDate(costDashboard.periodEnd)}` : ""}
           </p>
         </div>
+        {tab === "costs" ? (
+          <div className="page-header__actions">
+            <AnnualCostReportButton householdId={household.id} />
+          </div>
+        ) : null}
       </header>
 
       <div className="page-body">

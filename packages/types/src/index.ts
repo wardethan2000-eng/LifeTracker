@@ -5,6 +5,7 @@ export * from "./analytics/compliance.js";
 export * from "./analytics/hobbies.js";
 export * from "./analytics/projects.js";
 export * from "./dev-fixtures.js";
+export * from "./report-inputs.js";
 
 export const createOffsetPaginationQuerySchema = (
   options: {
