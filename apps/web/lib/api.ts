@@ -55,6 +55,7 @@ import {
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
   spaceGeneralItemSchema,
+  spaceItemHistoryListResponseSchema,
   spaceInventoryLinkDetailSchema,
   spaceContentsResponseSchema,
   spaceListResponseSchema,
@@ -197,6 +198,7 @@ import {
   type SpaceContentsResponse,
   type SpaceGeneralItem,
   type SpaceGeneralItemInput,
+  type SpaceItemHistoryListResponse,
   type SpaceListResponse,
   type SpaceResponse,
   type UpdateInventoryItemInput,
@@ -1153,7 +1155,9 @@ export const searchHousehold = async (
   query: string,
   options?: {
     limit?: number;
-    types?: SearchEntityType[];
+    include?: SearchEntityType[];
+    fuzzy?: boolean;
+    includeHistory?: boolean;
   }
 ): Promise<SearchResponse> => {
   const params = new URLSearchParams({ q: query });
@@ -1162,8 +1166,16 @@ export const searchHousehold = async (
     params.set("limit", String(options.limit));
   }
 
-  if (options?.types && options.types.length > 0) {
-    params.set("types", options.types.join(","));
+  if (options?.include && options.include.length > 0) {
+    params.set("include", options.include.join(","));
+  }
+
+  if (options?.fuzzy !== undefined) {
+    params.set("fuzzy", String(options.fuzzy));
+  }
+
+  if (options?.includeHistory !== undefined) {
+    params.set("includeHistory", String(options.includeHistory));
   }
 
   return apiRequest({
@@ -2527,6 +2539,48 @@ export const getSpaceContents = async (householdId: string, spaceId: string): Pr
   schema: spaceContentsResponseSchema,
   cacheOptions: { revalidate: 30 }
 });
+
+export const getSpaceHistory = async (
+  householdId: string,
+  spaceId: string,
+  options?: {
+    actions?: Array<"placed" | "removed" | "moved_in" | "moved_out" | "quantity_changed">;
+    since?: string;
+    until?: string;
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<SpaceItemHistoryListResponse> => {
+  const query = new URLSearchParams();
+
+  if (options?.actions && options.actions.length > 0) {
+    query.set("actions", options.actions.join(","));
+  }
+
+  if (options?.since) {
+    query.set("since", options.since);
+  }
+
+  if (options?.until) {
+    query.set("until", options.until);
+  }
+
+  if (options?.limit !== undefined) {
+    query.set("limit", String(options.limit));
+  }
+
+  if (options?.cursor) {
+    query.set("cursor", options.cursor);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/spaces/${spaceId}/history${suffix}`,
+    schema: spaceItemHistoryListResponseSchema,
+    cacheOptions: { revalidate: 30 }
+  });
+};
 
 export const updateInventoryPurchaseLine = async (
   householdId: string,

@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import type { SearchEntityType, SearchResponse, SearchResult, SearchResultGroup } from "@lifekeeper/types";
 import { validateEntryTarget } from "./entries.js";
+import { getSpaceBreadcrumb } from "./spaces.js";
 
 type SearchPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -21,7 +22,9 @@ type SearchQueryOptions = {
   householdId: string;
   q: string;
   limit: number;
-  types?: SearchEntityType[];
+  include?: SearchEntityType[];
+  fuzzy?: boolean;
+  includeHistory?: boolean;
 };
 
 type SearchIndexRow = {
@@ -34,6 +37,13 @@ type SearchIndexRow = {
   entityMeta: Record<string, unknown> | null;
 };
 
+type SearchScoredRow = SearchIndexRow & {
+  exactMatch: number;
+  fullTextRank: number;
+  trigramScore: number;
+  updatedAt: Date;
+};
+
 const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   asset: "Assets",
   schedule: "Schedules",
@@ -44,12 +54,14 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   hobby_project: "Hobby Projects",
   service_provider: "Service Providers",
   inventory_item: "Inventory Items",
+  space: "Spaces",
   comment: "Comments",
   entry: "Entries",
   invitation: "Invitations",
   hobby: "Hobbies",
   hobby_series: "Hobby Series",
-  hobby_collection_item: "Hobby Collection Items"
+  hobby_collection_item: "Hobby Collection Items",
+  historical_inventory_item: "Historical"
 };
 
 const SEARCH_GROUP_ORDER: SearchEntityType[] = [
@@ -62,12 +74,14 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "hobby_project",
   "service_provider",
   "inventory_item",
+  "space",
   "comment",
   "entry",
   "invitation",
   "hobby",
   "hobby_series",
-  "hobby_collection_item"
+  "hobby_collection_item",
+  "historical_inventory_item"
 ];
 
 const normalizeText = (value: string | null | undefined): string | null => {
@@ -273,6 +287,78 @@ const buildTsQuery = (query: string): string | null => {
     .join(" & ");
 };
 
+const sortSearchRows = (rows: SearchScoredRow[]): SearchScoredRow[] => rows.sort((left, right) => {
+  if (left.exactMatch !== right.exactMatch) {
+    return right.exactMatch - left.exactMatch;
+  }
+
+  if (left.fullTextRank !== right.fullTextRank) {
+    return right.fullTextRank - left.fullTextRank;
+  }
+
+  if (left.trigramScore !== right.trigramScore) {
+    return right.trigramScore - left.trigramScore;
+  }
+
+  return right.updatedAt.getTime() - left.updatedAt.getTime();
+});
+
+const dedupeSearchRows = (rows: SearchScoredRow[]): SearchScoredRow[] => {
+  const deduped = new Map<string, SearchScoredRow>();
+
+  for (const row of rows) {
+    const key = `${row.entityType}:${row.entityId}`;
+    const existing = deduped.get(key);
+
+    if (!existing) {
+      deduped.set(key, row);
+      continue;
+    }
+
+    deduped.set(key, {
+      ...existing,
+      subtitle: existing.subtitle ?? row.subtitle,
+      parentEntityName: existing.parentEntityName ?? row.parentEntityName,
+      entityMeta: existing.entityMeta ?? row.entityMeta,
+      exactMatch: Math.max(existing.exactMatch, row.exactMatch),
+      fullTextRank: Math.max(existing.fullTextRank, row.fullTextRank),
+      trigramScore: Math.max(existing.trigramScore, row.trigramScore),
+      updatedAt: existing.updatedAt > row.updatedAt ? existing.updatedAt : row.updatedAt
+    });
+  }
+
+  return sortSearchRows([...deduped.values()]);
+};
+
+const enrichHistoricalRows = async (
+  prisma: SearchPrisma,
+  rows: SearchScoredRow[]
+): Promise<SearchScoredRow[]> => {
+  const uniqueSpaceIds = Array.from(new Set(rows.flatMap((row) => {
+    const spaceId = typeof row.entityMeta?.spaceId === "string" ? row.entityMeta.spaceId : null;
+    return spaceId ? [spaceId] : [];
+  })));
+
+  const breadcrumbEntries = await Promise.all(uniqueSpaceIds.map(async (spaceId) => [spaceId, await getSpaceBreadcrumb(prisma, spaceId)] as const));
+  const breadcrumbsBySpaceId = new Map(breadcrumbEntries);
+
+  return rows.map((row) => {
+    const spaceId = typeof row.entityMeta?.spaceId === "string" ? row.entityMeta.spaceId : null;
+    const breadcrumb = spaceId ? breadcrumbsBySpaceId.get(spaceId) ?? [] : [];
+    const breadcrumbText = breadcrumb.map((segment) => segment.name).join(" > ");
+
+    return {
+      ...row,
+      subtitle: breadcrumbText ? `Was in ${breadcrumbText}` : row.subtitle,
+      entityMeta: {
+        ...(row.entityMeta ?? {}),
+        lastSpaceBreadcrumb: breadcrumbText,
+        historical: true
+      }
+    };
+  });
+};
+
 const mapRowsToGroups = (query: string, rows: SearchIndexRow[]): SearchResponse => {
   const grouped = rows.reduce((groups, row) => {
     const existing = groups.get(row.entityType);
@@ -317,14 +403,22 @@ export const querySearchIndex = async (
     return { query: options.q, groups: [] };
   }
 
-  const typeFilter = options.types && options.types.length > 0
-    ? Prisma.sql` AND "entityType" IN (${Prisma.join(options.types)})`
+  const currentTypes = options.include?.filter((type) => type !== "historical_inventory_item") ?? [];
+  const typeFilter = currentTypes.length > 0
+    ? Prisma.sql` AND "entityType" IN (${Prisma.join(currentTypes)})`
     : Prisma.empty;
+  const fuzzy = options.fuzzy ?? true;
+  const includeHistorical = (options.includeHistory ?? false)
+    && (options.include === undefined
+      || options.include.includes("inventory_item")
+      || options.include.includes("historical_inventory_item"));
+
+  let currentRows: SearchScoredRow[] = [];
 
   if (normalizedQuery.length <= 2) {
     const likeQuery = `%${normalizedQuery}%`;
     const prefixQuery = `${normalizedQuery}%`;
-    const rows = await prisma.$queryRaw<SearchIndexRow[]>(Prisma.sql`
+    currentRows = await prisma.$queryRaw<SearchScoredRow[]>(Prisma.sql`
       SELECT
         "entityType",
         "entityId",
@@ -332,45 +426,348 @@ export const querySearchIndex = async (
         "subtitle",
         "entityUrl",
         "parentEntityName",
-        "entityMeta"
+        "entityMeta",
+        CASE
+          WHEN lower("title") = lower(${normalizedQuery})
+            OR lower(coalesce("entityMeta"->>'shortCode', '')) = lower(${normalizedQuery})
+          THEN 1
+          ELSE 0
+        END AS "exactMatch",
+        0::double precision AS "fullTextRank",
+        0::double precision AS "trigramScore",
+        "updatedAt"
       FROM "SearchIndex"
       WHERE "householdId" = ${options.householdId}
-        AND "title" ILIKE ${likeQuery}
+        AND (
+          "title" ILIKE ${likeQuery}
+          OR coalesce("entityMeta"->>'shortCode', '') ILIKE ${likeQuery}
+        )
         ${typeFilter}
       ORDER BY
-        CASE WHEN "title" ILIKE ${prefixQuery} THEN 0 ELSE 1 END,
+        CASE
+          WHEN lower("title") = lower(${normalizedQuery})
+            OR lower(coalesce("entityMeta"->>'shortCode', '')) = lower(${normalizedQuery})
+          THEN 0
+          WHEN "title" ILIKE ${prefixQuery}
+            OR coalesce("entityMeta"->>'shortCode', '') ILIKE ${prefixQuery}
+          THEN 1
+          ELSE 2
+        END,
         "updatedAt" DESC,
         "title" ASC
       LIMIT ${options.limit}
     `);
+  } else {
+    const tsQuery = buildTsQuery(normalizedQuery);
 
-    return mapRowsToGroups(options.q, rows);
+    if (tsQuery) {
+      const fullTextRows = await prisma.$queryRaw<SearchScoredRow[]>(Prisma.sql`
+        SELECT
+          "entityType",
+          "entityId",
+          "title",
+          "subtitle",
+          "entityUrl",
+          "parentEntityName",
+          "entityMeta",
+          CASE
+            WHEN lower("title") = lower(${normalizedQuery})
+              OR lower(coalesce("entityMeta"->>'shortCode', '')) = lower(${normalizedQuery})
+            THEN 1
+            ELSE 0
+          END AS "exactMatch",
+          ts_rank("searchVector", to_tsquery('english', ${tsQuery})) AS "fullTextRank",
+          0::double precision AS "trigramScore",
+          "updatedAt"
+        FROM "SearchIndex"
+        WHERE "householdId" = ${options.householdId}
+          AND "searchVector" @@ to_tsquery('english', ${tsQuery})
+          ${typeFilter}
+        ORDER BY
+          CASE
+            WHEN lower("title") = lower(${normalizedQuery})
+              OR lower(coalesce("entityMeta"->>'shortCode', '')) = lower(${normalizedQuery})
+            THEN 0
+            ELSE 1
+          END,
+          ts_rank("searchVector", to_tsquery('english', ${tsQuery})) DESC,
+          "updatedAt" DESC
+        LIMIT ${options.limit}
+      `);
+
+      currentRows = fullTextRows;
+
+      if (fuzzy && fullTextRows.length < options.limit) {
+        const fuzzyRows = await prisma.$queryRaw<SearchScoredRow[]>(Prisma.sql`
+          SELECT
+            "entityType",
+            "entityId",
+            "title",
+            "subtitle",
+            "entityUrl",
+            "parentEntityName",
+            "entityMeta",
+            CASE
+              WHEN lower("title") = lower(${normalizedQuery})
+                OR lower(coalesce("entityMeta"->>'shortCode', '')) = lower(${normalizedQuery})
+              THEN 1
+              ELSE 0
+            END AS "exactMatch",
+            0::double precision AS "fullTextRank",
+            similarity("title", ${normalizedQuery}) AS "trigramScore",
+            "updatedAt"
+          FROM "SearchIndex"
+          WHERE "householdId" = ${options.householdId}
+            AND similarity("title", ${normalizedQuery}) > 0.3
+            ${typeFilter}
+          ORDER BY
+            CASE
+              WHEN lower("title") = lower(${normalizedQuery})
+                OR lower(coalesce("entityMeta"->>'shortCode', '')) = lower(${normalizedQuery})
+              THEN 0
+              ELSE 1
+            END,
+            similarity("title", ${normalizedQuery}) DESC,
+            "updatedAt" DESC
+          LIMIT ${Math.max(options.limit * 2, options.limit)}
+        `);
+
+        currentRows = dedupeSearchRows([...fullTextRows, ...fuzzyRows]).slice(0, options.limit);
+      }
+    }
   }
 
-  const tsQuery = buildTsQuery(normalizedQuery);
+  let historicalRows: SearchScoredRow[] = [];
 
-  if (!tsQuery) {
-    return { query: options.q, groups: [] };
+  if (includeHistorical) {
+    const historyTsQuery = buildTsQuery(normalizedQuery);
+
+    if (normalizedQuery.length <= 2) {
+      const likeQuery = `%${normalizedQuery}%`;
+      historicalRows = await prisma.$queryRaw<SearchScoredRow[]>(Prisma.sql`
+        WITH latest_action AS (
+          SELECT DISTINCT ON (history."inventoryItemId")
+            history."inventoryItemId",
+            history."action" AS "latestAction"
+          FROM "SpaceItemHistory" history
+          WHERE history."householdId" = ${options.householdId}
+            AND history."inventoryItemId" IS NOT NULL
+          ORDER BY history."inventoryItemId", history."createdAt" DESC, history."id" DESC
+        ),
+        latest_removal AS (
+          SELECT DISTINCT ON (history."inventoryItemId")
+            history."inventoryItemId",
+            history."spaceId",
+            history."createdAt" AS "removedAt"
+          FROM "SpaceItemHistory" history
+          WHERE history."householdId" = ${options.householdId}
+            AND history."inventoryItemId" IS NOT NULL
+            AND history."action" IN ('removed', 'moved_out')
+          ORDER BY history."inventoryItemId", history."createdAt" DESC, history."id" DESC
+        )
+        SELECT
+          'historical_inventory_item'::text AS "entityType",
+          item."id" AS "entityId",
+          item."name" AS "title",
+          NULL::text AS "subtitle",
+          CASE
+            WHEN removal."spaceId" IS NOT NULL
+            THEN '/inventory/spaces/' || removal."spaceId" || '?householdId=' || item."householdId" || '&tab=history'
+            ELSE '/inventory?householdId=' || item."householdId"
+          END AS "entityUrl",
+          NULL::text AS "parentEntityName",
+          jsonb_build_object(
+            'historical', true,
+            'inventoryItemId', item."id",
+            'spaceId', removal."spaceId",
+            'removedAt', removal."removedAt",
+            'itemDeleted', item."deletedAt" IS NOT NULL
+          ) AS "entityMeta",
+          CASE WHEN lower(item."name") = lower(${normalizedQuery}) THEN 1 ELSE 0 END AS "exactMatch",
+          0::double precision AS "fullTextRank",
+          0::double precision AS "trigramScore",
+          removal."removedAt" AS "updatedAt"
+        FROM latest_action action
+        INNER JOIN latest_removal removal ON removal."inventoryItemId" = action."inventoryItemId"
+        INNER JOIN "InventoryItem" item ON item."id" = removal."inventoryItemId"
+        WHERE item."householdId" = ${options.householdId}
+          AND (action."latestAction" IN ('removed', 'moved_out') OR item."deletedAt" IS NOT NULL)
+          AND item."name" ILIKE ${likeQuery}
+        ORDER BY
+          CASE WHEN lower(item."name") = lower(${normalizedQuery}) THEN 0 ELSE 1 END,
+          removal."removedAt" DESC,
+          item."name" ASC
+        LIMIT ${options.limit}
+      `);
+    } else if (historyTsQuery) {
+      const fullTextHistoricalRows = await prisma.$queryRaw<SearchScoredRow[]>(Prisma.sql`
+        WITH latest_action AS (
+          SELECT DISTINCT ON (history."inventoryItemId")
+            history."inventoryItemId",
+            history."action" AS "latestAction"
+          FROM "SpaceItemHistory" history
+          WHERE history."householdId" = ${options.householdId}
+            AND history."inventoryItemId" IS NOT NULL
+          ORDER BY history."inventoryItemId", history."createdAt" DESC, history."id" DESC
+        ),
+        latest_removal AS (
+          SELECT DISTINCT ON (history."inventoryItemId")
+            history."inventoryItemId",
+            history."spaceId",
+            history."createdAt" AS "removedAt"
+          FROM "SpaceItemHistory" history
+          WHERE history."householdId" = ${options.householdId}
+            AND history."inventoryItemId" IS NOT NULL
+            AND history."action" IN ('removed', 'moved_out')
+          ORDER BY history."inventoryItemId", history."createdAt" DESC, history."id" DESC
+        )
+        SELECT
+          'historical_inventory_item'::text AS "entityType",
+          item."id" AS "entityId",
+          item."name" AS "title",
+          NULL::text AS "subtitle",
+          CASE
+            WHEN removal."spaceId" IS NOT NULL
+            THEN '/inventory/spaces/' || removal."spaceId" || '?householdId=' || item."householdId" || '&tab=history'
+            ELSE '/inventory?householdId=' || item."householdId"
+          END AS "entityUrl",
+          NULL::text AS "parentEntityName",
+          jsonb_build_object(
+            'historical', true,
+            'inventoryItemId', item."id",
+            'spaceId', removal."spaceId",
+            'removedAt', removal."removedAt",
+            'itemDeleted', item."deletedAt" IS NOT NULL
+          ) AS "entityMeta",
+          CASE WHEN lower(item."name") = lower(${normalizedQuery}) THEN 1 ELSE 0 END AS "exactMatch",
+          ts_rank(to_tsvector('english', item."name"), to_tsquery('english', ${historyTsQuery})) AS "fullTextRank",
+          0::double precision AS "trigramScore",
+          removal."removedAt" AS "updatedAt"
+        FROM latest_action action
+        INNER JOIN latest_removal removal ON removal."inventoryItemId" = action."inventoryItemId"
+        INNER JOIN "InventoryItem" item ON item."id" = removal."inventoryItemId"
+        WHERE item."householdId" = ${options.householdId}
+          AND (action."latestAction" IN ('removed', 'moved_out') OR item."deletedAt" IS NOT NULL)
+          AND to_tsvector('english', item."name") @@ to_tsquery('english', ${historyTsQuery})
+        ORDER BY
+          CASE WHEN lower(item."name") = lower(${normalizedQuery}) THEN 0 ELSE 1 END,
+          ts_rank(to_tsvector('english', item."name"), to_tsquery('english', ${historyTsQuery})) DESC,
+          removal."removedAt" DESC
+        LIMIT ${options.limit}
+      `);
+
+      historicalRows = fullTextHistoricalRows;
+
+      if (fuzzy && fullTextHistoricalRows.length < options.limit) {
+        const fuzzyHistoricalRows = await prisma.$queryRaw<SearchScoredRow[]>(Prisma.sql`
+          WITH latest_action AS (
+            SELECT DISTINCT ON (history."inventoryItemId")
+              history."inventoryItemId",
+              history."action" AS "latestAction"
+            FROM "SpaceItemHistory" history
+            WHERE history."householdId" = ${options.householdId}
+              AND history."inventoryItemId" IS NOT NULL
+            ORDER BY history."inventoryItemId", history."createdAt" DESC, history."id" DESC
+          ),
+          latest_removal AS (
+            SELECT DISTINCT ON (history."inventoryItemId")
+              history."inventoryItemId",
+              history."spaceId",
+              history."createdAt" AS "removedAt"
+            FROM "SpaceItemHistory" history
+            WHERE history."householdId" = ${options.householdId}
+              AND history."inventoryItemId" IS NOT NULL
+              AND history."action" IN ('removed', 'moved_out')
+            ORDER BY history."inventoryItemId", history."createdAt" DESC, history."id" DESC
+          )
+          SELECT
+            'historical_inventory_item'::text AS "entityType",
+            item."id" AS "entityId",
+            item."name" AS "title",
+            NULL::text AS "subtitle",
+            CASE
+              WHEN removal."spaceId" IS NOT NULL
+              THEN '/inventory/spaces/' || removal."spaceId" || '?householdId=' || item."householdId" || '&tab=history'
+              ELSE '/inventory?householdId=' || item."householdId"
+            END AS "entityUrl",
+            NULL::text AS "parentEntityName",
+            jsonb_build_object(
+              'historical', true,
+              'inventoryItemId', item."id",
+              'spaceId', removal."spaceId",
+              'removedAt', removal."removedAt",
+              'itemDeleted', item."deletedAt" IS NOT NULL
+            ) AS "entityMeta",
+            CASE WHEN lower(item."name") = lower(${normalizedQuery}) THEN 1 ELSE 0 END AS "exactMatch",
+            0::double precision AS "fullTextRank",
+            similarity(item."name", ${normalizedQuery}) AS "trigramScore",
+            removal."removedAt" AS "updatedAt"
+          FROM latest_action action
+          INNER JOIN latest_removal removal ON removal."inventoryItemId" = action."inventoryItemId"
+          INNER JOIN "InventoryItem" item ON item."id" = removal."inventoryItemId"
+          WHERE item."householdId" = ${options.householdId}
+            AND (action."latestAction" IN ('removed', 'moved_out') OR item."deletedAt" IS NOT NULL)
+            AND similarity(item."name", ${normalizedQuery}) > 0.3
+          ORDER BY
+            CASE WHEN lower(item."name") = lower(${normalizedQuery}) THEN 0 ELSE 1 END,
+            similarity(item."name", ${normalizedQuery}) DESC,
+            removal."removedAt" DESC
+          LIMIT ${Math.max(options.limit * 2, options.limit)}
+        `);
+
+        historicalRows = dedupeSearchRows([...fullTextHistoricalRows, ...fuzzyHistoricalRows]).slice(0, options.limit);
+      }
+    }
+
+    historicalRows = await enrichHistoricalRows(prisma, historicalRows);
   }
 
-  const rows = await prisma.$queryRaw<SearchIndexRow[]>(Prisma.sql`
-    SELECT
-      "entityType",
-      "entityId",
-      "title",
-      "subtitle",
-      "entityUrl",
-      "parentEntityName",
-      "entityMeta"
-    FROM "SearchIndex"
-    WHERE "householdId" = ${options.householdId}
-      AND "searchVector" @@ to_tsquery('english', ${tsQuery})
-      ${typeFilter}
-    ORDER BY ts_rank("searchVector", to_tsquery('english', ${tsQuery})) DESC, "updatedAt" DESC
-    LIMIT ${options.limit}
-  `);
+  return mapRowsToGroups(options.q, [...currentRows, ...historicalRows]);
+};
 
-  return mapRowsToGroups(options.q, rows);
+export const syncSpaceToSearchIndex = async (prisma: SearchPrisma, spaceId: string): Promise<void> => {
+  const space = await prisma.space.findUnique({
+    where: { id: spaceId },
+    select: {
+      id: true,
+      householdId: true,
+      name: true,
+      shortCode: true,
+      type: true,
+      description: true,
+      notes: true,
+      deletedAt: true,
+      parent: {
+        select: {
+          name: true
+        }
+      }
+    }
+  });
+
+  if (!space || space.deletedAt) {
+    await deleteSearchIndexEntry(prisma, "space", spaceId);
+    return;
+  }
+
+  const breadcrumb = await getSpaceBreadcrumb(prisma, space.id);
+  const breadcrumbText = breadcrumb.map((segment) => segment.name).join(" > ");
+
+  await syncSearchIndexPayloads(prisma, "space", space.id, [{
+    householdId: space.householdId,
+    entityType: "space",
+    entityId: space.id,
+    title: space.name,
+    subtitle: space.shortCode,
+    body: joinText(space.description, space.notes, space.type, breadcrumbText),
+    entityUrl: `/inventory/spaces/${space.id}?householdId=${space.householdId}`,
+    entityMeta: {
+      type: space.type,
+      shortCode: space.shortCode,
+      parentSpaceName: space.parent?.name ?? null,
+      breadcrumb: breadcrumbText
+    }
+  }]);
 };
 
 export const syncAssetToSearchIndex = async (prisma: SearchPrisma, assetId: string): Promise<void> => {
@@ -1509,7 +1906,7 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
     WHERE "householdId" = ${householdId}
   `;
 
-  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, comments, invitations, entries, hobbySeries, hobbyCollectionItems] = await Promise.all([
+  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, spaces, comments, invitations, entries, hobbySeries, hobbyCollectionItems] = await Promise.all([
     prisma.asset.findMany({
       where: { householdId },
       select: { id: true }
@@ -1544,6 +1941,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
       select: { id: true }
     }),
     prisma.inventoryItem.findMany({
+      where: { householdId },
+      select: { id: true }
+    }),
+    prisma.space.findMany({
       where: { householdId },
       select: { id: true }
     }),
@@ -1602,6 +2003,10 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const item of inventoryItems) {
     await syncInventoryItemToSearchIndex(prisma, item.id);
+  }
+
+  for (const space of spaces) {
+    await syncSpaceToSearchIndex(prisma, space.id);
   }
 
   for (const comment of comments) {

@@ -208,6 +208,14 @@ enum SpaceType {
   other
 }
 
+enum SpaceItemAction {
+  placed
+  removed
+  moved_in
+  moved_out
+  quantity_changed
+}
+
 // Lifecycle state for a hobby workspace.
 enum HobbyStatus {
   active
@@ -350,6 +358,7 @@ model User {
   createdHobbyPracticeRoutines HobbyPracticeRoutine[] @relation("HobbyPracticeRoutineCreator")
   createdHobbyCollectionItems HobbyCollectionItem[] @relation("HobbyCollectionItemCreator")
   createdEntries          Entry[]               @relation("EntryCreator")
+  performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
 }
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
@@ -370,6 +379,7 @@ model Household {
   inventoryItems   InventoryItem[]
   spaces           Space[]
   spaceGeneralItems SpaceGeneralItem[]
+  spaceItemHistory SpaceItemHistory[]
   inventoryPurchases InventoryPurchase[]
   inventoryItemRevisions InventoryItemRevision[]
   activityLogs     ActivityLog[]
@@ -411,6 +421,7 @@ model Space {
   children       Space[]               @relation("SpaceHierarchy")
   spaceItems     SpaceInventoryItem[]
   generalItems   SpaceGeneralItem[]
+  itemHistory    SpaceItemHistory[]
 
   @@unique([householdId, shortCode])
   @@index([householdId, parentSpaceId])
@@ -883,6 +894,7 @@ model InventoryItem {
   hobbySessionIngredients HobbySessionIngredient[]
   revisions          InventoryItemRevision[]
   comments           Comment[]
+  spaceItemHistory   SpaceItemHistory[]
 
   @@index([householdId])
   @@index([householdId, deletedAt])
@@ -923,6 +935,30 @@ model SpaceGeneralItem {
 
   @@index([spaceId, deletedAt])
   @@index([householdId, deletedAt])
+}
+
+model SpaceItemHistory {
+  id               String          @id @default(cuid())
+  spaceId          String
+  inventoryItemId  String?
+  generalItemName  String?
+  householdId      String
+  action           SpaceItemAction
+  quantity         Float?
+  previousQuantity Float?
+  performedBy      String?
+  notes            String?
+  createdAt        DateTime        @default(now())
+  space            Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  inventoryItem    InventoryItem?  @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  household        Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  performer        User?           @relation("SpaceItemHistoryPerformer", fields: [performedBy], references: [id], onDelete: SetNull)
+
+  @@index([householdId, inventoryItemId])
+  @@index([householdId, spaceId])
+  @@index([spaceId, createdAt])
+  @@index([inventoryItemId, createdAt])
+  @@index([performedBy])
 }
 
 // Supplier-grouped purchase batch used for reorder carts and quick restocks.

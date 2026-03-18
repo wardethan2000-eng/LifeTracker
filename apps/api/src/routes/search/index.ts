@@ -19,11 +19,15 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
+    const include = query.include ?? query.types;
+
     const response = await querySearchIndex(app.prisma, {
       householdId: params.householdId,
       q: query.q,
       limit: query.limit,
-      ...(query.types ? { types: query.types } : {})
+      fuzzy: query.fuzzy,
+      includeHistory: query.includeHistory,
+      ...(include ? { include } : {})
     });
 
     return searchResponseSchema.parse(response);

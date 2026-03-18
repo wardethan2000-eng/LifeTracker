@@ -3,6 +3,7 @@ import {
   addSpaceItemInputSchema,
   createSpaceInputSchema,
   moveSpaceInputSchema,
+  spaceItemHistoryListResponseSchema,
   spaceGeneralItemInputSchema,
   spaceGeneralItemSchema,
   spaceInventoryLinkDetailSchema,
@@ -16,8 +17,10 @@ import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { createBatchLabelPdf, createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
+import { removeSearchIndexEntry, syncSpaceToSearchIndex } from "../../lib/search-index.js";
 import {
   serializeSpace,
+  serializeSpaceItemHistory,
   serializeSpaceList,
   toInventoryItemSummaryResponse
 } from "../../lib/serializers/index.js";
@@ -72,6 +75,45 @@ const spaceContentsSchema = z.object({
     names: z.array(z.string())
   })
 });
+
+const spaceHistoryQuerySchema = z.object({
+  actions: z.union([z.string(), z.array(z.string())]).optional().transform((value, context) => {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const raw = Array.isArray(value)
+      ? value.flatMap((entry) => entry.split(","))
+      : value.split(",");
+    const normalized = raw.map((entry) => entry.trim()).filter(Boolean);
+
+    if (normalized.length === 0) {
+      return undefined;
+    }
+
+    const allowed = new Set(["placed", "removed", "moved_in", "moved_out", "quantity_changed"]);
+
+    for (const action of normalized) {
+      if (!allowed.has(action)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["actions"],
+          message: `Unsupported history action: ${action}`
+        });
+
+        return z.NEVER;
+      }
+    }
+
+    return normalized as Array<"placed" | "removed" | "moved_in" | "moved_out" | "quantity_changed">;
+  }),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional()
+});
+
+const SPACE_HISTORY_MERGE_WINDOW_MS = 5 * 60 * 1000;
 
 const activeChildrenOrderBy = [
   { sortOrder: "asc" as const },
@@ -254,6 +296,129 @@ const collectDescendantIds = (
   return [...ids];
 };
 
+const syncSpacesToSearchIndex = async (prisma: PrismaClient, spaceIds: string[]): Promise<void> => {
+  await Promise.all(spaceIds.map((spaceId) => syncSpaceToSearchIndex(prisma, spaceId)));
+};
+
+const removeSpacesFromSearchIndex = async (prisma: PrismaClient, spaceIds: string[]): Promise<void> => {
+  await Promise.all(spaceIds.map((spaceId) => removeSearchIndexEntry(prisma, "space", spaceId)));
+};
+
+const findRecentInventoryHistory = async (
+  prisma: Prisma.TransactionClient | PrismaClient,
+  householdId: string,
+  inventoryItemId: string,
+  performedBy: string
+) => prisma.spaceItemHistory.findFirst({
+  where: {
+    householdId,
+    inventoryItemId,
+    performedBy,
+    action: {
+      in: ["removed", "moved_out"]
+    },
+    createdAt: {
+      gte: new Date(Date.now() - SPACE_HISTORY_MERGE_WINDOW_MS)
+    }
+  },
+  orderBy: [
+    { createdAt: "desc" },
+    { id: "desc" }
+  ]
+});
+
+const recordGeneralItemHistory = async (
+  prisma: Prisma.TransactionClient | PrismaClient,
+  params: {
+    householdId: string;
+    spaceId: string;
+    generalItemName: string;
+    action: "placed" | "removed";
+    notes?: string | null;
+    performedBy: string;
+  }
+): Promise<void> => {
+  await prisma.spaceItemHistory.create({
+    data: {
+      householdId: params.householdId,
+      spaceId: params.spaceId,
+      generalItemName: params.generalItemName,
+      action: params.action,
+      notes: params.notes ?? null,
+      performedBy: params.performedBy
+    }
+  });
+};
+
+const recordInventoryPlacementHistory = async (
+  prisma: Prisma.TransactionClient | PrismaClient,
+  params: {
+    householdId: string;
+    spaceId: string;
+    inventoryItemId: string;
+    quantity: number | null;
+    previousQuantity: number | null;
+    notes?: string | null;
+    performedBy: string;
+  }
+): Promise<void> => {
+  const recentHistory = await findRecentInventoryHistory(
+    prisma,
+    params.householdId,
+    params.inventoryItemId,
+    params.performedBy
+  );
+
+  if (recentHistory && recentHistory.spaceId === params.spaceId) {
+    await prisma.spaceItemHistory.update({
+      where: { id: recentHistory.id },
+      data: {
+        action: "quantity_changed",
+        previousQuantity: recentHistory.quantity,
+        quantity: params.quantity,
+        notes: params.notes ?? recentHistory.notes ?? null
+      }
+    });
+    return;
+  }
+
+  if (recentHistory && recentHistory.spaceId !== params.spaceId) {
+    await prisma.spaceItemHistory.update({
+      where: { id: recentHistory.id },
+      data: {
+        action: "moved_out"
+      }
+    });
+
+    await prisma.spaceItemHistory.create({
+      data: {
+        householdId: params.householdId,
+        spaceId: params.spaceId,
+        inventoryItemId: params.inventoryItemId,
+        action: "moved_in",
+        quantity: recentHistory.quantity ?? params.quantity,
+        previousQuantity: params.previousQuantity,
+        notes: params.notes ?? null,
+        performedBy: params.performedBy
+      }
+    });
+    return;
+  }
+
+  await prisma.spaceItemHistory.create({
+    data: {
+      householdId: params.householdId,
+      spaceId: params.spaceId,
+      inventoryItemId: params.inventoryItemId,
+      action: params.previousQuantity !== params.quantity ? "quantity_changed" : "placed",
+      quantity: params.quantity,
+      previousQuantity: params.previousQuantity,
+      notes: params.notes ?? null,
+      performedBy: params.performedBy
+    }
+  });
+};
+
 export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/households/:householdId/spaces", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
@@ -300,6 +465,8 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
         shortCode: created.shortCode
       }
     });
+
+    void syncSpaceToSearchIndex(app.prisma, created.id).catch(console.error);
 
     return reply.code(201).send(serializeSpace(created, { breadcrumb }));
   });
@@ -572,6 +739,16 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    const householdSpaces = await app.prisma.space.findMany({
+      where: { householdId: params.householdId },
+      select: {
+        id: true,
+        parentSpaceId: true
+      }
+    });
+
+    void syncSpacesToSearchIndex(app.prisma, collectDescendantIds(householdSpaces, updated.id)).catch(console.error);
+
     return serializeSpace(updated, { breadcrumb });
   });
 
@@ -633,6 +810,8 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    void removeSpacesFromSearchIndex(app.prisma, affectedSpaceIds).catch(console.error);
+
     return reply.code(204).send();
   });
 
@@ -689,6 +868,8 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    void syncSpaceToSearchIndex(app.prisma, restored.id).catch(console.error);
+
     return serializeSpace(restored, { breadcrumb });
   });
 
@@ -719,26 +900,53 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Inventory item not found." });
     }
 
-    const link = await app.prisma.spaceInventoryItem.upsert({
-      where: {
-        spaceId_inventoryItemId: {
-          spaceId: space.id,
-          inventoryItemId: inventoryItem.id
+    const link = await app.prisma.$transaction(async (tx) => {
+      const existingLink = await tx.spaceInventoryItem.findUnique({
+        where: {
+          spaceId_inventoryItemId: {
+            spaceId: space.id,
+            inventoryItemId: inventoryItem.id
+          }
+        },
+        select: {
+          quantity: true
         }
-      },
-      update: {
-        quantity: input.quantity ?? null,
-        notes: input.notes ?? null
-      },
-      create: {
+      });
+
+      const nextQuantity = input.quantity ?? null;
+      const createdOrUpdated = await tx.spaceInventoryItem.upsert({
+        where: {
+          spaceId_inventoryItemId: {
+            spaceId: space.id,
+            inventoryItemId: inventoryItem.id
+          }
+        },
+        update: {
+          quantity: nextQuantity,
+          notes: input.notes ?? null
+        },
+        create: {
+          spaceId: space.id,
+          inventoryItemId: inventoryItem.id,
+          quantity: nextQuantity,
+          notes: input.notes ?? null
+        },
+        include: {
+          inventoryItem: true
+        }
+      });
+
+      await recordInventoryPlacementHistory(tx, {
+        householdId: params.householdId,
         spaceId: space.id,
         inventoryItemId: inventoryItem.id,
-        quantity: input.quantity ?? null,
-        notes: input.notes ?? null
-      },
-      include: {
-        inventoryItem: true
-      }
+        quantity: nextQuantity,
+        previousQuantity: existingLink?.quantity ?? null,
+        notes: input.notes ?? null,
+        performedBy: request.auth.userId
+      });
+
+      return createdOrUpdated;
     });
 
     return reply.code(201).send(serializeSpaceItemLink(link));
@@ -757,11 +965,44 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Space not found." });
     }
 
-    await app.prisma.spaceInventoryItem.deleteMany({
+    const existingLink = await app.prisma.spaceInventoryItem.findUnique({
       where: {
-        spaceId: params.spaceId,
-        inventoryItemId: params.inventoryItemId
+        spaceId_inventoryItemId: {
+          spaceId: params.spaceId,
+          inventoryItemId: params.inventoryItemId
+        }
+      },
+      select: {
+        quantity: true,
+        notes: true
       }
+    });
+
+    if (!existingLink) {
+      return reply.code(404).send({ message: "Inventory item assignment not found." });
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      await tx.spaceInventoryItem.delete({
+        where: {
+          spaceId_inventoryItemId: {
+            spaceId: params.spaceId,
+            inventoryItemId: params.inventoryItemId
+          }
+        }
+      });
+
+      await tx.spaceItemHistory.create({
+        data: {
+          householdId: params.householdId,
+          spaceId: params.spaceId,
+          inventoryItemId: params.inventoryItemId,
+          action: "removed",
+          quantity: existingLink.quantity,
+          notes: existingLink.notes,
+          performedBy: request.auth.userId
+        }
+      });
     });
 
     return reply.code(204).send();
@@ -813,14 +1054,27 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Space not found." });
     }
 
-    const item = await app.prisma.spaceGeneralItem.create({
-      data: {
-        spaceId: space.id,
+    const item = await app.prisma.$transaction(async (tx) => {
+      const created = await tx.spaceGeneralItem.create({
+        data: {
+          spaceId: space.id,
+          householdId: params.householdId,
+          name: input.name,
+          description: input.description ?? null,
+          notes: input.notes ?? null
+        }
+      });
+
+      await recordGeneralItemHistory(tx, {
         householdId: params.householdId,
-        name: input.name,
-        description: input.description ?? null,
-        notes: input.notes ?? null
-      }
+        spaceId: space.id,
+        generalItemName: created.name,
+        action: "placed",
+        notes: created.notes,
+        performedBy: request.auth.userId
+      });
+
+      return created;
     });
 
     return reply.code(201).send(serializeGeneralItem(item));
@@ -873,16 +1127,27 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
         householdId: params.householdId,
         deletedAt: null
       },
-      select: { id: true }
+      select: { id: true, name: true, notes: true }
     });
 
     if (!item) {
       return reply.code(404).send({ message: "General item not found." });
     }
 
-    await app.prisma.spaceGeneralItem.update({
-      where: { id: item.id },
-      data: { deletedAt: new Date() }
+    await app.prisma.$transaction(async (tx) => {
+      await tx.spaceGeneralItem.update({
+        where: { id: item.id },
+        data: { deletedAt: new Date() }
+      });
+
+      await recordGeneralItemHistory(tx, {
+        householdId: params.householdId,
+        spaceId: params.spaceId,
+        generalItemName: item.name,
+        action: "removed",
+        notes: item.notes,
+        performedBy: request.auth.userId
+      });
     });
 
     return reply.code(204).send();
@@ -951,6 +1216,77 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.get("/v1/households/:householdId/spaces/:spaceId/history", async (request, reply) => {
+    const params = spaceParamsSchema.parse(request.params);
+    const query = spaceHistoryQuerySchema.parse(request.query);
+
+    if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
+
+    if (!space) {
+      return reply.code(404).send({ message: "Space not found." });
+    }
+
+    const items = await app.prisma.spaceItemHistory.findMany({
+      where: {
+        householdId: params.householdId,
+        spaceId: params.spaceId,
+        ...(query.actions ? { action: { in: query.actions } } : {}),
+        ...((query.since || query.until)
+          ? {
+              createdAt: {
+                ...(query.since ? { gte: new Date(query.since) } : {}),
+                ...(query.until ? { lte: new Date(query.until) } : {})
+              }
+            }
+          : {})
+      },
+      include: {
+        inventoryItem: {
+          select: {
+            id: true,
+            name: true,
+            deletedAt: true
+          }
+        },
+        performer: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        },
+        space: true
+      },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" }
+      ],
+      ...(query.cursor
+        ? {
+            cursor: { id: query.cursor },
+            skip: 1
+          }
+        : {}),
+      take: query.limit + 1
+    });
+
+    const page = items.slice(0, query.limit);
+    const nextCursor = items.length > query.limit ? items[query.limit]?.id ?? null : null;
+    const breadcrumbs = await Promise.all(page.map((entry) => getSpaceBreadcrumb(app.prisma, entry.spaceId)));
+
+    return spaceItemHistoryListResponseSchema.parse({
+      items: page.map((entry, index) => {
+        const breadcrumb = breadcrumbs[index];
+
+        return serializeSpaceItemHistory(entry, breadcrumb ? { breadcrumb } : {});
+      }),
+      nextCursor
+    });
+  });
+
   app.post("/v1/households/:householdId/spaces/:spaceId/move", async (request, reply) => {
     const params = spaceParamsSchema.parse(request.params);
     const input = moveSpaceInputSchema.parse(request.body);
@@ -985,6 +1321,16 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
         newParentSpaceId
       }
     });
+
+    const householdSpaces = await app.prisma.space.findMany({
+      where: { householdId: params.householdId },
+      select: {
+        id: true,
+        parentSpaceId: true
+      }
+    });
+
+    void syncSpacesToSearchIndex(app.prisma, collectDescendantIds(householdSpaces, moved.id)).catch(console.error);
 
     return serializeSpace(moved, { breadcrumb });
   });

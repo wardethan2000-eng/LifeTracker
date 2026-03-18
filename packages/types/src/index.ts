@@ -1420,6 +1420,14 @@ export const moveSpaceInputSchema = z.object({
   newParentSpaceId: z.string().cuid().nullable()
 });
 
+export const spaceItemActionSchema = z.enum([
+  "placed",
+  "removed",
+  "moved_in",
+  "moved_out",
+  "quantity_changed"
+]);
+
 export const spaceInventoryItemSchema = z.object({
   id: z.string().cuid(),
   spaceId: z.string().cuid(),
@@ -1513,6 +1521,32 @@ export const spaceContentsResponseSchema = z.object({
     count: z.number().int().min(0),
     names: z.array(z.string())
   })
+});
+
+export const spaceItemHistoryEntrySchema = z.object({
+  id: z.string().cuid(),
+  spaceId: z.string().cuid(),
+  inventoryItemId: z.string().cuid().nullable(),
+  generalItemName: z.string().nullable(),
+  householdId: z.string().cuid(),
+  action: spaceItemActionSchema,
+  quantity: z.number().nullable(),
+  previousQuantity: z.number().nullable(),
+  performedBy: z.string().cuid().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  itemName: z.string().min(1),
+  itemDeleted: z.boolean(),
+  entityUrl: z.string().nullable(),
+  space: spaceReferenceSchema.extend({
+    breadcrumb: z.array(spaceBreadcrumbSchema).default([])
+  }),
+  actor: shallowUserSchema.nullable().default(null)
+});
+
+export const spaceItemHistoryListResponseSchema = z.object({
+  items: z.array(spaceItemHistoryEntrySchema),
+  nextCursor: z.string().cuid().nullable()
 });
 
 export const inventoryItemRevisionValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
@@ -3036,12 +3070,14 @@ export const searchEntityTypeValues = [
   "hobby_project",
   "service_provider",
   "inventory_item",
+  "space",
   "comment",
   "entry",
   "invitation",
   "hobby",
   "hobby_series",
-  "hobby_collection_item"
+  "hobby_collection_item",
+  "historical_inventory_item"
 ] as const;
 
 export const searchEntityTypeSchema = z.enum(searchEntityTypeValues);
@@ -3067,48 +3103,84 @@ const searchTypesInputSchema = z.union([
   z.array(z.string())
 ]).optional();
 
+const parseSearchEntityTypeList = (
+  value: string | string[] | undefined,
+  context: z.RefinementCtx,
+  path: "include" | "types"
+): Array<(typeof searchEntityTypeValues)[number]> | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const rawValues = Array.isArray(value)
+    ? value.flatMap((entry) => entry.split(","))
+    : value.split(",");
+
+  const normalized = rawValues
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  const parsed: Array<(typeof searchEntityTypeValues)[number]> = [];
+
+  for (const entry of normalized) {
+    const result = searchEntityTypeSchema.safeParse(entry);
+
+    if (!result.success) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [path],
+        message: `Unsupported search type: ${entry}`
+      });
+
+      return z.NEVER;
+    }
+
+    if (!parsed.includes(result.data)) {
+      parsed.push(result.data);
+    }
+  }
+
+  return parsed;
+};
+
+const searchBooleanInputSchema = z.union([z.boolean(), z.string(), z.number()]).transform((value, context) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["false", "0", "no", "off", ""].includes(normalized)) {
+    return false;
+  }
+
+  context.addIssue({
+    code: z.ZodIssueCode.custom,
+    message: `Unsupported boolean value: ${value}`
+  });
+
+  return z.NEVER;
+});
+
 export const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(200),
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  types: searchTypesInputSchema.transform((value, context) => {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    const rawValues = Array.isArray(value)
-      ? value.flatMap((entry) => entry.split(","))
-      : value.split(",");
-
-    const normalized = rawValues
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-
-    if (normalized.length === 0) {
-      return undefined;
-    }
-
-    const parsed: Array<(typeof searchEntityTypeValues)[number]> = [];
-
-    for (const entry of normalized) {
-      const result = searchEntityTypeSchema.safeParse(entry);
-
-      if (!result.success) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["types"],
-          message: `Unsupported search type: ${entry}`
-        });
-
-        return z.NEVER;
-      }
-
-      if (!parsed.includes(result.data)) {
-        parsed.push(result.data);
-      }
-    }
-
-    return parsed;
-  })
+  include: searchTypesInputSchema.transform((value, context) => parseSearchEntityTypeList(value, context, "include")),
+  types: searchTypesInputSchema.transform((value, context) => parseSearchEntityTypeList(value, context, "types")),
+  fuzzy: searchBooleanInputSchema.default(true),
+  includeHistory: searchBooleanInputSchema.default(false)
 });
 
 export const searchResponseSchema = z.object({
@@ -3238,6 +3310,9 @@ export type SearchResult = z.infer<typeof searchResultSchema>;
 export type SearchResultGroup = z.infer<typeof searchResultGroupSchema>;
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export type SearchResponse = z.infer<typeof searchResponseSchema>;
+export type SpaceItemAction = z.infer<typeof spaceItemActionSchema>;
+export type SpaceItemHistoryEntry = z.infer<typeof spaceItemHistoryEntrySchema>;
+export type SpaceItemHistoryListResponse = z.infer<typeof spaceItemHistoryListResponseSchema>;
 export type ShareLink = z.infer<typeof shareLinkSchema>;
 export type CreateShareLinkInput = z.infer<typeof createShareLinkSchema>;
 export type PublicAssetReport = z.infer<typeof publicAssetReportSchema>;

@@ -1,6 +1,7 @@
 import type { Prisma, Space, SpaceGeneralItem, SpaceInventoryItem, SpaceType } from "@prisma/client";
 import {
   spaceGeneralItemSchema,
+  spaceItemHistoryEntrySchema,
   spaceInventoryLinkDetailSchema,
   spaceResponseSchema,
   type SpaceResponse
@@ -49,6 +50,30 @@ type SpaceItemRecord = Pick<
   | "updatedAt"
 > & {
   inventoryItem?: Prisma.InventoryItemGetPayload<{}>;
+};
+
+type SpaceHistoryRecord = {
+  id: string;
+  spaceId: string;
+  inventoryItemId: string | null;
+  generalItemName: string | null;
+  householdId: string;
+  action: string;
+  quantity: number | null;
+  previousQuantity: number | null;
+  performedBy: string | null;
+  notes: string | null;
+  createdAt: Date;
+  inventoryItem: {
+    id: string;
+    name: string;
+    deletedAt: Date | null;
+  } | null;
+  performer: {
+    id: string;
+    displayName: string | null;
+  } | null;
+  space: SpaceParentRecord;
 };
 
 type SpaceRecord = Pick<
@@ -116,6 +141,39 @@ const toSpaceItem = (item: SpaceItemRecord) => spaceInventoryLinkDetailSchema.pa
   updatedAt: item.updatedAt.toISOString(),
   inventoryItem: item.inventoryItem ? toInventoryItemSummaryResponse(item.inventoryItem) : undefined
 });
+
+export const serializeSpaceItemHistory = (
+  entry: SpaceHistoryRecord,
+  options: {
+    breadcrumb?: Array<{ id: string; name: string; type: SpaceType }>;
+  } = {}
+) => {
+  const breadcrumb = options.breadcrumb ?? [{ id: entry.space.id, name: entry.space.name, type: entry.space.type }];
+  const itemName = entry.inventoryItem?.name ?? entry.generalItemName ?? "Unknown item";
+  const itemDeleted = entry.inventoryItem ? entry.inventoryItem.deletedAt !== null : true;
+
+  return spaceItemHistoryEntrySchema.parse({
+    id: entry.id,
+    spaceId: entry.spaceId,
+    inventoryItemId: entry.inventoryItemId,
+    generalItemName: entry.generalItemName,
+    householdId: entry.householdId,
+    action: entry.action,
+    quantity: entry.quantity,
+    previousQuantity: entry.previousQuantity,
+    performedBy: entry.performedBy,
+    notes: entry.notes,
+    createdAt: entry.createdAt.toISOString(),
+    itemName,
+    itemDeleted,
+    entityUrl: entry.inventoryItemId && !itemDeleted ? `/inventory/${entry.inventoryItemId}?householdId=${entry.householdId}` : null,
+    actor: entry.performer,
+    space: {
+      ...toSpaceReference(entry.space),
+      breadcrumb
+    }
+  });
+};
 
 export const serializeSpace = (
   space: SpaceRecord,
