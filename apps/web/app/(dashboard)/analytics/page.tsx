@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
+import { AnalyticsPanelBoundary, AnalyticsPanelSkeleton } from "../../../components/analytics-panel-boundary";
 import { InventoryAnalyticsAssetParts } from "../../../components/inventory-analytics-asset-parts";
 import { InventoryAnalyticsCommonality } from "../../../components/inventory-analytics-commonality";
 import { InventoryAnalyticsReorder } from "../../../components/inventory-analytics-reorder";
@@ -84,6 +86,14 @@ const getComplianceBarColor = (value: number): string => {
 
   return "#c84d4d";
 };
+
+const renderInventoryPanel = (title: string, content: JSX.Element): JSX.Element => (
+  <AnalyticsPanelBoundary title={title}>
+    <Suspense fallback={<AnalyticsPanelSkeleton title={title} />}>
+      {content}
+    </Suspense>
+  </AnalyticsPanelBoundary>
+);
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
@@ -292,11 +302,11 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </div>
       </section>
 
-      {inventorySection === "summary" ? <InventoryAnalyticsSummary householdId={household.id} /> : null}
-      {inventorySection === "turnover" ? <InventoryAnalyticsTurnover householdId={household.id} /> : null}
-      {inventorySection === "reorder" ? <InventoryAnalyticsReorder householdId={household.id} /> : null}
-      {inventorySection === "asset-parts" ? <InventoryAnalyticsAssetParts householdId={household.id} /> : null}
-      {inventorySection === "commonality" ? <InventoryAnalyticsCommonality householdId={household.id} /> : null}
+      {inventorySection === "summary" ? renderInventoryPanel("Inventory Summary", <InventoryAnalyticsSummary householdId={household.id} />) : null}
+      {inventorySection === "turnover" ? renderInventoryPanel("Inventory Turnover", <InventoryAnalyticsTurnover householdId={household.id} />) : null}
+      {inventorySection === "reorder" ? renderInventoryPanel("Reorder Forecast", <InventoryAnalyticsReorder householdId={household.id} />) : null}
+      {inventorySection === "asset-parts" ? renderInventoryPanel("Asset Parts", <InventoryAnalyticsAssetParts householdId={household.id} />) : null}
+      {inventorySection === "commonality" ? renderInventoryPanel("Shared Parts", <InventoryAnalyticsCommonality householdId={household.id} />) : null}
     </div>
   );
 

@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, getAccessibleAsset, personalAssetAccessWhere } from "../../lib/asset-access.js";
+import { addUtcMonths, getMonthRange, startOfUtcMonth, toMonthKey } from "../../lib/date-utils.js";
 import {
   toCategoryAdherencePayloadResponse,
   toComplianceReportPayloadResponse,
@@ -59,20 +60,6 @@ type ComplianceSummary = {
   averageDaysLate: number | null;
 };
 
-const toMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-
-const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-
-const addUtcMonths = (date: Date, months: number): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth() + months,
-  1,
-  0,
-  0,
-  0,
-  0
-));
-
 const subtractMonths = (date: Date, months: number): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth() - months,
@@ -87,23 +74,6 @@ const getTrailingYearRange = (): { start: Date; end: Date } => {
   const end = new Date();
   const start = subtractMonths(end, 12);
   return { start, end };
-};
-
-const getMonthRange = (start: Date, end: Date): string[] => {
-  if (start > end) {
-    return [];
-  }
-
-  const months: string[] = [];
-  let cursor = startOfUtcMonth(start);
-  const endMonth = startOfUtcMonth(end);
-
-  while (cursor <= endMonth) {
-    months.push(toMonthKey(cursor));
-    cursor = addUtcMonths(cursor, 1);
-  }
-
-  return months;
 };
 
 const isCountableCycle = (cycle: CompletionCycleRecord): cycle is CompletionCycleRecord & {
@@ -421,6 +391,7 @@ export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
 
     const categories = Array.from(schedulesByCategory.entries()).map(([category, categorySchedules]) => {
       const categoryCycles = cycles.filter((cycle) => cycle.assetCategory === category);
+      const categorySummary = summarizeCycles(categoryCycles);
       const scheduleSummaries = categorySchedules.map((schedule) => ({
         schedule,
         summary: summarizeCycles(categoryCycles.filter((cycle) => cycle.scheduleId === schedule.id))
@@ -433,9 +404,9 @@ export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       return {
         category,
         activeScheduleCount: categorySchedules.length,
-        totalCyclesInPeriod: summarizeCycles(categoryCycles).totalCycles,
-        onTimeRate: summarizeCycles(categoryCycles).onTimeRate,
-        averageDaysLate: summarizeCycles(categoryCycles).averageDaysLate,
+        totalCyclesInPeriod: categorySummary.totalCycles,
+        onTimeRate: categorySummary.onTimeRate,
+        averageDaysLate: categorySummary.averageDaysLate,
         worstSchedule: worstSchedule ? {
           scheduleId: worstSchedule.schedule.id,
           scheduleName: worstSchedule.schedule.name,

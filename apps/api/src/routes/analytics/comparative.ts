@@ -2,11 +2,16 @@ import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
+import { addUtcMonths, getMonthRange, startOfUtcMonth, toMonthKey } from "../../lib/date-utils.js";
 import {
   toAssetComparisonPayloadResponse,
   toMemberContributionPayloadResponse,
   toYearOverYearPayloadResponse
 } from "../../lib/serializers/index.js";
+import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
+import type { CompletionCycleRecord } from "@lifekeeper/types";
+
+const MAX_YEAR_OVER_YEAR_COMPARISON_YEARS = 5;
 
 const assetComparisonQuerySchema = z.object({
   householdId: z.string().cuid(),
@@ -35,12 +40,24 @@ const assetComparisonQuerySchema = z.object({
 const yearOverYearQuerySchema = z.object({
   householdId: z.string().cuid(),
   assetId: z.string().cuid().optional(),
-  years: z.string().transform((value) => Array.from(new Set(
-    value
-      .split(",")
-      .map((entry) => Number.parseInt(entry.trim(), 10))
-      .filter((entry) => Number.isInteger(entry) && entry > 0)
-  ))).optional()
+  years: z.string().transform((value, context) => {
+    const years = Array.from(new Set(
+      value
+        .split(",")
+        .map((entry) => Number.parseInt(entry.trim(), 10))
+        .filter((entry) => Number.isInteger(entry) && entry > 0)
+    ));
+
+    if (years.length > MAX_YEAR_OVER_YEAR_COMPARISON_YEARS) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `years must contain no more than ${MAX_YEAR_OVER_YEAR_COMPARISON_YEARS} values.`
+      });
+      return z.NEVER;
+    }
+
+    return years;
+  }).optional()
 });
 
 const memberContributionQuerySchema = z.object({
@@ -48,37 +65,6 @@ const memberContributionQuerySchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional()
 });
-
-const toMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-
-const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-
-const addUtcMonths = (date: Date, months: number): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth() + months,
-  1,
-  0,
-  0,
-  0,
-  0
-));
-
-const getMonthRange = (start: Date, end: Date): string[] => {
-  if (start > end) {
-    return [];
-  }
-
-  const months: string[] = [];
-  let cursor = startOfUtcMonth(start);
-  const endMonth = startOfUtcMonth(end);
-
-  while (cursor <= endMonth) {
-    months.push(toMonthKey(cursor));
-    cursor = addUtcMonths(cursor, 1);
-  }
-
-  return months;
-};
 
 const toNumber = (value: number | null | undefined): number => value ?? 0;
 
@@ -90,7 +76,44 @@ const toPercentageChange = (current: number, previous: number): number | null =>
   return ((current - previous) / previous) * 100;
 };
 
-const toDateRangeFilter = (startDate?: string, endDate?: string): Pick<Prisma.MaintenanceLogWhereInput, "completedAt"> | {} => {
+const isCountableCycle = (cycle: CompletionCycleRecord): cycle is CompletionCycleRecord & {
+  dueDate: string;
+  completedAt: string;
+  deltaInDays: number;
+} => cycle.dueDate !== null && cycle.completedAt !== null && cycle.deltaInDays !== null;
+
+const summarizeCycles = (cycles: CompletionCycleRecord[]): {
+  onTimeCount: number;
+  lateCount: number;
+  onTimeRate: number | null;
+} => {
+  const eligibleCycles = cycles.filter(isCountableCycle);
+  const onTimeCount = eligibleCycles.filter((cycle) => cycle.deltaInDays <= 0).length;
+  const lateCount = eligibleCycles.length - onTimeCount;
+
+  return {
+    onTimeCount,
+    lateCount,
+    onTimeRate: eligibleCycles.length > 0 ? (onTimeCount / eligibleCycles.length) * 100 : null
+  };
+};
+
+const filterCompletedCyclesInRange = (
+  cycles: CompletionCycleRecord[],
+  startDate?: string,
+  endDate?: string
+): CompletionCycleRecord[] => cycles.filter((cycle) => {
+  if (!cycle.completedAt) {
+    return false;
+  }
+
+  const completedAt = new Date(cycle.completedAt);
+
+  return (!startDate || completedAt >= new Date(startDate))
+    && (!endDate || completedAt <= new Date(endDate));
+});
+
+const toDateRangeFilter = (startDate?: string, endDate?: string): Pick<Prisma.MaintenanceLogWhereInput, "completedAt"> | Record<string, never> => {
   if (!startDate && !endDate) {
     return {};
   }
@@ -131,7 +154,7 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const dateFilter = toDateRangeFilter(query.startDate, query.endDate);
-    const [logs, parts] = await Promise.all([
+    const [logs, parts, schedules] = await Promise.all([
       app.prisma.maintenanceLog.findMany({
         where: {
           assetId: { in: query.assetIds },
@@ -172,8 +195,29 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
             }
           }
         }
+      }),
+      app.prisma.maintenanceSchedule.findMany({
+        where: {
+          assetId: { in: query.assetIds },
+          deletedAt: null
+        },
+        select: {
+          id: true,
+          assetId: true
+        }
       })
     ]);
+
+    const adherenceCycles = schedules.length > 0
+      ? filterCompletedCyclesInRange(
+          await buildCompletionCycleLedger(app.prisma, {
+            scheduleIds: schedules.map((schedule) => schedule.id),
+            includeOpenCycles: false
+          }),
+          query.startDate,
+          query.endDate
+        )
+      : [];
 
     const monthKeys = Array.from(new Set(logs.map((log) => toMonthKey(log.completedAt)))).sort();
     const logsByAssetId = logs.reduce<Map<string, typeof logs>>((map, log) => {
@@ -199,11 +243,23 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
 
       return map;
     }, new Map());
+    const cyclesByAssetId = adherenceCycles.reduce<Map<string, CompletionCycleRecord[]>>((map, cycle) => {
+      const existing = map.get(cycle.assetId);
+
+      if (existing) {
+        existing.push(cycle);
+      } else {
+        map.set(cycle.assetId, [cycle]);
+      }
+
+      return map;
+    }, new Map());
 
     return toAssetComparisonPayloadResponse({
       assets: assets.map((asset) => {
         const assetLogs = logsByAssetId.get(asset.id) ?? [];
         const assetParts = partsByAssetId.get(asset.id) ?? [];
+        const assetCycleSummary = summarizeCycles(cyclesByAssetId.get(asset.id) ?? []);
         const monthlyCostMap = assetLogs.reduce<Map<string, number>>((map, log) => {
           const month = toMonthKey(log.completedAt);
           map.set(month, (map.get(month) ?? 0) + toNumber(log.cost));
@@ -229,12 +285,9 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
           assetCategory: asset.category,
           totalMaintenanceCost: assetLogs.reduce((sum, log) => sum + toNumber(log.cost), 0),
           totalMaintenanceLogCount: assetLogs.length,
-          // TODO: Compute on-time versus late completions from triggerConfig and prior completions.
-          onTimeCompletionCount: 0,
-          // TODO: Compute on-time versus late completions from triggerConfig and prior completions.
-          lateCompletionCount: 0,
-          // TODO: Return a computed percentage when schedule due-date reconstruction is implemented.
-          onTimeCompletionRate: null,
+          onTimeCompletionCount: assetCycleSummary.onTimeCount,
+          lateCompletionCount: assetCycleSummary.lateCount,
+          onTimeCompletionRate: assetCycleSummary.onTimeRate,
           // TODO: Switch this rollup to inventory transactions if asset linkage becomes first-class there.
           totalPartsConsumed: assetParts.length,
           totalPartsCost: assetParts.reduce((sum, part) => sum + (part.quantity * toNumber(part.unitCost)), 0),
@@ -274,12 +327,20 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    const yearBounds = query.years && query.years.length > 0
+      ? {
+          gte: new Date(Date.UTC(Math.min(...query.years), 0, 1, 0, 0, 0, 0)),
+          lte: new Date(Date.UTC(Math.max(...query.years), 11, 31, 23, 59, 59, 999))
+        }
+      : undefined;
+
     const logs = await app.prisma.maintenanceLog.findMany({
       where: {
         asset: {
           householdId: query.householdId
         },
-        ...(query.assetId ? { assetId: query.assetId } : {})
+        ...(query.assetId ? { assetId: query.assetId } : {}),
+        ...(yearBounds ? { completedAt: yearBounds } : {})
       },
       select: {
         completedAt: true,

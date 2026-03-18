@@ -496,7 +496,6 @@ export function ComparativeAnalyticsWorkspace({ householdId, assets }: Comparati
                       ))}
                     </tbody>
                   </table>
-                  <p className="comparative-note">On-time completion rate is unavailable in v1 while schedule due reconstruction is still incomplete for all trigger types.</p>
                 </div>
               </section>
 
