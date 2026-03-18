@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { AttachmentSection } from "../../../../components/attachment-section";
 import { InventoryCommentsPanel } from "../../../../components/inventory-comments-panel";
+import { InventoryDangerActions } from "../../../../components/inventory-danger-actions";
 import { InventoryItemDetailEditor } from "../../../../components/inventory-item-detail-editor";
 import { InventoryTransactionHistory } from "../../../../components/inventory-transaction-history";
-import { deleteInventoryItemAction } from "../../../actions";
 import {
   ApiError,
   getInventoryItemComments,
@@ -186,12 +186,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                   <h2>Danger Zone</h2>
                 </div>
                 <div className="panel__body--padded">
-                  <form action={deleteInventoryItemAction} className="inline-actions inline-actions--end">
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="inventoryItemId" value={item.id} />
-                    <input type="hidden" name="redirectTo" value={backHref} />
-                    <button type="submit" className="button button--danger">Delete Item</button>
-                  </form>
+                  <InventoryDangerActions householdId={household.id} inventoryItemId={item.id} redirectTo={backHref} />
                 </div>
               </section>
             </aside>

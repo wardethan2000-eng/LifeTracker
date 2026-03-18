@@ -1,0 +1,137 @@
+{
+  "common": {
+    "brand": {
+      "name": "LifeKeeper",
+      "tagline": "Maintenance Tracker"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "assets": "Assets",
+      "inventory": "Inventory",
+      "addAsset": "Add Asset",
+      "projects": "Projects",
+      "analytics": "Analytics",
+      "hobbies": "Hobbies",
+      "maintenance": "Maintenance",
+      "activity": "Activity",
+      "notifications": "Notifications",
+      "invitations": "Invitations",
+      "providers": "Providers"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "delete": "Delete",
+      "confirm": "Confirm",
+      "archive": "Archive",
+      "open": "Open",
+      "newProject": "New Project",
+      "newHobby": "New Hobby",
+      "addAsset": "+ Add Asset",
+      "backToProjects": "Back to Projects",
+      "goToDashboard": "Go to dashboard",
+      "createHousehold": "Create household",
+      "apply": "Apply",
+      "reset": "Reset",
+      "filter": "Filter"
+    },
+    "status": {
+      "active": "Active",
+      "archived": "Archived",
+      "planning": "Planning",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "onHold": "On Hold",
+      "paused": "Paused",
+      "all": "All",
+      "unread": "Unread",
+      "read": "Read"
+    },
+    "empty": {
+      "noHousehold": "No household found.",
+      "firstRunTitle": "Create your first household",
+      "firstRunDescription": "The dashboard is household-scoped. Create a household to start tracking assets.",
+      "householdName": "Household name",
+      "householdPlaceholder": "Main household"
+    },
+    "toolbar": {
+      "density": {
+        "label": "Density",
+        "ariaLabel": "Interface density",
+        "relaxed": "Relaxed",
+        "standard": "Standard",
+        "compact": "Compact"
+      },
+      "theme": {
+        "label": "Theme",
+        "ariaLabel": "Theme preference",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      },
+      "locale": {
+        "label": "Language",
+        "ariaLabel": "Active language",
+        "english": "English"
+      },
+      "realtime": {
+        "connected": "Live updates on",
+        "paused": "Live updates paused",
+        "disconnected": "Live updates reconnecting"
+      }
+    }
+  },
+  "assets": {
+    "pageTitle": "Assets",
+    "newPageTitle": "Add New Asset",
+    "listTitle": "All Tracked Assets ({count})",
+    "empty": "No assets yet.",
+    "emptyLink": "Create your first asset",
+    "emptySuffix": "to start tracking maintenance."
+  },
+  "hobbies": {
+    "pageTitle": "Hobbies",
+    "pageSubtitle": "Track recipes, sessions, inventory, and metrics for your creative pursuits.",
+    "empty": "No hobbies yet. Create your first hobby to start tracking sessions, recipes, and inventory.",
+    "emptyFiltered": "No {status} hobbies found.",
+    "createFirst": "Create Your First Hobby"
+  },
+  "projects": {
+    "pageTitle": "Projects",
+    "pageSubtitle": "Portfolio view for schedule risk, funding pressure, and material readiness across the household.",
+    "newPageTitle": "Create Project",
+    "newPageSubtitle": "Track household work with a budget, timeline, linked assets, tasks, and expenses.",
+    "portfolioControls": "Portfolio Controls",
+    "searchPlaceholder": "Search projects...",
+    "clear": "Clear"
+  },
+  "inventory": {
+    "pageTitle": "Inventory",
+    "pageSubtitle": "Universal household stock across assets, projects, and standalone supplies.",
+    "inventoryButton": "Inventory",
+    "analyticsHub": "Analytics Hub",
+    "reorderWatchlist": "Reorder Watchlist"
+  },
+  "maintenance": {
+    "pageTitle": "Maintenance Queue",
+    "queueControls": "Queue Controls",
+    "allWorkTitle": "All Due & Overdue Work",
+    "empty": "No maintenance is currently due or overdue. Everything is on track."
+  },
+  "notifications": {
+    "pageTitle": "Notifications",
+    "filters": "Filters",
+    "markVisibleRead": "Mark Visible Read",
+    "undoVisibleRead": "Undo Visible Read",
+    "backgroundNote": "Recurring background jobs keep notifications, low-stock alerts, and compliance checks up to date."
+  },
+  "dashboard": {
+    "connectionError": "Connection error",
+    "loadFailed": "Dashboard could not load",
+    "apiBaseUrl": "API base URL",
+    "devUserHeader": "Dev user header",
+    "connectionHelp": "Start the API, seed the database, and keep dev auth bypass enabled for the seeded demo user.",
+    "upcomingMaintenance": "Upcoming Maintenance",
+    "assetRegistry": "Asset Registry"
+  }
+}

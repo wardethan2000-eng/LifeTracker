@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { getTranslations } from "next-intl/server";
 import { ApiError, getHouseholdDueWork, getMe } from "../../../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../../../lib/formatters";
 
@@ -23,6 +24,8 @@ const getSortRank = (status: string): number => {
 };
 
 export default async function MaintenancePage({ searchParams }: MaintenancePageProps): Promise<JSX.Element> {
+  const t = await getTranslations("maintenance");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const statusFilter = typeof params.status === "string" && statusOptions.includes(params.status as (typeof statusOptions)[number])
     ? params.status as (typeof statusOptions)[number]
@@ -39,9 +42,9 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Maintenance</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -77,13 +80,13 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
     return (
       <>
         <header className="page-header">
-          <h1>Maintenance Queue</h1>
+          <h1>{t("pageTitle")}</h1>
         </header>
 
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
-              <h2>Queue Controls</h2>
+              <h2>{t("queueControls")}</h2>
             </div>
             <div className="panel__body--padded">
               <form method="GET" className="form-grid">
@@ -114,8 +117,8 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
                   </select>
                 </label>
                 <div className="inline-actions field field--full">
-                  <button type="submit" className="button button--ghost">Apply</button>
-                  <Link href="/maintenance" className="button button--ghost">Reset</Link>
+                  <button type="submit" className="button button--ghost">{tCommon("actions.apply")}</button>
+                  <Link href="/maintenance" className="button button--ghost">{tCommon("actions.reset")}</Link>
                 </div>
               </form>
             </div>
@@ -140,12 +143,12 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
           {/* ── Full Maintenance Queue ── */}
           <section className="panel">
             <div className="panel__header">
-              <h2>All Due & Overdue Work</h2>
+              <h2>{t("allWorkTitle")}</h2>
               <span className="pill">{filteredDueWork.length} visible</span>
             </div>
             <div className="panel__body">
               {filteredDueWork.length === 0 ? (
-                <p className="panel__empty">No maintenance is currently due or overdue. Everything is on track.</p>
+                <p className="panel__empty">{t("empty")}</p>
               ) : (
                 <table className="data-table">
                   <thead>

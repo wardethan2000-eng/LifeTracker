@@ -1,22 +1,27 @@
 import type { JSX, ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import { getMe } from "../../lib/api";
+import { DensityToggle } from "../../components/density-toggle";
+import { LocaleSwitcher } from "../../components/locale-switcher";
 import { SearchCommandPaletteLazy } from "../../components/search-command-palette-lazy";
 import { RoutePrefetcher } from "../../components/route-prefetcher";
+import { RealtimeStatusIndicator } from "../../components/realtime-status-indicator";
 import { SidebarNav, type SidebarNavItem } from "../../components/sidebar-nav";
+import { ThemeToggle } from "../../components/theme-toggle";
 
-const navItems: SidebarNavItem[] = [
-  { href: "/", label: "Dashboard", icon: "grid" },
-  { href: "/assets", label: "Assets", icon: "box" },
-  { href: "/inventory", label: "Inventory", icon: "layers" },
-  { href: "/assets/new", label: "Add Asset", icon: "plus" },
-  { href: "/projects", label: "Projects", icon: "folder" },
-  { href: "/analytics", label: "Analytics", icon: "dollar" },
-  { href: "/hobbies", label: "Hobbies", icon: "beaker" },
-  { href: "/maintenance", label: "Maintenance", icon: "wrench" },
-  { href: "/activity", label: "Activity", icon: "pulse" },
-  { href: "/notifications", label: "Notifications", icon: "bell" },
-  { href: "/invitations", label: "Invitations", icon: "mail" },
-  { href: "/service-providers", label: "Providers", icon: "briefcase" },
+const navItems: Array<SidebarNavItem & { translationKey: string }> = [
+  { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
+  { href: "/assets", label: "Assets", translationKey: "assets", icon: "box" },
+  { href: "/inventory", label: "Inventory", translationKey: "inventory", icon: "layers" },
+  { href: "/assets/new", label: "Add Asset", translationKey: "addAsset", icon: "plus" },
+  { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
+  { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
+  { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
+  { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
+  { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
+  { href: "/notifications", label: "Notifications", translationKey: "notifications", icon: "bell" },
+  { href: "/invitations", label: "Invitations", translationKey: "invitations", icon: "mail" },
+  { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
 ];
 
 const prefetchedRoutes = [
@@ -30,6 +35,7 @@ const prefetchedRoutes = [
 ];
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>): Promise<JSX.Element> {
+  const t = await getTranslations("common");
   let userName = "User";
   let userRole = "Member";
   let fallbackHouseholdId: string | null = null;
@@ -53,11 +59,11 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     <div className="app-layout">
       <nav className="sidebar">
         <div className="sidebar__brand">
-          <h1>LifeKeeper</h1>
-          <p>Maintenance Tracker</p>
+          <h1>{t("brand.name")}</h1>
+          <p>{t("brand.tagline")}</p>
         </div>
 
-        <SidebarNav navItems={navItems} />
+        <SidebarNav navItems={navItems.map((item) => ({ ...item, label: t(`nav.${item.translationKey}`) }))} />
 
         <div className="sidebar__footer">
           <div className="sidebar__user">
@@ -74,6 +80,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         <RoutePrefetcher routes={prefetchedRoutes} />
         <div className="shell-toolbar">
           <SearchCommandPaletteLazy fallbackHouseholdId={fallbackHouseholdId} />
+          <div className="shell-toolbar__controls">
+            <RealtimeStatusIndicator householdId={fallbackHouseholdId} />
+            <DensityToggle />
+            <ThemeToggle />
+            <LocaleSwitcher />
+          </div>
         </div>
         {children}
       </div>

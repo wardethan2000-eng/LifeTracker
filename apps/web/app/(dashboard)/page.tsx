@@ -7,6 +7,7 @@ import { DashboardDueWork } from "../../components/dashboard-due-work";
 import { getDashboardData } from "../../components/dashboard-data";
 import { EntryActionableList } from "../../components/entry-system";
 import { DashboardNotificationsAside } from "../../components/dashboard-notifications-aside";
+import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
 import { ApiError, getApiBaseUrl, getDevUserId, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDateTime } from "../../lib/formatters";
 
@@ -341,6 +342,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     return (
       <>
+        <RealtimeRefreshBoundary householdId={selectedHousehold.id} eventTypes={["asset.updated", "inventory.changed", "maintenance.completed", "hobby.session-progress"]} />
         <header className="page-header">
           <h1>Dashboard</h1>
           <div className="page-header__actions">

@@ -8,9 +8,17 @@ import type {
   HobbyRecipe,
   HobbySeriesDetail,
 } from "@lifekeeper/types";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent, type JSX } from "react";
+import { useEffect, useMemo, useState, type JSX } from "react";
+import { useForm } from "react-hook-form";
+import {
+  hobbySessionFormSchema,
+  type HobbySessionFormValues,
+  type HobbySessionResolvedValues
+} from "../lib/validation/forms";
 import { EntryTipsSurface } from "./entry-system";
+import { InlineError } from "./inline-error";
 
 type HobbySessionWorkbenchProps = {
   action: (formData: FormData) => Promise<void>;
@@ -40,18 +48,43 @@ export function HobbySessionWorkbench({
   initialSeriesSelection,
 }: HobbySessionWorkbenchProps): JSX.Element {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [recipeId, setRecipeId] = useState("");
-  const [startDate, setStartDate] = useState(todayInputValue());
-  const [notes, setNotes] = useState("");
-  const [seriesChoice, setSeriesChoice] = useState(initialSeriesSelection ?? "");
-  const [routineId, setRoutineId] = useState("");
-  const [collectionItemId, setCollectionItemId] = useState("");
-  const [newSeriesName, setNewSeriesName] = useState("");
-  const [newSeriesDescription, setNewSeriesDescription] = useState("");
-  const [newSeriesTags, setNewSeriesTags] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors }
+  } = useForm<HobbySessionFormValues, unknown, HobbySessionResolvedValues>({
+    resolver: zodResolver(hobbySessionFormSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      name: "",
+      recipeId: "",
+      startDate: todayInputValue(),
+      notes: "",
+      seriesChoice: initialSeriesSelection ?? "",
+      routineId: "",
+      collectionItemId: "",
+      newSeriesName: "",
+      newSeriesDescription: "",
+      newSeriesTags: ""
+    }
+  });
+
+  const name = watch("name") ?? "";
+  const recipeId = watch("recipeId") ?? "";
+  const startDate = watch("startDate") ?? "";
+  const notes = watch("notes") ?? "";
+  const seriesChoice = watch("seriesChoice") ?? "";
+  const routineId = watch("routineId") ?? "";
+  const collectionItemId = watch("collectionItemId") ?? "";
+  const newSeriesName = watch("newSeriesName") ?? "";
+  const newSeriesDescription = watch("newSeriesDescription") ?? "";
+  const newSeriesTags = watch("newSeriesTags") ?? "";
 
   const selectedExistingSeries = useMemo(
     () => activeSeries.find((series) => series.id === seriesChoice) ?? null,
@@ -69,31 +102,30 @@ export function HobbySessionWorkbench({
       .sort((left, right) => (right.batchNumber ?? 0) - (left.batchNumber ?? 0))[0];
 
     if (latestSession?.recipeId) {
-      setRecipeId(latestSession.recipeId);
+      setValue("recipeId", latestSession.recipeId, { shouldValidate: true });
     }
 
     if (!name.trim()) {
       const nextBatchNumber = (latestSession?.batchNumber ?? selectedExistingSeries.batchCount) + 1;
-      setName(`${selectedExistingSeries.name} Batch ${nextBatchNumber}`);
+      setValue("name", `${selectedExistingSeries.name} Batch ${nextBatchNumber}`, { shouldValidate: true });
     }
-  }, [name, selectedExistingSeries]);
+  }, [name, selectedExistingSeries, setValue]);
 
   const handleRecipeChange = (nextRecipeId: string) => {
-    setRecipeId(nextRecipeId);
+    setValue("recipeId", nextRecipeId, { shouldValidate: true });
 
-    if (name.trim()) {
+    if (getValues("name")?.trim()) {
       return;
     }
 
     const recipe = recipes.find((candidate) => candidate.id === nextRecipeId);
 
     if (recipe) {
-      setName(`Session from ${recipe.name}`);
+      setValue("name", `Session from ${recipe.name}`, { shouldValidate: true });
     }
   };
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitForm = handleSubmit(async (values) => {
     setSubmitting(true);
     setError(null);
 
@@ -101,26 +133,26 @@ export function HobbySessionWorkbench({
       const formData = new FormData();
       formData.set("householdId", householdId);
       formData.set("hobbyId", hobbyId);
-      formData.set("name", name);
-      if (recipeId) formData.set("recipeId", recipeId);
-      if (routineId) formData.set("routineId", routineId);
-      if (collectionItemId) formData.set("collectionItemId", collectionItemId);
-      if (startDate) formData.set("startDate", startDate);
-      formData.set("notes", notes);
+      formData.set("name", values.name);
+      if (values.recipeId) formData.set("recipeId", values.recipeId);
+      if (values.routineId) formData.set("routineId", values.routineId);
+      if (values.collectionItemId) formData.set("collectionItemId", values.collectionItemId);
+      if (values.startDate) formData.set("startDate", values.startDate);
+      formData.set("notes", values.notes ?? "");
       if (selectedExistingSeries) {
         formData.set("seriesId", selectedExistingSeries.id);
       }
-      if (isCreatingSeries && newSeriesName.trim()) {
-        formData.set("newSeriesName", newSeriesName.trim());
-        if (newSeriesDescription.trim()) formData.set("newSeriesDescription", newSeriesDescription.trim());
-        if (newSeriesTags.trim()) formData.set("newSeriesTags", newSeriesTags.trim());
+      if (isCreatingSeries && values.newSeriesName?.trim()) {
+        formData.set("newSeriesName", values.newSeriesName.trim());
+        if (values.newSeriesDescription?.trim()) formData.set("newSeriesDescription", values.newSeriesDescription.trim());
+        if (values.newSeriesTags?.trim()) formData.set("newSeriesTags", values.newSeriesTags.trim());
       }
       await action(formData);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to create session.");
       setSubmitting(false);
     }
-  };
+  });
 
   return (
     <div className="session-workbench-stack">
@@ -133,7 +165,7 @@ export function HobbySessionWorkbench({
         />
       ) : null}
 
-      <form className="workbench-form" onSubmit={handleSubmit}>
+      <form className="workbench-form" noValidate onSubmit={submitForm}>
         <section className="workbench-section">
           <div className="workbench-section__head">
             <h3>Session Setup</h3>
@@ -145,16 +177,15 @@ export function HobbySessionWorkbench({
               <input
                 type="text"
                 className="workbench-field__input"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
+                {...register("name")}
                 placeholder="e.g. Oatmeal Stout Brew Day"
-                required
               />
+              <InlineError message={errors.name?.message} size="sm" />
             </label>
 
             <label className="workbench-field">
               <span className="workbench-field__label">Add to Series</span>
-              <select className="workbench-field__input" value={seriesChoice} onChange={(event) => setSeriesChoice(event.target.value)}>
+              <select className="workbench-field__input" {...register("seriesChoice")}>
                 <option value="">No series</option>
                 {activeSeries.map((series) => (
                   <option key={series.id} value={series.id}>
@@ -163,6 +194,7 @@ export function HobbySessionWorkbench({
                 ))}
                 <option value="__new__">Create new series</option>
               </select>
+              <InlineError message={errors.seriesChoice?.message} size="sm" />
             </label>
 
             <label className="workbench-field">
@@ -177,6 +209,7 @@ export function HobbySessionWorkbench({
                   <option key={recipe.id} value={recipe.id}>{recipe.name}</option>
                 ))}
               </select>
+              <InlineError message={errors.recipeId?.message} size="sm" />
             </label>
 
             <label className="workbench-field">
@@ -184,15 +217,15 @@ export function HobbySessionWorkbench({
               <input
                 type="date"
                 className="workbench-field__input"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
+                {...register("startDate")}
               />
+              <InlineError message={errors.startDate?.message} size="sm" />
             </label>
 
             {(activityMode === "practice" || activeRoutines.length > 0) ? (
               <label className="workbench-field">
                 <span className="workbench-field__label">Practice Routine</span>
-                <select className="workbench-field__input" value={routineId} onChange={(event) => setRoutineId(event.target.value)}>
+                <select className="workbench-field__input" {...register("routineId")}>
                   <option value="">No routine</option>
                   {activeRoutines.map((routine) => (
                     <option key={routine.id} value={routine.id}>
@@ -200,18 +233,20 @@ export function HobbySessionWorkbench({
                     </option>
                   ))}
                 </select>
+                <InlineError message={errors.routineId?.message} size="sm" />
               </label>
             ) : null}
 
             {(activityMode === "collection" || collectionItems.length > 0) ? (
               <label className="workbench-field">
                 <span className="workbench-field__label">Collection Item</span>
-                <select className="workbench-field__input" value={collectionItemId} onChange={(event) => setCollectionItemId(event.target.value)}>
+                <select className="workbench-field__input" {...register("collectionItemId")}>
                   <option value="">No collection item</option>
                   {collectionItems.map((item) => (
                     <option key={item.id} value={item.id}>{item.name}</option>
                   ))}
                 </select>
+                <InlineError message={errors.collectionItemId?.message} size="sm" />
               </label>
             ) : null}
 
@@ -255,31 +290,30 @@ export function HobbySessionWorkbench({
                   <input
                     type="text"
                     className="workbench-field__input"
-                    value={newSeriesName}
-                    onChange={(event) => setNewSeriesName(event.target.value)}
+                    {...register("newSeriesName")}
                     placeholder="e.g. House Pilsner Iterations"
-                    required={isCreatingSeries}
                   />
+                  <InlineError message={errors.newSeriesName?.message} size="sm" />
                 </label>
                 <label className="workbench-field workbench-field--wide">
                   <span className="workbench-field__label">Series Description</span>
                   <textarea
                     className="workbench-field__input workbench-field__textarea"
                     rows={3}
-                    value={newSeriesDescription}
-                    onChange={(event) => setNewSeriesDescription(event.target.value)}
+                    {...register("newSeriesDescription")}
                     placeholder="What will this series compare across batches?"
                   />
+                  <InlineError message={errors.newSeriesDescription?.message} size="sm" />
                 </label>
                 <label className="workbench-field workbench-field--wide">
                   <span className="workbench-field__label">Series Tags</span>
                   <input
                     type="text"
                     className="workbench-field__input"
-                    value={newSeriesTags}
-                    onChange={(event) => setNewSeriesTags(event.target.value)}
+                    {...register("newSeriesTags")}
                     placeholder="lager, house beer, spring"
                   />
+                  <InlineError message={errors.newSeriesTags?.message} size="sm" />
                 </label>
               </>
             ) : null}
@@ -288,11 +322,11 @@ export function HobbySessionWorkbench({
               <span className="workbench-field__label">Notes</span>
               <textarea
                 className="workbench-field__input workbench-field__textarea"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
+                {...register("notes")}
                 rows={4}
                 placeholder="Capture goals, batch targets, or anything you want visible in the session detail."
               />
+              <InlineError message={errors.notes?.message} size="sm" />
             </label>
           </div>
         </section>
@@ -303,7 +337,7 @@ export function HobbySessionWorkbench({
           <button type="button" className="button button--ghost" disabled={submitting} onClick={() => router.back()}>
             Cancel
           </button>
-          <button type="submit" className="button button--primary" disabled={submitting || !name.trim() || (isCreatingSeries && !newSeriesName.trim())}>
+          <button type="submit" className="button button--primary" disabled={submitting}>
             {submitting ? "Creating…" : "Create Session"}
           </button>
         </div>

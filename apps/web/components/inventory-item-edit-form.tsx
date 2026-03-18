@@ -1,10 +1,16 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { BarcodeLookupResult, InventoryItemSummary, UpdateInventoryItemInput } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
-import { updateInventoryItem } from "../lib/api";
-import { normalizeExternalUrl } from "../lib/url";
+import { useForm } from "react-hook-form";
+import { updateInventoryItemAction } from "../app/actions";
+import {
+  inventoryItemFormSchema,
+  type InventoryItemFormValues,
+  type InventoryItemResolvedValues
+} from "../lib/validation/forms";
 import { BarcodeLookupField } from "./barcode-lookup-field";
 import { InlineError } from "./inline-error";
 
@@ -18,24 +24,46 @@ type InventoryItemEditFormProps = {
 export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: InventoryItemEditFormProps): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [itemType, setItemType] = useState<"consumable" | "equipment">(item.itemType === "equipment" ? "equipment" : "consumable");
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors }
+  } = useForm<InventoryItemFormValues, unknown, InventoryItemResolvedValues>({
+    resolver: zodResolver(inventoryItemFormSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      name: item.name,
+      itemType: item.itemType === "equipment" ? "equipment" : "consumable",
+      conditionStatus: item.conditionStatus ?? "",
+      partNumber: item.partNumber ?? "",
+      description: item.description ?? "",
+      category: item.category ?? "",
+      manufacturer: item.manufacturer ?? "",
+      unit: item.unit,
+      quantityOnHand: String(item.quantityOnHand),
+      reorderThreshold: item.reorderThreshold !== null && item.reorderThreshold !== undefined ? String(item.reorderThreshold) : "",
+      reorderQuantity: item.reorderQuantity !== null && item.reorderQuantity !== undefined ? String(item.reorderQuantity) : "",
+      preferredSupplier: item.preferredSupplier ?? "",
+      supplierUrl: item.supplierUrl ?? "",
+      unitCost: item.unitCost !== null && item.unitCost !== undefined ? String(item.unitCost) : "",
+      storageLocation: item.storageLocation ?? "",
+      notes: item.notes ?? ""
+    }
+  });
+  const itemType = watch("itemType") === "equipment" ? "equipment" : "consumable";
 
   const handleBarcodeResult = useCallback((result: BarcodeLookupResult) => {
-    const form = document.getElementById("inventory-edit-form") as HTMLFormElement | null;
-
-    if (!form) {
-      return;
-    }
-
     const setIfEmpty = (name: string, value: string | null) => {
       if (!value) {
         return;
       }
 
-      const input = form.elements.namedItem(name) as HTMLInputElement | null;
-
-      if (input && !input.value.trim()) {
-        input.value = value;
+      const current = watch(name as keyof InventoryItemFormValues);
+      if (typeof current === "string" && !current.trim()) {
+        setValue(name as keyof InventoryItemFormValues, value as never, { shouldValidate: true, shouldDirty: true });
       }
     };
 
@@ -48,129 +76,68 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
     } else {
       setIfEmpty("partNumber", result.barcode);
     }
-  }, []);
+  }, [setValue, watch]);
 
-  const handleSubmit = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const onSubmit = handleSubmit(async (values) => {
     setSaving(true);
     setError(null);
 
-    const form = event.currentTarget;
-    const data = new FormData(form);
-
-    const getString = (name: string): string | undefined => {
-      const value = (data.get(name) as string | null)?.trim();
-      return value || undefined;
-    };
-
-    const getNumber = (name: string): number | undefined => {
-      const raw = (data.get(name) as string | null)?.trim();
-
-      if (!raw) {
-        return undefined;
-      }
-
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    };
-
     const input: UpdateInventoryItemInput = {};
-    const name = getString("name");
 
-    if (name) {
-      input.name = name;
+    if (values.name) {
+      input.name = values.name;
     }
 
     input.itemType = itemType;
+    input.conditionStatus = values.conditionStatus ?? null;
 
-    const conditionStatus = getString("conditionStatus");
-    input.conditionStatus = conditionStatus || null;
-
-    const partNumber = getString("partNumber");
-    if (partNumber !== undefined) {
-      input.partNumber = partNumber;
-    }
-
-    const description = getString("description");
-    if (description !== undefined) {
-      input.description = description;
-    }
-
-    const category = getString("category");
-    if (category !== undefined) {
-      input.category = category;
-    }
-
-    const manufacturer = getString("manufacturer");
-    if (manufacturer !== undefined) {
-      input.manufacturer = manufacturer;
-    }
-
-    const unit = getString("unit");
-    if (unit !== undefined) {
-      input.unit = unit;
-    }
-
-    const quantityOnHand = getNumber("quantityOnHand");
-    if (quantityOnHand !== undefined) {
-      input.quantityOnHand = quantityOnHand;
-    }
-
-    const reorderThreshold = getNumber("reorderThreshold");
-    if (reorderThreshold !== undefined) {
-      input.reorderThreshold = reorderThreshold;
-    }
-
-    const reorderQuantity = getNumber("reorderQuantity");
-    if (reorderQuantity !== undefined) {
-      input.reorderQuantity = reorderQuantity;
-    }
-
-    const preferredSupplier = getString("preferredSupplier");
-    if (preferredSupplier !== undefined) {
-      input.preferredSupplier = preferredSupplier;
-    }
-
-    const supplierUrl = getString("supplierUrl");
-    if (supplierUrl !== undefined) {
-      const normalizedSupplierUrl = normalizeExternalUrl(supplierUrl);
-
-      if (!normalizedSupplierUrl) {
-        setSaving(false);
-        setError("Supplier Link must be a valid URL.");
-        return;
-      }
-
-      input.supplierUrl = normalizedSupplierUrl;
-    }
-
-    const unitCost = getNumber("unitCost");
-    if (unitCost !== undefined) {
-      input.unitCost = unitCost;
-    }
-
-    const storageLocation = getString("storageLocation");
-    if (storageLocation !== undefined) {
-      input.storageLocation = storageLocation;
-    }
-
-    const notes = getString("notes");
-    if (notes !== undefined) {
-      input.notes = notes;
-    }
+    if (values.partNumber !== undefined) input.partNumber = values.partNumber;
+    if (values.description !== undefined) input.description = values.description;
+    if (values.category !== undefined) input.category = values.category;
+    if (values.manufacturer !== undefined) input.manufacturer = values.manufacturer;
+    if (values.unit !== undefined) input.unit = values.unit;
+    if (values.quantityOnHand !== undefined) input.quantityOnHand = values.quantityOnHand;
+    if (values.reorderThreshold !== undefined) input.reorderThreshold = values.reorderThreshold;
+    if (values.reorderQuantity !== undefined) input.reorderQuantity = values.reorderQuantity;
+    if (values.preferredSupplier !== undefined) input.preferredSupplier = values.preferredSupplier;
+    if (values.supplierUrl !== undefined) input.supplierUrl = values.supplierUrl;
+    if (values.unitCost !== undefined) input.unitCost = values.unitCost;
+    if (values.storageLocation !== undefined) input.storageLocation = values.storageLocation;
+    if (values.notes !== undefined) input.notes = values.notes;
 
     try {
-      await updateInventoryItem(householdId, item.id, input);
+      const formData = new FormData();
+      formData.set("householdId", householdId);
+      formData.set("inventoryItemId", item.id);
+
+      formData.set("name", values.name ?? "");
+      formData.set("itemType", itemType);
+      formData.set("conditionStatus", values.conditionStatus ?? "");
+      formData.set("partNumber", values.partNumber ?? "");
+      formData.set("description", values.description ?? "");
+      formData.set("category", values.category ?? "");
+      formData.set("manufacturer", values.manufacturer ?? "");
+      formData.set("unit", values.unit ?? "");
+      formData.set("quantityOnHand", values.quantityOnHand === undefined ? "" : String(values.quantityOnHand));
+      formData.set("reorderThreshold", values.reorderThreshold === undefined ? "" : String(values.reorderThreshold));
+      formData.set("reorderQuantity", values.reorderQuantity === undefined ? "" : String(values.reorderQuantity));
+      formData.set("preferredSupplier", values.preferredSupplier ?? "");
+      formData.set("supplierUrl", values.supplierUrl ?? "");
+      formData.set("unitCost", values.unitCost === undefined ? "" : String(values.unitCost));
+      formData.set("storageLocation", values.storageLocation ?? "");
+      formData.set("notes", values.notes ?? "");
+
+      await updateInventoryItemAction(formData);
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save changes.");
     } finally {
       setSaving(false);
     }
-  }, [householdId, item.id, onSaved]);
+  });
 
   return (
-    <form id="inventory-edit-form" onSubmit={handleSubmit} className="form-grid">
+    <form id="inventory-edit-form" onSubmit={onSubmit} noValidate className="form-grid">
       <div className="field field--full" style={{ marginBottom: 8 }}>
         <span style={{ display: "block", marginBottom: 4, fontSize: "0.85rem", color: "var(--ink-muted)" }}>Look Up by Barcode</span>
         <BarcodeLookupField onResult={handleBarcodeResult} />
@@ -178,81 +145,97 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
       <div className="field field--full inventory-type-toggle" style={{ marginBottom: 8 }}>
         <span className="inventory-type-toggle__label">Item Type</span>
         <div className="inventory-type-toggle__options">
-          <button type="button" className={`inventory-type-toggle__btn${itemType === "consumable" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setItemType("consumable")}>Consumable</button>
-          <button type="button" className={`inventory-type-toggle__btn${itemType === "equipment" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setItemType("equipment")}>Equipment</button>
+          <button type="button" className={`inventory-type-toggle__btn${itemType === "consumable" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setValue("itemType", "consumable", { shouldValidate: true, shouldDirty: true })}>Consumable</button>
+          <button type="button" className={`inventory-type-toggle__btn${itemType === "equipment" ? " inventory-type-toggle__btn--active" : ""}`} onClick={() => setValue("itemType", "equipment", { shouldValidate: true, shouldDirty: true })}>Equipment</button>
         </div>
+        <InlineError message={errors.itemType?.message} size="sm" />
       </div>
       <label className="field">
         <span>Name</span>
-        <input type="text" name="name" defaultValue={item.name} required />
+        <input type="text" {...register("name")} />
+        <InlineError message={errors.name?.message} size="sm" />
       </label>
       <label className="field">
         <span>Part Number</span>
-        <input type="text" name="partNumber" defaultValue={item.partNumber ?? ""} />
+        <input type="text" {...register("partNumber")} />
+        <InlineError message={errors.partNumber?.message} size="sm" />
       </label>
       <label className="field">
         <span>Category</span>
-        <input type="text" name="category" defaultValue={item.category ?? ""} />
+        <input type="text" {...register("category")} />
+        <InlineError message={errors.category?.message} size="sm" />
       </label>
       <label className="field">
         <span>Manufacturer</span>
-        <input type="text" name="manufacturer" defaultValue={item.manufacturer ?? ""} />
+        <input type="text" {...register("manufacturer")} />
+        <InlineError message={errors.manufacturer?.message} size="sm" />
       </label>
       <label className="field">
         <span>Unit</span>
-        <input type="text" name="unit" defaultValue={item.unit} />
+        <input type="text" {...register("unit")} />
+        <InlineError message={errors.unit?.message} size="sm" />
       </label>
       <label className="field">
         <span>On Hand</span>
-        <input type="number" name="quantityOnHand" min="0" step="0.01" defaultValue={item.quantityOnHand} />
+        <input type="number" step="0.01" {...register("quantityOnHand")} />
+        <InlineError message={errors.quantityOnHand?.message} size="sm" />
       </label>
       {itemType === "equipment" && (
         <label className="field">
           <span>Condition</span>
-          <select name="conditionStatus" defaultValue={item.conditionStatus ?? ""}>
+          <select {...register("conditionStatus")}>
             <option value="">No condition set</option>
             <option value="good">Good</option>
             <option value="fair">Fair</option>
             <option value="needs_repair">Needs Repair</option>
             <option value="needs_replacement">Needs Replacement</option>
           </select>
+          <InlineError message={errors.conditionStatus?.message} size="sm" />
         </label>
       )}
       {itemType === "consumable" && (
         <>
           <label className="field">
             <span>Reorder When At</span>
-            <input type="number" name="reorderThreshold" min="0" step="0.01" defaultValue={item.reorderThreshold ?? ""} />
+            <input type="number" step="0.01" {...register("reorderThreshold")} />
+            <InlineError message={errors.reorderThreshold?.message} size="sm" />
           </label>
           <label className="field">
             <span>Usually Buy</span>
-            <input type="number" name="reorderQuantity" min="0" step="0.01" defaultValue={item.reorderQuantity ?? ""} />
+            <input type="number" step="0.01" {...register("reorderQuantity")} />
+            <InlineError message={errors.reorderQuantity?.message} size="sm" />
           </label>
         </>
       )}
       <label className="field">
         <span>Last Price</span>
-        <input type="number" name="unitCost" min="0" step="0.01" defaultValue={item.unitCost ?? ""} />
+        <input type="number" step="0.01" {...register("unitCost")} />
+        <InlineError message={errors.unitCost?.message} size="sm" />
       </label>
       <label className="field">
         <span>Supplier</span>
-        <input type="text" name="preferredSupplier" defaultValue={item.preferredSupplier ?? ""} />
+        <input type="text" {...register("preferredSupplier")} />
+        <InlineError message={errors.preferredSupplier?.message} size="sm" />
       </label>
       <label className="field field--full">
         <span>Supplier Link</span>
-        <input type="text" name="supplierUrl" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} defaultValue={item.supplierUrl ?? ""} />
+        <input type="text" {...register("supplierUrl")} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+        <InlineError message={errors.supplierUrl?.message} size="sm" />
       </label>
       <label className="field field--full">
         <span>Storage Location</span>
-        <input type="text" name="storageLocation" defaultValue={item.storageLocation ?? ""} />
+        <input type="text" {...register("storageLocation")} />
+        <InlineError message={errors.storageLocation?.message} size="sm" />
       </label>
       <label className="field field--full">
         <span>Description</span>
-        <textarea name="description" rows={2} defaultValue={item.description ?? ""} />
+        <textarea rows={2} {...register("description")} />
+        <InlineError message={errors.description?.message} size="sm" />
       </label>
       <label className="field field--full">
         <span>Notes</span>
-        <textarea name="notes" rows={3} defaultValue={item.notes ?? ""} />
+        <textarea rows={3} {...register("notes")} />
+        <InlineError message={errors.notes?.message} size="sm" />
       </label>
       <InlineError message={error} className="field field--full" size="sm" />
       <div className="inline-actions inline-actions--end field field--full">

@@ -8,10 +8,7 @@ import type {
 } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
-  archiveAssetAction,
-  softDeleteAssetAction,
   transferAssetAction,
-  unarchiveAssetAction,
   updateAssetAction
 } from "../app/actions";
 import { AssetDangerActions } from "./asset-danger-actions";
@@ -143,11 +140,9 @@ export async function AssetSettingsTab({
         </div>
         <div className="panel__body--padded">
           <AssetDangerActions
+            householdId={detail.asset.householdId}
             assetId={detail.asset.id}
             isArchived={detail.asset.isArchived}
-            archiveAction={archiveAssetAction}
-            unarchiveAction={unarchiveAssetAction}
-            deleteAction={softDeleteAssetAction}
           />
         </div>
       </section>

@@ -1,6 +1,7 @@
 import type { HobbyStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
+import { getTranslations } from "next-intl/server";
 import { ApiError, getHouseholdHobbies, getMe } from "../../../lib/api";
 
 type HobbiesPageProps = {
@@ -25,6 +26,8 @@ const getParam = (value: string | string[] | undefined): string | undefined => {
 };
 
 export default async function HobbiesPage({ searchParams }: HobbiesPageProps): Promise<JSX.Element> {
+  const t = await getTranslations("hobbies");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const statusParam = getParam(params.status);
   const selectedStatus = (statusParam === "active" || statusParam === "paused" || statusParam === "archived")
@@ -38,9 +41,9 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Hobbies</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -60,11 +63,11 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
       <>
         <header className="page-header">
           <div>
-            <h1>Hobbies</h1>
-            <p>Track recipes, sessions, inventory, and metrics for your creative pursuits.</p>
+            <h1>{t("pageTitle")}</h1>
+            <p>{t("pageSubtitle")}</p>
           </div>
           <div className="page-header__actions">
-            <Link href="/hobbies/new" className="button">New Hobby</Link>
+            <Link href="/hobbies/new" className="button">{tCommon("actions.newHobby")}</Link>
           </div>
         </header>
 
@@ -119,10 +122,10 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
               <div className="panel__body--padded panel__empty">
                 <p>
                   {selectedStatus
-                    ? `No ${hobbyStatusLabels[selectedStatus].toLowerCase()} hobbies found.`
-                    : "No hobbies yet. Create your first hobby to start tracking sessions, recipes, and inventory."}
+                    ? t("emptyFiltered", { status: hobbyStatusLabels[selectedStatus].toLowerCase() })
+                    : t("empty")}
                 </p>
-                <Link href="/hobbies/new" className="button button--primary">Create Your First Hobby</Link>
+                <Link href="/hobbies/new" className="button button--primary">{t("createFirst")}</Link>
               </div>
             </section>
           ) : (

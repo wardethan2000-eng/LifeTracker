@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { getTranslations } from "next-intl/server";
 import { InventoryBulkActions } from "../../../components/inventory-bulk-actions";
 import { InventoryEditableRow } from "../../../components/inventory-editable-row";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
 import { InventoryQuickRestock } from "../../../components/inventory-quick-restock";
+import { RealtimeRefreshBoundary } from "../../../components/realtime-refresh-boundary";
 import { InventoryValuationReportButton } from "../../../components/report-download-actions";
 import { InventorySection } from "../../../components/inventory-section";
 import { InventoryShoppingListSection } from "../../../components/inventory-shopping-list-section";
@@ -82,6 +84,8 @@ const buildInventoryHref = (householdId: string, params?: Record<string, string 
 const buildInventoryItemHref = (householdId: string, inventoryItemId: string): string => `/inventory/${inventoryItemId}?householdId=${householdId}`;
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps): Promise<JSX.Element> {
+  const t = await getTranslations("inventory");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
@@ -95,9 +99,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Inventory</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -160,15 +164,16 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
     return (
       <>
+        <RealtimeRefreshBoundary householdId={household.id} eventTypes={["inventory.changed"]} />
         <header className="page-header">
           <div>
-            <h1>Inventory</h1>
-            <p style={{ marginTop: 6 }}>Universal household stock across assets, projects, and standalone supplies.</p>
+            <h1>{t("pageTitle")}</h1>
+            <p style={{ marginTop: 6 }}>{t("pageSubtitle")}</p>
           </div>
           <div className="page-header__actions">
             <InventoryValuationReportButton householdId={household.id} />
-            <Link href={inventoryViewHref} className="button button--primary button--sm">Inventory</Link>
-            <Link href={analyticsViewHref} className="button button--ghost button--sm">Analytics Hub</Link>
+            <Link href={inventoryViewHref} className="button button--primary button--sm">{t("inventoryButton")}</Link>
+            <Link href={analyticsViewHref} className="button button--ghost button--sm">{t("analyticsHub")}</Link>
           </div>
         </header>
 
@@ -213,7 +218,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           {!isEquipmentView && (
           <section className="panel">
             <div className="panel__header">
-              <h2>Reorder Watchlist</h2>
+              <h2>{t("reorderWatchlist")}</h2>
               <span className="data-table__secondary">{lowStockItems.length} items need attention</span>
             </div>
             <div className="panel__body">

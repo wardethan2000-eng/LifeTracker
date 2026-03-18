@@ -1,5 +1,7 @@
 import type { Asset } from "@lifekeeper/types";
 import type { JSX } from "react";
+import type { FieldErrors, UseFormRegister } from "react-hook-form";
+import type { AssetProfileFormValues } from "../lib/validation/forms";
 import {
   conditionSummary,
   dispositionSummary,
@@ -10,6 +12,7 @@ import {
 } from "./card-summary-line";
 import { Card } from "./card";
 import { CollapsibleCard } from "./collapsible-card";
+import { InlineError } from "./inline-error";
 
 type AssetWorkbenchAsideProps = {
   initialAsset: Asset | undefined;
@@ -17,6 +20,8 @@ type AssetWorkbenchAsideProps = {
   assetTypeLabel: string;
   assetTypeDescription: string;
   assetTypeKey: string;
+  register: UseFormRegister<AssetProfileFormValues>;
+  errors: FieldErrors<AssetProfileFormValues>;
   onSaveAsPresetChange: (value: boolean) => void;
 };
 
@@ -26,6 +31,8 @@ export function AssetProfileWorkbenchAside({
   assetTypeLabel,
   assetTypeDescription,
   assetTypeKey,
+  register,
+  errors,
   onSaveAsPresetChange,
 }: AssetWorkbenchAsideProps): JSX.Element {
   return (
@@ -33,10 +40,11 @@ export function AssetProfileWorkbenchAside({
       <Card title="Visibility">
         <label className="field">
           <span>Who can see this asset</span>
-          <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
+          <select {...register("visibility")}>
             <option value="shared">Shared (visible to household)</option>
             <option value="personal">Personal (only you)</option>
           </select>
+          <InlineError message={errors.visibility?.message} size="sm" />
         </label>
       </Card>
 
@@ -49,15 +57,18 @@ export function AssetProfileWorkbenchAside({
           <div className="workbench-grid" style={{ marginTop: "12px" }}>
             <label className="field">
               <span>Template Name</span>
-              <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder='e.g. "My Vehicle Profile"' required={saveAsPreset} />
+              <input type="text" placeholder='e.g. "My Vehicle Profile"' {...register("presetLabel")} />
+              <InlineError message={errors.presetLabel?.message} size="sm" />
             </label>
             <label className="field field--full">
               <span>Description</span>
-              <textarea name="presetDescription" rows={2} defaultValue={assetTypeDescription} placeholder="What this template is for" />
+              <textarea rows={2} placeholder="What this template is for" {...register("presetDescription")} />
+              <InlineError message={errors.presetDescription?.message} size="sm" />
             </label>
             <label className="field field--full">
               <span>Tags (comma separated)</span>
-              <input type="text" name="presetTags" placeholder="vehicle, outdoor, power-tool" />
+              <input type="text" placeholder="vehicle, outdoor, power-tool" {...register("presetTags")} />
+              <InlineError message={errors.presetTags?.message} size="sm" />
             </label>
             <input type="hidden" name="presetKeyOverride" value={assetTypeKey} />
           </div>
@@ -68,7 +79,7 @@ export function AssetProfileWorkbenchAside({
         <>
           <CollapsibleCard title="Purchase Details" summary={purchaseSummary(initialAsset)}>
             <div className="workbench-grid">
-              <label className="field"><span>Purchase Date</span><input type="date" name="purchaseDate" defaultValue={initialAsset.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : ""} /></label>
+              <label className="field"><span>Purchase Date</span><input type="date" {...register("purchaseDate")} /><InlineError message={errors.purchaseDate?.message} size="sm" /></label>
               <label className="field"><span>Purchase Price</span><input type="number" name="purchaseDetails.price" min="0" step="0.01" defaultValue={initialAsset.purchaseDetails?.price ?? ""} /></label>
               <label className="field"><span>Vendor</span><input type="text" name="purchaseDetails.vendor" defaultValue={initialAsset.purchaseDetails?.vendor ?? ""} /></label>
               <label className="field"><span>Condition at Purchase</span><select name="purchaseDetails.condition" defaultValue={initialAsset.purchaseDetails?.condition ?? ""}><option value="">Unknown</option><option value="new">New</option><option value="used">Used</option><option value="refurbished">Refurbished</option></select></label>
@@ -114,7 +125,8 @@ export function AssetProfileWorkbenchAside({
             <div className="workbench-grid">
               <label className="field">
                 <span>Condition Score (1–10)</span>
-                <input type="number" name="conditionScore" min="1" max="10" step="1" defaultValue={initialAsset.conditionScore ?? ""} placeholder="1-10" />
+                <input type="number" step="1" placeholder="1-10" {...register("conditionScore")} />
+                <InlineError message={errors.conditionScore?.message} size="sm" />
               </label>
             </div>
           </CollapsibleCard>

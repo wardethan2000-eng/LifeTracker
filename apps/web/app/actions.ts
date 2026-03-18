@@ -65,6 +65,7 @@ import type {
   InstantiateProjectTemplateInput,
   UpdateHobbyInput,
   UpdateHobbyRecipeInput,
+  UpdateInventoryItemInput,
   UpdateInventoryPurchaseLineInput,
   UpdateUsageMetricInput
 } from "@lifekeeper/types";
@@ -78,6 +79,11 @@ import {
 } from "@lifekeeper/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  broadcastRealtimeEvent,
+  createRealtimeEvent,
+  type RealtimeEventType
+} from "../lib/realtime-events";
 import {
   acceptInvitation,
   addProjectAsset,
@@ -156,6 +162,7 @@ import {
   softDeleteAsset,
   unarchiveAsset,
   updateAsset,
+  updateInventoryItem,
   updateComment,
   updateInventoryComment,
   updateEntry,
@@ -183,6 +190,18 @@ import {
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
+
+const emitRealtimeEvent = async (
+  householdId: string | undefined,
+  type: RealtimeEventType,
+  entityId: string
+): Promise<void> => {
+  if (!householdId) {
+    return;
+  }
+
+  broadcastRealtimeEvent(createRealtimeEvent(type, householdId, entityId));
+};
 
 const getString = (formData: FormData, key: string): string => {
   const value = formData.get(key);
@@ -901,9 +920,101 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
     input.notes = notes;
   }
 
-  await createInventoryItem(householdId, input);
+  const item = await createInventoryItem(householdId, input);
+  await emitRealtimeEvent(householdId, "inventory.changed", item.id);
   revalidateInventoryPaths(householdId);
   redirect(`/inventory?householdId=${householdId}`);
+}
+
+export async function updateInventoryItemAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const input: UpdateInventoryItemInput = {};
+
+  const name = getOptionalString(formData, "name");
+  const itemType = getOptionalString(formData, "itemType");
+  const conditionStatus = formData.has("conditionStatus") ? getString(formData, "conditionStatus") : undefined;
+  const partNumber = formData.has("partNumber") ? getNullableString(formData, "partNumber") : undefined;
+  const description = formData.has("description") ? getNullableString(formData, "description") : undefined;
+  const category = formData.has("category") ? getNullableString(formData, "category") : undefined;
+  const manufacturer = formData.has("manufacturer") ? getNullableString(formData, "manufacturer") : undefined;
+  const unit = getOptionalString(formData, "unit");
+  const quantityOnHand = getOptionalNumber(formData, "quantityOnHand");
+  const reorderThreshold = formData.has("reorderThreshold") ? getNullableNumber(formData, "reorderThreshold") : undefined;
+  const reorderQuantity = formData.has("reorderQuantity") ? getNullableNumber(formData, "reorderQuantity") : undefined;
+  const preferredSupplier = formData.has("preferredSupplier") ? getNullableString(formData, "preferredSupplier") : undefined;
+  const supplierUrl = formData.has("supplierUrl") ? (getOptionalNormalizedUrl(formData, "supplierUrl") ?? null) : undefined;
+  const storageLocation = formData.has("storageLocation") ? getNullableString(formData, "storageLocation") : undefined;
+  const unitCost = formData.has("unitCost") ? getNullableNumber(formData, "unitCost") : undefined;
+  const notes = formData.has("notes") ? getNullableString(formData, "notes") : undefined;
+
+  if (name) {
+    input.name = name;
+  }
+
+  if (itemType === "consumable" || itemType === "equipment") {
+    input.itemType = itemType;
+  }
+
+  if (conditionStatus !== undefined) {
+    input.conditionStatus = conditionStatus || null;
+  }
+
+  if (partNumber !== undefined) {
+    input.partNumber = partNumber ?? undefined;
+  }
+
+  if (description !== undefined) {
+    input.description = description ?? undefined;
+  }
+
+  if (category !== undefined) {
+    input.category = category ?? undefined;
+  }
+
+  if (manufacturer !== undefined) {
+    input.manufacturer = manufacturer ?? undefined;
+  }
+
+  if (unit !== undefined) {
+    input.unit = unit;
+  }
+
+  if (quantityOnHand !== undefined) {
+    input.quantityOnHand = quantityOnHand;
+  }
+
+  if (reorderThreshold !== undefined) {
+    input.reorderThreshold = reorderThreshold ?? undefined;
+  }
+
+  if (reorderQuantity !== undefined) {
+    input.reorderQuantity = reorderQuantity ?? undefined;
+  }
+
+  if (preferredSupplier !== undefined) {
+    input.preferredSupplier = preferredSupplier ?? undefined;
+  }
+
+  if (storageLocation !== undefined) {
+    input.storageLocation = storageLocation ?? undefined;
+  }
+
+  if (unitCost !== undefined) {
+    input.unitCost = unitCost ?? undefined;
+  }
+
+  if (notes !== undefined) {
+    input.notes = notes ?? undefined;
+  }
+
+  if (supplierUrl !== undefined) {
+    input.supplierUrl = supplierUrl ?? undefined;
+  }
+  await updateInventoryItem(householdId, inventoryItemId, input);
+  await emitRealtimeEvent(householdId, "inventory.changed", inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidateInventoryDetailPath(inventoryItemId);
 }
 
 export async function deleteInventoryItemAction(formData: FormData): Promise<void> {
@@ -912,6 +1023,7 @@ export async function deleteInventoryItemAction(formData: FormData): Promise<voi
   const redirectTo = getOptionalString(formData, "redirectTo");
 
   await deleteInventoryItem(householdId, inventoryItemId);
+  await emitRealtimeEvent(householdId, "inventory.changed", inventoryItemId);
   revalidateInventoryPaths(householdId);
   revalidateInventoryDetailPath(inventoryItemId);
   redirect(redirectTo ?? `/inventory?householdId=${householdId}`);
@@ -1103,6 +1215,7 @@ export async function createAssetAction(formData: FormData): Promise<void> {
     profile.scheduleTemplates
   );
 
+  await emitRealtimeEvent(input.householdId, "asset.updated", asset.id);
   revalidateAssetPaths(asset.id);
   redirect(`/assets/${asset.id}`);
 }
@@ -1170,6 +1283,7 @@ export async function updateAssetAction(formData: FormData): Promise<void> {
     profile.scheduleTemplates
   );
 
+  await emitRealtimeEvent(input.householdId, "asset.updated", assetId);
   revalidateAssetPaths(assetId);
 }
 
@@ -1290,6 +1404,7 @@ export async function createMetricEntryAction(formData: FormData): Promise<void>
 }
 
 export async function completeScheduleAction(formData: FormData): Promise<void> {
+  const householdId = getOptionalString(formData, "householdId");
   const assetId = getRequiredString(formData, "assetId");
   const scheduleId = getRequiredString(formData, "scheduleId");
   const input: CompleteMaintenanceScheduleInput = {
@@ -1324,11 +1439,13 @@ export async function completeScheduleAction(formData: FormData): Promise<void> 
   }
 
   await completeSchedule(assetId, scheduleId, input);
+  await emitRealtimeEvent(householdId, "maintenance.completed", scheduleId);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
 }
 
 export async function createLogAction(formData: FormData): Promise<void> {
+  const householdId = getOptionalString(formData, "householdId");
   const assetId = getRequiredString(formData, "assetId");
   const input: CreateMaintenanceLogInput = {
     applyLinkedParts: getOptionalString(formData, "applyLinkedParts") !== "false",
@@ -1376,7 +1493,8 @@ export async function createLogAction(formData: FormData): Promise<void> {
     input.parts = parts;
   }
 
-  await createMaintenanceLog(assetId, input);
+  const log = await createMaintenanceLog(assetId, input);
+  await emitRealtimeEvent(householdId, "maintenance.completed", assetId);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
 }
@@ -1830,25 +1948,37 @@ export async function deleteScheduleAction(formData: FormData): Promise<void> {
 
 export async function archiveAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
+  const householdId = getOptionalString(formData, "householdId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
   await archiveAsset(assetId);
+  await emitRealtimeEvent(householdId, "asset.updated", assetId);
   revalidatePath("/assets");
   revalidatePath("/maintenance");
-  redirect("/assets");
+  if (redirectTo !== "none") {
+    redirect(redirectTo ?? "/assets");
+  }
 }
 
 export async function unarchiveAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
+  const householdId = getOptionalString(formData, "householdId");
   await unarchiveAsset(assetId);
+  await emitRealtimeEvent(householdId, "asset.updated", assetId);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
 }
 
 export async function softDeleteAssetAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
+  const householdId = getOptionalString(formData, "householdId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
   await softDeleteAsset(assetId);
+  await emitRealtimeEvent(householdId, "asset.updated", assetId);
   revalidatePath("/assets");
   revalidatePath("/maintenance");
-  redirect("/assets");
+  if (redirectTo !== "none") {
+    redirect(redirectTo ?? "/assets");
+  }
 }
 
 export async function restoreAssetAction(formData: FormData): Promise<void> {
@@ -2136,10 +2266,13 @@ export async function updateProjectStatusAction(formData: FormData): Promise<voi
 export async function deleteProjectAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
 
   await deleteProject(householdId, projectId);
   revalidateProjectPaths(householdId);
-  redirect(`/projects?householdId=${householdId}`);
+  if (redirectTo !== "none") {
+    redirect(redirectTo ?? `/projects?householdId=${householdId}`);
+  }
 }
 
 export async function addProjectAssetAction(formData: FormData): Promise<void> {
@@ -2968,10 +3101,14 @@ export async function updateHobbyAction(formData: FormData): Promise<void> {
 export async function archiveHobbyAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const hobbyId = getRequiredString(formData, "hobbyId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
 
   await updateHobby(householdId, hobbyId, { status: "archived" });
+  await emitRealtimeEvent(householdId, "hobby.session-progress", hobbyId);
   revalidateHobbyPaths(hobbyId);
-  redirect(`/hobbies/${hobbyId}?tab=settings`);
+  if (redirectTo !== "none") {
+    redirect(redirectTo ?? `/hobbies/${hobbyId}?tab=settings`);
+  }
 }
 
 export async function restoreHobbyAction(formData: FormData): Promise<void> {
@@ -2979,6 +3116,7 @@ export async function restoreHobbyAction(formData: FormData): Promise<void> {
   const hobbyId = getRequiredString(formData, "hobbyId");
 
   await updateHobby(householdId, hobbyId, { status: "active" });
+  await emitRealtimeEvent(householdId, "hobby.session-progress", hobbyId);
   revalidateHobbyPaths(hobbyId);
   redirect(`/hobbies/${hobbyId}?tab=settings`);
 }
@@ -2986,10 +3124,14 @@ export async function restoreHobbyAction(formData: FormData): Promise<void> {
 export async function deleteHobbyAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const hobbyId = getRequiredString(formData, "hobbyId");
+  const redirectTo = getOptionalString(formData, "redirectTo");
 
   await deleteHobby(householdId, hobbyId);
+  await emitRealtimeEvent(householdId, "hobby.session-progress", hobbyId);
   revalidateHobbyPaths();
-  redirect("/hobbies");
+  if (redirectTo !== "none") {
+    redirect(redirectTo ?? "/hobbies");
+  }
 }
 
 export async function createHobbyRecipeAction(formData: FormData): Promise<void> {
@@ -3133,6 +3275,7 @@ export async function createHobbySessionAction(formData: FormData): Promise<void
     revalidateHobbySeriesPaths(hobbyId, linkedSeriesId);
   }
 
+  await emitRealtimeEvent(householdId, "hobby.session-progress", session.id);
   revalidateHobbySessionPaths(hobbyId, session.id);
   redirect(`/hobbies/${hobbyId}/sessions/${session.id}`);
 }
@@ -3183,6 +3326,7 @@ export async function advanceHobbySessionAction(formData: FormData): Promise<voi
   const sessionId = getRequiredString(formData, "sessionId");
 
   await advanceHobbySession(householdId, hobbyId, sessionId);
+  await emitRealtimeEvent(householdId, "hobby.session-progress", sessionId);
   revalidateHobbySessionPaths(hobbyId, sessionId);
 }
 

@@ -1,6 +1,9 @@
 import type { Asset, AssetCategory } from "@lifekeeper/types";
 import type { JSX } from "react";
+import type { FieldErrors, UseFormRegister } from "react-hook-form";
+import type { AssetProfileFormValues } from "../lib/validation/forms";
 import { Card } from "./card";
+import { InlineError } from "./inline-error";
 
 type BlueprintOption = {
   id: string;
@@ -24,6 +27,8 @@ type CoreIdentitySectionProps = {
   categoryLibraryBlueprints: BlueprintOption[];
   categoryCustomBlueprints: BlueprintOption[];
   availableParentAssets: Asset[];
+  register: UseFormRegister<AssetProfileFormValues>;
+  errors: FieldErrors<AssetProfileFormValues>;
   onCategoryChange: (nextCategory: AssetCategory) => void;
   onBlueprintChange: (nextId: string) => void;
 };
@@ -39,6 +44,8 @@ export function AssetProfileWorkbenchCoreIdentitySection({
   categoryLibraryBlueprints,
   categoryCustomBlueprints,
   availableParentAssets,
+  register,
+  errors,
   onCategoryChange,
   onBlueprintChange,
 }: CoreIdentitySectionProps): JSX.Element {
@@ -47,16 +54,25 @@ export function AssetProfileWorkbenchCoreIdentitySection({
       <div className="workbench-grid">
         <label className="field field--full">
           <span>Asset Name *</span>
-          <input type="text" name="name" defaultValue={initialAsset?.name ?? ""} placeholder='e.g. "Riding Mower", "Family SUV"' required />
+          <input type="text" placeholder='e.g. "Riding Mower", "Family SUV"' {...register("name")} />
+          <InlineError message={errors.name?.message} size="sm" />
         </label>
 
         <label className="field">
           <span>Category</span>
-          <select name="category" value={category} onChange={(event) => onCategoryChange(event.target.value as AssetCategory)}>
+          <select
+            value={category}
+            {...register("category")}
+            onChange={(event) => {
+              register("category").onChange(event);
+              onCategoryChange(event.target.value as AssetCategory);
+            }}
+          >
             {categoryOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+          <InlineError message={errors.category?.message} size="sm" />
         </label>
 
         <label className="field">
@@ -83,28 +99,33 @@ export function AssetProfileWorkbenchCoreIdentitySection({
 
         <label className="field">
           <span>Manufacturer / Brand</span>
-          <input type="text" name="manufacturer" defaultValue={initialAsset?.manufacturer ?? ""} placeholder='e.g. "Honda", "Samsung"' />
+          <input type="text" placeholder='e.g. "Honda", "Samsung"' {...register("manufacturer")} />
+          <InlineError message={errors.manufacturer?.message} size="sm" />
         </label>
         <label className="field">
           <span>Model</span>
-          <input type="text" name="model" defaultValue={initialAsset?.model ?? ""} placeholder='e.g. "HRX217"' />
+          <input type="text" placeholder='e.g. "HRX217"' {...register("model")} />
+          <InlineError message={errors.model?.message} size="sm" />
         </label>
         <label className="field">
           <span>Serial Number</span>
-          <input type="text" name="serialNumber" defaultValue={initialAsset?.serialNumber ?? ""} placeholder="For warranty claims" />
+          <input type="text" placeholder="For warranty claims" {...register("serialNumber")} />
+          <InlineError message={errors.serialNumber?.message} size="sm" />
         </label>
         <label className="field">
           <span>Parent Asset</span>
-          <select name="parentAssetId" defaultValue={initialAsset?.parentAssetId ?? ""}>
+          <select {...register("parentAssetId")}>
             <option value="">No parent asset</option>
             {availableParentAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>{asset.name}</option>
             ))}
           </select>
+          <InlineError message={errors.parentAssetId?.message} size="sm" />
         </label>
         <label className="field field--full">
           <span>Description & Notes</span>
-          <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Anything helpful..." />
+          <textarea rows={3} placeholder="Anything helpful..." {...register("description")} />
+          <InlineError message={errors.description?.message} size="sm" />
         </label>
       </div>
     </Card>

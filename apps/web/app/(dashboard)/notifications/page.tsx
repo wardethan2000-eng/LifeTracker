@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Notification } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { getTranslations } from "next-intl/server";
 import {
   markNotificationReadAction,
   markNotificationUnreadAction,
@@ -142,6 +143,8 @@ function NotificationTable({ notifications }: { notifications: Notification[] })
 }
 
 export default async function NotificationsPage({ searchParams }: NotificationsPageProps): Promise<JSX.Element> {
+  const t = await getTranslations("notifications");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const status = typeof params.status === "string" && statusOptions.includes(params.status as (typeof statusOptions)[number])
     ? params.status as (typeof statusOptions)[number]
@@ -167,9 +170,9 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Notifications</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -195,14 +198,14 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     return (
       <>
         <header className="page-header">
-          <h1>Notifications</h1>
+          <h1>{t("pageTitle")}</h1>
           <div className="page-header__actions">
             {visibleUnreadNotifications.length > 0 ? (
               <form action={markNotificationsReadAction}>
                 {visibleUnreadNotifications.map((notification) => (
                   <input key={notification.id} type="hidden" name="notificationId" value={notification.id} />
                 ))}
-                <button type="submit" className="button button--primary">Mark Visible Read</button>
+                <button type="submit" className="button button--primary">{t("markVisibleRead")}</button>
               </form>
             ) : null}
             {visibleReadNotifications.length > 0 ? (
@@ -210,17 +213,17 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                 {visibleReadNotifications.map((notification) => (
                   <input key={notification.id} type="hidden" name="notificationId" value={notification.id} />
                 ))}
-                <button type="submit" className="button button--ghost">Undo Visible Read</button>
+                <button type="submit" className="button button--ghost">{t("undoVisibleRead")}</button>
               </form>
             ) : null}
-            <p className="note">Recurring background jobs keep notifications, low-stock alerts, and compliance checks up to date.</p>
+            <p className="note">{t("backgroundNote")}</p>
           </div>
         </header>
 
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
-              <h2>Filters</h2>
+              <h2>{t("filters")}</h2>
             </div>
             <div className="panel__body--padded">
               <form method="GET" className="form-grid">

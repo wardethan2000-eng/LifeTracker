@@ -1,7 +1,9 @@
 "use client";
 
 import type { JSX } from "react";
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { useToast } from "./toast-provider";
 
 type ConfirmDestructiveActionTone = "danger" | "warning";
 
@@ -18,6 +20,11 @@ type ConfirmDestructiveActionProps = {
   confirmClassName?: string;
   cancelClassName?: string;
   className?: string;
+  deferredAction?: () => Promise<void>;
+  onOptimisticAction?: () => void;
+  onUndoRestore?: () => void;
+  toastMessage?: string;
+  toastDuration?: number;
 };
 
 export function ConfirmDestructiveAction({
@@ -33,10 +40,40 @@ export function ConfirmDestructiveAction({
   confirmClassName = "button button--danger button--sm",
   cancelClassName = "button button--ghost button--sm",
   className = "asset-danger-actions__confirm",
+  deferredAction,
+  onOptimisticAction,
+  onUndoRestore,
+  toastMessage,
+  toastDuration,
 }: ConfirmDestructiveActionProps): JSX.Element {
+  const router = useRouter();
+  const { pushToast } = useToast();
   const [isConfirming, setIsConfirming] = useState(false);
   const titleId = useId();
   const messageId = useId();
+
+  const runDeferredAction = (): void => {
+    if (!deferredAction) {
+      return;
+    }
+
+    setIsConfirming(false);
+    onOptimisticAction?.();
+    pushToast({
+      actionLabel: "Undo",
+      duration: toastDuration ?? 8000,
+      message: toastMessage ?? title,
+      tone: tone === "danger" ? "danger" : "info",
+      onAction: () => {
+        onUndoRestore?.();
+        router.refresh();
+      },
+      onExpire: async () => {
+        await deferredAction();
+        router.refresh();
+      }
+    });
+  };
 
   if (!isConfirming) {
     return (
@@ -61,14 +98,20 @@ export function ConfirmDestructiveAction({
         <strong id={titleId} className="asset-danger-actions__confirm-title">{title}</strong>
         <span id={messageId}>{message}</span>
       </div>
-      <form action={action}>
-        {hiddenFields.map((field) => (
-          <input key={field.name} type="hidden" name={field.name} value={field.value} />
-        ))}
-        <button type="submit" className={confirmClassName}>
+      {deferredAction ? (
+        <button type="button" className={confirmClassName} onClick={runDeferredAction}>
           {confirmLabel}
         </button>
-      </form>
+      ) : (
+        <form action={action}>
+          {hiddenFields.map((field) => (
+            <input key={field.name} type="hidden" name={field.name} value={field.value} />
+          ))}
+          <button type="submit" className={confirmClassName}>
+            {confirmLabel}
+          </button>
+        </form>
+      )}
       <button
         type="button"
         className={cancelClassName}

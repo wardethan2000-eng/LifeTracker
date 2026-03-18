@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { getTranslations } from "next-intl/server";
 import { createProjectAction, createProjectFromTemplateAction } from "../../../actions";
 import { ProjectCoreFormFields } from "../../../../components/project-core-form-fields";
 import { ApiError, getMe, getProjectDetail, getProjectTemplates } from "../../../../lib/api";
@@ -9,6 +10,8 @@ type NewProjectPageProps = {
 };
 
 export default async function NewProjectPage({ searchParams }: NewProjectPageProps): Promise<JSX.Element> {
+  const t = await getTranslations("projects");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const parentProjectId = typeof params.parentProjectId === "string" ? params.parentProjectId : undefined;
@@ -20,9 +23,9 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>New Project</h1></header>
+          <header className="page-header"><h1>{t("newPageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -37,11 +40,11 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
       <>
         <header className="page-header">
           <div>
-            <h1>Create Project</h1>
-            <p style={{ marginTop: 6 }}>Track household work with a budget, timeline, linked assets, tasks, and expenses.</p>
+            <h1>{t("newPageTitle")}</h1>
+            <p style={{ marginTop: 6 }}>{t("newPageSubtitle")}</p>
           </div>
           <div className="page-header__actions">
-            <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">Back to Projects</Link>
+            <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">{tCommon("actions.backToProjects")}</Link>
           </div>
         </header>
 
@@ -88,14 +91,13 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
               </div>
             </section>
           )}
-          <form action={createProjectAction} className="workbench-form">
-            <ProjectCoreFormFields householdId={household.id} />
-            {parentProjectId && <input type="hidden" name="parentProjectId" value={parentProjectId} />}
-            <div className="workbench-bar">
-              <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">Cancel</Link>
-              <button type="submit" className="button button--primary">Create Project</button>
-            </div>
-          </form>
+          <ProjectCoreFormFields
+            action={createProjectAction}
+            householdId={household.id}
+            submitLabel="Create Project"
+            cancelHref={`/projects?householdId=${household.id}`}
+            {...(parentProjectId ? { parentProjectId } : {})}
+          />
         </div>
       </>
     );

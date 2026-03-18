@@ -1,6 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 type Density = "relaxed" | "standard" | "compact";
@@ -13,6 +14,7 @@ const applyDensity = (density: Density): void => {
 };
 
 export function DensityToggle(): JSX.Element {
+  const t = useTranslations("common.toolbar.density");
   const [density, setDensity] = useState<Density>("standard");
 
   useEffect(() => {
@@ -32,18 +34,18 @@ export function DensityToggle(): JSX.Element {
   };
 
   return (
-    <div className="density-toggle">
-      <span className="density-toggle__label">Style</span>
-      <div className="density-toggle__group" role="group" aria-label="Interface density">
+    <div className="toolbar-segment">
+      <span className="toolbar-segment__label">{t("label")}</span>
+      <div className="toolbar-segment__group" role="group" aria-label={t("ariaLabel")}>
         {densityOptions.map((option) => (
           <button
             key={option}
             type="button"
-            className="density-toggle__button"
+            className="toolbar-segment__button"
             aria-pressed={density === option}
             onClick={() => handleSelect(option)}
           >
-            {option.charAt(0).toUpperCase() + option.slice(1)}
+            {t(option)}
           </button>
         ))}
       </div>

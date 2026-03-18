@@ -424,12 +424,12 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 }
               >
                 <div>
-                  <form action={updateProjectAction} className="workbench-form">
-                    <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />
-                    <div className="inline-actions" style={{ marginTop: 16 }}>
-                      <button type="submit" className="button">Save Project</button>
-                    </div>
-                  </form>
+                  <ProjectCoreFormFields
+                    action={updateProjectAction}
+                    householdId={household.id}
+                    project={project}
+                    submitLabel="Save Project"
+                  />
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)", display: "grid", gap: 16 }}>
                     <form action={saveProjectAsTemplateAction} className="workbench-grid">
                       <input type="hidden" name="householdId" value={household.id} />

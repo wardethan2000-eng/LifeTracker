@@ -1,12 +1,25 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { Project, ProjectStatus } from "@lifekeeper/types";
+import Link from "next/link";
+import type { JSX } from "react";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import {
+  projectFormSchema,
+  type ProjectFormValues,
+  type ProjectResolvedValues
+} from "../lib/validation/forms";
+import { InlineError } from "./inline-error";
 
 type ProjectCoreFormFieldsProps = {
+  action: (formData: FormData) => Promise<void>;
   householdId: string;
   project?: Project;
-  includeProjectId?: boolean;
+  submitLabel: string;
+  cancelHref?: string;
+  parentProjectId?: string;
 };
 
 const projectStatusOptions = [
@@ -94,31 +107,51 @@ type ProjectDraft = {
 const toDateInputValue = (value: string | null | undefined): string => value ? value.slice(0, 10) : "";
 
 export function ProjectCoreFormFields({
+  action,
   householdId,
   project,
-  includeProjectId = false
-}: ProjectCoreFormFieldsProps) {
+  submitLabel,
+  cancelHref,
+  parentProjectId,
+}: ProjectCoreFormFieldsProps): JSX.Element {
   const isCreateMode = !project;
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState("");
-  const [draft, setDraft] = useState<ProjectDraft>({
-    name: project?.name ?? "",
-    description: project?.description ?? "",
-    status: project?.status ?? "planning",
-    budgetAmount: project?.budgetAmount !== null && project?.budgetAmount !== undefined ? String(project.budgetAmount) : "",
-    startDate: toDateInputValue(project?.startDate),
-    targetEndDate: toDateInputValue(project?.targetEndDate),
-    notes: project?.notes ?? ""
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting }
+  } = useForm<ProjectFormValues, unknown, ProjectResolvedValues>({
+    resolver: zodResolver(projectFormSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      name: project?.name ?? "",
+      description: project?.description ?? "",
+      status: project?.status ?? "planning",
+      budgetAmount: project?.budgetAmount !== null && project?.budgetAmount !== undefined ? String(project.budgetAmount) : "",
+      startDate: toDateInputValue(project?.startDate),
+      targetEndDate: toDateInputValue(project?.targetEndDate),
+      notes: project?.notes ?? "",
+      parentProjectId: parentProjectId ?? project?.parentProjectId ?? "",
+      suggestedPhasesJson: "[]",
+      templateKey: ""
+    }
   });
   const [phaseDrafts, setPhaseDrafts] = useState<string[]>([]);
 
+  const selectedTemplateKey = watch("templateKey") ?? "";
   const selectedTemplate = projectTemplates.find((template) => template.key === selectedTemplateKey);
+  const name = watch("name") ?? "";
+  const description = watch("description") ?? "";
+  const status = watch("status") ?? "planning";
+  const budgetAmount = watch("budgetAmount") ?? "";
+  const startDate = watch("startDate") ?? "";
+  const targetEndDate = watch("targetEndDate") ?? "";
+  const notes = watch("notes") ?? "";
   const serializedPhaseDrafts = JSON.stringify(
     phaseDrafts.map((phase) => phase.trim()).filter((phase) => phase.length > 0)
   );
-
-  const updateDraft = <Field extends keyof ProjectDraft>(field: Field, value: ProjectDraft[Field]): void => {
-    setDraft((current) => ({ ...current, [field]: value }));
-  };
 
   const updatePhaseDraft = (index: number, value: string): void => {
     setPhaseDrafts((current) => current.map((phase, phaseIndex) => (phaseIndex === index ? value : phase)));
@@ -132,12 +165,51 @@ export function ProjectCoreFormFields({
     setPhaseDrafts((current) => current.filter((_, phaseIndex) => phaseIndex !== index));
   };
 
+  const submitForm = handleSubmit(async (values) => {
+    const formData = new FormData();
+    formData.set("householdId", householdId);
+    formData.set("name", values.name);
+    formData.set("status", values.status);
+    formData.set("suggestedPhasesJson", serializedPhaseDrafts);
+    formData.set("templateKey", selectedTemplateKey);
+
+    if (project) {
+      formData.set("projectId", project.id);
+    }
+
+    if (values.description) {
+      formData.set("description", values.description);
+    }
+
+    if (values.startDate) {
+      formData.set("startDate", values.startDate);
+    }
+
+    if (values.targetEndDate) {
+      formData.set("targetEndDate", values.targetEndDate);
+    }
+
+    if (values.budgetAmount !== undefined) {
+      formData.set("budgetAmount", String(values.budgetAmount));
+    }
+
+    if (values.notes) {
+      formData.set("notes", values.notes);
+    }
+
+    if (values.parentProjectId) {
+      formData.set("parentProjectId", values.parentProjectId);
+    }
+
+    await action(formData);
+  });
+
   return (
-    <>
+    <form className="workbench-form" noValidate onSubmit={submitForm}>
       <input type="hidden" name="householdId" value={householdId} />
-      {includeProjectId && project ? <input type="hidden" name="projectId" value={project.id} /> : null}
-      <input type="hidden" name="templateKey" value={selectedTemplate?.key ?? ""} />
-      <input type="hidden" name="suggestedPhasesJson" value={serializedPhaseDrafts} />
+      <input type="hidden" value={selectedTemplate?.key ?? ""} {...register("templateKey")} />
+      <input type="hidden" value={serializedPhaseDrafts} {...register("suggestedPhasesJson")} />
+      <input type="hidden" value={parentProjectId ?? project?.parentProjectId ?? ""} {...register("parentProjectId")} />
 
       <section className="workbench-section">
         <div className="workbench-section__head">
@@ -150,15 +222,12 @@ export function ProjectCoreFormFields({
               value={selectedTemplateKey}
               onChange={(event) => {
                 const key = event.target.value;
-                setSelectedTemplateKey(key);
+                setValue("templateKey", key, { shouldDirty: true, shouldValidate: true });
                 const tpl = projectTemplates.find((t) => t.key === key);
                 if (tpl) {
-                  setDraft((current) => ({
-                    ...current,
-                    status: tpl.status,
-                    description: tpl.scopeSummary,
-                    notes: tpl.executionNotes
-                  }));
+                  setValue("status", tpl.status, { shouldDirty: true, shouldValidate: true });
+                  setValue("description", tpl.scopeSummary, { shouldDirty: true, shouldValidate: true });
+                  setValue("notes", tpl.executionNotes, { shouldDirty: true, shouldValidate: true });
                   if (isCreateMode) {
                     setPhaseDrafts([...tpl.suggestedPhases]);
                   }
@@ -231,26 +300,27 @@ export function ProjectCoreFormFields({
         <div className="workbench-grid">
           <label className="field field--full">
             <span>Project Name</span>
-            <input id="project-name" name="name" value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="Kitchen refresh, roof replacement, spring maintenance" required />
+            <input id="project-name" placeholder="Kitchen refresh, roof replacement, spring maintenance" {...register("name")} />
+            <InlineError message={errors.name?.message} size="sm" />
           </label>
           <label className="field">
             <span>Status</span>
-            <select id="project-status" name="status" value={draft.status} onChange={(event) => updateDraft("status", event.target.value as ProjectStatus)}>
+            <select id="project-status" {...register("status")}>
               {projectStatusOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
+            <InlineError message={errors.status?.message} size="sm" />
           </label>
           <label className="field field--full">
             <span>Description</span>
             <textarea
               id="project-description"
-              name="description"
               rows={3}
-              value={draft.description}
-              onChange={(event) => updateDraft("description", event.target.value)}
               placeholder="Scope, intent, or expected outcome"
+              {...register("description")}
             />
+            <InlineError message={errors.description?.message} size="sm" />
           </label>
         </div>
       </section>
@@ -262,15 +332,18 @@ export function ProjectCoreFormFields({
         <div className="workbench-grid">
           <label className="field">
             <span>Budget</span>
-            <input id="project-budget" name="budgetAmount" type="number" min="0" step="0.01" value={draft.budgetAmount} onChange={(event) => updateDraft("budgetAmount", event.target.value)} placeholder="0.00" />
+            <input id="project-budget" type="number" step="0.01" placeholder="0.00" {...register("budgetAmount")} />
+            <InlineError message={errors.budgetAmount?.message} size="sm" />
           </label>
           <label className="field">
             <span>Start Date</span>
-            <input id="project-start-date" name="startDate" type="date" value={draft.startDate} onChange={(event) => updateDraft("startDate", event.target.value)} />
+            <input id="project-start-date" type="date" {...register("startDate")} />
+            <InlineError message={errors.startDate?.message} size="sm" />
           </label>
           <label className="field">
             <span>Target End Date</span>
-            <input id="project-target-end-date" name="targetEndDate" type="date" value={draft.targetEndDate} onChange={(event) => updateDraft("targetEndDate", event.target.value)} />
+            <input id="project-target-end-date" type="date" {...register("targetEndDate")} />
+            <InlineError message={errors.targetEndDate?.message} size="sm" />
           </label>
         </div>
       </section>
@@ -284,15 +357,21 @@ export function ProjectCoreFormFields({
             <span>Notes</span>
             <textarea
               id="project-notes"
-              name="notes"
               rows={4}
-              value={draft.notes}
-              onChange={(event) => updateDraft("notes", event.target.value)}
               placeholder="Dependencies, purchase plans, constraints, vendor notes"
+              {...register("notes")}
             />
+            <InlineError message={errors.notes?.message} size="sm" />
           </label>
         </div>
       </section>
-    </>
+
+      <div className="workbench-bar">
+        {cancelHref ? <Link href={cancelHref} className="button button--ghost">Cancel</Link> : null}
+        <button type="submit" className="button button--primary" disabled={isSubmitting || !name.trim()}>
+          {isSubmitting ? "Saving…" : submitLabel}
+        </button>
+      </div>
+    </form>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { getTranslations } from "next-intl/server";
 import { ApiError, getHouseholdAssets, getMe } from "../../../lib/api";
 import {
   formatCategoryLabel,
@@ -12,6 +13,8 @@ type AssetsPageProps = {
 };
 
 export default async function AssetsPage({ searchParams }: AssetsPageProps): Promise<JSX.Element> {
+  const t = await getTranslations("assets");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
 
@@ -22,9 +25,9 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Assets</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -38,21 +41,21 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
     return (
       <>
         <header className="page-header">
-          <h1>Assets</h1>
+          <h1>{t("pageTitle")}</h1>
           <div className="page-header__actions">
-            <Link href="/assets/new" className="button button--primary">+ Add Asset</Link>
+            <Link href="/assets/new" className="button button--primary">{tCommon("actions.addAsset")}</Link>
           </div>
         </header>
 
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
-              <h2>All Tracked Assets ({sortedAssets.length})</h2>
+              <h2>{t("listTitle", { count: sortedAssets.length })}</h2>
             </div>
             <div className="panel__body">
               {sortedAssets.length === 0 ? (
                 <p className="panel__empty">
-                  No assets yet. <Link href="/assets/new" className="text-link">Create your first asset</Link> to start tracking maintenance.
+                  {t("empty")} <Link href="/assets/new" className="text-link">{t("emptyLink")}</Link> {t("emptySuffix")}
                 </p>
               ) : (
                 <table className="data-table">
@@ -78,12 +81,12 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
                         </td>
                         <td><span className="pill">{formatCategoryLabel(item.category)}</span></td>
                         <td><span className="pill">{formatVisibilityLabel(item.visibility)}</span></td>
-                        <td>{item.isArchived ? "Archived" : "Active"}</td>
+                        <td>{item.isArchived ? tCommon("status.archived") : tCommon("status.active")}</td>
                         <td>{item.manufacturer ?? "—"}</td>
                         <td>{item.model ?? "—"}</td>
                         <td>{formatDate(item.createdAt)}</td>
                         <td>
-                          <Link href={`/assets/${item.id}`} className="data-table__link">Open</Link>
+                          <Link href={`/assets/${item.id}`} className="data-table__link">{tCommon("actions.open")}</Link>
                         </td>
                       </tr>
                     ))}
@@ -99,7 +102,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
     if (error instanceof ApiError) {
       return (
         <>
-          <header className="page-header"><h1>Assets</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
             <div className="panel">
               <div className="panel__body--padded">

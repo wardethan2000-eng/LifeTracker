@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getScheduleInventoryItems } from "../lib/api";
 
 type ScheduleCardActionsProps = {
+  householdId: string;
   assetId: string;
   scheduleId: string;
   scheduleName: string;
@@ -16,6 +17,7 @@ type ScheduleCardActionsProps = {
 };
 
 export function ScheduleCardActions({
+  householdId,
   assetId,
   scheduleId,
   scheduleName,
@@ -101,6 +103,7 @@ export function ScheduleCardActions({
 
       {showForm && (
         <form action={completeAction} className="form-grid schedule-card__complete-form">
+          <input type="hidden" name="householdId" value={householdId} />
           <input type="hidden" name="assetId" value={assetId} />
           <input type="hidden" name="scheduleId" value={scheduleId} />
           <input type="hidden" name="applyLinkedParts" value={applyLinkedParts ? "true" : "false"} />

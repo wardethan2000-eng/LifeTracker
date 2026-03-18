@@ -125,6 +125,7 @@ export function AssetMaintenanceSections({
                           scheduleId={schedule.id}
                         />
                         <ScheduleCardActions
+                          householdId={detail.asset.householdId}
                           assetId={detail.asset.id}
                           scheduleId={schedule.id}
                           scheduleName={schedule.name}
@@ -186,6 +187,7 @@ export function AssetMaintenanceSections({
 
       <Card title="Log Maintenance">
         <LogMaintenanceForm
+          householdId={detail.asset.householdId}
           assetId={detail.asset.id}
           schedules={detail.schedules.map((schedule) => ({ id: schedule.id, name: schedule.name }))}
           createLogAction={createLogAction}

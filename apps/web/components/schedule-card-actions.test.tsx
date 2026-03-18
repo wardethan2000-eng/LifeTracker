@@ -50,6 +50,7 @@ describe("ScheduleCardActions", () => {
 
     const { container } = render(
       <ScheduleCardActions
+        householdId="household-1"
         assetId="asset-1"
         scheduleId="schedule-1"
         scheduleName="Oil change"
@@ -84,6 +85,7 @@ describe("ScheduleCardActions", () => {
 
     const { container } = render(
       <ScheduleCardActions
+        householdId="household-1"
         assetId="asset-1"
         scheduleId="schedule-1"
         scheduleName="Oil change"
@@ -114,6 +116,7 @@ describe("ScheduleCardActions", () => {
 
     render(
       <ScheduleCardActions
+        householdId="household-1"
         assetId="asset-1"
         scheduleId="schedule-1"
         scheduleName="Oil change"

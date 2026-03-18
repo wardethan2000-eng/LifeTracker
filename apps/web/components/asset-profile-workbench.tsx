@@ -12,13 +12,21 @@ import type {
   PresetScheduleTemplate,
   PresetUsageMetricTemplate
 } from "@lifekeeper/types";
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { useForm } from "react-hook-form";
+import {
+  assetProfileFormSchema,
+  type AssetProfileFormValues,
+  type AssetProfileResolvedValues
+} from "../lib/validation/forms";
 import { AssetProfileWorkbenchAside } from "./asset-profile-workbench-aside";
 import { AssetProfileWorkbenchCoreIdentitySection } from "./asset-profile-workbench-core-identity-section";
 import { AssetProfileWorkbenchCustomFieldsSection } from "./asset-profile-workbench-custom-fields-section";
 import { AssetProfileWorkbenchMaintenanceSchedulesSection } from "./asset-profile-workbench-maintenance-schedules-section";
 import { AssetProfileWorkbenchUsageMetricsSection } from "./asset-profile-workbench-usage-metrics-section";
+import { InlineError } from "./inline-error";
 
 type AssetProfileWorkbenchProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -1047,6 +1055,7 @@ export function AssetProfileWorkbench({
   const [newSectionName, setNewSectionName] = useState("");
   const [manualSections, setManualSections] = useState<string[]>([]);
   const [expandedFieldEditors, setExpandedFieldEditors] = useState<number[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const selectedBlueprint = blueprintOptions.find((preset) => preset.id === selectedBlueprintId);
   const categoryLibraryBlueprints = libraryBlueprints.filter((preset) => preset.category === category);
@@ -1400,8 +1409,111 @@ export function AssetProfileWorkbench({
       ? "Choose the aircraft family that matches the asset so the details, metrics, and maintenance profile fit the mission and systems on board."
       : "Templates can pre-fill recommended details for common asset types.");
 
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    setError,
+    formState: { errors, isSubmitting }
+  } = useForm<AssetProfileFormValues, unknown, AssetProfileResolvedValues>({
+    resolver: zodResolver(assetProfileFormSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
+    defaultValues: {
+      householdId,
+      name: initialAsset?.name ?? "",
+      category: initialAsset?.category ?? initialBlueprint?.category ?? "vehicle",
+      visibility: initialAsset?.visibility ?? "shared",
+      description: initialAsset?.description ?? "",
+      manufacturer: initialAsset?.manufacturer ?? "",
+      model: initialAsset?.model ?? "",
+      serialNumber: initialAsset?.serialNumber ?? "",
+      purchaseDate: initialAsset?.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : "",
+      parentAssetId: initialAsset?.parentAssetId ?? "",
+      conditionScore: initialAsset?.conditionScore ?? undefined,
+      saveAsPreset: false,
+      presetLabel: initialAsset?.assetTypeLabel ?? initialBlueprint?.label ?? "",
+      presetDescription: initialAsset?.assetTypeDescription ?? initialBlueprint?.description ?? "",
+      presetTags: "",
+      fieldDefinitionsJson: fieldDefinitionJson,
+      fieldValuesJson,
+      metricDraftsJson,
+      scheduleDraftsJson
+    }
+  });
+
+  useEffect(() => {
+    setValue("householdId", householdId, { shouldValidate: false });
+    setValue("category", category, { shouldValidate: false });
+    setValue("saveAsPreset", saveAsPreset, { shouldValidate: false });
+    setValue("presetLabel", assetTypeLabel, { shouldValidate: false });
+    setValue("presetDescription", assetTypeDescription, { shouldValidate: false });
+    setValue("fieldDefinitionsJson", fieldDefinitionJson, { shouldValidate: false });
+    setValue("fieldValuesJson", fieldValuesJson, { shouldValidate: false });
+    setValue("metricDraftsJson", metricDraftsJson, { shouldValidate: false });
+    setValue("scheduleDraftsJson", scheduleDraftsJson, { shouldValidate: false });
+  }, [
+    assetTypeDescription,
+    assetTypeLabel,
+    category,
+    fieldDefinitionJson,
+    fieldValuesJson,
+    householdId,
+    metricDraftsJson,
+    saveAsPreset,
+    scheduleDraftsJson,
+    setValue
+  ]);
+
+  const submitForm = handleSubmit(async (values, event) => {
+    const validated = assetProfileFormSchema.safeParse({
+      ...values,
+      householdId,
+      category,
+      saveAsPreset,
+      presetLabel: values.presetLabel ?? assetTypeLabel,
+      presetDescription: values.presetDescription ?? assetTypeDescription,
+      fieldDefinitionsJson: fieldDefinitionJson,
+      fieldValuesJson,
+      metricDraftsJson,
+      scheduleDraftsJson
+    });
+
+    if (!validated.success) {
+      setSubmitError("Fix the highlighted asset fields before saving.");
+
+      for (const issue of validated.error.issues) {
+        const path = issue.path[0];
+
+        if (typeof path === "string") {
+          setError(path as keyof AssetProfileResolvedValues, { message: issue.message });
+        }
+      }
+
+      return;
+    }
+
+    setSubmitError(null);
+    const form = event?.currentTarget as HTMLFormElement | undefined;
+
+    if (!form) {
+      return;
+    }
+
+    const formData = new FormData(form);
+    formData.set("householdId", householdId);
+    formData.set("category", category);
+    formData.set("saveAsPreset", saveAsPreset ? "true" : "false");
+    formData.set("fieldDefinitionsJson", fieldDefinitionJson);
+    formData.set("fieldValuesJson", fieldValuesJson);
+    formData.set("metricDraftsJson", metricDraftsJson);
+    formData.set("scheduleDraftsJson", scheduleDraftsJson);
+
+    await action(formData);
+  });
+
   return (
-    <form action={action} className="workbench-form">
+    <form className="workbench-form" noValidate onSubmit={submitForm}>
       {initialAsset ? <input type="hidden" name="assetId" value={initialAsset.id} /> : null}
       <input type="hidden" name="householdId" value={householdId} />
       <input type="hidden" name="fieldDefinitionsJson" value={fieldDefinitionJson} />
@@ -1439,6 +1551,8 @@ export function AssetProfileWorkbench({
             categoryLibraryBlueprints={categoryLibraryBlueprints}
             categoryCustomBlueprints={categoryCustomBlueprints}
             availableParentAssets={availableParentAssets}
+            register={register}
+            errors={errors}
             onCategoryChange={handleCategoryChange}
             onBlueprintChange={handleBlueprintChange}
           />
@@ -1512,7 +1626,8 @@ export function AssetProfileWorkbench({
           />
 
           <div className="workbench-bar">
-            <button type="submit" className="button button--primary">{submitLabel}</button>
+            <InlineError message={submitError} size="sm" />
+            <button type="submit" className="button button--primary" disabled={isSubmitting}>{submitLabel}</button>
           </div>
         </div>
 
@@ -1522,6 +1637,8 @@ export function AssetProfileWorkbench({
           assetTypeLabel={assetTypeLabel}
           assetTypeDescription={assetTypeDescription}
           assetTypeKey={assetTypeKey}
+          register={register}
+          errors={errors}
           onSaveAsPresetChange={setSaveAsPreset}
         />
       </div>

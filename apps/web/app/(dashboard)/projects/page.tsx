@@ -2,6 +2,7 @@ import type { ProjectStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { ProjectPortfolioAside } from "../../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../../components/project-portfolio-stats";
 import { ProjectPortfolioTable } from "../../../components/project-portfolio-table";
@@ -142,6 +143,8 @@ const ProjectAsideSkeleton = (): JSX.Element => (
 );
 
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps): Promise<JSX.Element> {
+  const t = await getTranslations("projects");
+  const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const householdId = getParam(params.householdId);
   const statusParam = getParam(params.status);
@@ -158,9 +161,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Projects</h1></header>
+          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
           </div>
         </>
       );
@@ -198,8 +201,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       <>
         <header className="page-header">
           <div>
-            <h1>Projects</h1>
-            <p>Portfolio view for schedule risk, funding pressure, and material readiness across the household.</p>
+            <h1>{t("pageTitle")}</h1>
+            <p>{t("pageSubtitle")}</p>
           </div>
           <div className="page-header__actions">
             {me.households.length > 1 && (
@@ -220,14 +223,14 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                 ))}
               </div>
             )}
-            <Link href={`/projects/new?householdId=${household.id}`} className="button">New Project</Link>
+            <Link href={`/projects/new?householdId=${household.id}`} className="button">{tCommon("actions.newProject")}</Link>
           </div>
         </header>
 
         <div className="page-body">
           <section className="panel project-filter-panel">
             <div className="panel__header">
-              <h2>Portfolio Controls</h2>
+              <h2>{t("portfolioControls")}</h2>
             </div>
             <div className="panel__body--padded project-filter-bar">
               <form method="GET" className="project-filter-form inline-filter-form">
@@ -239,7 +242,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                       type="search"
                       name="q"
                       defaultValue={rawSearchQuery}
-                      placeholder="Search projects..."
+                      placeholder={t("searchPlaceholder")}
                       className="input--ghost"
                     />
                   </div>
@@ -254,10 +257,10 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                       <option key={sort} value={sort}>{projectSortLabels[sort]}</option>
                     ))}
                   </select>
-                  <button type="submit" className="button button--primary button--sm">Filter</button>
+                  <button type="submit" className="button button--primary button--sm">{tCommon("actions.filter")}</button>
                   { (rawSearchQuery || selectedStatus || selectedSort !== "risk") && (
                     <Link href={buildProjectsHref({ householdId: household.id })} className="text-link text-link--muted" style={{ fontSize: '0.875rem' }}>
-                      Clear
+                      {t("clear")}
                     </Link>
                   )}
                 </div>
