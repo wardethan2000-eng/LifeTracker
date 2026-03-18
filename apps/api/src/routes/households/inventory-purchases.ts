@@ -13,6 +13,7 @@ import {
   getHouseholdInventoryItem,
   isInventoryLowStock
 } from "../../lib/inventory.js";
+import { syncProjectDerivedStatuses } from "../../lib/project-status.js";
 import {
   toInventoryPurchaseResponse,
   toInventoryShoppingListResponse
@@ -255,7 +256,24 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
       },
       include: {
         inventoryItem: true,
-        purchase: true
+        purchase: true,
+        projectPhaseSupply: {
+          select: {
+            id: true,
+            name: true,
+            quantityNeeded: true,
+            quantityOnHand: true,
+            isProcured: true,
+            procuredAt: true,
+            actualUnitCost: true,
+            phase: {
+              select: {
+                name: true,
+                projectId: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -269,7 +287,7 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
       return reply.code(400).send({ message: "This purchase line has already been received." });
     }
 
-    const updatedPurchase = await app.prisma.$transaction(async (tx) => {
+    const { purchase: updatedPurchase, linkedSupplyResult } = await app.prisma.$transaction(async (tx) => {
       const lineData: Prisma.InventoryPurchaseLineUncheckedUpdateInput = {
         ...(input.plannedQuantity !== undefined ? { plannedQuantity: input.plannedQuantity } : {}),
         ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {}),
@@ -316,7 +334,51 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
           }
         });
 
-        return syncPurchaseStatus(tx, existing.purchaseId);
+        let linkedSupplyResult: {
+          id: string;
+          name: string;
+          phaseName: string;
+          projectId: string;
+          becameProcured: boolean;
+        } | null = null;
+
+        if (existing.projectPhaseSupply) {
+          const resolvedUnitCost = input.unitCost !== undefined
+            ? input.unitCost ?? null
+            : (existing.unitCost ?? existing.projectPhaseSupply.actualUnitCost ?? existing.inventoryItem.unitCost ?? null);
+          const shouldMarkProcured = existing.projectPhaseSupply.isProcured
+            || (existing.projectPhaseSupply.quantityOnHand + receivedQuantity >= existing.projectPhaseSupply.quantityNeeded);
+          const updatedSupply = await tx.projectPhaseSupply.update({
+            where: { id: existing.projectPhaseSupply.id },
+            data: {
+              actualUnitCost: resolvedUnitCost,
+              isProcured: shouldMarkProcured,
+              procuredAt: shouldMarkProcured
+                ? (existing.projectPhaseSupply.procuredAt ?? new Date())
+                : null
+            },
+            select: {
+              id: true,
+              name: true,
+              isProcured: true
+            }
+          });
+
+          await syncProjectDerivedStatuses(tx, existing.projectPhaseSupply.phase.projectId);
+
+          linkedSupplyResult = {
+            id: updatedSupply.id,
+            name: updatedSupply.name,
+            phaseName: existing.projectPhaseSupply.phase.name,
+            projectId: existing.projectPhaseSupply.phase.projectId,
+            becameProcured: !existing.projectPhaseSupply.isProcured && updatedSupply.isProcured
+          };
+        }
+
+        return {
+          purchase: await syncPurchaseStatus(tx, existing.purchaseId),
+          linkedSupplyResult
+        };
       }
 
       if (nextStatus === "draft") {
@@ -332,7 +394,10 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
         data: lineData
       });
 
-      return syncPurchaseStatus(tx, existing.purchaseId);
+      return {
+        purchase: await syncPurchaseStatus(tx, existing.purchaseId),
+        linkedSupplyResult: null
+      };
     });
 
     if (nextStatus === "ordered") {
@@ -361,6 +426,21 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
           itemName: existing.inventoryItem.name
         }
       });
+
+      if (linkedSupplyResult?.becameProcured) {
+        await logActivity(app.prisma, {
+          householdId: params.householdId,
+          userId: request.auth.userId,
+          action: "project.supply.procured",
+          entityType: "project_phase_supply",
+          entityId: linkedSupplyResult.id,
+          metadata: {
+            supplyName: linkedSupplyResult.name,
+            phaseName: linkedSupplyResult.phaseName,
+            source: "inventory_purchase"
+          }
+        });
+      }
     }
 
     return reply.send(toInventoryPurchaseResponse(updatedPurchase));

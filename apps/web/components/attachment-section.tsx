@@ -46,7 +46,7 @@ export function AttachmentSection({
 
   return (
     <div className="attachment-section">
-      <h4 style={{ margin: "0 0 8px 0", fontSize: "0.9rem", fontWeight: 600 }}>{label}</h4>
+      {label ? <h4 style={{ margin: "0 0 8px 0", fontSize: "0.9rem", fontWeight: 600 }}>{label}</h4> : null}
 
       <AttachmentGallery
         householdId={householdId}

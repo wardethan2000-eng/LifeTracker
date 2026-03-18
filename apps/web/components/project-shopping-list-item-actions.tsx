@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { ProjectShoppingListItem } from "@lifekeeper/types";
 import {
   allocateSupplyFromInventoryAction,
+  createProjectPurchaseRequestsAction,
   updateProjectPhaseSupplyAction
 } from "../app/actions";
 import { ExpandableCard } from "./expandable-card";
@@ -54,10 +55,32 @@ export function ProjectShoppingListItemActions({ householdId, item }: ProjectSho
             </button>
           </form>
         ) : null}
+        {item.activePurchaseRequest ? (
+          <span className={`status-chip status-chip--${item.activePurchaseRequest.purchaseStatus === "ordered" ? "due" : "warning"}`}>
+            {item.activePurchaseRequest.purchaseStatus}
+          </span>
+        ) : (
+          <form action={createProjectPurchaseRequestsAction}>
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={item.projectId} />
+            <input type="hidden" name="supplyId" value={item.id} />
+            <button type="submit" className="button button--ghost button--sm">
+              Request Purchase
+            </button>
+          </form>
+        )}
         <button type="button" className="button button--ghost button--sm" onClick={() => setIsProcurementOpen((current) => !current)}>
-          {isProcurementOpen ? "Close Procurement" : "Procure"}
+          {isProcurementOpen ? "Close Receipt" : "Manual Receipt"}
         </button>
       </div>
+
+      {item.activePurchaseRequest ? (
+        <div className="data-table__secondary" style={{ marginTop: 8, textAlign: "right" }}>
+          Purchase line {item.activePurchaseRequest.lineStatus}
+          {item.activePurchaseRequest.orderedQuantity != null ? ` • ordered ${item.activePurchaseRequest.orderedQuantity} ${item.unit}` : ""}
+          {item.activePurchaseRequest.receivedQuantity != null ? ` • received ${item.activePurchaseRequest.receivedQuantity} ${item.unit}` : ""}
+        </div>
+      ) : null}
 
       {isProcurementOpen ? (
         <div style={{ marginTop: 12, minWidth: 340 }}>
@@ -71,11 +94,12 @@ export function ProjectShoppingListItemActions({ householdId, item }: ProjectSho
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                   <span className="compact-preview__pill">{item.quantityRemaining} {item.unit} remaining</span>
                   <span className="compact-preview__pill">{item.quantityOnHand}/{item.quantityNeeded} on hand</span>
+                  {item.activePurchaseRequest ? <span className="compact-preview__pill">Requested in {item.activePurchaseRequest.purchaseStatus} batch</span> : null}
                   {item.estimatedLineCost != null ? (
                     <span className="compact-preview__pill">~${item.estimatedLineCost.toFixed(2)} estimated</span>
                   ) : null}
                 </div>
-                <p className="compact-preview__overflow">Record partial receipts, actual pricing, and procurement notes inline.</p>
+                <p className="compact-preview__overflow">Use this when something was bought outside the purchase workflow or you need to backfill a receipt.</p>
               </div>
             )}
           >

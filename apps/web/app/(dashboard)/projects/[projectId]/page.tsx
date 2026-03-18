@@ -593,6 +593,15 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 <ProjectLinkedInventoryCard householdId={household.id} projectId={project.id} />
               </Suspense>
 
+              <Card title="Project Files">
+                <AttachmentSection
+                  householdId={household.id}
+                  entityType="project"
+                  entityId={project.id}
+                  label=""
+                />
+              </Card>
+
               {project.hobbyLinks.length > 0 ? (
                 <Card title="Linked Hobbies">
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>

@@ -90,6 +90,33 @@ const getNextSortOrder = async (
   return (result._max.sortOrder ?? -1) + 1;
 };
 
+const activePurchaseRequestInclude = {
+  where: {
+    purchase: {
+      status: {
+        in: ["draft", "ordered"]
+      }
+    }
+  },
+  select: {
+    id: true,
+    status: true,
+    plannedQuantity: true,
+    orderedQuantity: true,
+    receivedQuantity: true,
+    purchase: {
+      select: {
+        id: true,
+        status: true,
+        supplierName: true,
+        supplierUrl: true
+      }
+    }
+  },
+  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  take: 1
+} satisfies Prisma.InventoryPurchaseLineFindManyArgs;
+
 const projectPhaseDetailInclude = {
   tasks: {
     include: {
@@ -105,7 +132,8 @@ const projectPhaseDetailInclude = {
     include: {
       inventoryItem: {
         select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-      }
+      },
+      purchaseLines: activePurchaseRequestInclude
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
   },
@@ -248,14 +276,6 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
 
     if (!phase) {
       return reply.code(404).send({ message: "Project phase not found." });
-    }
-
-    if (input.status === "completed") {
-      const summary = await getPhaseCompletionSummary(app.prisma, phase.id);
-
-      if (summary && !summary.canComplete) {
-        return reply.code(400).send({ message: buildPhaseCompletionGuardrailMessage(summary) });
-      }
     }
 
     return toProjectPhaseDetailResponse(phase);
@@ -794,7 +814,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       include: {
         inventoryItem: {
           select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-        }
+        },
+        purchaseLines: activePurchaseRequestInclude
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
@@ -858,7 +879,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         include: {
           inventoryItem: {
             select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-          }
+          },
+          purchaseLines: activePurchaseRequestInclude
         }
       });
     });
@@ -918,7 +940,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       include: {
         inventoryItem: {
           select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-        }
+        },
+        purchaseLines: activePurchaseRequestInclude
       }
     });
 
@@ -931,6 +954,14 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       if (!inventoryItem) {
         return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
       }
+    }
+
+    if (
+      input.inventoryItemId !== undefined
+      && input.inventoryItemId !== supply.inventoryItemId
+      && supply.purchaseLines.length > 0
+    ) {
+      return reply.code(409).send({ message: "Cannot change the linked inventory item while this supply has an active purchase request." });
     }
 
     const data: Prisma.ProjectPhaseSupplyUncheckedUpdateInput = {};
@@ -987,7 +1018,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         include: {
           inventoryItem: {
             select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-          }
+          },
+          purchaseLines: activePurchaseRequestInclude
         }
       });
     });
@@ -1030,11 +1062,18 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       where: {
         id: params.supplyId,
         phase: { id: params.phaseId, projectId: params.projectId, project: { deletedAt: null } }
+      },
+      include: {
+        purchaseLines: activePurchaseRequestInclude
       }
     });
 
     if (!supply) {
       return reply.code(404).send({ message: "Phase supply not found." });
+    }
+
+    if (supply.purchaseLines.length > 0) {
+      return reply.code(409).send({ message: "Cannot delete a supply while it has an active purchase request." });
     }
 
     await app.prisma.$transaction(async (tx) => {
@@ -1103,7 +1142,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
           include: {
             inventoryItem: {
               select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
-            }
+            },
+            purchaseLines: activePurchaseRequestInclude
           }
         });
 

@@ -548,7 +548,33 @@ export const toProjectPhaseSupplyResponse = (supply: {
     unit: string;
     unitCost: number | null;
   } | null;
+  purchaseLines?: Array<{
+    id: string;
+    status: string;
+    plannedQuantity: number;
+    orderedQuantity: number | null;
+    receivedQuantity: number | null;
+    purchase: {
+      id: string;
+      status: string;
+      supplierName: string | null;
+      supplierUrl: string | null;
+    };
+  }>;
 }) => projectPhaseSupplySchema.parse({
+  activePurchaseRequest: supply.purchaseLines?.[0]
+    ? {
+        purchaseId: supply.purchaseLines[0].purchase.id,
+        purchaseLineId: supply.purchaseLines[0].id,
+        purchaseStatus: supply.purchaseLines[0].purchase.status,
+        lineStatus: supply.purchaseLines[0].status,
+        plannedQuantity: supply.purchaseLines[0].plannedQuantity,
+        orderedQuantity: supply.purchaseLines[0].orderedQuantity,
+        receivedQuantity: supply.purchaseLines[0].receivedQuantity,
+        supplierName: supply.purchaseLines[0].purchase.supplierName,
+        supplierUrl: supply.purchaseLines[0].purchase.supplierUrl
+      }
+    : null,
   id: supply.id,
   phaseId: supply.phaseId,
   name: supply.name,

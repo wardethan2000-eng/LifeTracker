@@ -43,6 +43,13 @@ const validateEntityOwnership = async (
       });
       return asset !== null;
     }
+    case "project": {
+      const project = await prisma.project.findFirst({
+        where: { id: entityId, householdId, deletedAt: null },
+        select: { id: true },
+      });
+      return project !== null;
+    }
     case "maintenance_log": {
       const log = await prisma.maintenanceLog.findFirst({
         where: { id: entityId, asset: { householdId } },

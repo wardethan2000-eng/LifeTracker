@@ -90,6 +90,7 @@ type InventoryPurchaseLineRecord = Pick<
   | "id"
   | "purchaseId"
   | "inventoryItemId"
+  | "projectPhaseSupplyId"
   | "status"
   | "plannedQuantity"
   | "orderedQuantity"
@@ -223,6 +224,7 @@ export const toInventoryPurchaseLineResponse = (line: InventoryPurchaseLineRecor
   id: line.id,
   purchaseId: line.purchaseId,
   inventoryItemId: line.inventoryItemId,
+  projectPhaseSupplyId: line.projectPhaseSupplyId ?? null,
   status: line.status,
   plannedQuantity: line.plannedQuantity,
   orderedQuantity: line.orderedQuantity ?? null,

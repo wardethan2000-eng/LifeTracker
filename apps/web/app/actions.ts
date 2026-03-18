@@ -25,6 +25,7 @@ import type {
   CreateProjectPhaseChecklistItemInput,
   CreateProjectPhaseInput,
   CreateProjectPhaseSupplyInput,
+  CreateProjectPurchaseRequestInput,
   CreateProjectTemplateInput,
   CreateProjectInventoryItemInput,
   CreateProjectInput,
@@ -99,6 +100,7 @@ import {
   createProjectPhase,
   createPhaseChecklistItem,
   createProjectPhaseSupply,
+  createProjectPurchaseRequests,
   createProjectTemplate,
   createProjectTask,
   createQuickTodo,
@@ -2674,6 +2676,27 @@ export async function allocateSupplyFromInventoryAction(formData: FormData): Pro
 
   await allocateSupplyFromInventory(householdId, projectId, phaseId, supplyId, input);
   revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createProjectPurchaseRequestsAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const supplyIdsPayload = getOptionalString(formData, "supplyIdsJson");
+  const input: CreateProjectPurchaseRequestInput = {};
+
+  if (supplyIdsPayload) {
+    const parsed = JSON.parse(supplyIdsPayload) as unknown;
+
+    if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
+      throw new Error("supplyIdsJson must be a JSON array of supply IDs.");
+    }
+
+    input.supplyIds = parsed;
+  }
+
+  await createProjectPurchaseRequests(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+  revalidateInventoryPaths(householdId);
 }
 
 export async function createProjectInventoryItemAction(formData: FormData): Promise<void> {

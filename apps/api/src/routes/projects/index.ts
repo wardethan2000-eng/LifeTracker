@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   cloneProjectSchema,
   createOffsetPaginationQuerySchema,
+  createProjectPurchaseRequestSchema,
   createProjectSchema,
   createProjectTemplateSchema,
   projectStatusCountListSchema,
@@ -42,6 +43,7 @@ import {
   toMaintenanceLogResponse
 } from "../../lib/maintenance-logs.js";
 import {
+  toInventoryPurchaseResponse,
   toProjectAssetResponse,
   toProjectBudgetCategoryResponse,
   toProjectExpenseResponse,
@@ -280,6 +282,90 @@ const buildProjectInventoryRollups = (
   }
 
   return rollups;
+};
+
+const activeProjectPurchaseStatuses = ["draft", "ordered"] as const;
+
+const activeProjectSupplyPurchaseInclude = {
+  where: {
+    purchase: {
+      status: {
+        in: [...activeProjectPurchaseStatuses]
+      }
+    }
+  },
+  select: {
+    id: true,
+    status: true,
+    plannedQuantity: true,
+    orderedQuantity: true,
+    receivedQuantity: true,
+    purchaseId: true,
+    purchase: {
+      select: {
+        id: true,
+        status: true,
+        supplierName: true,
+        supplierUrl: true
+      }
+    }
+  },
+  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  take: 1
+} satisfies Prisma.InventoryPurchaseLineFindManyArgs;
+
+const getProjectSupplyPurchaseRequest = (supply: {
+  purchaseLines?: Array<{
+    id: string;
+    status: string;
+    plannedQuantity: number;
+    orderedQuantity: number | null;
+    receivedQuantity: number | null;
+    purchaseId: string;
+    purchase: {
+      id: string;
+      status: string;
+      supplierName: string | null;
+      supplierUrl: string | null;
+    };
+  }>;
+}) => {
+  const purchaseLine = supply.purchaseLines?.[0];
+
+  if (!purchaseLine) {
+    return null;
+  }
+
+  return {
+    purchaseId: purchaseLine.purchase.id,
+    purchaseLineId: purchaseLine.id,
+    purchaseStatus: purchaseLine.purchase.status,
+    lineStatus: purchaseLine.status,
+    plannedQuantity: purchaseLine.plannedQuantity,
+    orderedQuantity: purchaseLine.orderedQuantity,
+    receivedQuantity: purchaseLine.receivedQuantity,
+    supplierName: purchaseLine.purchase.supplierName,
+    supplierUrl: purchaseLine.purchase.supplierUrl
+  };
+};
+
+const getInventoryPurchaseSupplierKey = (supplierName: string | null, supplierUrl: string | null): string => (
+  `${supplierName?.trim().toLowerCase() ?? ""}::${supplierUrl?.trim().toLowerCase() ?? ""}`
+);
+
+const getProjectTreeIds = async (prisma: PrismaClient, projectId: string): Promise<string[]> => {
+  const treeRows = await prisma.$queryRaw<{ id: string }[]>`
+    WITH RECURSIVE project_tree AS (
+      SELECT id FROM "Project" WHERE id = ${projectId} AND "deletedAt" IS NULL
+      UNION ALL
+      SELECT p.id FROM "Project" p
+      JOIN project_tree pt ON p."parentProjectId" = pt.id
+      WHERE p."deletedAt" IS NULL
+    )
+    SELECT id FROM project_tree
+  `;
+
+  return treeRows.map((row) => row.id);
 };
 
 const buildProjectBreadcrumbs = async (
@@ -2119,18 +2205,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    // Collect all project IDs in the tree rooted at this project
-    const treeRows = await app.prisma.$queryRaw<{ id: string }[]>`
-      WITH RECURSIVE project_tree AS (
-        SELECT id FROM "Project" WHERE id = ${params.projectId} AND "deletedAt" IS NULL
-        UNION ALL
-        SELECT p.id FROM "Project" p
-        JOIN project_tree pt ON p."parentProjectId" = pt.id
-        WHERE p."deletedAt" IS NULL
-      )
-      SELECT id FROM project_tree
-    `;
-    const treeProjectIds = treeRows.map((row) => row.id);
+    const treeProjectIds = await getProjectTreeIds(app.prisma, params.projectId);
 
     const supplies = await app.prisma.projectPhaseSupply.findMany({
       where: {
@@ -2156,7 +2231,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
             unit: true,
             unitCost: true
           }
-        }
+        },
+        purchaseLines: activeProjectSupplyPurchaseInclude
       },
       orderBy: [
         { supplier: { sort: "asc", nulls: "last" } },
@@ -2182,6 +2258,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         supplierUrl: supply.supplierUrl,
         inventoryItemId: supply.inventoryItemId,
         inventoryItem: supply.inventoryItem,
+        activePurchaseRequest: getProjectSupplyPurchaseRequest(supply),
         phaseName: supply.phase.name,
         phaseId: supply.phase.id,
         projectName: supply.phase.project.name,
@@ -2225,5 +2302,246 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       lineCount: items.length,
       groupedBySupplier
     });
+  });
+
+  app.post("/v1/households/:householdId/projects/:projectId/shopping-list/purchase-requests", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+    const input = createProjectPurchaseRequestSchema.parse(request.body ?? {});
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: activeProjectWhere(params.householdId, params.projectId),
+      select: { id: true, name: true }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    const treeProjectIds = await getProjectTreeIds(app.prisma, params.projectId);
+
+    const supplies = await app.prisma.projectPhaseSupply.findMany({
+      where: {
+        phase: {
+          projectId: { in: treeProjectIds }
+        },
+        ...(input.supplyIds ? { id: { in: input.supplyIds } } : {})
+      },
+      include: {
+        phase: {
+          select: {
+            name: true,
+            projectId: true,
+            project: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        inventoryItem: {
+          select: {
+            id: true,
+            name: true,
+            quantityOnHand: true,
+            unit: true,
+            unitCost: true,
+            preferredSupplier: true,
+            supplierUrl: true
+          }
+        },
+        purchaseLines: activeProjectSupplyPurchaseInclude
+      },
+      orderBy: [
+        { supplier: { sort: "asc", nulls: "last" } },
+        { name: "asc" }
+      ]
+    });
+
+    if (input.supplyIds && supplies.length !== input.supplyIds.length) {
+      return reply.code(400).send({ message: "One or more requested supplies were not found in this project tree." });
+    }
+
+    const eligibleSupplies = supplies.filter((supply) => !supply.isProcured && Math.max(0, supply.quantityNeeded - supply.quantityOnHand) > 0);
+
+    const summary = await app.prisma.$transaction(async (tx) => {
+      const existingPurchases = await tx.inventoryPurchase.findMany({
+        where: {
+          householdId: params.householdId,
+          status: {
+            in: [...activeProjectPurchaseStatuses]
+          }
+        },
+        include: {
+          lines: {
+            select: {
+              id: true,
+              inventoryItemId: true,
+              projectPhaseSupplyId: true
+            },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+          }
+        },
+        orderBy: [{ supplierName: "asc" }, { createdAt: "asc" }]
+      });
+
+      const openPurchaseBySupplier = new Map(existingPurchases.map((purchase) => [
+        getInventoryPurchaseSupplierKey(purchase.supplierName, purchase.supplierUrl),
+        purchase
+      ]));
+      const affectedPurchaseIds = new Set<string>();
+      let createdLineCount = 0;
+      let reusedLineCount = 0;
+      let skippedSupplyCount = 0;
+
+      for (const supply of eligibleSupplies) {
+        const existingRequest = supply.purchaseLines[0];
+
+        if (existingRequest) {
+          affectedPurchaseIds.add(existingRequest.purchaseId);
+          reusedLineCount += 1;
+          continue;
+        }
+
+        let inventoryItemId = supply.inventoryItemId;
+
+        if (!inventoryItemId) {
+          const createdInventoryItem = await tx.inventoryItem.create({
+            data: {
+              householdId: params.householdId,
+              itemType: "consumable",
+              name: supply.name,
+              description: supply.description ?? null,
+              quantityOnHand: 0,
+              unit: supply.unit,
+              preferredSupplier: supply.supplier?.trim() || null,
+              supplierUrl: supply.supplierUrl?.trim() || null,
+              unitCost: supply.estimatedUnitCost ?? null,
+              notes: `Auto-created from project supply ${supply.name} in ${supply.phase.project.name} / ${supply.phase.name}.`
+            }
+          });
+
+          inventoryItemId = createdInventoryItem.id;
+
+          await tx.projectPhaseSupply.update({
+            where: { id: supply.id },
+            data: { inventoryItemId }
+          });
+        }
+
+        if (!inventoryItemId) {
+          skippedSupplyCount += 1;
+          continue;
+        }
+
+        const supplierName = supply.supplier?.trim() || null;
+        const supplierUrl = supply.supplierUrl?.trim() || null;
+        const supplierKey = getInventoryPurchaseSupplierKey(supplierName, supplierUrl);
+        let purchase = openPurchaseBySupplier.get(supplierKey) ?? null;
+
+        if (!purchase) {
+          purchase = await tx.inventoryPurchase.create({
+            data: {
+              householdId: params.householdId,
+              createdById: request.auth.userId,
+              supplierName,
+              supplierUrl,
+              source: "manual",
+              status: "draft",
+              notes: `Generated from the ${project.name} project shopping list.`
+            },
+            include: {
+              lines: {
+                select: {
+                  id: true,
+                  inventoryItemId: true,
+                  projectPhaseSupplyId: true
+                },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+              }
+            }
+          });
+
+          openPurchaseBySupplier.set(supplierKey, purchase);
+        }
+
+        const quantityRemaining = Math.max(0, supply.quantityNeeded - supply.quantityOnHand);
+
+        const createdLine = await tx.inventoryPurchaseLine.create({
+          data: {
+            purchaseId: purchase.id,
+            inventoryItemId,
+            projectPhaseSupplyId: supply.id,
+            status: "draft",
+            plannedQuantity: quantityRemaining,
+            unitCost: supply.estimatedUnitCost ?? supply.inventoryItem?.unitCost ?? null,
+            notes: `${supply.phase.project.name} / ${supply.phase.name} / ${supply.name}`
+          }
+        });
+
+        purchase.lines.push({
+          id: createdLine.id,
+          inventoryItemId,
+          projectPhaseSupplyId: supply.id
+        });
+        affectedPurchaseIds.add(purchase.id);
+        createdLineCount += 1;
+      }
+
+      const purchases = affectedPurchaseIds.size === 0
+        ? []
+        : await tx.inventoryPurchase.findMany({
+            where: {
+              id: { in: Array.from(affectedPurchaseIds) }
+            },
+            include: {
+              lines: {
+                where: {
+                  inventoryItem: {
+                    deletedAt: null
+                  }
+                },
+                include: {
+                  inventoryItem: true
+                },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+              }
+            },
+            orderBy: [{ supplierName: "asc" }, { createdAt: "asc" }]
+          });
+
+      return {
+        purchaseCount: purchases.length,
+        createdLineCount,
+        reusedLineCount,
+        skippedSupplyCount,
+        purchases: purchases.map(toInventoryPurchaseResponse)
+      };
+    });
+
+    if (summary.createdLineCount > 0) {
+      await logActivity(app.prisma, {
+        householdId: params.householdId,
+        userId: request.auth.userId,
+        action: "project.supplies.purchase_requests_created",
+        entityType: "project",
+        entityId: project.id,
+        metadata: {
+          purchaseCount: summary.purchaseCount,
+          createdLineCount: summary.createdLineCount,
+          reusedLineCount: summary.reusedLineCount
+        }
+      });
+    }
+
+    refreshProjectArtifacts(params.householdId, params.projectId);
+
+    return reply.code(201).send(summary);
   });
 };
