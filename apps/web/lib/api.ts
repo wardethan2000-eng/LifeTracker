@@ -76,6 +76,7 @@ import {
   projectTemplateListSchema,
   projectTemplateSchema,
   projectShoppingListSchema,
+  projectPurchaseRequestResultSchema,
   projectSchema,
   cloneProjectSchema,
   reorderProjectPhasesSchema,
@@ -193,6 +194,8 @@ import {
   type ProjectPhaseSummary,
   type ProjectTemplate,
   type ProjectShoppingList,
+  type CreateProjectPurchaseRequestInput,
+  type ProjectPurchaseRequestResult,
   type ProjectChildSummary,
   type ProjectBreadcrumb,
   type ProjectTreeStats,
@@ -264,7 +267,14 @@ import {
   hobbySummarySchema,
   hobbyAssetSchema,
   hobbyInventoryItemSchema,
+  hobbyProjectLinkSchema,
   hobbyProjectSchema,
+  hobbyProjectDetailSchema,
+  hobbyProjectListResponseSchema,
+  hobbyProjectMilestoneSchema,
+  hobbyProjectInventoryLinkDetailSchema,
+  hobbyProjectWorkLogSchema,
+  hobbyProjectWorkLogListResponseSchema,
   hobbyInventoryCategorySchema,
   hobbyRecipeSchema,
   hobbyRecipeDetailSchema,
@@ -282,7 +292,14 @@ import {
   type HobbySummary,
   type HobbyAsset,
   type HobbyInventoryItem,
+  type HobbyProjectLink,
   type HobbyProject,
+  type HobbyProjectDetail,
+  type HobbyProjectListResponse,
+  type HobbyProjectMilestone,
+  type HobbyProjectInventoryLinkDetail,
+  type HobbyProjectWorkLog,
+  type HobbyProjectWorkLogListResponse,
   type HobbyInventoryCategory,
   type HobbyRecipe,
   type HobbyRecipeDetail,
@@ -317,7 +334,18 @@ import {
   type UpdateHobbyLogInput,
   type CreateHobbyAssetInput,
   type CreateHobbyInventoryItemInput,
+  type CreateHobbyProjectLinkInput,
   type CreateHobbyProjectInput,
+  type UpdateHobbyProjectInput,
+  type HobbyProjectListQuery,
+  type CreateHobbyProjectMilestoneInput,
+  type UpdateHobbyProjectMilestoneInput,
+  type ReorderHobbyProjectMilestonesInput,
+  type CreateHobbyProjectWorkLogInput,
+  type UpdateHobbyProjectWorkLogInput,
+  type HobbyProjectWorkLogListQuery,
+  type CreateHobbyProjectInventoryItemInput,
+  type UpdateHobbyProjectInventoryItemInput,
   type CreateHobbyInventoryCategoryInput,
   type HobbyStatus,
   type HobbyLogType,
@@ -1312,6 +1340,17 @@ export const getProjectShoppingList = async (
 ): Promise<ProjectShoppingList> => apiRequest({
   path: `/v1/households/${householdId}/projects/${projectId}/shopping-list`,
   schema: projectShoppingListSchema
+});
+
+export const createProjectPurchaseRequests = async (
+  householdId: string,
+  projectId: string,
+  input: CreateProjectPurchaseRequestInput
+): Promise<ProjectPurchaseRequestResult> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/shopping-list/purchase-requests`,
+  method: "POST",
+  body: input,
+  schema: projectPurchaseRequestResultSchema
 });
 
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => getHouseholdAssetsCached(householdId);
@@ -3582,32 +3621,252 @@ export const unlinkHobbyInventory = async (
   });
 };
 
-export const getHobbyProjects = async (
+export const getHobbyProjectLinks = async (
   householdId: string,
   hobbyId: string
-): Promise<HobbyProject[]> => apiRequest({
+): Promise<HobbyProjectLink[]> => apiRequest({
   path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/projects`,
-  schema: hobbyProjectSchema.array(),
+  schema: hobbyProjectLinkSchema.array(),
 });
 
-export const linkHobbyProject = async (
+export const linkHobbyProjectLink = async (
   householdId: string,
   hobbyId: string,
-  input: CreateHobbyProjectInput
-): Promise<HobbyProject> => apiRequest({
+  input: CreateHobbyProjectLinkInput
+): Promise<HobbyProjectLink> => apiRequest({
   path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/projects`,
   method: "POST",
   body: input,
-  schema: hobbyProjectSchema,
+  schema: hobbyProjectLinkSchema,
 });
 
-export const unlinkHobbyProject = async (
+export const unlinkHobbyProjectLink = async (
   householdId: string,
   hobbyId: string,
   hobbyProjectId: string
 ): Promise<void> => {
   await apiRequest({
     path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/projects/${hobbyProjectId}`,
+    method: "DELETE",
+  });
+};
+
+export const listHobbyProjects = async (
+  householdId: string,
+  hobbyId: string,
+  query?: Partial<HobbyProjectListQuery>
+): Promise<HobbyProjectListResponse> => {
+  const params = new URLSearchParams();
+
+  if (query?.status) params.set("status", query.status);
+  if (query?.sortBy) params.set("sortBy", query.sortBy);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  if (query?.cursor) params.set("cursor", query.cursor);
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects${params.size ? `?${params.toString()}` : ""}`,
+    schema: hobbyProjectListResponseSchema,
+  });
+};
+
+export const createHobbyProject = async (
+  householdId: string,
+  hobbyId: string,
+  input: CreateHobbyProjectInput
+): Promise<HobbyProject> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects`,
+  method: "POST",
+  body: input,
+  schema: hobbyProjectSchema,
+});
+
+export const getHobbyProject = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string
+): Promise<HobbyProjectDetail> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}`,
+  schema: hobbyProjectDetailSchema,
+});
+
+export const updateHobbyProject = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  input: UpdateHobbyProjectInput
+): Promise<HobbyProject> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbyProjectSchema,
+});
+
+export const deleteHobbyProject = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}`,
+    method: "DELETE",
+  });
+};
+
+export const listHobbyProjectMilestones = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string
+): Promise<HobbyProjectMilestone[]> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/milestones`,
+  schema: hobbyProjectMilestoneSchema.array(),
+});
+
+export const createHobbyProjectMilestone = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  input: CreateHobbyProjectMilestoneInput
+): Promise<HobbyProjectMilestone> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/milestones`,
+  method: "POST",
+  body: input,
+  schema: hobbyProjectMilestoneSchema,
+});
+
+export const updateHobbyProjectMilestone = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  milestoneId: string,
+  input: UpdateHobbyProjectMilestoneInput
+): Promise<HobbyProjectMilestone> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/milestones/${milestoneId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbyProjectMilestoneSchema,
+});
+
+export const reorderHobbyProjectMilestones = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  input: ReorderHobbyProjectMilestonesInput
+): Promise<HobbyProjectMilestone[]> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/milestones/reorder`,
+  method: "POST",
+  body: input,
+  schema: hobbyProjectMilestoneSchema.array(),
+});
+
+export const deleteHobbyProjectMilestone = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  milestoneId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/milestones/${milestoneId}`,
+    method: "DELETE",
+  });
+};
+
+export const listHobbyProjectWorkLogs = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  query?: Partial<HobbyProjectWorkLogListQuery>
+): Promise<HobbyProjectWorkLogListResponse> => {
+  const params = new URLSearchParams();
+
+  if (query?.milestoneId) params.set("milestoneId", query.milestoneId);
+  if (query?.startDate) params.set("startDate", query.startDate);
+  if (query?.endDate) params.set("endDate", query.endDate);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  if (query?.cursor) params.set("cursor", query.cursor);
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/work-logs${params.size ? `?${params.toString()}` : ""}`,
+    schema: hobbyProjectWorkLogListResponseSchema,
+  });
+};
+
+export const createHobbyProjectWorkLog = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  input: CreateHobbyProjectWorkLogInput
+): Promise<HobbyProjectWorkLog> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/work-logs`,
+  method: "POST",
+  body: input,
+  schema: hobbyProjectWorkLogSchema,
+});
+
+export const updateHobbyProjectWorkLog = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  workLogId: string,
+  input: UpdateHobbyProjectWorkLogInput
+): Promise<HobbyProjectWorkLog> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/work-logs/${workLogId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbyProjectWorkLogSchema,
+});
+
+export const deleteHobbyProjectWorkLog = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  workLogId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/work-logs/${workLogId}`,
+    method: "DELETE",
+  });
+};
+
+export const listHobbyProjectInventoryItems = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string
+): Promise<HobbyProjectInventoryLinkDetail[]> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/inventory`,
+  schema: hobbyProjectInventoryLinkDetailSchema.array(),
+});
+
+export const createHobbyProjectInventoryItem = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  input: CreateHobbyProjectInventoryItemInput
+): Promise<unknown> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/inventory`,
+  method: "POST",
+  body: input,
+});
+
+export const updateHobbyProjectInventoryItem = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  inventoryItemId: string,
+  input: UpdateHobbyProjectInventoryItemInput
+): Promise<unknown> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/inventory/${inventoryItemId}`,
+  method: "PATCH",
+  body: input,
+});
+
+export const deleteHobbyProjectInventoryItem = async (
+  householdId: string,
+  hobbyId: string,
+  projectId: string,
+  inventoryItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/inventory/${inventoryItemId}`,
     method: "DELETE",
   });
 };

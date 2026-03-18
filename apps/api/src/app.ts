@@ -54,6 +54,7 @@ import { hobbySessionRoutes } from "./routes/hobbies/sessions.js";
 import { hobbyMetricRoutes } from "./routes/hobbies/metrics.js";
 import { hobbyLogRoutes } from "./routes/hobbies/logs.js";
 import { hobbyLinkRoutes } from "./routes/hobbies/links.js";
+import { hobbyProjectRoutes } from "./routes/hobbies/projects.js";
 import { hobbyShoppingListRoutes } from "./routes/hobbies/shopping-list.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
@@ -105,6 +106,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   hobbyMetricRoutes,
   hobbyLogRoutes,
   hobbyLinkRoutes,
+  hobbyProjectRoutes,
   hobbyShoppingListRoutes
 ];
 

@@ -118,30 +118,68 @@ export const validateEntryTarget = async (
         : { status: "missing" };
     }
     case "hobby_project": {
-      const link = await prisma.hobbyProject.findFirst({
+      const project = await prisma.hobbyProject.findFirst({
         where: {
           id: entityId,
-          hobby: { householdId },
-          project: { householdId, deletedAt: null }
+          householdId,
         },
         select: {
           id: true,
+          name: true,
           hobby: { select: { id: true, name: true } },
-          project: { select: { id: true, name: true } }
         }
       });
 
-      return link
+      return project
         ? {
             status: "ok",
             context: buildContext({
               entityType,
-              entityId: link.id,
-              label: `${link.hobby.name} / ${link.project.name}`,
+              entityId: project.id,
+              label: project.name,
               parentEntityType: "hobby",
-              parentEntityId: link.hobby.id,
-              parentLabel: link.hobby.name,
-              entityUrl: `/hobbies/${link.hobby.id}?householdId=${householdId}`
+              parentEntityId: project.hobby.id,
+              parentLabel: project.hobby.name,
+              entityUrl: `/hobbies/${project.hobby.id}?householdId=${householdId}&projectId=${project.id}`
+            })
+          }
+        : { status: "missing" };
+    }
+    case "hobby_project_milestone": {
+      const milestone = await prisma.hobbyProjectMilestone.findFirst({
+        where: {
+          id: entityId,
+          hobbyProject: { householdId },
+        },
+        select: {
+          id: true,
+          name: true,
+          hobbyProject: {
+            select: {
+              id: true,
+              name: true,
+              hobby: {
+                select: {
+                  id: true,
+                  name: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return milestone
+        ? {
+            status: "ok",
+            context: buildContext({
+              entityType,
+              entityId: milestone.id,
+              label: milestone.name,
+              parentEntityType: "hobby_project",
+              parentEntityId: milestone.hobbyProject.id,
+              parentLabel: milestone.hobbyProject.name,
+              entityUrl: `/hobbies/${milestone.hobbyProject.hobby.id}?householdId=${householdId}&projectId=${milestone.hobbyProject.id}`
             })
           }
         : { status: "missing" };

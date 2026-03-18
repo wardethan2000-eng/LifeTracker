@@ -1443,6 +1443,7 @@ export const inventoryPurchaseLineSchema = z.object({
   id: z.string().cuid(),
   purchaseId: z.string().cuid(),
   inventoryItemId: z.string().cuid(),
+  projectPhaseSupplyId: z.string().cuid().nullable().default(null),
   status: inventoryPurchaseLineStatusSchema,
   plannedQuantity: z.number(),
   orderedQuantity: z.number().nullable(),
@@ -2007,6 +2008,18 @@ export const projectPhaseSupplyInventoryItemSchema = z.object({
   unitCost: z.number().nullable()
 });
 
+export const projectSupplyPurchaseRequestSchema = z.object({
+  purchaseId: z.string().cuid(),
+  purchaseLineId: z.string().cuid(),
+  purchaseStatus: inventoryPurchaseStatusSchema,
+  lineStatus: inventoryPurchaseLineStatusSchema,
+  plannedQuantity: z.number(),
+  orderedQuantity: z.number().nullable(),
+  receivedQuantity: z.number().nullable(),
+  supplierName: z.string().nullable(),
+  supplierUrl: z.string().nullable()
+});
+
 export const projectPhaseSupplySchema = z.object({
   id: z.string().cuid(),
   phaseId: z.string().cuid(),
@@ -2025,6 +2038,7 @@ export const projectPhaseSupplySchema = z.object({
   stagedAt: z.string().datetime().nullable(),
   inventoryItemId: z.string().cuid().nullable(),
   inventoryItem: projectPhaseSupplyInventoryItemSchema.nullable().default(null),
+  activePurchaseRequest: projectSupplyPurchaseRequestSchema.nullable().default(null),
   notes: z.string().nullable(),
   sortOrder: z.number().int().nullable(),
   createdAt: z.string().datetime(),
@@ -2357,6 +2371,7 @@ export const projectShoppingListItemSchema = z.object({
   supplierUrl: z.string().nullable(),
   inventoryItemId: z.string().cuid().nullable(),
   inventoryItem: projectPhaseSupplyInventoryItemSchema.nullable().default(null),
+  activePurchaseRequest: projectSupplyPurchaseRequestSchema.nullable().default(null),
   phaseName: z.string(),
   phaseId: z.string().cuid(),
   projectName: z.string(),
@@ -2376,6 +2391,18 @@ export const projectShoppingListSchema = z.object({
   supplierCount: z.number(),
   lineCount: z.number(),
   groupedBySupplier: z.array(projectShoppingListSupplierGroupSchema)
+});
+
+export const createProjectPurchaseRequestSchema = z.object({
+  supplyIds: z.array(z.string().cuid()).min(1).max(200).optional()
+});
+
+export const projectPurchaseRequestResultSchema = z.object({
+  purchaseCount: z.number().int().min(0),
+  createdLineCount: z.number().int().min(0),
+  reusedLineCount: z.number().int().min(0),
+  skippedSupplyCount: z.number().int().min(0),
+  purchases: z.array(inventoryPurchaseSchema)
 });
 
 export const projectNoteSchema = z.object({
@@ -2821,6 +2848,7 @@ export const searchEntityTypeValues = [
   "timeline_entry",
   "asset_transfer",
   "project",
+  "hobby_project",
   "service_provider",
   "inventory_item",
   "comment",
@@ -3176,6 +3204,7 @@ export type ProjectBudgetCategory = z.infer<typeof projectBudgetCategorySchema>;
 export type CreateProjectBudgetCategoryInput = z.infer<typeof createProjectBudgetCategorySchema>;
 export type UpdateProjectBudgetCategoryInput = z.infer<typeof updateProjectBudgetCategorySchema>;
 export type ProjectPhaseSupplyInventoryItem = z.infer<typeof projectPhaseSupplyInventoryItemSchema>;
+export type ProjectSupplyPurchaseRequest = z.infer<typeof projectSupplyPurchaseRequestSchema>;
 export type ProjectPhaseSupply = z.infer<typeof projectPhaseSupplySchema>;
 export type CreateProjectPhaseSupplyInput = z.infer<typeof createProjectPhaseSupplySchema>;
 export type UpdateProjectPhaseSupplyInput = z.infer<typeof updateProjectPhaseSupplySchema>;
@@ -3230,6 +3259,8 @@ export type CreateAssetTimelineEntryInput = z.infer<typeof createAssetTimelineEn
 export type UpdateAssetTimelineEntryInput = z.infer<typeof updateAssetTimelineEntrySchema>;
 export type AssetTimelineItem = z.infer<typeof assetTimelineItemSchema>;
 export type AssetTimelineQuery = z.infer<typeof assetTimelineQuerySchema>;
+export type CreateProjectPurchaseRequestInput = z.infer<typeof createProjectPurchaseRequestSchema>;
+export type ProjectPurchaseRequestResult = z.infer<typeof projectPurchaseRequestResultSchema>;
 export type ProjectShoppingListItem = z.infer<typeof projectShoppingListItemSchema>;
 export type ProjectShoppingListSupplierGroup = z.infer<typeof projectShoppingListSupplierGroupSchema>;
 export type ProjectShoppingList = z.infer<typeof projectShoppingListSchema>;
@@ -3305,6 +3336,7 @@ export type BarcodeLookupResult = z.infer<typeof barcodeLookupResultSchema>;
 export const attachmentEntityTypeValues = [
   "maintenance_log",
   "asset",
+  "project",
   "project_note",
   "project_expense",
   "project_phase",
@@ -3380,6 +3412,12 @@ export type HobbyStatus = z.infer<typeof hobbyStatusSchema>;
 
 export const hobbyActivityModeSchema = z.enum(["session", "project", "practice", "collection"]);
 export type HobbyActivityMode = z.infer<typeof hobbyActivityModeSchema>;
+
+export const hobbyProjectStatusSchema = z.enum(["planned", "active", "paused", "completed", "abandoned"]);
+export type HobbyProjectStatus = z.infer<typeof hobbyProjectStatusSchema>;
+
+export const milestoneStatusSchema = z.enum(["pending", "in_progress", "completed", "skipped"]);
+export type MilestoneStatus = z.infer<typeof milestoneStatusSchema>;
 
 export const hobbySessionLifecycleModeSchema = z.enum(["binary", "pipeline"]);
 export type HobbySessionLifecycleMode = z.infer<typeof hobbySessionLifecycleModeSchema>;
@@ -3579,8 +3617,8 @@ export const updateHobbyInventoryItemInputSchema = createHobbyInventoryItemInput
 export type CreateHobbyInventoryItemInput = z.infer<typeof createHobbyInventoryItemInputSchema>;
 export type UpdateHobbyInventoryItemInput = z.infer<typeof updateHobbyInventoryItemInputSchema>;
 
-// HobbyProject (link table)
-export const hobbyProjectSchema = z.object({
+// HobbyProjectLink (link table to top-level projects)
+export const hobbyProjectLinkSchema = z.object({
   id: z.string().cuid(),
   hobbyId: z.string().cuid(),
   projectId: z.string().cuid(),
@@ -3588,15 +3626,227 @@ export const hobbyProjectSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
-export type HobbyProject = z.infer<typeof hobbyProjectSchema>;
+export type HobbyProjectLink = z.infer<typeof hobbyProjectLinkSchema>;
 
-export const createHobbyProjectInputSchema = z.object({
+export const createHobbyProjectLinkInputSchema = z.object({
   projectId: z.string().cuid(),
   notes: z.string().max(2000).optional(),
 });
-export const updateHobbyProjectInputSchema = createHobbyProjectInputSchema.partial().omit({ projectId: true });
+export const updateHobbyProjectLinkInputSchema = createHobbyProjectLinkInputSchema.partial().omit({ projectId: true });
+export type CreateHobbyProjectLinkInput = z.infer<typeof createHobbyProjectLinkInputSchema>;
+export type UpdateHobbyProjectLinkInput = z.infer<typeof updateHobbyProjectLinkInputSchema>;
+
+// HobbyProject
+export const hobbyProjectSchema = z.object({
+  id: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: hobbyProjectStatusSchema,
+  startDate: z.string().datetime().nullable(),
+  targetEndDate: z.string().datetime().nullable(),
+  completedDate: z.string().datetime().nullable(),
+  coverImageUrl: z.string().nullable(),
+  difficulty: z.string().nullable(),
+  notes: z.string().nullable(),
+  tags: z.array(z.string()),
+  seriesId: z.string().cuid().nullable(),
+  batchNumber: z.number().int().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyProject = z.infer<typeof hobbyProjectSchema>;
+
+export const hobbyProjectMilestoneSchema = z.object({
+  id: z.string().cuid(),
+  hobbyProjectId: z.string().cuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: milestoneStatusSchema,
+  sortOrder: z.number().int(),
+  targetDate: z.string().datetime().nullable(),
+  completedDate: z.string().datetime().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyProjectMilestone = z.infer<typeof hobbyProjectMilestoneSchema>;
+
+export const hobbyProjectWorkLogSchema = z.object({
+  id: z.string().cuid(),
+  hobbyProjectId: z.string().cuid(),
+  milestoneId: z.string().cuid().nullable(),
+  date: z.string().datetime(),
+  durationMinutes: z.number().int().nullable(),
+  description: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyProjectWorkLog = z.infer<typeof hobbyProjectWorkLogSchema>;
+
+export const hobbyProjectInventoryItemSchema = z.object({
+  id: z.string().cuid(),
+  hobbyProjectId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  quantityNeeded: z.number(),
+  quantityUsed: z.number(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbyProjectInventoryItem = z.infer<typeof hobbyProjectInventoryItemSchema>;
+
+export const hobbyProjectInventoryLinkDetailSchema = hobbyProjectInventoryItemSchema.extend({
+  inventoryItem: inventoryItemSummarySchema,
+  quantityRemaining: z.number(),
+});
+export type HobbyProjectInventoryLinkDetail = z.infer<typeof hobbyProjectInventoryLinkDetailSchema>;
+
+export const hobbyProjectSummarySchema = hobbyProjectSchema.extend({
+  milestoneCount: z.number().int().min(0),
+  completedMilestoneCount: z.number().int().min(0),
+  completionPercentage: z.number().min(0).max(100),
+  totalLoggedHours: z.number().min(0),
+});
+export type HobbyProjectSummary = z.infer<typeof hobbyProjectSummarySchema>;
+
+export const hobbyProjectEntryCountSchema = z.object({
+  entryType: entryTypeSchema,
+  count: z.number().int().min(0),
+});
+export type HobbyProjectEntryCount = z.infer<typeof hobbyProjectEntryCountSchema>;
+
+export const hobbyProjectDetailSchema = hobbyProjectSchema.extend({
+  milestones: z.array(hobbyProjectMilestoneSchema),
+  recentWorkLogs: z.array(hobbyProjectWorkLogSchema),
+  inventoryItems: z.array(hobbyProjectInventoryLinkDetailSchema),
+  totalLoggedHours: z.number().min(0),
+  daysActive: z.number().int().min(0).nullable(),
+  milestoneCount: z.number().int().min(0),
+  completedMilestoneCount: z.number().int().min(0),
+  milestoneCompletionPercentage: z.number().min(0).max(100),
+  entryCountsByType: z.array(hobbyProjectEntryCountSchema),
+});
+export type HobbyProjectDetail = z.infer<typeof hobbyProjectDetailSchema>;
+
+export const hobbyProjectListQuerySchema = z.object({
+  status: hobbyProjectStatusSchema.optional(),
+  sortBy: z.enum(["updatedAt", "startDate"]).default("updatedAt"),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional(),
+});
+export type HobbyProjectListQuery = z.infer<typeof hobbyProjectListQuerySchema>;
+
+export const hobbyProjectListResponseSchema = z.object({
+  items: z.array(hobbyProjectSummarySchema),
+  nextCursor: z.string().cuid().nullable(),
+});
+export type HobbyProjectListResponse = z.infer<typeof hobbyProjectListResponseSchema>;
+
+export const createHobbyProjectInputSchema = z.object({
+  name: z.string().trim().min(1).max(300),
+  description: z.string().max(5000).optional(),
+  status: hobbyProjectStatusSchema.optional(),
+  startDate: z.string().datetime().optional(),
+  targetEndDate: z.string().datetime().optional(),
+  completedDate: z.string().datetime().optional(),
+  coverImageUrl: z.string().max(2000).optional(),
+  difficulty: z.string().max(80).optional(),
+  notes: z.string().max(20000).optional(),
+  tags: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
+  seriesId: z.string().cuid().optional(),
+  batchNumber: z.number().int().positive().optional(),
+});
+export const updateHobbyProjectInputSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  description: z.string().max(5000).nullable().optional(),
+  status: hobbyProjectStatusSchema.optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  targetEndDate: z.string().datetime().nullable().optional(),
+  completedDate: z.string().datetime().nullable().optional(),
+  coverImageUrl: z.string().max(2000).nullable().optional(),
+  difficulty: z.string().max(80).nullable().optional(),
+  notes: z.string().max(20000).nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
+  seriesId: z.string().cuid().nullable().optional(),
+  batchNumber: z.number().int().positive().nullable().optional(),
+});
 export type CreateHobbyProjectInput = z.infer<typeof createHobbyProjectInputSchema>;
 export type UpdateHobbyProjectInput = z.infer<typeof updateHobbyProjectInputSchema>;
+
+export const createHobbyProjectMilestoneInputSchema = z.object({
+  name: z.string().trim().min(1).max(300),
+  description: z.string().max(2000).optional(),
+  status: milestoneStatusSchema.optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  targetDate: z.string().datetime().optional(),
+  completedDate: z.string().datetime().optional(),
+  notes: z.string().max(20000).optional(),
+});
+export const updateHobbyProjectMilestoneInputSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  status: milestoneStatusSchema.optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  targetDate: z.string().datetime().nullable().optional(),
+  completedDate: z.string().datetime().nullable().optional(),
+  notes: z.string().max(20000).nullable().optional(),
+});
+export const reorderHobbyProjectMilestonesInputSchema = z.object({
+  milestoneIds: z.array(z.string().cuid()).min(1),
+});
+export type CreateHobbyProjectMilestoneInput = z.infer<typeof createHobbyProjectMilestoneInputSchema>;
+export type UpdateHobbyProjectMilestoneInput = z.infer<typeof updateHobbyProjectMilestoneInputSchema>;
+export type ReorderHobbyProjectMilestonesInput = z.infer<typeof reorderHobbyProjectMilestonesInputSchema>;
+
+export const createHobbyProjectWorkLogInputSchema = z.object({
+  milestoneId: z.string().cuid().optional(),
+  date: z.string().datetime(),
+  durationMinutes: z.number().int().min(0).optional(),
+  description: z.string().trim().min(1).max(5000),
+  notes: z.string().max(20000).optional(),
+});
+export const updateHobbyProjectWorkLogInputSchema = z.object({
+  milestoneId: z.string().cuid().nullable().optional(),
+  date: z.string().datetime().optional(),
+  durationMinutes: z.number().int().min(0).nullable().optional(),
+  description: z.string().trim().min(1).max(5000).optional(),
+  notes: z.string().max(20000).nullable().optional(),
+});
+export const hobbyProjectWorkLogListQuerySchema = z.object({
+  milestoneId: z.string().cuid().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().cuid().optional(),
+});
+export const hobbyProjectWorkLogListResponseSchema = z.object({
+  items: z.array(hobbyProjectWorkLogSchema),
+  nextCursor: z.string().cuid().nullable(),
+  totalDurationMinutes: z.number().int().min(0),
+  totalDurationHours: z.number().min(0),
+});
+export type CreateHobbyProjectWorkLogInput = z.infer<typeof createHobbyProjectWorkLogInputSchema>;
+export type UpdateHobbyProjectWorkLogInput = z.infer<typeof updateHobbyProjectWorkLogInputSchema>;
+export type HobbyProjectWorkLogListQuery = z.infer<typeof hobbyProjectWorkLogListQuerySchema>;
+export type HobbyProjectWorkLogListResponse = z.infer<typeof hobbyProjectWorkLogListResponseSchema>;
+
+export const createHobbyProjectInventoryItemInputSchema = z.object({
+  inventoryItemId: z.string().cuid(),
+  quantityNeeded: z.number().positive(),
+  quantityUsed: z.number().min(0).optional(),
+  notes: z.string().max(2000).optional(),
+});
+export const updateHobbyProjectInventoryItemInputSchema = z.object({
+  quantityNeeded: z.number().positive().optional(),
+  quantityUsed: z.number().min(0).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export type CreateHobbyProjectInventoryItemInput = z.infer<typeof createHobbyProjectInventoryItemInputSchema>;
+export type UpdateHobbyProjectInventoryItemInput = z.infer<typeof updateHobbyProjectInventoryItemInputSchema>;
 
 // HobbyInventoryCategory
 export const hobbyInventoryCategorySchema = z.object({

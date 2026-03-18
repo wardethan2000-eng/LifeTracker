@@ -1,7 +1,7 @@
 import {
   createHobbyAssetInputSchema,
   createHobbyInventoryItemInputSchema,
-  createHobbyProjectInputSchema,
+  createHobbyProjectLinkInputSchema,
   createHobbyInventoryCategoryInputSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
@@ -222,7 +222,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const links = await app.prisma.hobbyProject.findMany({
+    const links = await app.prisma.hobbyProjectLink.findMany({
       where: { hobbyId, hobby: { householdId } },
       include: {
         project: { select: { id: true, name: true, status: true } }
@@ -235,7 +235,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
   // POST .../links/projects
   app.post(`${BASE}/projects`, async (request, reply) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
-    const input = createHobbyProjectInputSchema.parse(request.body);
+    const input = createHobbyProjectLinkInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
     if (!await checkMembership(app.prisma, householdId, userId)) {
@@ -249,7 +249,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Hobby not found" });
     }
 
-    const link = await app.prisma.hobbyProject.create({
+    const link = await app.prisma.hobbyProjectLink.create({
       data: {
         hobbyId,
         projectId: input.projectId,
@@ -277,14 +277,14 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const existing = await app.prisma.hobbyProject.findFirst({
+    const existing = await app.prisma.hobbyProjectLink.findFirst({
       where: { id: hobbyProjectId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
       return reply.code(404).send({ message: "Project link not found" });
     }
 
-    await app.prisma.hobbyProject.delete({ where: { id: hobbyProjectId } });
+    await app.prisma.hobbyProjectLink.delete({ where: { id: hobbyProjectId } });
 
     void Promise.all([
       syncHobbyToSearchIndex(app.prisma, hobbyId),

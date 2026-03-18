@@ -5,7 +5,7 @@ type TransactionReferenceRecord = Pick<InventoryTransaction, "referenceType" | "
 
 type InventoryReferencePrisma = Pick<
   PrismaClient,
-  "maintenanceLog" | "project" | "hobbySession" | "inventoryTransaction"
+  "maintenanceLog" | "project" | "hobbyProject" | "hobbySession" | "inventoryTransaction"
 >;
 
 export const getInventoryTransactionReferenceKey = (
@@ -33,10 +33,11 @@ export const resolveInventoryTransactionReferenceLinks = async (
 ): Promise<Map<string, InventoryTransactionReferenceLink>> => {
   const maintenanceLogIds = uniqueReferenceIds(transactions, "maintenance_log");
   const projectIds = uniqueReferenceIds(transactions, "project");
+  const hobbyProjectIds = uniqueReferenceIds(transactions, "hobby_project");
   const hobbySessionIds = uniqueReferenceIds(transactions, "hobby_session");
   const inventoryTransactionIds = uniqueReferenceIds(transactions, "inventory_transaction");
 
-  const [maintenanceLogs, projects, hobbySessions, inventoryTransactions] = await Promise.all([
+  const [maintenanceLogs, projects, hobbyProjects, hobbySessions, inventoryTransactions] = await Promise.all([
     maintenanceLogIds.length > 0
       ? prisma.maintenanceLog.findMany({
           where: {
@@ -69,6 +70,24 @@ export const resolveInventoryTransactionReferenceLinks = async (
           select: {
             id: true,
             name: true
+          }
+        })
+      : Promise.resolve([]),
+    hobbyProjectIds.length > 0
+      ? prisma.hobbyProject.findMany({
+          where: {
+            id: { in: hobbyProjectIds },
+            householdId,
+          },
+          select: {
+            id: true,
+            name: true,
+            hobbyId: true,
+            hobby: {
+              select: {
+                name: true
+              }
+            }
           }
         })
       : Promise.resolve([]),
@@ -137,6 +156,18 @@ export const resolveInventoryTransactionReferenceLinks = async (
         href: `/projects/${project.id}?householdId=${householdId}`,
         label: project.name,
         secondaryLabel: "Project"
+      });
+    }
+  });
+
+  hobbyProjects.forEach((project) => {
+    const key = getInventoryTransactionReferenceKey("hobby_project", project.id);
+
+    if (key) {
+      links.set(key, {
+        href: `/hobbies/${project.hobbyId}?householdId=${householdId}&projectId=${project.id}`,
+        label: project.name,
+        secondaryLabel: project.hobby.name
       });
     }
   });

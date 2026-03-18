@@ -12,10 +12,10 @@ import {
   deleteHobbyInventoryCategory,
   linkHobbyAsset,
   linkHobbyInventory,
-  linkHobbyProject,
+  linkHobbyProjectLink,
   unlinkHobbyAsset,
   unlinkHobbyInventory,
-  unlinkHobbyProject,
+  unlinkHobbyProjectLink,
 } from "../lib/api";
 import {
   SectionFilterBar,
@@ -163,7 +163,7 @@ export function HobbyLinksManager({
     setError(null);
 
     try {
-      const created = await linkHobbyProject(householdId, hobbyId, {
+      const created = await linkHobbyProjectLink(householdId, hobbyId, {
         projectId,
         ...(projectNotes.trim() ? { notes: projectNotes.trim() } : {}),
       });
@@ -243,7 +243,7 @@ export function HobbyLinksManager({
     setError(null);
 
     try {
-      await unlinkHobbyProject(householdId, hobbyId, linkId);
+      await unlinkHobbyProjectLink(householdId, hobbyId, linkId);
       setProjectLinks((current) => current.filter((link) => link.id !== linkId));
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Failed to unlink project.");

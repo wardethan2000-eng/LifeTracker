@@ -41,6 +41,7 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   timeline_entry: "Timeline Entries",
   asset_transfer: "Transfers",
   project: "Projects",
+  hobby_project: "Hobby Projects",
   service_provider: "Service Providers",
   inventory_item: "Inventory Items",
   comment: "Comments",
@@ -57,6 +58,7 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "timeline_entry",
   "asset_transfer",
   "project",
+  "hobby_project",
   "service_provider",
   "inventory_item",
   "comment",
@@ -1215,6 +1217,101 @@ export const syncHobbyToSearchIndex = async (prisma: SearchPrisma, hobbyId: stri
       status: hobby.status,
       hobbyType: hobby.hobbyType,
       activityMode: hobby.activityMode
+    }
+  }]);
+};
+
+export const syncHobbyProjectToSearchIndex = async (prisma: SearchPrisma, hobbyProjectId: string): Promise<void> => {
+  const project = await prisma.hobbyProject.findUnique({
+    where: { id: hobbyProjectId },
+    select: {
+      id: true,
+      householdId: true,
+      hobbyId: true,
+      name: true,
+      description: true,
+      status: true,
+      difficulty: true,
+      notes: true,
+      tags: true,
+      hobby: {
+        select: {
+          name: true,
+          hobbyType: true,
+        }
+      },
+      milestones: {
+        select: {
+          name: true,
+          description: true,
+          notes: true,
+          status: true,
+        }
+      },
+      workLogs: {
+        select: {
+          description: true,
+          notes: true,
+        }
+      },
+      inventoryItems: {
+        select: {
+          notes: true,
+          inventoryItem: {
+            select: {
+              name: true,
+              category: true,
+              manufacturer: true,
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!project) {
+    await deleteSearchIndexEntry(prisma, "hobby_project", hobbyProjectId);
+    return;
+  }
+
+  const tagText = Array.isArray(project.tags) ? project.tags.flatMap(flattenSearchValues).join(" ") : "";
+  const milestoneText = project.milestones.flatMap((milestone) => [
+    milestone.name,
+    milestone.description,
+    milestone.notes,
+    milestone.status,
+  ]).filter(Boolean).join(" ");
+  const workLogText = project.workLogs.flatMap((workLog) => [workLog.description, workLog.notes]).filter(Boolean).join(" ");
+  const inventoryText = project.inventoryItems.flatMap((link) => [
+    link.inventoryItem.name,
+    link.inventoryItem.category,
+    link.inventoryItem.manufacturer,
+    link.notes,
+  ]).filter(Boolean).join(" ");
+
+  await syncSearchIndexPayloads(prisma, "hobby_project", project.id, [{
+    householdId: project.householdId,
+    entityType: "hobby_project",
+    entityId: project.id,
+    parentEntityId: project.hobbyId,
+    parentEntityName: project.hobby.name,
+    title: project.name,
+    subtitle: joinText(project.hobby.name, project.status),
+    body: joinText(
+      project.description,
+      project.notes,
+      project.difficulty,
+      project.hobby.hobbyType,
+      tagText,
+      milestoneText,
+      workLogText,
+      inventoryText
+    ),
+    entityUrl: `/hobbies/${project.hobbyId}?householdId=${project.householdId}&projectId=${project.id}`,
+    entityMeta: {
+      status: project.status,
+      hobbyId: project.hobbyId,
+      difficulty: project.difficulty,
     }
   }]);
 };

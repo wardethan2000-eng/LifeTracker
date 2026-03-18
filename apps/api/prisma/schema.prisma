@@ -182,6 +182,7 @@ enum ProjectAssetRelationship {
 enum AttachmentEntityType {
   maintenance_log
   asset
+  project
   project_note
   project_expense
   project_phase
@@ -238,6 +239,21 @@ enum HobbyLogType {
   issue
 }
 
+enum HobbyProjectStatus {
+  planned
+  active
+  paused
+  completed
+  abandoned
+}
+
+enum MilestoneStatus {
+  pending
+  in_progress
+  completed
+  skipped
+}
+
 enum CommentEntityType {
   asset
   project
@@ -288,6 +304,7 @@ model User {
   attachments             Attachment[]          @relation("AttachmentUploader")
   createdShareLinks       ShareLink[]           @relation("ShareLinkCreator")
   createdHobbies          Hobby[]               @relation("HobbyCreator")
+  createdHobbyProjects    HobbyProject[]        @relation("HobbyProjectCreator")
   createdEntries          Entry[]               @relation("EntryCreator")
 }
 
@@ -317,6 +334,7 @@ model Household {
   shareLinks       ShareLink[]
   hobbies          Hobby[]
   hobbySeries      HobbySeries[]
+  hobbyProjects    HobbyProject[]
   comments         Comment[]
   entries          Entry[]
   domainEvents     DomainEvent[]
@@ -739,7 +757,7 @@ model Project {
   expenses        ProjectExpense[]
   noteEntries     ProjectNote[]
   templates       ProjectTemplate[]
-  hobbyLinks       HobbyProject[]
+  hobbyLinks       HobbyProjectLink[]
   comments         Comment[]
 
   @@index([householdId, status])
@@ -783,6 +801,7 @@ model InventoryItem {
   purchaseLines      InventoryPurchaseLine[]
   maintenanceLogParts MaintenanceLogPart[]
   hobbyLinks          HobbyInventoryItem[]
+  hobbyProjectLinks   HobbyProjectInventoryItem[]
   hobbyRecipeIngredients HobbyRecipeIngredient[]
   hobbySessionIngredients HobbySessionIngredient[]
   revisions          InventoryItemRevision[]
@@ -822,6 +841,7 @@ model InventoryPurchaseLine {
   id               String                      @id @default(cuid())
   purchaseId       String
   inventoryItemId  String
+  projectPhaseSupplyId String?
   status           InventoryPurchaseLineStatus @default(draft)
   plannedQuantity  Float
   orderedQuantity  Float?
@@ -834,10 +854,11 @@ model InventoryPurchaseLine {
   updatedAt        DateTime                    @updatedAt
   purchase         InventoryPurchase           @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   inventoryItem    InventoryItem               @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  projectPhaseSupply ProjectPhaseSupply?       @relation(fields: [projectPhaseSupplyId], references: [id], onDelete: SetNull)
 
-  @@unique([purchaseId, inventoryItemId])
   @@index([purchaseId, status])
   @@index([inventoryItemId, status])
+  @@index([projectPhaseSupplyId])
 }
 
 // Join table linking an Asset to the inventory items it uses or recommends.
@@ -1455,7 +1476,8 @@ model Hobby {
   logs             HobbyLog[]
   assetLinks       HobbyAsset[]
   inventoryLinks   HobbyInventoryItem[]
-  projectLinks     HobbyProject[]
+  projectLinks     HobbyProjectLink[]
+  projects         HobbyProject[]
   inventoryCategories HobbyInventoryCategory[]
   comments         Comment[]
 
@@ -1498,7 +1520,7 @@ model HobbyInventoryItem {
 }
 
 // Join table linking a Hobby to a related Project.
-model HobbyProject {
+model HobbyProjectLink {
   id        String   @id @default(cuid())
   hobbyId   String
   projectId String
@@ -1511,6 +1533,93 @@ model HobbyProject {
   @@unique([hobbyId, projectId])
   @@index([hobbyId])
   @@index([projectId])
+}
+
+model HobbyProject {
+  id            String             @id @default(cuid())
+  hobbyId       String
+  householdId   String
+  createdById   String
+  name          String             @db.VarChar(300)
+  description   String?            @db.VarChar(5000)
+  status        HobbyProjectStatus @default(planned)
+  startDate     DateTime?
+  targetEndDate DateTime?
+  completedDate DateTime?
+  coverImageUrl String?
+  difficulty    String?
+  notes         String?
+  tags          Json               @default("[]")
+  seriesId      String?
+  batchNumber   Int?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  hobby         Hobby              @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  household     Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy     User               @relation("HobbyProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  series        HobbySeries?       @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  milestones    HobbyProjectMilestone[]
+  workLogs      HobbyProjectWorkLog[]
+  inventoryItems HobbyProjectInventoryItem[]
+
+  @@index([hobbyId, status])
+  @@index([hobbyId, updatedAt])
+  @@index([householdId, status])
+  @@index([seriesId, batchNumber])
+  @@index([createdById])
+}
+
+model HobbyProjectMilestone {
+  id             String          @id @default(cuid())
+  hobbyProjectId String
+  name           String          @db.VarChar(300)
+  description    String?         @db.VarChar(2000)
+  status         MilestoneStatus @default(pending)
+  sortOrder      Int
+  targetDate     DateTime?
+  completedDate  DateTime?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  hobbyProject   HobbyProject    @relation(fields: [hobbyProjectId], references: [id], onDelete: Cascade)
+  workLogs       HobbyProjectWorkLog[]
+
+  @@index([hobbyProjectId, sortOrder])
+  @@index([hobbyProjectId, status])
+}
+
+model HobbyProjectWorkLog {
+  id             String                @id @default(cuid())
+  hobbyProjectId String
+  milestoneId    String?
+  date           DateTime
+  durationMinutes Int?
+  description    String                @db.VarChar(5000)
+  notes          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  hobbyProject   HobbyProject          @relation(fields: [hobbyProjectId], references: [id], onDelete: Cascade)
+  milestone      HobbyProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  @@index([hobbyProjectId, date])
+  @@index([milestoneId])
+}
+
+model HobbyProjectInventoryItem {
+  id              String        @id @default(cuid())
+  hobbyProjectId  String
+  inventoryItemId String
+  quantityNeeded  Float
+  quantityUsed    Float         @default(0)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  hobbyProject    HobbyProject  @relation(fields: [hobbyProjectId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([hobbyProjectId, inventoryItemId])
+  @@index([hobbyProjectId])
+  @@index([inventoryItemId])
 }
 
 // An organizational inventory grouping defined within a Hobby.
@@ -1582,6 +1691,7 @@ model HobbyRecipeIngredient {
   updatedAt       DateTime       @updatedAt
   recipe          HobbyRecipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  purchaseLines     InventoryPurchaseLine[]
   sessionIngredients HobbySessionIngredient[]
 
   @@index([recipeId, sortOrder])
@@ -1623,6 +1733,7 @@ model HobbySeries {
   hobby              Hobby         @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
   household          Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
   sessions           HobbySession[] @relation("HobbySeriesSessions")
+  hobbyProjects      HobbyProject[]
   bestBatchSession   HobbySession? @relation("HobbySeriesBestBatchSession", fields: [bestBatchSessionId], references: [id], onDelete: SetNull)
 
   @@index([hobbyId, status])

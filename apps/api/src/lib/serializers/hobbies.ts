@@ -1,6 +1,14 @@
 import type { Prisma } from "@prisma/client";
 import {
   hobbyLogSchema,
+  hobbyProjectDetailSchema,
+  hobbyProjectEntryCountSchema,
+  hobbyProjectInventoryItemSchema,
+  hobbyProjectInventoryLinkDetailSchema,
+  hobbyProjectMilestoneSchema,
+  hobbyProjectSchema,
+  hobbyProjectSummarySchema,
+  hobbyProjectWorkLogSchema,
   hobbySeriesSchema,
   hobbySeriesSummarySchema,
   hobbyDetailAssetLinkSchema,
@@ -20,7 +28,8 @@ import {
   hobbySessionStepSchema,
   hobbySessionSummarySchema,
   hobbySummarySchema,
-  hobbySchema
+  hobbySchema,
+  inventoryItemSummarySchema
 } from "@lifekeeper/types";
 
 export const toHobbyResponse = (hobby: {
@@ -444,6 +453,220 @@ export const toHobbyProjectLinkResponse = (link: {
   project: link.project,
   createdAt: link.createdAt.toISOString(),
   updatedAt: link.updatedAt.toISOString()
+});
+
+export const toHobbyProjectResponse = (project: {
+  id: string;
+  hobbyId: string;
+  householdId: string;
+  createdById: string;
+  name: string;
+  description: string | null;
+  status: string;
+  startDate: Date | null;
+  targetEndDate: Date | null;
+  completedDate: Date | null;
+  coverImageUrl: string | null;
+  difficulty: string | null;
+  notes: string | null;
+  tags: Prisma.JsonValue;
+  seriesId: string | null;
+  batchNumber: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyProjectSchema.parse({
+  id: project.id,
+  hobbyId: project.hobbyId,
+  householdId: project.householdId,
+  createdById: project.createdById,
+  name: project.name,
+  description: project.description,
+  status: project.status,
+  startDate: project.startDate?.toISOString() ?? null,
+  targetEndDate: project.targetEndDate?.toISOString() ?? null,
+  completedDate: project.completedDate?.toISOString() ?? null,
+  coverImageUrl: project.coverImageUrl,
+  difficulty: project.difficulty,
+  notes: project.notes,
+  tags: Array.isArray(project.tags) ? project.tags : [],
+  seriesId: project.seriesId,
+  batchNumber: project.batchNumber,
+  createdAt: project.createdAt.toISOString(),
+  updatedAt: project.updatedAt.toISOString()
+});
+
+export const toHobbyProjectMilestoneResponse = (milestone: {
+  id: string;
+  hobbyProjectId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  sortOrder: number;
+  targetDate: Date | null;
+  completedDate: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyProjectMilestoneSchema.parse({
+  id: milestone.id,
+  hobbyProjectId: milestone.hobbyProjectId,
+  name: milestone.name,
+  description: milestone.description,
+  status: milestone.status,
+  sortOrder: milestone.sortOrder,
+  targetDate: milestone.targetDate?.toISOString() ?? null,
+  completedDate: milestone.completedDate?.toISOString() ?? null,
+  notes: milestone.notes,
+  createdAt: milestone.createdAt.toISOString(),
+  updatedAt: milestone.updatedAt.toISOString()
+});
+
+export const toHobbyProjectWorkLogResponse = (workLog: {
+  id: string;
+  hobbyProjectId: string;
+  milestoneId: string | null;
+  date: Date;
+  durationMinutes: number | null;
+  description: string;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyProjectWorkLogSchema.parse({
+  id: workLog.id,
+  hobbyProjectId: workLog.hobbyProjectId,
+  milestoneId: workLog.milestoneId,
+  date: workLog.date.toISOString(),
+  durationMinutes: workLog.durationMinutes,
+  description: workLog.description,
+  notes: workLog.notes,
+  createdAt: workLog.createdAt.toISOString(),
+  updatedAt: workLog.updatedAt.toISOString()
+});
+
+export const toHobbyProjectInventoryItemResponse = (link: {
+  id: string;
+  hobbyProjectId: string;
+  inventoryItemId: string;
+  quantityNeeded: number;
+  quantityUsed: number;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => hobbyProjectInventoryItemSchema.parse({
+  id: link.id,
+  hobbyProjectId: link.hobbyProjectId,
+  inventoryItemId: link.inventoryItemId,
+  quantityNeeded: link.quantityNeeded,
+  quantityUsed: link.quantityUsed,
+  notes: link.notes,
+  createdAt: link.createdAt.toISOString(),
+  updatedAt: link.updatedAt.toISOString()
+});
+
+export const toHobbyProjectInventoryLinkDetailResponse = (link: {
+  id: string;
+  hobbyProjectId: string;
+  inventoryItemId: string;
+  quantityNeeded: number;
+  quantityUsed: number;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  inventoryItem: {
+    id: string;
+    householdId: string;
+    itemType: string;
+    conditionStatus: string | null;
+    name: string;
+    partNumber: string | null;
+    description: string | null;
+    category: string | null;
+    manufacturer: string | null;
+    quantityOnHand: number;
+    unit: string;
+    reorderThreshold: number | null;
+    reorderQuantity: number | null;
+    preferredSupplier: string | null;
+    supplierUrl: string | null;
+    unitCost: number | null;
+    storageLocation: string | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}) => hobbyProjectInventoryLinkDetailSchema.parse({
+  ...toHobbyProjectInventoryItemResponse(link),
+  inventoryItem: inventoryItemSummarySchema.parse({
+    id: link.inventoryItem.id,
+    householdId: link.inventoryItem.householdId,
+    itemType: link.inventoryItem.itemType,
+    conditionStatus: link.inventoryItem.conditionStatus,
+    name: link.inventoryItem.name,
+    partNumber: link.inventoryItem.partNumber,
+    description: link.inventoryItem.description,
+    category: link.inventoryItem.category,
+    manufacturer: link.inventoryItem.manufacturer,
+    quantityOnHand: link.inventoryItem.quantityOnHand,
+    unit: link.inventoryItem.unit,
+    reorderThreshold: link.inventoryItem.reorderThreshold,
+    reorderQuantity: link.inventoryItem.reorderQuantity,
+    preferredSupplier: link.inventoryItem.preferredSupplier,
+    supplierUrl: link.inventoryItem.supplierUrl,
+    unitCost: link.inventoryItem.unitCost,
+    storageLocation: link.inventoryItem.storageLocation,
+    notes: link.inventoryItem.notes,
+    totalValue: (link.inventoryItem.unitCost ?? 0) * link.inventoryItem.quantityOnHand,
+    lowStock: link.inventoryItem.reorderThreshold !== null && link.inventoryItem.reorderThreshold !== undefined
+      ? link.inventoryItem.quantityOnHand <= link.inventoryItem.reorderThreshold
+      : false,
+    createdAt: link.inventoryItem.createdAt.toISOString(),
+    updatedAt: link.inventoryItem.updatedAt.toISOString()
+  }),
+  quantityRemaining: link.quantityNeeded - link.quantityUsed
+});
+
+export const toHobbyProjectSummaryResponse = (
+  project: Parameters<typeof toHobbyProjectResponse>[0],
+  stats: {
+    milestoneCount: number;
+    completedMilestoneCount: number;
+    completionPercentage: number;
+    totalLoggedHours: number;
+  }
+) => hobbyProjectSummarySchema.parse({
+  ...toHobbyProjectResponse(project),
+  ...stats
+});
+
+export const toHobbyProjectEntryCountResponse = (entryCount: {
+  entryType: string;
+  count: number;
+}) => hobbyProjectEntryCountSchema.parse(entryCount);
+
+export const toHobbyProjectDetailResponse = (
+  project: Parameters<typeof toHobbyProjectResponse>[0],
+  detail: {
+    milestones: Parameters<typeof toHobbyProjectMilestoneResponse>[0][];
+    recentWorkLogs: Parameters<typeof toHobbyProjectWorkLogResponse>[0][];
+    inventoryItems: Parameters<typeof toHobbyProjectInventoryLinkDetailResponse>[0][];
+    totalLoggedHours: number;
+    daysActive: number | null;
+    milestoneCount: number;
+    completedMilestoneCount: number;
+    milestoneCompletionPercentage: number;
+    entryCountsByType: Array<{ entryType: string; count: number }>;
+  }
+) => hobbyProjectDetailSchema.parse({
+  ...toHobbyProjectResponse(project),
+  milestones: detail.milestones.map(toHobbyProjectMilestoneResponse),
+  recentWorkLogs: detail.recentWorkLogs.map(toHobbyProjectWorkLogResponse),
+  inventoryItems: detail.inventoryItems.map(toHobbyProjectInventoryLinkDetailResponse),
+  totalLoggedHours: detail.totalLoggedHours,
+  daysActive: detail.daysActive,
+  milestoneCount: detail.milestoneCount,
+  completedMilestoneCount: detail.completedMilestoneCount,
+  milestoneCompletionPercentage: detail.milestoneCompletionPercentage,
+  entryCountsByType: detail.entryCountsByType.map(toHobbyProjectEntryCountResponse)
 });
 
 export const toHobbyInventoryCategoryResponse = (category: {
