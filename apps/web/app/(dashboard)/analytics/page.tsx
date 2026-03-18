@@ -599,6 +599,51 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           ))}
         </nav>
 
+        <section className="panel" style={{ marginBottom: 24 }}>
+          <div className="panel__header">
+            <h2>Dedicated Analytics Workspaces</h2>
+          </div>
+          <div className="panel__body--padded">
+            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              {[
+                {
+                  href: `/analytics/compliance?householdId=${household.id}`,
+                  title: "Compliance",
+                  description: "Investigate on-time performance, late work, and risk by category or asset."
+                },
+                {
+                  href: `/analytics/comparative?householdId=${household.id}`,
+                  title: "Comparative",
+                  description: "Compare assets, seasonal cost shifts, and household member contribution patterns."
+                },
+                {
+                  href: `/analytics/hobbies?householdId=${household.id}`,
+                  title: "Hobbies",
+                  description: "Session trends, practice streaks, and goal tracking."
+                }
+              ].map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-link"
+                  style={{
+                    display: "grid",
+                    gap: 8,
+                    padding: 16,
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-lg)",
+                    textDecoration: "none",
+                    color: "inherit"
+                  }}
+                >
+                  <strong style={{ fontSize: "1rem" }}>{link.title}</strong>
+                  <span style={{ color: "var(--ink-muted)", lineHeight: 1.5 }}>{link.description}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {tab === "costs" ? renderCostsTab() : null}
         {tab === "inventory" ? renderInventoryTab() : null}
         {tab === "compliance" ? renderComplianceTab() : null}

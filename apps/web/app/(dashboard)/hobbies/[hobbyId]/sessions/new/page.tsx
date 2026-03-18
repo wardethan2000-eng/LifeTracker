@@ -2,7 +2,17 @@ import type { JSX } from "react";
 import Link from "next/link";
 import { createHobbySessionAction } from "../../../../../actions";
 import { HobbySessionWorkbench } from "../../../../../../components/hobby-session-workbench";
-import { ApiError, getHobbyDetail, getHobbyRecipes, getHobbySeries, getHobbySeriesDetail, getMe } from "../../../../../../lib/api";
+import {
+  ApiError,
+  getHobbyDetail,
+  getHobbyRecipes,
+  getHobbySeries,
+  getHobbySeriesDetail,
+  getMe,
+  listHobbyCollectionItems,
+  listHobbyPracticeGoals,
+  listHobbyPracticeRoutines,
+} from "../../../../../../lib/api";
 
 type NewHobbySessionPageProps = {
   params: Promise<{ hobbyId: string }>;
@@ -26,10 +36,13 @@ export default async function NewHobbySessionPage({ params, searchParams }: NewH
       );
     }
 
-    const [hobby, recipes, activeSeries] = await Promise.all([
+    const [hobby, recipes, activeSeries, goals, routines, collectionItems] = await Promise.all([
       getHobbyDetail(household.id, hobbyId),
       getHobbyRecipes(household.id, hobbyId),
       getHobbySeries(household.id, hobbyId, { status: "active" }),
+      listHobbyPracticeGoals(household.id, hobbyId, { status: "active", limit: 12 }),
+      listHobbyPracticeRoutines(household.id, hobbyId, { isActive: true, limit: 12 }),
+      listHobbyCollectionItems(household.id, hobbyId, { limit: 50 }),
     ]);
 
     const activeSeriesDetails = await Promise.all(
@@ -52,8 +65,12 @@ export default async function NewHobbySessionPage({ params, searchParams }: NewH
             action={createHobbySessionAction}
             householdId={household.id}
             hobbyId={hobbyId}
+            activityMode={hobby.activityMode}
             recipes={recipes}
             activeSeries={activeSeriesDetails}
+            activeGoals={goals.items}
+            activeRoutines={routines.items}
+            collectionItems={collectionItems.items}
             initialSeriesSelection={seriesId}
           />
         </div>

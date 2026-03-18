@@ -2992,12 +2992,16 @@ export async function createHobbySessionAction(formData: FormData): Promise<void
   const recipeId = getOptionalString(formData, "recipeId");
   const startDate = getOptionalString(formData, "startDate");
   const notes = getOptionalString(formData, "notes");
+  const routineId = getOptionalString(formData, "routineId");
+  const collectionItemId = getOptionalString(formData, "collectionItemId");
   const existingSeriesId = getOptionalString(formData, "seriesId");
   const newSeriesName = getOptionalString(formData, "newSeriesName");
   const newSeriesDescription = getOptionalString(formData, "newSeriesDescription");
   const newSeriesTags = getOptionalString(formData, "newSeriesTags");
 
   if (recipeId) input.recipeId = recipeId;
+  if (routineId) input.routineId = routineId;
+  if (collectionItemId) input.collectionItemId = collectionItemId;
   if (startDate) input.startDate = new Date(`${startDate}T00:00:00.000Z`).toISOString();
   if (notes) input.notes = notes;
 

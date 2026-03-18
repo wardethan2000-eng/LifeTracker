@@ -1,6 +1,13 @@
 "use client";
 
-import type { HobbyRecipe, HobbySeriesDetail } from "@lifekeeper/types";
+import type {
+  HobbyActivityMode,
+  HobbyCollectionItem,
+  HobbyPracticeGoalSummary,
+  HobbyPracticeRoutineSummary,
+  HobbyRecipe,
+  HobbySeriesDetail,
+} from "@lifekeeper/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent, type JSX } from "react";
 import { EntryTipsSurface } from "./entry-system";
@@ -9,8 +16,12 @@ type HobbySessionWorkbenchProps = {
   action: (formData: FormData) => Promise<void>;
   householdId: string;
   hobbyId: string;
+  activityMode: HobbyActivityMode;
   recipes: HobbyRecipe[];
   activeSeries: HobbySeriesDetail[];
+  activeGoals: HobbyPracticeGoalSummary[];
+  activeRoutines: HobbyPracticeRoutineSummary[];
+  collectionItems: HobbyCollectionItem[];
   initialSeriesSelection?: string | undefined;
 };
 
@@ -20,8 +31,12 @@ export function HobbySessionWorkbench({
   action,
   householdId,
   hobbyId,
+  activityMode,
   recipes,
   activeSeries,
+  activeGoals,
+  activeRoutines,
+  collectionItems,
   initialSeriesSelection,
 }: HobbySessionWorkbenchProps): JSX.Element {
   const router = useRouter();
@@ -30,6 +45,8 @@ export function HobbySessionWorkbench({
   const [startDate, setStartDate] = useState(todayInputValue());
   const [notes, setNotes] = useState("");
   const [seriesChoice, setSeriesChoice] = useState(initialSeriesSelection ?? "");
+  const [routineId, setRoutineId] = useState("");
+  const [collectionItemId, setCollectionItemId] = useState("");
   const [newSeriesName, setNewSeriesName] = useState("");
   const [newSeriesDescription, setNewSeriesDescription] = useState("");
   const [newSeriesTags, setNewSeriesTags] = useState("");
@@ -86,6 +103,8 @@ export function HobbySessionWorkbench({
       formData.set("hobbyId", hobbyId);
       formData.set("name", name);
       if (recipeId) formData.set("recipeId", recipeId);
+      if (routineId) formData.set("routineId", routineId);
+      if (collectionItemId) formData.set("collectionItemId", collectionItemId);
       if (startDate) formData.set("startDate", startDate);
       formData.set("notes", notes);
       if (selectedExistingSeries) {
@@ -170,12 +189,62 @@ export function HobbySessionWorkbench({
               />
             </label>
 
+            {(activityMode === "practice" || activeRoutines.length > 0) ? (
+              <label className="workbench-field">
+                <span className="workbench-field__label">Practice Routine</span>
+                <select className="workbench-field__input" value={routineId} onChange={(event) => setRoutineId(event.target.value)}>
+                  <option value="">No routine</option>
+                  {activeRoutines.map((routine) => (
+                    <option key={routine.id} value={routine.id}>
+                      {routine.name} ({routine.currentStreak} streak)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {(activityMode === "collection" || collectionItems.length > 0) ? (
+              <label className="workbench-field">
+                <span className="workbench-field__label">Collection Item</span>
+                <select className="workbench-field__input" value={collectionItemId} onChange={(event) => setCollectionItemId(event.target.value)}>
+                  <option value="">No collection item</option>
+                  {collectionItems.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             {selectedExistingSeries ? (
               <div className="workbench-callout workbench-field--wide">
                 <strong>{selectedExistingSeries.name}</strong>
                 <p>
                   This session will join the active series as the next batch. The most recent batch recipe is preloaded when available.
                 </p>
+              </div>
+            ) : null}
+
+            {(activityMode === "practice" || activeGoals.length > 0) ? (
+              <div className="workbench-callout workbench-field--wide">
+                <strong>Active goals</strong>
+                {activeGoals.length === 0 ? (
+                  <p>No active goals yet.</p>
+                ) : (
+                  <div className="session-goal-preview-list">
+                    {activeGoals.map((goal) => (
+                      <div key={goal.id} className="session-goal-preview">
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                          <strong>{goal.name}</strong>
+                          <span>{Math.round(goal.progressPercentage)}%</span>
+                        </div>
+                        <div className="mode-progress__bar">
+                          <span style={{ width: `${Math.max(0, Math.min(100, goal.progressPercentage))}%` }} />
+                        </div>
+                        <p>{goal.currentValue} / {goal.targetValue} {goal.unit}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null}
 

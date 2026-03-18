@@ -33,6 +33,7 @@ import { usageMetricAnalyticsRoutes } from "./routes/usage-metrics/analytics.js"
 import { activityLogRoutes } from "./routes/activity-logs/index.js";
 import { complianceAnalyticsRoutes } from "./routes/analytics/compliance.js";
 import { comparativeAnalyticsRoutes } from "./routes/analytics/comparative.js";
+import { hobbyAnalyticsRoutes } from "./routes/analytics/hobbies.js";
 import { commentRoutes } from "./routes/comments/index.js";
 import { costAnalyticsRoutes } from "./routes/cost-analytics/index.js";
 import { entryRoutes } from "./routes/entries/index.js";
@@ -94,6 +95,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   activityLogRoutes,
   complianceAnalyticsRoutes,
   comparativeAnalyticsRoutes,
+  hobbyAnalyticsRoutes,
   commentRoutes,
   costAnalyticsRoutes,
   entryRoutes,

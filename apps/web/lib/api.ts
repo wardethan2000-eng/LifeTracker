@@ -21,11 +21,15 @@ import {
   entryListResponseSchema,
   entrySchema,
   householdInventoryAnalyticsSchema,
+  hobbyAnalyticsOverviewPayloadSchema,
+  hobbyGoalProgressPayloadSchema,
   householdInvitationSchema,
   householdNotificationListSchema,
   householdCostDashboardSchema,
   householdCostOverviewSchema,
   householdUsageHighlightListSchema,
+  hobbyPracticeStreaksPayloadSchema,
+  hobbySessionFrequencyPayloadSchema,
   scheduleComplianceDashboardSchema,
   householdMemberSchema,
   maintenanceLogSchema,
@@ -153,6 +157,8 @@ import {
   type EntrySurfaceQuery,
   type EntryType,
   type HouseholdInventoryAnalytics,
+  type HobbyAnalyticsOverviewPayload,
+  type HobbyGoalProgressPayload,
   type CustomPresetProfile,
   type HouseholdDashboard,
   type HouseholdInvitation,
@@ -286,6 +292,16 @@ import {
   hobbyProjectInventoryLinkDetailSchema,
   hobbyProjectWorkLogSchema,
   hobbyProjectWorkLogListResponseSchema,
+  hobbyPracticeGoalSchema,
+  hobbyPracticeGoalDetailSchema,
+  hobbyPracticeGoalListResponseSchema,
+  hobbyPracticeRoutineSchema,
+  hobbyPracticeRoutineSummarySchema,
+  hobbyPracticeRoutineListResponseSchema,
+  hobbyPracticeRoutineComplianceSummarySchema,
+  hobbyCollectionItemSchema,
+  hobbyCollectionItemDetailSchema,
+  hobbyCollectionItemListResponseSchema,
   hobbyInventoryCategorySchema,
   hobbyRecipeSchema,
   hobbyRecipeDetailSchema,
@@ -303,6 +319,8 @@ import {
   hobbyMetricReadingSchema,
   hobbyRecipeShoppingListSchema,
   type Hobby,
+  type HobbySessionFrequencyPayload,
+  type HobbyPracticeStreaksPayload,
   type HobbySummary,
   type HobbyAsset,
   type HobbyInventoryItem,
@@ -314,6 +332,17 @@ import {
   type HobbyProjectInventoryLinkDetail,
   type HobbyProjectWorkLog,
   type HobbyProjectWorkLogListResponse,
+  type HobbyPracticeGoal,
+  type HobbyGoalProgressGoal,
+  type HobbyPracticeGoalDetail,
+  type HobbyPracticeGoalListResponse,
+  type HobbyPracticeRoutine,
+  type HobbyPracticeRoutineSummary,
+  type HobbyPracticeRoutineListResponse,
+  type HobbyPracticeRoutineComplianceSummary,
+  type HobbyCollectionItem,
+  type HobbyCollectionItemDetail,
+  type HobbyCollectionItemListResponse,
   type HobbyInventoryCategory,
   type HobbyRecipe,
   type HobbyRecipeDetail,
@@ -364,6 +393,16 @@ import {
   type HobbyProjectWorkLogListQuery,
   type CreateHobbyProjectInventoryItemInput,
   type UpdateHobbyProjectInventoryItemInput,
+  type CreateHobbyPracticeGoalInput,
+  type UpdateHobbyPracticeGoalInput,
+  type HobbyPracticeGoalListQuery,
+  type CreateHobbyPracticeRoutineInput,
+  type UpdateHobbyPracticeRoutineInput,
+  type HobbyPracticeRoutineListQuery,
+  type HobbyPracticeRoutineComplianceQuery,
+  type CreateHobbyCollectionItemInput,
+  type UpdateHobbyCollectionItemInput,
+  type HobbyCollectionItemListQuery,
   type CreateHobbyInventoryCategoryInput,
   type HobbyStatus,
   hobbyDetailSchema,
@@ -1695,6 +1734,81 @@ export const getMemberContributionAnalytics = async (
   return apiRequest({
     path: `/v1/analytics/comparative/member-contributions?${query.toString()}`,
     schema: memberContributionPayloadSchema
+  });
+};
+
+export const getHobbySessionFrequency = async (
+  householdId: string,
+  options?: {
+    hobbyId?: string;
+    months?: number;
+  }
+): Promise<HobbySessionFrequencyPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.hobbyId) {
+    query.set("hobbyId", options.hobbyId);
+  }
+
+  if (options?.months !== undefined) {
+    query.set("months", String(options.months));
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/hobbies/session-frequency?${query.toString()}`,
+    schema: hobbySessionFrequencyPayloadSchema
+  });
+};
+
+export const getHobbyPracticeStreaks = async (
+  householdId: string,
+  options?: {
+    hobbyId?: string;
+  }
+): Promise<HobbyPracticeStreaksPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.hobbyId) {
+    query.set("hobbyId", options.hobbyId);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/hobbies/practice-streaks?${query.toString()}`,
+    schema: hobbyPracticeStreaksPayloadSchema
+  });
+};
+
+export const getHobbyGoalProgress = async (
+  householdId: string,
+  options?: {
+    hobbyId?: string;
+    status?: HobbyGoalProgressGoal["onTrack"] extends never ? never : "active" | "achieved" | "abandoned" | "paused";
+  }
+): Promise<HobbyGoalProgressPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.hobbyId) {
+    query.set("hobbyId", options.hobbyId);
+  }
+
+  if (options?.status) {
+    query.set("status", options.status);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/hobbies/goal-progress?${query.toString()}`,
+    schema: hobbyGoalProgressPayloadSchema
+  });
+};
+
+export const getHobbyAnalyticsOverview = async (
+  householdId: string
+): Promise<HobbyAnalyticsOverviewPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  return apiRequest({
+    path: `/v1/analytics/hobbies/overview?${query.toString()}`,
+    schema: hobbyAnalyticsOverviewPayloadSchema
   });
 };
 
@@ -4130,6 +4244,206 @@ export const deleteHobbyProjectInventoryItem = async (
 ): Promise<void> => {
   await apiRequest({
     path: `/v1/households/${householdId}/hobbies/${hobbyId}/projects/${projectId}/inventory/${inventoryItemId}`,
+    method: "DELETE",
+  });
+};
+
+export const listHobbyPracticeGoals = async (
+  householdId: string,
+  hobbyId: string,
+  query?: Partial<HobbyPracticeGoalListQuery>
+): Promise<HobbyPracticeGoalListResponse> => {
+  const params = new URLSearchParams();
+
+  if (query?.status) params.set("status", query.status);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  if (query?.cursor) params.set("cursor", query.cursor);
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/goals${params.size ? `?${params.toString()}` : ""}`,
+    schema: hobbyPracticeGoalListResponseSchema,
+  });
+};
+
+export const createHobbyPracticeGoal = async (
+  householdId: string,
+  hobbyId: string,
+  input: CreateHobbyPracticeGoalInput
+): Promise<HobbyPracticeGoal> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/goals`,
+  method: "POST",
+  body: input,
+  schema: hobbyPracticeGoalSchema,
+});
+
+export const getHobbyPracticeGoal = async (
+  householdId: string,
+  hobbyId: string,
+  goalId: string
+): Promise<HobbyPracticeGoalDetail> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/goals/${goalId}`,
+  schema: hobbyPracticeGoalDetailSchema,
+});
+
+export const updateHobbyPracticeGoal = async (
+  householdId: string,
+  hobbyId: string,
+  goalId: string,
+  input: UpdateHobbyPracticeGoalInput
+): Promise<HobbyPracticeGoal> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/goals/${goalId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbyPracticeGoalSchema,
+});
+
+export const deleteHobbyPracticeGoal = async (
+  householdId: string,
+  hobbyId: string,
+  goalId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/goals/${goalId}`,
+    method: "DELETE",
+  });
+};
+
+export const listHobbyPracticeRoutines = async (
+  householdId: string,
+  hobbyId: string,
+  query?: Partial<HobbyPracticeRoutineListQuery>
+): Promise<HobbyPracticeRoutineListResponse> => {
+  const params = new URLSearchParams();
+
+  if (query?.isActive !== undefined) params.set("isActive", String(query.isActive));
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  if (query?.cursor) params.set("cursor", query.cursor);
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/routines${params.size ? `?${params.toString()}` : ""}`,
+    schema: hobbyPracticeRoutineListResponseSchema,
+  });
+};
+
+export const createHobbyPracticeRoutine = async (
+  householdId: string,
+  hobbyId: string,
+  input: CreateHobbyPracticeRoutineInput
+): Promise<HobbyPracticeRoutine> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/routines`,
+  method: "POST",
+  body: input,
+  schema: hobbyPracticeRoutineSchema,
+});
+
+export const getHobbyPracticeRoutine = async (
+  householdId: string,
+  hobbyId: string,
+  routineId: string
+): Promise<HobbyPracticeRoutineSummary> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/routines/${routineId}`,
+  schema: hobbyPracticeRoutineSummarySchema,
+});
+
+export const updateHobbyPracticeRoutine = async (
+  householdId: string,
+  hobbyId: string,
+  routineId: string,
+  input: UpdateHobbyPracticeRoutineInput
+): Promise<HobbyPracticeRoutine> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/routines/${routineId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbyPracticeRoutineSchema,
+});
+
+export const deleteHobbyPracticeRoutine = async (
+  householdId: string,
+  hobbyId: string,
+  routineId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/routines/${routineId}`,
+    method: "DELETE",
+  });
+};
+
+export const getHobbyPracticeRoutineCompliance = async (
+  householdId: string,
+  hobbyId: string,
+  routineId: string,
+  query: HobbyPracticeRoutineComplianceQuery
+): Promise<HobbyPracticeRoutineComplianceSummary> => {
+  const params = new URLSearchParams({
+    startDate: query.startDate,
+    endDate: query.endDate,
+  });
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/routines/${routineId}/compliance?${params.toString()}`,
+    schema: hobbyPracticeRoutineComplianceSummarySchema,
+  });
+};
+
+export const listHobbyCollectionItems = async (
+  householdId: string,
+  hobbyId: string,
+  query?: Partial<HobbyCollectionItemListQuery>
+): Promise<HobbyCollectionItemListResponse> => {
+  const params = new URLSearchParams();
+
+  if (query?.status) params.set("status", query.status);
+  if (query?.location) params.set("location", query.location);
+  if (query?.tag) params.set("tag", query.tag);
+  if (query?.search) params.set("search", query.search);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  if (query?.cursor) params.set("cursor", query.cursor);
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/collection${params.size ? `?${params.toString()}` : ""}`,
+    schema: hobbyCollectionItemListResponseSchema,
+  });
+};
+
+export const createHobbyCollectionItem = async (
+  householdId: string,
+  hobbyId: string,
+  input: CreateHobbyCollectionItemInput
+): Promise<HobbyCollectionItem> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/collection`,
+  method: "POST",
+  body: input,
+  schema: hobbyCollectionItemSchema,
+});
+
+export const getHobbyCollectionItem = async (
+  householdId: string,
+  hobbyId: string,
+  collectionItemId: string
+): Promise<HobbyCollectionItemDetail> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/collection/${collectionItemId}`,
+  schema: hobbyCollectionItemDetailSchema,
+});
+
+export const updateHobbyCollectionItem = async (
+  householdId: string,
+  hobbyId: string,
+  collectionItemId: string,
+  input: UpdateHobbyCollectionItemInput
+): Promise<HobbyCollectionItem> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/collection/${collectionItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbyCollectionItemSchema,
+});
+
+export const deleteHobbyCollectionItem = async (
+  householdId: string,
+  hobbyId: string,
+  collectionItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/collection/${collectionItemId}`,
     method: "DELETE",
   });
 };

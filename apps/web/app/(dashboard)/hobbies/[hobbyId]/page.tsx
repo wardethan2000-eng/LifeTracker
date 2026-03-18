@@ -8,8 +8,11 @@ import {
 } from "../../../actions";
 import { EntryTimeline, EntryTipsSurface } from "../../../../components/entry-system";
 import { HobbyDangerActions } from "../../../../components/hobby-danger-actions";
+import { HobbyCollectionTab } from "../../../../components/hobby-collection-tab";
 import { HobbyLinksManager } from "../../../../components/hobby-links-manager";
 import { HobbyMetricsManager } from "../../../../components/hobby-metrics-manager";
+import { HobbyPracticeTab } from "../../../../components/hobby-practice-tab";
+import { HobbyProjectsTab } from "../../../../components/hobby-projects-tab";
 import { HobbyRecipeList } from "../../../../components/hobby-recipe-list";
 import { HobbySeriesList } from "../../../../components/hobby-series-list";
 import { HobbySessionList } from "../../../../components/hobby-session-list";
@@ -27,6 +30,10 @@ import {
   getHobbyMetricReadings,
   getMe,
   getHobbySeries,
+  listHobbyCollectionItems,
+  listHobbyPracticeGoals,
+  listHobbyPracticeRoutines,
+  listHobbyProjects,
 } from "../../../../lib/api";
 import {
   getBrewDayHighlights,
@@ -43,17 +50,6 @@ type HobbyDetailPageProps = {
   params: Promise<{ hobbyId: string }>;
   searchParams: Promise<{ tab?: string }>;
 };
-
-const tabs = [
-  { id: "overview", label: "Overview" },
-  { id: "recipes", label: "Recipes" },
-  { id: "sessions", label: "Sessions" },
-  { id: "series", label: "Series" },
-  { id: "inventory", label: "Inventory" },
-  { id: "metrics", label: "Metrics" },
-  { id: "entries", label: "Entries" },
-  { id: "settings", label: "Settings" },
-] as const;
 
 function formatDate(iso: string | null | undefined, fallback = "-"): string {
   if (!iso) return fallback;
@@ -89,7 +85,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const hobby = await getHobbyDetail(household.id, hobbyId);
 
-    const [recipes, sessions, metrics, assets, inventoryCatalog, projects, series] = await Promise.all([
+    const [recipes, sessions, metrics, assets, inventoryCatalog, projects, series, hobbyProjects, practiceGoals, practiceRoutines, collectionItems] = await Promise.all([
       getHobbyRecipes(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbyMetrics(household.id, hobbyId),
@@ -97,7 +93,38 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
       getHouseholdInventory(household.id, { limit: 100 }),
       getHouseholdProjects(household.id),
       getHobbySeries(household.id, hobbyId),
+      listHobbyProjects(household.id, hobbyId, { limit: 100 }),
+      listHobbyPracticeGoals(household.id, hobbyId, { limit: 100 }),
+      listHobbyPracticeRoutines(household.id, hobbyId, { limit: 100 }),
+      listHobbyCollectionItems(household.id, hobbyId, { limit: 100 }),
     ]);
+
+    const preferredModeTab = {
+      project: "projects",
+      practice: "practice",
+      collection: "collection",
+      session: null,
+    }[hobby.activityMode];
+    const orderedModeTabs = [
+      { id: "projects", label: "Projects" },
+      { id: "practice", label: "Practice" },
+      { id: "collection", label: "Collection" },
+    ].sort((left, right) => {
+      if (left.id === preferredModeTab) return -1;
+      if (right.id === preferredModeTab) return 1;
+      return 0;
+    });
+    const tabs = [
+      { id: "overview", label: "Overview" },
+      ...orderedModeTabs,
+      { id: "recipes", label: "Recipes" },
+      { id: "sessions", label: "Sessions" },
+      { id: "series", label: "Series" },
+      { id: "inventory", label: "Inventory" },
+      { id: "metrics", label: "Metrics" },
+      { id: "entries", label: "Entries" },
+      { id: "settings", label: "Settings" },
+    ] as const;
 
     // Load metric readings for all metrics
     const metricReadingsMap: Record<string, HobbyMetricReading[]> = {};
@@ -389,6 +416,18 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
       />
     );
 
+    const renderProjectsTab = (): JSX.Element => (
+      <HobbyProjectsTab hobbyId={hobbyId} activityMode={hobby.activityMode} projects={hobbyProjects.items} />
+    );
+
+    const renderPracticeTab = (): JSX.Element => (
+      <HobbyPracticeTab hobbyId={hobbyId} activityMode={hobby.activityMode} goals={practiceGoals.items} routines={practiceRoutines.items} metrics={metrics} />
+    );
+
+    const renderCollectionTab = (): JSX.Element => (
+      <HobbyCollectionTab hobbyId={hobbyId} activityMode={hobby.activityMode} items={collectionItems.items} />
+    );
+
     const renderEntriesTab = (): JSX.Element => (
       <EntryTimeline
         householdId={household.id}
@@ -559,6 +598,9 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
         <main>
           {tab === "overview" ? renderOverviewTab() : null}
+          {tab === "projects" ? renderProjectsTab() : null}
+          {tab === "practice" ? renderPracticeTab() : null}
+          {tab === "collection" ? renderCollectionTab() : null}
           {tab === "recipes" ? renderRecipesTab() : null}
           {tab === "sessions" ? renderSessionsTab() : null}
           {tab === "series" ? renderSeriesTab() : null}
