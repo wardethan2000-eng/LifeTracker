@@ -1851,6 +1851,20 @@ textarea { resize: vertical; }
   color: var(--ink-muted);
 }
 
+.asset-danger-actions__confirm-copy {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.asset-danger-actions__confirm-title {
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.asset-danger-actions__confirm--warning {
+  color: var(--warning);
+}
+
 .button--danger {
   background: var(--error, #dc2626);
   color: #fff;

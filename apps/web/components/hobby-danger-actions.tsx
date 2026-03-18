@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useState } from "react";
+import { ConfirmDestructiveAction } from "./confirm-destructive-action";
 
 type HobbyDangerActionsProps = {
   householdId: string;
@@ -20,8 +20,6 @@ export function HobbyDangerActions({
   restoreAction,
   deleteAction,
 }: HobbyDangerActionsProps): JSX.Element {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   return (
     <div className="asset-danger-actions">
       {isArchived ? (
@@ -42,25 +40,16 @@ export function HobbyDangerActions({
         </form>
       )}
 
-      {!confirmDelete ? (
-        <button type="button" className="button button--danger button--sm" onClick={() => setConfirmDelete(true)}>
-          Delete Hobby
-        </button>
-      ) : (
-        <div className="asset-danger-actions__confirm">
-          <span>Delete this hobby and all related records?</span>
-          <form action={deleteAction}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="hobbyId" value={hobbyId} />
-            <button type="submit" className="button button--danger button--sm">
-              Yes, delete
-            </button>
-          </form>
-          <button type="button" className="button button--ghost button--sm" onClick={() => setConfirmDelete(false)}>
-            Cancel
-          </button>
-        </div>
-      )}
+      <ConfirmDestructiveAction
+        action={deleteAction}
+        hiddenFields={[
+          { name: "householdId", value: householdId },
+          { name: "hobbyId", value: hobbyId },
+        ]}
+        triggerLabel="Delete Hobby"
+        title="Delete hobby"
+        message="Delete this hobby and all related records?"
+      />
     </div>
   );
 }

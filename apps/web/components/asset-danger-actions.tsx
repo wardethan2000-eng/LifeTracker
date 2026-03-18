@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useState } from "react";
+import { ConfirmDestructiveAction } from "./confirm-destructive-action";
 
 type AssetDangerActionsProps = {
   assetId: string;
@@ -18,8 +18,6 @@ export function AssetDangerActions({
   unarchiveAction,
   deleteAction,
 }: AssetDangerActionsProps): JSX.Element {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   return (
     <div className="asset-danger-actions">
       {isArchived ? (
@@ -38,32 +36,13 @@ export function AssetDangerActions({
         </form>
       )}
 
-      {!confirmDelete ? (
-        <button
-          type="button"
-          className="button button--danger button--sm"
-          onClick={() => setConfirmDelete(true)}
-        >
-          Delete
-        </button>
-      ) : (
-        <div className="asset-danger-actions__confirm">
-          <span>Are you sure?</span>
-          <form action={deleteAction}>
-            <input type="hidden" name="assetId" value={assetId} />
-            <button type="submit" className="button button--danger button--sm">
-              Yes, delete
-            </button>
-          </form>
-          <button
-            type="button"
-            className="button button--ghost button--sm"
-            onClick={() => setConfirmDelete(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+      <ConfirmDestructiveAction
+        action={deleteAction}
+        hiddenFields={[{ name: "assetId", value: assetId }]}
+        triggerLabel="Delete"
+        title="Delete asset"
+        message="Are you sure?"
+      />
     </div>
   );
 }
