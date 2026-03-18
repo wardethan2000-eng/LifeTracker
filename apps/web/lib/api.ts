@@ -291,6 +291,10 @@ import {
   hobbyRecipeDetailSchema,
   hobbyRecipeIngredientSchema,
   hobbyRecipeStepSchema,
+  hobbySeriesComparisonSchema,
+  hobbySeriesDetailSchema,
+  hobbySeriesListSchema,
+  hobbySeriesSchema,
   hobbySessionSchema,
   hobbySessionSummarySchema,
   hobbySessionIngredientSchema,
@@ -315,6 +319,10 @@ import {
   type HobbyRecipeDetail,
   type HobbyRecipeIngredient,
   type HobbyRecipeStep,
+  type HobbySeries,
+  type HobbySeriesComparison,
+  type HobbySeriesDetail,
+  type HobbySeriesSummary,
   type HobbySession,
   type HobbySessionSummary,
   type HobbySessionIngredient,
@@ -330,12 +338,15 @@ import {
   type UpdateHobbyRecipeIngredientInput,
   type CreateHobbyRecipeStepInput,
   type UpdateHobbyRecipeStepInput,
+  type CreateHobbySeriesInput,
   type CreateHobbySessionInput,
   type UpdateHobbySessionInput,
   type CreateHobbySessionIngredientInput,
   type UpdateHobbySessionIngredientInput,
   type CreateHobbySessionStepInput,
   type UpdateHobbySessionStepInput,
+  type UpdateHobbySeriesInput,
+  type UpdateHobbySeriesSessionInput,
   type CreateHobbyMetricDefinitionInput,
   type UpdateHobbyMetricDefinitionInput,
   type CreateHobbyMetricReadingInput,
@@ -3491,6 +3502,157 @@ export const deleteHobbySession = async (
     method: "DELETE",
   });
 };
+
+// ── Hobby Series ─────────────────────────────────────────────────────
+
+export const getHobbySeries = async (
+  householdId: string,
+  hobbyId: string,
+  options?: { status?: "active" | "completed" | "archived"; search?: string; includeArchived?: boolean }
+): Promise<HobbySeriesSummary[]> => {
+  const params = new URLSearchParams();
+  if (options?.status) params.set("status", options.status);
+  if (options?.search) params.set("search", options.search);
+  if (options?.includeArchived !== undefined) params.set("includeArchived", String(options.includeArchived));
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/series${suffix}`,
+    schema: hobbySeriesListSchema,
+  });
+};
+
+export const createHobbySeries = async (
+  householdId: string,
+  hobbyId: string,
+  input: CreateHobbySeriesInput
+): Promise<HobbySeriesSummary> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/series`,
+  method: "POST",
+  body: input,
+  schema: hobbySeriesDetailSchema.pick({
+    id: true,
+    hobbyId: true,
+    householdId: true,
+    name: true,
+    description: true,
+    status: true,
+    batchCount: true,
+    bestBatchSessionId: true,
+    tags: true,
+    notes: true,
+    coverImageUrl: true,
+    createdAt: true,
+    updatedAt: true,
+    bestBatchSessionName: true,
+    lastSessionDate: true,
+  }),
+});
+
+export const getHobbySeriesDetail = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string
+): Promise<HobbySeriesDetail> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}`,
+  schema: hobbySeriesDetailSchema,
+});
+
+export const updateHobbySeries = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string,
+  input: UpdateHobbySeriesInput
+): Promise<HobbySeriesSummary> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbySeriesDetailSchema.pick({
+    id: true,
+    hobbyId: true,
+    householdId: true,
+    name: true,
+    description: true,
+    status: true,
+    batchCount: true,
+    bestBatchSessionId: true,
+    tags: true,
+    notes: true,
+    coverImageUrl: true,
+    createdAt: true,
+    updatedAt: true,
+    bestBatchSessionName: true,
+    lastSessionDate: true,
+  }),
+});
+
+export const deleteHobbySeries = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}`,
+    method: "DELETE",
+  });
+};
+
+export const compareHobbySeries = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string,
+  query?: { sessionIds?: string[] }
+): Promise<HobbySeriesComparison> => {
+  const params = new URLSearchParams();
+
+  if (query?.sessionIds && query.sessionIds.length > 0) {
+    params.set("sessionIds", query.sessionIds.join(","));
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}/compare${suffix}`,
+    schema: hobbySeriesComparisonSchema,
+  });
+};
+
+export const linkHobbySeriesSession = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string,
+  sessionId: string
+): Promise<HobbySession> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}/sessions`,
+  method: "POST",
+  body: { sessionId },
+  schema: hobbySessionSchema,
+});
+
+export const unlinkHobbySeriesSession = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string,
+  sessionId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}/sessions/${sessionId}`,
+    method: "DELETE",
+  });
+};
+
+export const updateHobbySeriesSession = async (
+  householdId: string,
+  hobbyId: string,
+  seriesId: string,
+  sessionId: string,
+  input: UpdateHobbySeriesSessionInput
+): Promise<HobbySession> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/series/${seriesId}/sessions/${sessionId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbySessionSchema,
+});
 
 // ── Hobby Session Ingredients ────────────────────────────────────────
 

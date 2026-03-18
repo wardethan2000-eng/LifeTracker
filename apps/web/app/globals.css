@@ -5201,6 +5201,319 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--accent);
 }
 
+.session-workbench-stack,
+.hobby-series-detail-stack,
+.hobby-series-aside-stack,
+.hobby-series-compare-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.workbench-callout {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent-bg), rgba(13, 148, 136, 0.06));
+}
+
+.workbench-callout p {
+  margin: 0;
+  color: var(--ink-light);
+}
+
+.hobby-series-panel-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.hobby-series-panel-heading__copy {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.88rem;
+}
+
+.hobby-series-panel-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hobby-series-panel-actions__status {
+  min-width: 160px;
+}
+
+.hobby-series-summary-row,
+.hobby-series-hero__meta,
+.hobby-series-detail-actions,
+.hobby-series-batch-card__badges,
+.hobby-series-batch-card__metrics,
+.hobby-series-note-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hobby-series-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.hobby-series-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0.04), rgba(255, 255, 255, 0));
+  text-decoration: none;
+  color: inherit;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.hobby-series-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.hobby-series-card__media,
+.hobby-series-hero__media {
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(13, 148, 136, 0.18), rgba(30, 41, 59, 0.06));
+}
+
+.hobby-series-card__image,
+.hobby-series-hero__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hobby-series-card__placeholder,
+.hobby-series-hero__placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 112px;
+  color: var(--accent);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hobby-series-card__content,
+.hobby-series-batch-card,
+.hobby-series-batch-card__body,
+.hobby-series-note-detail,
+.hobby-series-compare-columnhead,
+.hobby-series-compare-metric-cell,
+.session-series-compare,
+.session-series-compare__metrics {
+  display: grid;
+  gap: 10px;
+}
+
+.hobby-series-card__topline,
+.hobby-series-batch-card__header,
+.hobby-series-batch-card__footer,
+.session-series-summary,
+.session-series-compare__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hobby-series-card__description,
+.hobby-series-batch-card__caption {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.86rem;
+}
+
+.hobby-series-card__stats,
+.hobby-series-card__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hobby-series-card__best {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.hobby-series-hero {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.hobby-series-hero__media {
+  min-height: 200px;
+}
+
+.hobby-series-hero__content {
+  display: grid;
+  gap: 12px;
+}
+
+.hobby-series-hero__topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hobby-series-edit-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.hobby-series-timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.hobby-series-batch-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.hobby-series-batch-card.is-best {
+  border-color: var(--success-border);
+  background: linear-gradient(180deg, rgba(5, 150, 105, 0.08), rgba(255, 255, 255, 0));
+}
+
+.hobby-series-batch-card__select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.hobby-series-batch-card__batch-input {
+  min-width: 100px;
+}
+
+.hobby-series-batch-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-series-summary,
+.session-series-compare {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.session-series-compare__metrics {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.session-series-compare__metric {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.session-series-compare__metric dt {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.session-series-compare__metric dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.hobby-series-compare-scroll {
+  overflow-x: auto;
+}
+
+.hobby-series-compare-table {
+  width: max(100%, 860px);
+  border-collapse: collapse;
+}
+
+.hobby-series-compare-table th,
+.hobby-series-compare-table td {
+  padding: 12px;
+  border: 1px solid var(--border);
+  vertical-align: top;
+  text-align: left;
+}
+
+.hobby-series-compare-table tbody th {
+  min-width: 180px;
+  background: var(--surface-alt);
+  color: var(--ink-light);
+}
+
+.hobby-series-compare-table__group td {
+  background: linear-gradient(90deg, rgba(13, 148, 136, 0.12), rgba(13, 148, 136, 0.02));
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+}
+
+.hobby-series-compare-columnhead span {
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+}
+
+.hobby-series-compare-metric-cell span {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
+.hobby-series-note-summary {
+  font-size: 0.82rem;
+  color: var(--ink-light);
+}
+
+.hobby-series-note-detail__item {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.hobby-series-note-detail__item p {
+  margin: 4px 0 0;
+  color: var(--ink-light);
+  white-space: pre-wrap;
+  font-size: 0.84rem;
+}
+
+.hobby-series-compare-table td.is-best {
+  background: var(--success-bg);
+}
+
+.hobby-series-compare-table td.is-warning {
+  background: var(--warning-bg);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
   ═══ 55. Section Filter
   ═══════════════════════════════════════════════════════════════════ */
@@ -5376,7 +5689,8 @@ html[data-ui-density="compact"] .resource-layout__aside {
 @media (max-width: 960px) {
   .session-brew-grid,
   .session-brew-details-grid,
-  .session-metric-form-row {
+  .session-metric-form-row,
+  .hobby-series-hero {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -5384,8 +5698,17 @@ html[data-ui-density="compact"] .resource-layout__aside {
 @media (max-width: 640px) {
   .session-brew-checklist,
   .session-pipeline-track,
-  .session-metric-form-row {
+  .session-metric-form-row,
+  .hobby-series-grid,
+  .hobby-series-card,
+  .hobby-series-hero {
     grid-template-columns: 1fr;
+  }
+
+  .hobby-series-panel-actions,
+  .hobby-series-batch-card__footer,
+  .hobby-series-batch-card__actions {
+    align-items: stretch;
   }
 
   .session-step {

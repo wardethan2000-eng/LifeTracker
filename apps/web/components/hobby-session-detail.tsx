@@ -2,6 +2,7 @@
 
 import type {
   HobbyDetail,
+  HobbySeriesDetail,
   HobbySession,
   HobbySessionDetail,
   HobbySessionDetailIngredient,
@@ -37,6 +38,7 @@ type HobbySessionDetailProps = {
   hobbyId: string;
   hobby: HobbyDetail;
   session: HobbySessionDetail;
+  series: HobbySeriesDetail | null;
   advanceHobbySessionAction: (formData: FormData) => Promise<void>;
   deleteHobbySessionAction: (formData: FormData) => Promise<void>;
 };
@@ -198,6 +200,7 @@ export function HobbySessionDetail({
   hobbyId,
   hobby,
   session,
+  series,
   advanceHobbySessionAction,
   deleteHobbySessionAction,
 }: HobbySessionDetailProps): JSX.Element {
@@ -258,6 +261,44 @@ export function HobbySessionDetail({
   const brewDayHighlights = useMemo(() => getBrewDayHighlights(brewDayDraft), [brewDayDraft]);
   const brewDayMissingItems = useMemo(() => getBrewDayMissingItems(brewDayDraft), [brewDayDraft]);
   const brewDayReadinessLabel = useMemo(() => getBrewDayReadinessLabel(brewDayDraft), [brewDayDraft]);
+  const previousSeriesBatch = useMemo(() => {
+    const currentBatchNumber = sessionState.batchNumber;
+
+    if (!series || currentBatchNumber == null) {
+      return null;
+    }
+
+    return [...series.sessions]
+      .filter((item) => item.id !== sessionState.id && item.batchNumber != null && item.batchNumber < currentBatchNumber)
+      .sort((left, right) => (right.batchNumber ?? 0) - (left.batchNumber ?? 0))[0] ?? null;
+  }, [series, sessionState.batchNumber, sessionState.id]);
+  const previousMetricComparisons = useMemo(() => {
+    if (!previousSeriesBatch) {
+      return [];
+    }
+
+    return sessionState.metricReadings
+      .map((reading) => {
+        const previousReading = previousSeriesBatch.metricReadings.find(
+          (candidate) => candidate.metricDefinitionId === reading.metricDefinitionId,
+        );
+
+        if (!previousReading) {
+          return null;
+        }
+
+        return {
+          id: reading.id,
+          metricName: reading.metricName,
+          metricUnit: reading.metricUnit,
+          currentValue: reading.value,
+          previousValue: previousReading.value,
+          delta: reading.value - previousReading.value,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .slice(0, 6);
+  }, [previousSeriesBatch, sessionState.metricReadings]);
   const recommendedPitchTemp = useMemo(() => getRecommendedPitchTemperature(brewDayDraft), [brewDayDraft]);
   const brewDayHasChanges = useMemo(() => {
     const nextCustomFields = mergeBrewDayCustomFields(sessionState.customFields, brewDayDraft);
@@ -668,6 +709,59 @@ export function HobbySessionDetail({
             )}
           </div>
         </Card>
+
+        {series ? (
+          <Card title="Series Context">
+            <div className="session-section-stack">
+              <div className="session-series-summary">
+                <div>
+                  <strong>
+                    <Link href={`/hobbies/${hobbyId}/series/${series.id}`} className="text-link">
+                      {series.name}
+                    </Link>
+                  </strong>
+                  <p className="session-brew-summary__caption">
+                    Batch {sessionState.batchNumber ?? "-"} of {series.batchCount}
+                  </p>
+                </div>
+                {series.bestBatchSessionId === sessionState.id ? <span className="pill pill--success">Best batch</span> : null}
+              </div>
+
+              {previousSeriesBatch ? (
+                <div className="session-series-compare">
+                  <div className="session-series-compare__header">
+                    <strong>Compared with previous batch</strong>
+                    <Link href={`/hobbies/${hobbyId}/series/${series.id}`} className="text-link">
+                      Open series
+                    </Link>
+                  </div>
+                  <p className="session-brew-summary__caption">
+                    {previousSeriesBatch.name} · Batch {previousSeriesBatch.batchNumber ?? "-"}
+                  </p>
+                  {previousMetricComparisons.length > 0 ? (
+                    <div className="session-series-compare__metrics">
+                      {previousMetricComparisons.map((item) => (
+                        <div key={item.id} className="session-series-compare__metric">
+                          <dt>{item.metricName}</dt>
+                          <dd>
+                            {item.currentValue} {item.metricUnit} vs {item.previousValue} {item.metricUnit}
+                          </dd>
+                          <span className={item.delta >= 0 ? "pill pill--success" : "pill pill--warning"}>
+                            {item.delta > 0 ? "+" : ""}{item.delta.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="panel__empty">No overlapping metrics to compare with the previous batch.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="panel__empty">No previous batch is available for comparison yet.</p>
+              )}
+            </div>
+          </Card>
+        ) : null}
 
         {isBrewingSession ? (
           <div id="brew-day-workspace">

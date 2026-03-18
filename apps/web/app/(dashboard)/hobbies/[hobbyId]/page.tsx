@@ -11,6 +11,7 @@ import { HobbyDangerActions } from "../../../../components/hobby-danger-actions"
 import { HobbyLinksManager } from "../../../../components/hobby-links-manager";
 import { HobbyMetricsManager } from "../../../../components/hobby-metrics-manager";
 import { HobbyRecipeList } from "../../../../components/hobby-recipe-list";
+import { HobbySeriesList } from "../../../../components/hobby-series-list";
 import { HobbySessionList } from "../../../../components/hobby-session-list";
 import { HobbySessionAdvanceButton } from "../../../../components/hobby-session-advance-button";
 import { HobbyShoppingListButton } from "../../../../components/hobby-shopping-list-button";
@@ -25,6 +26,7 @@ import {
   getHobbyMetrics,
   getHobbyMetricReadings,
   getMe,
+  getHobbySeries,
 } from "../../../../lib/api";
 import {
   getBrewDayHighlights,
@@ -46,6 +48,7 @@ const tabs = [
   { id: "overview", label: "Overview" },
   { id: "recipes", label: "Recipes" },
   { id: "sessions", label: "Sessions" },
+  { id: "series", label: "Series" },
   { id: "inventory", label: "Inventory" },
   { id: "metrics", label: "Metrics" },
   { id: "entries", label: "Entries" },
@@ -86,13 +89,14 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
 
     const hobby = await getHobbyDetail(household.id, hobbyId);
 
-    const [recipes, sessions, metrics, assets, inventoryCatalog, projects] = await Promise.all([
+    const [recipes, sessions, metrics, assets, inventoryCatalog, projects, series] = await Promise.all([
       getHobbyRecipes(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbyMetrics(household.id, hobbyId),
       getHouseholdAssets(household.id),
       getHouseholdInventory(household.id, { limit: 100 }),
       getHouseholdProjects(household.id),
+      getHobbySeries(household.id, hobbyId),
     ]);
 
     // Load metric readings for all metrics
@@ -137,6 +141,11 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
             <span className="stat-card__label">Equipment</span>
             <strong className="stat-card__value">{hobby.assetLinks.length}</strong>
             <span className="stat-card__sub">Linked assets</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__label">Series</span>
+            <strong className="stat-card__value">{series.length}</strong>
+            <span className="stat-card__sub">Tracked batch lines</span>
           </div>
         </section>
 
@@ -327,6 +336,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
               <div className="panel__body--padded">
                 <div style={{ display: "grid", gap: "8px" }}>
                   <Link href={`/hobbies/${hobbyId}/sessions/new`} className="button button--primary button--sm">Start New Session</Link>
+                    <Link href={`/hobbies/${hobbyId}/series/new`} className="button button--secondary button--sm">New Series</Link>
                   <Link href={`/hobbies/${hobbyId}/recipes/new`} className="button button--secondary button--sm">Add Recipe</Link>
                   <Link href={`/hobbies/${hobbyId}/edit`} className="button button--ghost button--sm">Edit Hobby</Link>
                   {suggestedSession ? (
@@ -340,6 +350,10 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           </aside>
         </div>
       </div>
+    );
+
+    const renderSeriesTab = (): JSX.Element => (
+      <HobbySeriesList hobbyId={hobbyId} activityMode={hobby.activityMode} series={series} />
     );
 
     const renderRecipesTab = (): JSX.Element => (
@@ -547,6 +561,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           {tab === "overview" ? renderOverviewTab() : null}
           {tab === "recipes" ? renderRecipesTab() : null}
           {tab === "sessions" ? renderSessionsTab() : null}
+          {tab === "series" ? renderSeriesTab() : null}
           {tab === "inventory" ? renderInventoryTab() : null}
           {tab === "metrics" ? renderMetricsTab() : null}
           {tab === "entries" || tab === "journal" ? renderEntriesTab() : null}

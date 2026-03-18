@@ -38,6 +38,7 @@ import type {
   CreateUsageMetricInput,
   CreateHobbyInput,
   CreateHobbyRecipeInput,
+  CreateHobbySeriesInput,
   CreateHobbySessionInput,
   HobbySessionLifecycleMode,
   HobbyStatus,
@@ -110,6 +111,7 @@ import {
   createHousehold,
   createHobby,
   createHobbyRecipe,
+  createHobbySeries,
   createHobbySession,
   createInventoryItem,
   createQuickRestockBatch,
@@ -125,6 +127,7 @@ import {
   deleteAssetTimelineEntry,
   deleteHobby,
   deleteHobbyRecipe,
+  deleteHobbySeries,
   deleteMetric,
   deleteHobbySession,
   deleteProject,
@@ -156,6 +159,7 @@ import {
   updateAssetTimelineEntry,
   updateHobby,
   updateHobbyRecipe,
+  updateHobbySeries,
   updateProject,
   updateProjectBudgetCategory,
   updateProjectExpense,
@@ -168,6 +172,7 @@ import {
   updateProjectTask,
   updateTaskChecklistItem,
   instantiateProjectTemplate,
+  linkHobbySeriesSession,
   promoteTask,
   updateSchedule,
   updateServiceProvider,
@@ -772,9 +777,21 @@ const revalidateHobbyRecipePaths = (hobbyId: string, recipeId?: string): void =>
 const revalidateHobbySessionPaths = (hobbyId: string, sessionId?: string): void => {
   revalidatePath("/hobbies");
   revalidatePath(`/hobbies/${hobbyId}`);
+  revalidatePath(`/hobbies/${hobbyId}/sessions/new`);
 
   if (sessionId) {
     revalidatePath(`/hobbies/${hobbyId}/sessions/${sessionId}`);
+  }
+};
+
+const revalidateHobbySeriesPaths = (hobbyId: string, seriesId?: string): void => {
+  revalidatePath("/hobbies");
+  revalidatePath(`/hobbies/${hobbyId}`);
+  revalidatePath(`/hobbies/${hobbyId}/series/new`);
+
+  if (seriesId) {
+    revalidatePath(`/hobbies/${hobbyId}/series/${seriesId}`);
+    revalidatePath(`/hobbies/${hobbyId}/series/${seriesId}/compare`);
   }
 };
 
@@ -785,6 +802,7 @@ const revalidateHobbyPaths = (hobbyId?: string): void => {
     revalidatePath(`/hobbies/${hobbyId}`);
     revalidatePath(`/hobbies/${hobbyId}/edit`);
     revalidatePath(`/hobbies/${hobbyId}/sessions/new`);
+    revalidatePath(`/hobbies/${hobbyId}/series/new`);
   }
 };
 
@@ -2974,14 +2992,85 @@ export async function createHobbySessionAction(formData: FormData): Promise<void
   const recipeId = getOptionalString(formData, "recipeId");
   const startDate = getOptionalString(formData, "startDate");
   const notes = getOptionalString(formData, "notes");
+  const existingSeriesId = getOptionalString(formData, "seriesId");
+  const newSeriesName = getOptionalString(formData, "newSeriesName");
+  const newSeriesDescription = getOptionalString(formData, "newSeriesDescription");
+  const newSeriesTags = getOptionalString(formData, "newSeriesTags");
 
   if (recipeId) input.recipeId = recipeId;
   if (startDate) input.startDate = new Date(`${startDate}T00:00:00.000Z`).toISOString();
   if (notes) input.notes = notes;
 
+  let linkedSeriesId = existingSeriesId || "";
+
+  if (!linkedSeriesId && newSeriesName) {
+    const seriesInput: CreateHobbySeriesInput = {
+      name: newSeriesName,
+      ...(newSeriesDescription ? { description: newSeriesDescription } : {}),
+      ...(newSeriesTags
+        ? {
+            tags: newSeriesTags
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          }
+        : {}),
+    };
+
+    const series = await createHobbySeries(householdId, hobbyId, seriesInput);
+    linkedSeriesId = series.id;
+    revalidateHobbySeriesPaths(hobbyId, series.id);
+  }
+
   const session = await createHobbySession(householdId, hobbyId, input);
+
+  if (linkedSeriesId) {
+    await linkHobbySeriesSession(householdId, hobbyId, linkedSeriesId, session.id);
+    revalidateHobbySeriesPaths(hobbyId, linkedSeriesId);
+  }
+
   revalidateHobbySessionPaths(hobbyId, session.id);
   redirect(`/hobbies/${hobbyId}/sessions/${session.id}`);
+}
+
+export async function createHobbySeriesAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+
+  const tags = getOptionalString(formData, "tags");
+  const input: CreateHobbySeriesInput = {
+    name: getRequiredString(formData, "name"),
+  };
+
+  const description = getOptionalString(formData, "description");
+  const status = getOptionalString(formData, "status");
+  const notes = getOptionalString(formData, "notes");
+  const coverImageUrl = getOptionalString(formData, "coverImageUrl");
+
+  if (description) input.description = description;
+  if (status === "active" || status === "completed" || status === "archived") input.status = status;
+  if (notes) input.notes = notes;
+  if (coverImageUrl) input.coverImageUrl = coverImageUrl;
+  if (tags) {
+    input.tags = tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  const series = await createHobbySeries(householdId, hobbyId, input);
+  revalidateHobbySeriesPaths(hobbyId, series.id);
+  redirect(`/hobbies/${hobbyId}/series/${series.id}`);
+}
+
+export async function deleteHobbySeriesAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const seriesId = getRequiredString(formData, "seriesId");
+
+  await deleteHobbySeries(householdId, hobbyId, seriesId);
+  revalidateHobbySeriesPaths(hobbyId);
+  redirect(`/hobbies/${hobbyId}?tab=series`);
 }
 
 export async function advanceHobbySessionAction(formData: FormData): Promise<void> {

@@ -8,6 +8,7 @@ import {
 import {
   ApiError,
   getHobbyDetail,
+  getHobbySeriesDetail,
   getHobbySessionDetail,
   getMe,
 } from "../../../../../../lib/api";
@@ -36,6 +37,8 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
       getHobbySessionDetail(household.id, hobbyId, sessionId),
     ]);
 
+    const series = session.seriesId ? await getHobbySeriesDetail(household.id, hobbyId, session.seriesId) : null;
+
     return (
       <>
         <header className="page-header">
@@ -54,6 +57,14 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
                 From recipe: {session.recipeName}
               </p>
             ) : null}
+            {series && session.batchNumber ? (
+              <p style={{ color: "var(--ink-muted)", fontSize: "0.9rem", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                <span className="pill pill--success">Series</span>
+                <Link href={`/hobbies/${hobbyId}/series/${series.id}`} className="text-link">
+                  {series.name} · Batch {session.batchNumber}
+                </Link>
+              </p>
+            ) : null}
           </div>
         </header>
         <HobbySessionDetail
@@ -61,6 +72,7 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
           hobbyId={hobbyId}
           hobby={hobby}
           session={session}
+          series={series}
           advanceHobbySessionAction={advanceHobbySessionAction}
           deleteHobbySessionAction={deleteHobbySessionAction}
         />
