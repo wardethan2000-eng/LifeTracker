@@ -17,6 +17,9 @@ import {
   customPresetProfileSchema,
   devFixtureIds,
   dueWorkItemSchema,
+  actionableEntryGroupListSchema,
+  entryListResponseSchema,
+  entrySchema,
   householdInventoryAnalyticsSchema,
   householdInvitationSchema,
   householdNotificationListSchema,
@@ -104,6 +107,8 @@ import {
   type AssetTimelineQuery,
   type ActivityLog,
   type AcceptInvitationInput,
+  type ActionableEntryGroup,
+  type CreateEntryInput,
   type CreateAssetTimelineEntryInput,
   type CompleteMaintenanceScheduleInput,
   type CreateCommentInput,
@@ -142,6 +147,11 @@ import {
   type ComplianceReportPayload,
   type CompletionCycleRecord,
   type DueWorkItem,
+  type Entry,
+  type EntryFlag,
+  type EntryListQuery,
+  type EntrySurfaceQuery,
+  type EntryType,
   type HouseholdInventoryAnalytics,
   type CustomPresetProfile,
   type HouseholdDashboard,
@@ -216,6 +226,7 @@ import {
   type ServiceProvider,
   type ServiceProviderSpend,
   type ThreadedComment,
+  type UpdateEntryInput,
   type UpdateAssetTimelineEntryInput,
   type UpdateCommentInput,
   type UpdateProjectBudgetCategoryInput,
@@ -382,7 +393,10 @@ const customPresetProfileListSchema = customPresetProfileSchema.array();
 const activityLogListSchema = activityLogSchema.array();
 const assetListSchema = assetSchema.array();
 const dueWorkItemListSchema = dueWorkItemSchema.array();
+const actionableEntryGroupResponseSchema = actionableEntryGroupListSchema;
 const assetTimelineEntryListSchema = assetTimelineEntrySchema.array();
+const entryListSchema = entryListResponseSchema;
+const surfacedEntryListSchema = entrySchema.array();
 const assetTimelineResponseSchema: Schema<{ items: AssetTimelineItem[]; nextCursor: string | null; totalSources: number }> = {
   parse: (value: unknown) => {
     if (typeof value !== "object" || value === null) {
@@ -689,6 +703,136 @@ export const getHouseholdDashboard = async (householdId: string): Promise<Househ
   path: `/v1/households/${householdId}/dashboard`,
   schema: householdDashboardSchema,
   cacheOptions: { revalidate: 60 }
+});
+
+const appendListValue = (params: URLSearchParams, key: string, value?: string | string[]): void => {
+  if (value === undefined) {
+    return;
+  }
+
+  const values = Array.isArray(value) ? value : [value];
+  const normalized = values.map((entry) => entry.trim()).filter(Boolean);
+
+  if (normalized.length === 0) {
+    return;
+  }
+
+  params.set(key, normalized.join(","));
+};
+
+export const getEntries = async (
+  householdId: string,
+  query?: Partial<EntryListQuery> & {
+    entryType?: EntryType | EntryType[];
+    flags?: EntryFlag[];
+    excludeFlags?: EntryFlag[];
+  }
+): Promise<{ items: Entry[]; nextCursor: string | null }> => {
+  const params = new URLSearchParams();
+
+  if (query?.entityType) {
+    params.set("entityType", query.entityType);
+  }
+
+  if (query?.entityId) {
+    params.set("entityId", query.entityId);
+  }
+
+  appendListValue(params, "entryType", query?.entryType);
+  appendListValue(params, "flags", query?.flags);
+  appendListValue(params, "excludeFlags", query?.excludeFlags);
+  appendListValue(params, "tags", query?.tags);
+
+  if (query?.search) {
+    params.set("search", query.search);
+  }
+
+  if (query?.createdById) {
+    params.set("createdById", query.createdById);
+  }
+
+  if (query?.startDate) {
+    params.set("startDate", query.startDate);
+  }
+
+  if (query?.endDate) {
+    params.set("endDate", query.endDate);
+  }
+
+  if (query?.hasMeasurements !== undefined) {
+    params.set("hasMeasurements", String(query.hasMeasurements));
+  }
+
+  if (query?.measurementName) {
+    params.set("measurementName", query.measurementName);
+  }
+
+  if (query?.sortBy) {
+    params.set("sortBy", query.sortBy);
+  }
+
+  if (query?.limit !== undefined) {
+    params.set("limit", String(query.limit));
+  }
+
+  if (query?.cursor) {
+    params.set("cursor", query.cursor);
+  }
+
+  if (query?.includeArchived !== undefined) {
+    params.set("includeArchived", String(query.includeArchived));
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/entries${suffix}`,
+    schema: entryListSchema,
+    cacheOptions: "no-store"
+  });
+};
+
+export const getEntry = async (householdId: string, entryId: string): Promise<Entry> => apiRequest({
+  path: `/v1/households/${householdId}/entries/${entryId}`,
+  schema: entrySchema,
+  cacheOptions: "no-store"
+});
+
+export const createEntry = async (householdId: string, input: CreateEntryInput): Promise<Entry> => apiRequest({
+  path: `/v1/households/${householdId}/entries`,
+  method: "POST",
+  body: input,
+  schema: entrySchema
+});
+
+export const updateEntry = async (householdId: string, entryId: string, input: UpdateEntryInput): Promise<Entry> => apiRequest({
+  path: `/v1/households/${householdId}/entries/${entryId}`,
+  method: "PATCH",
+  body: input,
+  schema: entrySchema
+});
+
+export const deleteEntry = async (householdId: string, entryId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/entries/${entryId}`,
+    method: "DELETE"
+  });
+};
+
+export const getSurfacedEntries = async (householdId: string, query: EntrySurfaceQuery): Promise<Entry[]> => {
+  const params = new URLSearchParams({ entityType: query.entityType, entityId: query.entityId });
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/entries/surface?${params.toString()}`,
+    schema: surfacedEntryListSchema,
+    cacheOptions: "no-store"
+  });
+};
+
+export const getActionableEntries = async (householdId: string): Promise<ActionableEntryGroup[]> => apiRequest({
+  path: `/v1/households/${householdId}/entries/actionable`,
+  schema: actionableEntryGroupResponseSchema,
+  cacheOptions: "no-store"
 });
 
 export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkItem[]> => apiRequest({

@@ -6,8 +6,8 @@ import {
   deleteHobbyAction,
   restoreHobbyAction,
 } from "../../../actions";
+import { EntryTimeline, EntryTipsSurface } from "../../../../components/entry-system";
 import { HobbyDangerActions } from "../../../../components/hobby-danger-actions";
-import { HobbyJournalManager } from "../../../../components/hobby-journal-manager";
 import { HobbyLinksManager } from "../../../../components/hobby-links-manager";
 import { HobbyMetricsManager } from "../../../../components/hobby-metrics-manager";
 import { HobbyRecipeList } from "../../../../components/hobby-recipe-list";
@@ -49,7 +49,7 @@ const tabs = [
   { id: "sessions", label: "Sessions" },
   { id: "inventory", label: "Inventory" },
   { id: "metrics", label: "Metrics" },
-  { id: "journal", label: "Journal" },
+  { id: "entries", label: "Entries" },
   { id: "settings", label: "Settings" },
 ] as const;
 
@@ -377,11 +377,15 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
       />
     );
 
-    const renderJournalTab = (): JSX.Element => (
-      <HobbyJournalManager
+    const renderEntriesTab = (): JSX.Element => (
+      <EntryTimeline
         householdId={household.id}
-        hobbyId={hobbyId}
-        initialLogs={logs}
+        entityType="hobby"
+        entityId={hobbyId}
+        title="Hobby Entries"
+        quickAddLabel="Entry"
+        initialComposerOpen={tab === "entries" && typeof searchParams === "object" && false}
+        entryHrefBuilder={(entry) => `/hobbies/${hobbyId}?tab=entries#entry-${entry.id}`}
       />
     );
 
@@ -524,6 +528,12 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         </header>
 
         <div className="page-body">
+        <EntryTipsSurface
+          householdId={household.id}
+          queries={[{ entityType: "hobby", entityId: hobbyId }]}
+          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}?tab=entries#entry-${entry.id}`}
+        />
+
         <nav aria-label="Hobby sections">
           <ul className="hobby-tab-bar">
             {tabs.map((item) => (
@@ -542,7 +552,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           {tab === "sessions" ? renderSessionsTab() : null}
           {tab === "inventory" ? renderInventoryTab() : null}
           {tab === "metrics" ? renderMetricsTab() : null}
-          {tab === "journal" ? renderJournalTab() : null}
+          {tab === "entries" || tab === "journal" ? renderEntriesTab() : null}
           {tab === "settings" ? renderSettingsTab() : null}
         </main>
         </div>

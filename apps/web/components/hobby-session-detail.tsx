@@ -35,6 +35,7 @@ import {
   updateHobbySessionStep,
 } from "../lib/api";
 import { Card } from "./card";
+import { EntryTimeline, EntryTipsSurface } from "./entry-system";
 
 type HobbySessionDetailProps = {
   householdId: string;
@@ -719,6 +720,15 @@ export function HobbySessionDetail({
   };
 
   return (
+    <>
+    <EntryTipsSurface
+      householdId={householdId}
+      queries={[
+        { entityType: "hobby_session", entityId: sessionState.id },
+        { entityType: "hobby", entityId: hobbyId }
+      ]}
+      entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/sessions/${sessionState.id}#entry-${entry.id}`}
+    />
     <div className="resource-layout">
       <div className="resource-layout__primary session-detail-stack">
         {errorMessage ? (
@@ -1452,7 +1462,17 @@ export function HobbySessionDetail({
             </div>
           </div>
         </Card>
+
+        <EntryTimeline
+          householdId={householdId}
+          entityType="hobby_session"
+          entityId={sessionState.id}
+          title="Entry Timeline"
+          quickAddLabel="Entry"
+          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/sessions/${sessionState.id}#entry-${entry.id}`}
+        />
       </aside>
     </div>
+    </>
   );
 }

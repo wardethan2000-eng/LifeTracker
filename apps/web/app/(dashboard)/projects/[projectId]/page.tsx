@@ -34,6 +34,7 @@ import { Card } from "../../../../components/card";
 import { ConfirmActionForm } from "../../../../components/confirm-action-form";
 import { CompactPhasePreview } from "../../../../components/compact-phase-preview";
 import { CompactTaskPreview } from "../../../../components/compact-task-preview";
+import { EntryTimeline, EntryTipsSurface } from "../../../../components/entry-system";
 import { ExpandableCard } from "../../../../components/expandable-card";
 import { ProjectChecklist } from "../../../../components/project-checklist";
 import { ProjectLinkedInventoryCard } from "../../../../components/project-linked-inventory-card";
@@ -191,6 +192,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
   const focusedPhaseId = typeof query.focusPhaseId === "string" ? query.focusPhaseId : undefined;
+  const view = query.view === "entries" ? "entries" : "overview";
 
   try {
     const me = await getMe();
@@ -208,6 +210,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     }
 
     const project = await getProjectDetail(household.id, routeParams.projectId);
+    const projectEntriesHref = `/projects/${project.id}?householdId=${household.id}&view=entries`;
 
     const phaseNameLookup = new Map(project.phases.map((phase) => [phase.id, phase.name]));
     const quickTodos = project.tasks.filter((task) => task.taskType === "quick");
@@ -272,7 +275,32 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           </div>
         </header>
 
+        <nav className="entry-view-tab-bar" aria-label="Project detail views">
+          <Link href={`/projects/${project.id}?householdId=${household.id}`} className={`entry-view-tab-bar__tab${view === "overview" ? " entry-view-tab-bar__tab--active" : ""}`}>
+            Overview
+          </Link>
+          <Link href={projectEntriesHref} className={`entry-view-tab-bar__tab${view === "entries" ? " entry-view-tab-bar__tab--active" : ""}`}>
+            Entries
+          </Link>
+        </nav>
+
         <div className="page-body">
+          <EntryTipsSurface
+            householdId={household.id}
+            queries={[{ entityType: "project", entityId: project.id }]}
+            entryHrefBuilder={(entry) => `${projectEntriesHref}#entry-${entry.id}`}
+          />
+
+          {view === "entries" ? (
+            <EntryTimeline
+              householdId={household.id}
+              entityType="project"
+              entityId={project.id}
+              title="Project Entries"
+              quickAddLabel="Entry"
+              entryHrefBuilder={(entry) => `${projectEntriesHref}#entry-${entry.id}`}
+            />
+          ) : (
           {project.treeStats && (
             <div className="note" style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", marginBottom: "12px" }}>
               <span><strong>Tree totals:</strong></span>
@@ -381,7 +409,8 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     </div>
                   </div>
                 }
-              >
+                )}
+              </div>
                 <div>
                   <form action={updateProjectAction} className="workbench-form">
                     <ProjectCoreFormFields householdId={household.id} project={project} includeProjectId />

@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { createHouseholdAction } from "../actions";
 import { DashboardDueWork } from "../../components/dashboard-due-work";
 import { getDashboardData } from "../../components/dashboard-data";
+import { EntryActionableList } from "../../components/entry-system";
 import { DashboardNotificationsAside } from "../../components/dashboard-notifications-aside";
 import { ApiError, getApiBaseUrl, getDevUserId, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDateTime } from "../../lib/formatters";
@@ -274,6 +275,7 @@ async function DashboardAssetRegistry({ dashboardPromise }: { dashboardPromise: 
 
 async function DashboardAsidePanels({ dashboardPromise }: { dashboardPromise: Promise<HouseholdDashboard> }): Promise<JSX.Element> {
   const dashboard = await dashboardPromise;
+  const householdId = dashboard.household.id;
 
   return (
     <>
@@ -294,6 +296,8 @@ async function DashboardAsidePanels({ dashboardPromise }: { dashboardPromise: Pr
           )}
         </div>
       </section>
+
+      <EntryActionableList householdId={householdId} title="Entry Action Items" compact />
 
       <DashboardNotificationsAside notifications={dashboard.notifications} />
     </>

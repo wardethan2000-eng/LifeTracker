@@ -125,11 +125,24 @@ CREATE INDEX "HobbySession_routineId_idx" ON "HobbySession"("routineId");
 -- CreateIndex
 CREATE INDEX "HobbySession_collectionItemId_idx" ON "HobbySession"("collectionItemId");
 
--- RenameForeignKey
-ALTER TABLE "HobbyProjectLink" RENAME CONSTRAINT "HobbyProject_hobbyId_fkey" TO "HobbyProjectLink_hobbyId_fkey";
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'HobbyProject_hobbyId_fkey'
+    ) THEN
+        ALTER TABLE "HobbyProject" RENAME CONSTRAINT "HobbyProject_hobbyId_fkey" TO "HobbyProjectLink_hobbyId_fkey";
+    END IF;
 
--- RenameForeignKey
-ALTER TABLE "HobbyProjectLink" RENAME CONSTRAINT "HobbyProject_projectId_fkey" TO "HobbyProjectLink_projectId_fkey";
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'HobbyProject_projectId_fkey'
+    ) THEN
+        ALTER TABLE "HobbyProject" RENAME CONSTRAINT "HobbyProject_projectId_fkey" TO "HobbyProjectLink_projectId_fkey";
+    END IF;
+END $$;
 
 -- AddForeignKey
 ALTER TABLE "HobbyPracticeGoal" ADD CONSTRAINT "HobbyPracticeGoal_hobbyId_fkey" FOREIGN KEY ("hobbyId") REFERENCES "Hobby"("id") ON DELETE CASCADE ON UPDATE CASCADE;
