@@ -22,6 +22,12 @@ import {
   getHouseholdInventoryItem,
   InventoryError
 } from "../../lib/inventory.js";
+import { enqueueNotificationScan } from "../../lib/queues.js";
+import {
+  buildPhaseCompletionGuardrailMessage,
+  getPhaseCompletionSummary,
+  syncProjectDerivedStatuses
+} from "../../lib/project-status.js";
 import {
   toInventoryItemSummaryResponse,
   toInventoryTransactionResponse,
@@ -107,6 +113,13 @@ const projectPhaseDetailInclude = {
 } satisfies Prisma.ProjectPhaseInclude;
 
 export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
+  const refreshProjectArtifacts = (householdId: string, projectId: string) => {
+    void Promise.all([
+      syncProjectToSearchIndex(app.prisma, projectId),
+      enqueueNotificationScan({ householdId })
+    ]).catch(console.error);
+  };
+
   app.get("/v1/households/:householdId/projects/:projectId/phases", async (request, reply) => {
     const params = projectParamsSchema.parse(request.params);
 
@@ -163,34 +176,42 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       _max: { sortOrder: true }
     }));
 
-    const phase = await app.prisma.projectPhase.create({
-      data: {
-        projectId: project.id,
-        name: input.name,
-        description: input.description ?? null,
-        status: input.status,
-        sortOrder,
-        startDate: input.startDate ? new Date(input.startDate) : null,
-        targetEndDate: input.targetEndDate ? new Date(input.targetEndDate) : null,
-        budgetAmount: input.budgetAmount ?? null,
-        notes: input.notes ?? null
-      },
-      include: {
-        tasks: {
-          select: {
-            id: true,
-            status: true,
-            taskType: true,
-            isCompleted: true,
-            estimatedHours: true,
-            actualHours: true,
-            predecessorLinks: { select: { predecessorTaskId: true } }
-          }
-        },
-        checklistItems: { select: { isCompleted: true } },
-        supplies: { select: { isProcured: true } },
-        expenses: { select: { amount: true } }
-      }
+    const phase = await app.prisma.$transaction(async (tx) => {
+      const createdPhase = await tx.projectPhase.create({
+        data: {
+          projectId: project.id,
+          name: input.name,
+          description: input.description ?? null,
+          status: input.status,
+          sortOrder,
+          startDate: input.startDate ? new Date(input.startDate) : null,
+          targetEndDate: input.targetEndDate ? new Date(input.targetEndDate) : null,
+          budgetAmount: input.budgetAmount ?? null,
+          notes: input.notes ?? null
+        }
+      });
+
+      await syncProjectDerivedStatuses(tx, project.id);
+
+      return tx.projectPhase.findUniqueOrThrow({
+        where: { id: createdPhase.id },
+        include: {
+          tasks: {
+            select: {
+              id: true,
+              status: true,
+              taskType: true,
+              isCompleted: true,
+              estimatedHours: true,
+              actualHours: true,
+              predecessorLinks: { select: { predecessorTaskId: true } }
+            }
+          },
+          checklistItems: { select: { isCompleted: true } },
+          supplies: { select: { isProcured: true } },
+          expenses: { select: { amount: true } }
+        }
+      });
     });
 
     await logActivity(app.prisma, {
@@ -202,7 +223,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       metadata: { phaseName: phase.name, sortOrder: phase.sortOrder }
     });
 
-    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return reply.code(201).send(toProjectPhaseSummaryResponse(phase));
   });
@@ -227,6 +248,14 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
 
     if (!phase) {
       return reply.code(404).send({ message: "Project phase not found." });
+    }
+
+    if (input.status === "completed") {
+      const summary = await getPhaseCompletionSummary(app.prisma, phase.id);
+
+      if (summary && !summary.canComplete) {
+        return reply.code(400).send({ message: buildPhaseCompletionGuardrailMessage(summary) });
+      }
     }
 
     return toProjectPhaseDetailResponse(phase);
@@ -290,25 +319,33 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       data.actualEndDate = new Date();
     }
 
-    const updated = await app.prisma.projectPhase.update({
-      where: { id: phase.id },
-      data,
-      include: {
-        tasks: {
-          select: {
-            id: true,
-            status: true,
-            taskType: true,
-            isCompleted: true,
-            estimatedHours: true,
-            actualHours: true,
-            predecessorLinks: { select: { predecessorTaskId: true } }
-          }
-        },
-        checklistItems: { select: { isCompleted: true } },
-        supplies: { select: { isProcured: true } },
-        expenses: { select: { amount: true } }
-      }
+    const updated = await app.prisma.$transaction(async (tx) => {
+      await tx.projectPhase.update({
+        where: { id: phase.id },
+        data
+      });
+
+      await syncProjectDerivedStatuses(tx, params.projectId);
+
+      return tx.projectPhase.findUniqueOrThrow({
+        where: { id: phase.id },
+        include: {
+          tasks: {
+            select: {
+              id: true,
+              status: true,
+              taskType: true,
+              isCompleted: true,
+              estimatedHours: true,
+              actualHours: true,
+              predecessorLinks: { select: { predecessorTaskId: true } }
+            }
+          },
+          checklistItems: { select: { isCompleted: true } },
+          supplies: { select: { isProcured: true } },
+          expenses: { select: { amount: true } }
+        }
+      });
     });
 
     if (input.status !== undefined && input.status !== phase.status) {
@@ -322,7 +359,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return toProjectPhaseSummaryResponse(updated);
   });
@@ -340,7 +377,10 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project phase not found." });
     }
 
-    await app.prisma.projectPhase.delete({ where: { id: phase.id } });
+    await app.prisma.$transaction(async (tx) => {
+      await tx.projectPhase.delete({ where: { id: phase.id } });
+      await syncProjectDerivedStatuses(tx, params.projectId);
+    });
 
     await logActivity(app.prisma, {
       householdId: params.householdId,
@@ -351,7 +391,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       metadata: { phaseName: phase.name }
     });
 
-    void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return reply.code(204).send();
   });
@@ -788,31 +828,39 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       _max: { sortOrder: true }
     }));
 
-    const supply = await app.prisma.projectPhaseSupply.create({
-      data: {
-        phaseId: phase.id,
-        name: input.name,
-        description: input.description ?? null,
-        quantityNeeded: input.quantityNeeded,
-        quantityOnHand: input.quantityOnHand ?? 0,
-        unit: input.unit ?? "each",
-        estimatedUnitCost: input.estimatedUnitCost ?? null,
-        actualUnitCost: input.actualUnitCost ?? null,
-        supplier: input.supplier ?? null,
-        supplierUrl: input.supplierUrl ?? null,
-        isProcured: input.isProcured ?? false,
-        procuredAt: input.isProcured ? new Date() : null,
-        isStaged: input.isStaged ?? false,
-        stagedAt: input.isStaged ? new Date() : null,
-        inventoryItemId: input.inventoryItemId ?? null,
-        notes: input.notes ?? null,
-        sortOrder
-      },
-      include: {
-        inventoryItem: {
-          select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
+    const supply = await app.prisma.$transaction(async (tx) => {
+      const createdSupply = await tx.projectPhaseSupply.create({
+        data: {
+          phaseId: phase.id,
+          name: input.name,
+          description: input.description ?? null,
+          quantityNeeded: input.quantityNeeded,
+          quantityOnHand: input.quantityOnHand ?? 0,
+          unit: input.unit ?? "each",
+          estimatedUnitCost: input.estimatedUnitCost ?? null,
+          actualUnitCost: input.actualUnitCost ?? null,
+          supplier: input.supplier ?? null,
+          supplierUrl: input.supplierUrl ?? null,
+          isProcured: input.isProcured ?? false,
+          procuredAt: input.isProcured ? new Date() : null,
+          isStaged: input.isStaged ?? false,
+          stagedAt: input.isStaged ? new Date() : null,
+          inventoryItemId: input.inventoryItemId ?? null,
+          notes: input.notes ?? null,
+          sortOrder
         }
-      }
+      });
+
+      await syncProjectDerivedStatuses(tx, params.projectId);
+
+      return tx.projectPhaseSupply.findUniqueOrThrow({
+        where: { id: createdSupply.id },
+        include: {
+          inventoryItem: {
+            select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
+          }
+        }
+      });
     });
 
     await logActivity(app.prisma, {
@@ -846,7 +894,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return reply.code(201).send(toProjectPhaseSupplyResponse(supply));
   });
@@ -926,14 +974,22 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       data.stagedAt = input.stagedAt ? new Date(input.stagedAt) : null;
     }
 
-    const updated = await app.prisma.projectPhaseSupply.update({
-      where: { id: supply.id },
-      data,
-      include: {
-        inventoryItem: {
-          select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
+    const updated = await app.prisma.$transaction(async (tx) => {
+      await tx.projectPhaseSupply.update({
+        where: { id: supply.id },
+        data
+      });
+
+      await syncProjectDerivedStatuses(tx, params.projectId);
+
+      return tx.projectPhaseSupply.findUniqueOrThrow({
+        where: { id: supply.id },
+        include: {
+          inventoryItem: {
+            select: { id: true, name: true, quantityOnHand: true, unit: true, unitCost: true }
+          }
         }
-      }
+      });
     });
 
     if (procuredBecameTrue) {
@@ -958,7 +1014,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return toProjectPhaseSupplyResponse(updated);
   });
@@ -981,9 +1037,12 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Phase supply not found." });
     }
 
-    await app.prisma.projectPhaseSupply.delete({ where: { id: supply.id } });
+    await app.prisma.$transaction(async (tx) => {
+      await tx.projectPhaseSupply.delete({ where: { id: supply.id } });
+      await syncProjectDerivedStatuses(tx, params.projectId);
+    });
 
-    void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return reply.code(204).send();
   });
@@ -1067,6 +1126,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         };
       });
 
+      await syncProjectDerivedStatuses(app.prisma, params.projectId);
+
       await logActivity(app.prisma, {
         householdId: params.householdId,
         userId: request.auth.userId,
@@ -1091,7 +1152,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         });
       }
 
-      void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
+      refreshProjectArtifacts(params.householdId, params.projectId);
 
       return reply.code(201).send({
         supply: toProjectPhaseSupplyResponse(result.supply),

@@ -82,6 +82,22 @@ interface LowStockCandidate {
   };
 }
 
+interface ProjectCandidate {
+  id: string;
+  name: string;
+  householdId: string;
+  status: string;
+  targetEndDate: Date | null;
+  budgetAmount: number | null;
+  expenses: Array<{ amount: number }>;
+  household: {
+    members: Array<{
+      userId: string;
+      user: Pick<User, "id" | "notificationPreferences">;
+    }>;
+  };
+}
+
 export interface NotificationScanResult {
   createdCount: number;
   createdNotificationIds: string[];
@@ -341,6 +357,11 @@ const getHouseholdRecipients = (item: LowStockCandidate): Recipient[] => item.ho
   preferences: parsePreferences(member.user.notificationPreferences)
 }));
 
+const getProjectRecipients = (project: ProjectCandidate): Recipient[] => project.household.members.map((member) => ({
+  userId: member.userId,
+  preferences: parsePreferences(member.user.notificationPreferences)
+}));
+
 const formatQuantityValue = (value: number): string => Number.isInteger(value)
   ? String(value)
   : value.toFixed(2).replace(/\.0+$|0+$/g, "").replace(/\.$/, "");
@@ -460,6 +481,146 @@ const createLowStockNotificationRecord = async (
   });
 
   return notification.id;
+};
+
+const projectLeadDays = 7;
+const projectOverdueCadenceDays = 7;
+
+const buildProjectBudgetCycleKey = (project: ProjectCandidate): string => [
+  project.id,
+  project.budgetAmount?.toString() ?? "no-budget"
+].join(":");
+
+const buildProjectDateCycleKey = (project: ProjectCandidate): string => [
+  project.id,
+  project.targetEndDate?.toISOString() ?? "no-target"
+].join(":");
+
+const createProjectNotificationRecord = async (
+  prisma: PrismaExecutor,
+  project: ProjectCandidate,
+  recipient: Recipient,
+  channel: NotificationChannel,
+  event: NotificationEvent,
+  now: Date
+) => {
+  const cycleKey = event.dedupeSuffix.startsWith("budget")
+    ? buildProjectBudgetCycleKey(project)
+    : buildProjectDateCycleKey(project);
+  const dedupeKey = `${recipient.userId}:${channel}:${project.id}:${event.dedupeSuffix}:${cycleKey}`;
+
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        userId: recipient.userId,
+        householdId: project.householdId,
+        dedupeKey,
+        type: event.type,
+        channel,
+        status: "pending",
+        title: event.title,
+        body: event.body,
+        scheduledFor: event.scheduledFor,
+        escalationLevel: event.escalationLevel,
+        payload: {
+          ...(event.payload as Record<string, unknown>),
+          createdAt: now.toISOString()
+        } as Prisma.InputJsonValue
+      }
+    });
+
+    return notification.id;
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+};
+
+const buildProjectNotificationEvents = (project: ProjectCandidate, now: Date): NotificationEvent[] => {
+  if (project.status === "completed" || project.status === "cancelled") {
+    return [];
+  }
+
+  const events: NotificationEvent[] = [];
+  const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+  if (project.targetEndDate) {
+    const phase = getDatePhase(project.targetEndDate, projectLeadDays, now);
+    const datePayload = {
+      entityType: "project",
+      entityId: project.id,
+      projectName: project.name,
+      targetEndDate: project.targetEndDate.toISOString(),
+      notificationContext: "project_target_date"
+    } satisfies Record<string, unknown>;
+
+    if (phase === "due_soon") {
+      events.push({
+        type: "due_soon",
+        escalationLevel: 0,
+        scheduledFor: now,
+        title: `${project.name} is approaching its target date`,
+        body: `${project.name} is due on ${project.targetEndDate.toISOString().slice(0, 10)}.`,
+        payload: datePayload as Prisma.InputJsonValue,
+        dedupeSuffix: "project-target-due-soon"
+      });
+    }
+
+    if (phase === "due" || phase === "overdue") {
+      events.push({
+        type: "due",
+        escalationLevel: 0,
+        scheduledFor: project.targetEndDate,
+        title: `${project.name} is due`,
+        body: `${project.name} has reached its target date.`,
+        payload: datePayload as Prisma.InputJsonValue,
+        dedupeSuffix: "project-target-due"
+      });
+    }
+
+    if (phase === "overdue") {
+      const millisecondsSinceDue = Math.max(0, now.getTime() - project.targetEndDate.getTime());
+      const escalationLevel = Math.floor(millisecondsSinceDue / (projectOverdueCadenceDays * 24 * 60 * 60 * 1000));
+
+      events.push({
+        type: "overdue",
+        escalationLevel,
+        scheduledFor: now,
+        title: `${project.name} is overdue`,
+        body: `${project.name} is past its target date of ${project.targetEndDate.toISOString().slice(0, 10)}.`,
+        payload: {
+          ...datePayload,
+          daysOverdue: Math.max(1, Math.ceil(millisecondsSinceDue / (24 * 60 * 60 * 1000)))
+        } as Prisma.InputJsonValue,
+        dedupeSuffix: `project-target-overdue-${escalationLevel}`
+      });
+    }
+  }
+
+  if (project.budgetAmount !== null && totalSpent > project.budgetAmount) {
+    events.push({
+      type: "announcement",
+      escalationLevel: 0,
+      scheduledFor: now,
+      title: `${project.name} is over budget`,
+      body: `${project.name} has spent ${totalSpent.toFixed(2)} against a budget of ${project.budgetAmount.toFixed(2)}.`,
+      payload: {
+        entityType: "project",
+        entityId: project.id,
+        projectName: project.name,
+        notificationContext: "project_budget_overrun",
+        budgetAmount: project.budgetAmount,
+        totalSpent,
+        overrunAmount: totalSpent - project.budgetAmount
+      } as Prisma.InputJsonValue,
+      dedupeSuffix: "budget-overrun"
+    });
+  }
+
+  return events;
 };
 
 export const scanAndCreateNotifications = async (
@@ -610,6 +771,61 @@ export const scanAndCreateNotifications = async (
 
         if (notificationId) {
           createdNotificationIds.push(notificationId);
+        }
+      }
+    }
+  }
+
+  const projects = await prisma.project.findMany({
+    where: {
+      deletedAt: null,
+      ...(options.householdId ? { householdId: options.householdId } : {})
+    },
+    include: {
+      expenses: {
+        select: {
+          amount: true
+        }
+      },
+      household: {
+        select: {
+          members: {
+            select: {
+              userId: true,
+              user: {
+                select: {
+                  id: true,
+                  notificationPreferences: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  for (const project of projects) {
+    const recipients = getProjectRecipients(project as ProjectCandidate);
+    const events = buildProjectNotificationEvents(project as ProjectCandidate, now);
+
+    for (const recipient of recipients) {
+      const channels = resolveChannels(recipient.preferences.enabledChannels, recipient.preferences);
+
+      for (const channel of channels) {
+        for (const event of events) {
+          const notificationId = await createProjectNotificationRecord(
+            prisma,
+            project as ProjectCandidate,
+            recipient,
+            channel,
+            event,
+            now
+          );
+
+          if (notificationId) {
+            createdNotificationIds.push(notificationId);
+          }
         }
       }
     }

@@ -28,7 +28,12 @@ const getNotificationBucket = (notification: Notification): "overdue" | "dueSoon
     return "overdue";
   }
 
-  if (notification.type === "due" || notification.type === "due_soon" || notification.type === "inventory_low_stock") {
+  if (
+    notification.type === "due"
+    || notification.type === "due_soon"
+    || notification.type === "inventory_low_stock"
+    || (notification.type === "announcement" && notification.payload.notificationContext === "project_budget_overrun")
+  ) {
     return "dueSoon";
   }
 
@@ -60,6 +65,21 @@ const buildNotificationsHref = (params: {
   return `/notifications?${query.toString()}`;
 };
 
+const getNotificationTargetHref = (notification: Notification): string | null => {
+  if (notification.assetId) {
+    return `/assets/${notification.assetId}`;
+  }
+
+  const entityType = notification.payload.entityType;
+  const entityId = notification.payload.entityId;
+
+  if (entityType === "project" && typeof entityId === "string") {
+    return `/projects/${entityId}`;
+  }
+
+  return null;
+};
+
 function NotificationTable({ notifications }: { notifications: Notification[] }): JSX.Element {
   return (
     <table className="data-table">
@@ -77,6 +97,7 @@ function NotificationTable({ notifications }: { notifications: Notification[] })
       <tbody>
         {notifications.map((notification) => {
           const tone = formatNotificationTone(notification);
+          const targetHref = getNotificationTargetHref(notification);
 
           return (
             <tr key={notification.id}>
@@ -96,8 +117,8 @@ function NotificationTable({ notifications }: { notifications: Notification[] })
               <td>{formatDateTime(notification.scheduledFor)}</td>
               <td>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {notification.assetId && (
-                    <Link href={`/assets/${notification.assetId}`} className="data-table__link">View Asset</Link>
+                  {targetHref && (
+                    <Link href={targetHref} className="data-table__link">View</Link>
                   )}
                   {!notification.readAt && notification.status !== "read" ? (
                     <form action={markNotificationReadAction}>

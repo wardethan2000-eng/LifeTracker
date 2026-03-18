@@ -24,6 +24,12 @@ import { assertMembership, requireHouseholdMembership } from "../../lib/asset-ac
 import { logActivity } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { buildOffsetPage } from "../../lib/pagination.js";
+import { enqueueNotificationScan } from "../../lib/queues.js";
+import {
+  buildProjectCompletionGuardrailMessage,
+  getProjectCompletionSummary,
+  syncProjectDerivedStatuses
+} from "../../lib/project-status.js";
 import { buildProjectTemplateSnapshot, instantiateProjectFromTemplateSnapshot, summarizeProjectTemplateSnapshot, type ProjectTemplateSnapshot } from "../../lib/project-templates.js";
 import { assertTaskDependenciesAcyclic, buildProjectTaskGraphSummary } from "../../lib/project-task-graph.js";
 import {
@@ -354,6 +360,13 @@ const getProjectTreeStats = async (
 };
 
 export const projectRoutes: FastifyPluginAsync = async (app) => {
+  const refreshProjectArtifacts = (householdId: string, projectId: string) => {
+    void Promise.all([
+      syncProjectToSearchIndex(app.prisma, projectId),
+      enqueueNotificationScan({ householdId })
+    ]).catch(console.error);
+  };
+
   // ── Project CRUD ─────────────────────────────────────────────────
 
   app.get("/v1/households/:householdId/projects/status-counts", async (request, reply) => {
@@ -555,7 +568,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: project.name }
     });
 
-    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return reply.code(201).send(toProjectResponse(project));
   });
@@ -708,6 +721,14 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
+    if (input.status === "completed") {
+      const summary = await getProjectCompletionSummary(app.prisma, existing.id);
+
+      if (summary && !summary.canComplete) {
+        return reply.code(400).send({ message: buildProjectCompletionGuardrailMessage(summary) });
+      }
+    }
+
     const data: Prisma.ProjectUncheckedUpdateInput = {};
 
     if (input.name !== undefined) data.name = input.name;
@@ -747,7 +768,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         await syncProjectTreeDepths(tx, updatedProject.id);
       }
 
-      return updatedProject;
+      await syncProjectDerivedStatuses(tx, existing.id);
+
+      return tx.project.findUniqueOrThrow({
+        where: { id: updatedProject.id }
+      });
     });
 
     await logActivity(app.prisma, {
@@ -759,7 +784,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: project.name }
     });
 
-    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return toProjectResponse(project);
   });
@@ -989,7 +1014,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { templateId: template.id, templateName: template.name }
     });
 
-    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return reply.code(201).send(toProjectResponse(project));
   });
@@ -1096,7 +1121,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { sourceProjectId: sourceProject.id, sourceProjectName: sourceProject.name }
     });
 
-    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return reply.code(201).send(toProjectResponse(project));
   });
@@ -1121,15 +1146,28 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const data: Prisma.ProjectUncheckedUpdateInput = { status };
-
     if (status === "completed") {
-      data.actualEndDate = new Date();
+      const summary = await getProjectCompletionSummary(app.prisma, existing.id);
+
+      if (summary && !summary.canComplete) {
+        return reply.code(400).send({ message: buildProjectCompletionGuardrailMessage(summary) });
+      }
     }
 
-    const project = await app.prisma.project.update({
-      where: { id: existing.id },
-      data
+    const project = await app.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          actualEndDate: status === "completed" ? new Date() : null
+        }
+      });
+
+      await syncProjectDerivedStatuses(tx, existing.id);
+
+      return tx.project.findUniqueOrThrow({
+        where: { id: existing.id }
+      });
     });
 
     await logActivity(app.prisma, {
@@ -1141,7 +1179,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       metadata: { name: project.name, oldStatus: existing.status, newStatus: status }
     });
 
-    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return toProjectResponse(project);
   });
@@ -1428,6 +1466,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         }
       }
 
+      await syncProjectDerivedStatuses(tx, project.id);
+
       return tx.projectTask.findUniqueOrThrow({
         where: { id: createdTask.id },
         include: projectTaskDetailInclude
@@ -1444,6 +1484,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         metadata: { taskTitle: task.title, assignedToId: input.assignedToId }
       });
     }
+
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return reply.code(201).send(toProjectTaskResponse(task));
   });
@@ -1648,11 +1690,15 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         }
       }
 
+      await syncProjectDerivedStatuses(tx, params.projectId);
+
       return tx.projectTask.findUniqueOrThrow({
         where: { id: existing.id },
         include: projectTaskDetailInclude
       });
     });
+
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return toProjectTaskResponse(task);
   });
@@ -1677,7 +1723,12 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project task not found." });
     }
 
-    await app.prisma.projectTask.delete({ where: { id: existing.id } });
+    await app.prisma.$transaction(async (tx) => {
+      await tx.projectTask.delete({ where: { id: existing.id } });
+      await syncProjectDerivedStatuses(tx, params.projectId);
+    });
+
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return reply.code(204).send();
   });
@@ -1714,23 +1765,31 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const task = await app.prisma.projectTask.create({
-      data: {
-        projectId: project.id,
-        phaseId: input.phaseId ?? null,
-        title: input.title,
-        description: null,
-        status: "pending",
-        taskType: "quick",
-        isCompleted: false,
-        sortOrder: input.sortOrder ?? null
-      },
-      include: {
-        assignedTo: { select: { id: true, displayName: true } },
-        checklistItems: {
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    const task = await app.prisma.$transaction(async (tx) => {
+      const createdTask = await tx.projectTask.create({
+        data: {
+          projectId: project.id,
+          phaseId: input.phaseId ?? null,
+          title: input.title,
+          description: null,
+          status: "pending",
+          taskType: "quick",
+          isCompleted: false,
+          sortOrder: input.sortOrder ?? null
         }
-      }
+      });
+
+      await syncProjectDerivedStatuses(tx, project.id);
+
+      return tx.projectTask.findUniqueOrThrow({
+        where: { id: createdTask.id },
+        include: {
+          assignedTo: { select: { id: true, displayName: true } },
+          checklistItems: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+          }
+        }
+      });
     });
 
     await logActivity(app.prisma, {
@@ -1741,6 +1800,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       entityId: task.id,
       metadata: { taskTitle: task.title }
     });
+
+    refreshProjectArtifacts(params.householdId, project.id);
 
     return reply.code(201).send(toProjectTaskResponse(task));
   });
@@ -1773,22 +1834,30 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const promotedStatus = input.status ?? (existing.isCompleted ? "completed" : "pending");
     const promotedCompletedAt = promotedStatus === "completed" && !existing.completedAt ? new Date() : existing.completedAt;
 
-    const task = await app.prisma.projectTask.update({
-      where: { id: existing.id },
-      data: {
-        taskType: "full",
-        status: promotedStatus,
-        completedAt: promotedCompletedAt,
-        assignedToId: input.assignedToId ?? null,
-        dueDate: input.dueDate ? new Date(input.dueDate) : null,
-        estimatedCost: input.estimatedCost ?? null
-      },
-      include: {
-        assignedTo: { select: { id: true, displayName: true } },
-        checklistItems: {
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    const task = await app.prisma.$transaction(async (tx) => {
+      await tx.projectTask.update({
+        where: { id: existing.id },
+        data: {
+          taskType: "full",
+          status: promotedStatus,
+          completedAt: promotedCompletedAt,
+          assignedToId: input.assignedToId ?? null,
+          dueDate: input.dueDate ? new Date(input.dueDate) : null,
+          estimatedCost: input.estimatedCost ?? null
         }
-      }
+      });
+
+      await syncProjectDerivedStatuses(tx, params.projectId);
+
+      return tx.projectTask.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: {
+          assignedTo: { select: { id: true, displayName: true } },
+          checklistItems: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+          }
+        }
+      });
     });
 
     await logActivity(app.prisma, {
@@ -1799,6 +1868,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       entityId: existing.id,
       metadata: { taskTitle: existing.title }
     });
+
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return toProjectTaskResponse(task);
   });
@@ -1909,6 +1980,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    refreshProjectArtifacts(params.householdId, project.id);
+
     return reply.code(201).send(toProjectExpenseResponse(expense));
   });
 
@@ -1994,6 +2067,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
+    refreshProjectArtifacts(params.householdId, params.projectId);
+
     return toProjectExpenseResponse(expense);
   });
 
@@ -2018,6 +2093,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.prisma.projectExpense.delete({ where: { id: existing.id } });
+
+    refreshProjectArtifacts(params.householdId, params.projectId);
 
     return reply.code(204).send();
   });

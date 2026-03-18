@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildProjectTemplateSnapshot, summarizeProjectTemplateSnapshot } from "../src/lib/project-templates.js";
 import { assertTaskDependenciesAcyclic, buildProjectTaskGraphSummary } from "../src/lib/project-task-graph.js";
+import {
+  buildPhaseCompletionGuardrailMessage,
+  buildProjectCompletionGuardrailMessage,
+  getPhaseCompletionSummary,
+  getProjectCompletionSummary,
+  syncProjectDerivedStatuses
+} from "../src/lib/project-status.js";
 
 describe("project task graph", () => {
   it("flags blocked work and derives a critical path from estimated hours", () => {
@@ -163,6 +170,131 @@ describe("project templates", () => {
       phaseCount: 1,
       taskCount: 2,
       assetCount: 1
+    });
+  });
+});
+
+describe("project status guardrails", () => {
+  it("summarizes incomplete phase work for completion validation", async () => {
+    const summary = await getPhaseCompletionSummary({
+      projectPhase: {
+        findUnique: async () => ({
+          id: "phase-1",
+          projectId: "project-1",
+          name: "Rough-In",
+          status: "in_progress",
+          actualEndDate: null,
+          tasks: [
+            { status: "completed", taskType: "full", isCompleted: true },
+            { status: "pending", taskType: "full", isCompleted: false }
+          ],
+          supplies: [
+            { isProcured: true },
+            { isProcured: false }
+          ]
+        })
+      }
+    } as never, "phase-1");
+
+    expect(summary).toMatchObject({
+      pendingTaskCount: 1,
+      unprocuredSupplyCount: 1,
+      canComplete: false
+    });
+    expect(buildPhaseCompletionGuardrailMessage(summary!)).toBe(
+      "Cannot mark phase complete while 1 task still pending and 1 supply still unprocured."
+    );
+  });
+
+  it("summarizes project completion blockers across phases and unphased tasks", async () => {
+    const summary = await getProjectCompletionSummary({
+      project: {
+        findUnique: async () => ({
+          id: "project-1",
+          name: "Kitchen Remodel",
+          phases: [
+            {
+              id: "phase-1",
+              name: "Demo",
+              status: "completed",
+              actualEndDate: new Date("2026-03-10T00:00:00.000Z"),
+              tasks: [{ status: "completed", taskType: "full", isCompleted: true }],
+              supplies: []
+            },
+            {
+              id: "phase-2",
+              name: "Cabinet Install",
+              status: "in_progress",
+              actualEndDate: null,
+              tasks: [{ status: "pending", taskType: "full", isCompleted: false }],
+              supplies: []
+            }
+          ],
+          tasks: [{ status: "pending", taskType: "quick", isCompleted: false }]
+        })
+      }
+    } as never, "project-1");
+
+    expect(summary).toMatchObject({
+      incompletePhaseCount: 1,
+      pendingUnphasedTaskCount: 1,
+      canComplete: false
+    });
+    expect(buildProjectCompletionGuardrailMessage(summary!)).toBe(
+      "Cannot mark project complete while 1 phase still incomplete (Cabinet Install) and 1 unphased task still pending."
+    );
+  });
+
+  it("auto-reopens stale completed phases and projects when new incomplete work exists", async () => {
+    const phaseUpdate = [] as Array<{ where: { id: string }; data: { status: string; actualEndDate: Date | null } }>;
+    const projectUpdate = [] as Array<{ where: { id: string }; data: { status: string; actualEndDate: Date | null } }>;
+
+    const result = await syncProjectDerivedStatuses({
+      project: {
+        findUnique: async () => ({
+          id: "project-1",
+          status: "completed",
+          actualEndDate: new Date("2026-03-11T00:00:00.000Z"),
+          phases: [
+            {
+              id: "phase-1",
+              name: "Cabinet Install",
+              status: "completed",
+              actualEndDate: new Date("2026-03-10T00:00:00.000Z"),
+              tasks: [{ status: "pending", taskType: "full", isCompleted: false }],
+              supplies: [{ isProcured: true }]
+            }
+          ],
+          tasks: []
+        }),
+        update: async (args: { where: { id: string }; data: { status: string; actualEndDate: Date | null } }) => {
+          projectUpdate.push(args);
+          return null;
+        }
+      },
+      projectPhase: {
+        update: async (args: { where: { id: string }; data: { status: string; actualEndDate: Date | null } }) => {
+          phaseUpdate.push(args);
+          return null;
+        }
+      }
+    } as never, "project-1", new Date("2026-03-17T00:00:00.000Z"));
+
+    expect(phaseUpdate).toEqual([
+      {
+        where: { id: "phase-1" },
+        data: { status: "in_progress", actualEndDate: null }
+      }
+    ]);
+    expect(projectUpdate).toEqual([
+      {
+        where: { id: "project-1" },
+        data: { status: "active", actualEndDate: null }
+      }
+    ]);
+    expect(result).toMatchObject({
+      projectStatus: "active",
+      phaseStatuses: [{ phaseId: "phase-1", status: "in_progress" }]
     });
   });
 });

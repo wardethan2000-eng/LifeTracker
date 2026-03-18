@@ -8,6 +8,21 @@ type DashboardNotificationsAsideProps = {
   notifications: Notification[];
 };
 
+const getNotificationTargetHref = (notification: Notification): string | null => {
+  if (notification.assetId) {
+    return `/assets/${notification.assetId}`;
+  }
+
+  const entityType = notification.payload.entityType;
+  const entityId = notification.payload.entityId;
+
+  if (entityType === "project" && typeof entityId === "string") {
+    return `/projects/${entityId}`;
+  }
+
+  return null;
+};
+
 export async function DashboardNotificationsAside({ notifications }: DashboardNotificationsAsideProps): Promise<JSX.Element> {
   return (
     <section className="panel">
@@ -24,6 +39,7 @@ export async function DashboardNotificationsAside({ notifications }: DashboardNo
           <div className="notification-feed">
             {notifications.slice(0, 5).map((notification) => {
               const tone = formatNotificationTone(notification);
+              const targetHref = getNotificationTargetHref(notification);
 
               return (
                 <div key={notification.id} className={`notification-item${tone === "pending" ? " notification-item--unread" : ""}`}>
@@ -33,8 +49,8 @@ export async function DashboardNotificationsAside({ notifications }: DashboardNo
                   </div>
                   <div className="notification-item__actions">
                     <span className="notification-item__meta">{formatDateTime(notification.scheduledFor)}</span>
-                    {notification.assetId && (
-                      <Link href={`/assets/${notification.assetId}`} className="text-link" style={{ fontSize: "0.8rem" }}>View</Link>
+                    {targetHref && (
+                      <Link href={targetHref} className="text-link" style={{ fontSize: "0.8rem" }}>View</Link>
                     )}
                     {!notification.readAt && notification.status !== "read" && (
                       <form action={markNotificationReadAction}>
