@@ -932,6 +932,10 @@ p { margin: 0; color: var(--ink-light); }
   padding: 0 20px 20px;
 }
 
+.inventory-transaction-history__correction-row td {
+  padding: 0 20px 20px;
+}
+
 .inventory-transaction-type {
   display: inline-flex;
   align-items: center;
@@ -958,6 +962,38 @@ p { margin: 0; color: var(--ink-light); }
 
 .inventory-transaction-type--adjust {
   color: var(--ink-muted);
+}
+
+.inventory-transaction-meta {
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.inventory-transaction-correction {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.inventory-transaction-correction__intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.inventory-transaction-correction__intro p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.inventory-transaction-correction__hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
 }
 
 /* Inventory Bulk Actions */

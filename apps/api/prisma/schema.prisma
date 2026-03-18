@@ -729,14 +729,18 @@ model InventoryTransaction {
   quantityAfter   Float
   referenceType   String?
   referenceId     String?
+  correctionOfTransactionId String?
   unitCost        Float?
   notes           String?
   userId          String
   createdAt       DateTime      @default(now())
   inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  correctionOfTransaction InventoryTransaction? @relation("InventoryTransactionCorrections", fields: [correctionOfTransactionId], references: [id], onDelete: SetNull)
+  correctedByTransactions InventoryTransaction[] @relation("InventoryTransactionCorrections")
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([inventoryItemId, createdAt])
+  @@index([correctionOfTransactionId])
   @@index([referenceType, referenceId])
   @@index([userId])
 }

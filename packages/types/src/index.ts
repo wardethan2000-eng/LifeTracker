@@ -54,7 +54,7 @@ export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
-export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", "return", "transfer", "project_supply_allocation"] as const;
+export const inventoryTransactionTypeValues = ["purchase", "consume", "adjust", "correction", "return", "transfer", "project_supply_allocation"] as const;
 export const scheduleStatusValues = ["upcoming", "due", "overdue"] as const;
 export const presetSourceValues = ["library", "custom"] as const;
 export const assetTypeSourceValues = ["manual", "library", "custom", "inline"] as const;
@@ -1289,6 +1289,13 @@ export const inventoryItemSummarySchema = inventoryItemSchema.extend({
   lowStock: z.boolean()
 });
 
+export const inventoryTransactionLinkSchema = z.object({
+  id: z.string().cuid(),
+  type: inventoryTransactionTypeSchema,
+  quantity: z.number(),
+  createdAt: z.string().datetime()
+});
+
 export const inventoryTransactionSchema = z.object({
   id: z.string().cuid(),
   inventoryItemId: z.string().cuid(),
@@ -1297,6 +1304,9 @@ export const inventoryTransactionSchema = z.object({
   quantityAfter: z.number(),
   referenceType: z.string().nullable(),
   referenceId: z.string().nullable(),
+  correctionOfTransactionId: z.string().cuid().nullable(),
+  correctionOfTransaction: inventoryTransactionLinkSchema.nullable(),
+  correctedByTransactions: z.array(inventoryTransactionLinkSchema),
   unitCost: z.number().nullable(),
   notes: z.string().nullable(),
   userId: z.string().cuid(),
@@ -1309,6 +1319,11 @@ export const createInventoryTransactionSchema = z.object({
   unitCost: z.number().min(0).optional(),
   referenceType: z.string().max(80).optional(),
   referenceId: z.string().max(120).optional(),
+  notes: z.string().max(2000).optional()
+});
+
+export const createInventoryTransactionCorrectionSchema = z.object({
+  replacementQuantity: z.number(),
   notes: z.string().max(2000).optional()
 });
 
@@ -1330,6 +1345,11 @@ export const inventoryTransactionWithItemSchema = inventoryTransactionSchema.ext
 export const inventoryTransactionListSchema = z.object({
   transactions: z.array(inventoryTransactionWithItemSchema),
   nextCursor: z.string().cuid().nullable()
+});
+
+export const inventoryTransactionCorrectionResultSchema = z.object({
+  transaction: inventoryTransactionSchema,
+  inventoryItem: inventoryItemSummarySchema
 });
 
 export const assetInventoryItemSchema = z.object({
@@ -2660,6 +2680,8 @@ export type InventoryItemType = z.infer<typeof inventoryItemTypeSchema>;
 export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
+export type CreateInventoryTransactionCorrectionInput = z.infer<typeof createInventoryTransactionCorrectionSchema>;
+export type InventoryTransactionCorrectionResult = z.infer<typeof inventoryTransactionCorrectionResultSchema>;
 export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
 export type CreateInventoryTransactionInput = z.infer<typeof createInventoryTransactionSchema>;
 export type InventoryItemConsumption = z.infer<typeof inventoryItemConsumptionSchema>;

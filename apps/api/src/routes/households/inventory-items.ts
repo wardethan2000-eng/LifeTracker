@@ -435,6 +435,28 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       },
       include: {
         transactions: {
+          include: {
+            correctionOfTransaction: {
+              select: {
+                id: true,
+                type: true,
+                quantity: true,
+                createdAt: true
+              }
+            },
+            correctedByTransactions: {
+              select: {
+                id: true,
+                type: true,
+                quantity: true,
+                createdAt: true
+              },
+              orderBy: [
+                { createdAt: "asc" },
+                { id: "asc" }
+              ]
+            }
+          },
           orderBy: { createdAt: "desc" },
           take: query.transactionLimit
         },

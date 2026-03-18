@@ -67,11 +67,15 @@ type InventoryTransactionRecord = Pick<
   | "quantityAfter"
   | "referenceType"
   | "referenceId"
+  | "correctionOfTransactionId"
   | "unitCost"
   | "notes"
   | "userId"
   | "createdAt"
->;
+> & {
+  correctionOfTransaction?: Pick<InventoryTransaction, "id" | "type" | "quantity" | "createdAt"> | null;
+  correctedByTransactions?: Array<Pick<InventoryTransaction, "id" | "type" | "quantity" | "createdAt">>;
+};
 
 type MaintenanceLogPartRecord = Pick<
   MaintenanceLogPart,
@@ -113,10 +117,24 @@ export const toInventoryItemSummaryResponse = (item: InventorySummaryRecord) => 
   updatedAt: item.updatedAt.toISOString()
 });
 
+const toInventoryTransactionLinkResponse = (
+  transaction: Pick<InventoryTransaction, "id" | "type" | "quantity" | "createdAt">
+) => ({
+  id: transaction.id,
+  type: transaction.type,
+  quantity: transaction.quantity,
+  createdAt: transaction.createdAt.toISOString()
+});
+
 export const toInventoryTransactionResponse = (transaction: InventoryTransactionRecord) => inventoryTransactionSchema.parse({
   ...transaction,
   referenceType: transaction.referenceType ?? null,
   referenceId: transaction.referenceId ?? null,
+  correctionOfTransactionId: transaction.correctionOfTransactionId ?? null,
+  correctionOfTransaction: transaction.correctionOfTransaction
+    ? toInventoryTransactionLinkResponse(transaction.correctionOfTransaction)
+    : null,
+  correctedByTransactions: (transaction.correctedByTransactions ?? []).map(toInventoryTransactionLinkResponse),
   unitCost: transaction.unitCost ?? null,
   notes: transaction.notes ?? null,
   createdAt: transaction.createdAt.toISOString()

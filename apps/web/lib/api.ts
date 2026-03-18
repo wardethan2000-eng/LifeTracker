@@ -33,11 +33,15 @@ import {
   bulkPartsReadinessSchema,
   scheduleInventoryLinkDetailSchema,
   schedulePartsReadinessSchema,
+  createInventoryTransactionCorrectionSchema,
   inventoryTransactionListSchema,
+  inventoryTransactionCorrectionResultSchema,
   inventoryTransactionSchema,
   inventoryItemDetailSchema,
   inventoryItemSummarySchema,
   inventoryItemConsumptionSchema,
+  inventoryPurchaseSchema,
+  inventoryShoppingListSummarySchema,
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
   memberContributionPayloadSchema,
@@ -140,15 +144,21 @@ import {
   type HouseholdMember,
   type HouseholdSummary,
   type InventoryItemConsumption,
+  type InventoryPurchase,
+  type InventoryShoppingListSummary,
   type CreateInventoryItemInput,
+  type CreateQuickRestockInput,
   type InventoryReorderForecast,
   type InventoryTurnover,
   type BulkPartsReadiness,
   type CreateScheduleInventoryItemInput,
+  type CreateInventoryTransactionCorrectionInput,
   type InventoryTransactionList,
+  type InventoryTransactionCorrectionResult,
   type InventoryTransactionQuery,
   type InventoryItemDetail,
   type UpdateInventoryItemInput,
+  type UpdateInventoryPurchaseLineInput,
   type InventoryItemSummary,
   type AssetPartsConsumption,
   type InventoryProjectLinkDetail,
@@ -377,6 +387,7 @@ const householdLowStockListSchema = lowStockInventoryItemSchema.array();
 const assetPartsConsumptionListSchema = assetPartsConsumptionSchema.array();
 const inventoryTurnoverListSchema = inventoryTurnoverSchema.array();
 const inventoryReorderForecastListSchema = inventoryReorderForecastSchema.array();
+const inventoryPurchaseSchemaResponse = inventoryPurchaseSchema;
 const partCommonalityListSchema = partCommonalitySchema.array();
 const regulatoryAssetOptionListSchema = regulatoryAssetOptionSchema.array();
 const importInventoryResultSchema: Schema<ImportInventoryResult> = {
@@ -1600,6 +1611,17 @@ export const getHouseholdLowStockInventory = async (householdId: string): Promis
   schema: householdLowStockListSchema
 });
 
+export const getInventoryShoppingList = async (householdId: string): Promise<InventoryShoppingListSummary> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/shopping-list`,
+  schema: inventoryShoppingListSummarySchema
+});
+
+export const generateInventoryShoppingList = async (householdId: string): Promise<InventoryShoppingListSummary> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/shopping-list/generate`,
+  method: "POST",
+  schema: inventoryShoppingListSummarySchema
+});
+
 export const getInventoryAnalyticsSummary = async (householdId: string): Promise<HouseholdInventoryAnalytics> => apiRequest({
   path: `/v1/households/${householdId}/inventory/analytics/summary`,
   schema: householdInventoryAnalyticsSchema
@@ -1784,6 +1806,17 @@ export const getHouseholdInventoryTransactions = async (
   });
 };
 
+export const createInventoryTransactionCorrection = async (
+  householdId: string,
+  transactionId: string,
+  input: CreateInventoryTransactionCorrectionInput
+): Promise<InventoryTransactionCorrectionResult> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/transactions/${transactionId}/corrections`,
+  method: "POST",
+  body: createInventoryTransactionCorrectionSchema.parse(input),
+  schema: inventoryTransactionCorrectionResultSchema
+});
+
 export const createInventoryItem = async (
   householdId: string,
   input: CreateInventoryItemInput
@@ -1811,6 +1844,28 @@ export const deleteInventoryItem = async (householdId: string, inventoryItemId: 
     method: "DELETE"
   });
 };
+
+export const updateInventoryPurchaseLine = async (
+  householdId: string,
+  purchaseId: string,
+  lineId: string,
+  input: UpdateInventoryPurchaseLineInput
+): Promise<InventoryPurchase> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/purchases/${purchaseId}/lines/${lineId}`,
+  method: "PATCH",
+  body: input,
+  schema: inventoryPurchaseSchemaResponse
+});
+
+export const createQuickRestockBatch = async (
+  householdId: string,
+  input: CreateQuickRestockInput
+): Promise<InventoryPurchase> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/restock-batches`,
+  method: "POST",
+  body: input,
+  schema: inventoryPurchaseSchemaResponse
+});
 
 export const createServiceProvider = async (
   householdId: string,

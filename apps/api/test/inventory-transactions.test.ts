@@ -13,6 +13,7 @@ const inventoryMocks = vi.hoisted(() => {
 
   return {
     applyInventoryTransaction: vi.fn(),
+    createInventoryTransactionCorrection: vi.fn(),
     getHouseholdInventoryItem: vi.fn(),
     InventoryError: TestInventoryError
   };
@@ -24,6 +25,7 @@ vi.mock("../src/lib/inventory.js", async (importOriginal) => {
   return {
     ...actual,
     applyInventoryTransaction: inventoryMocks.applyInventoryTransaction,
+    createInventoryTransactionCorrection: inventoryMocks.createInventoryTransactionCorrection,
     getHouseholdInventoryItem: inventoryMocks.getHouseholdInventoryItem,
     InventoryError: inventoryMocks.InventoryError
   };
@@ -103,6 +105,9 @@ const createApp = async () => {
         }
       ]
     },
+    activityLog: {
+      create: async () => ({ id: "clkeeperactivity00000000001" })
+    },
     $transaction: async <T>(callback: (tx: object) => Promise<T>) => callback({})
   } as never);
 
@@ -142,6 +147,27 @@ beforeEach(() => {
       updatedAt: new Date("2026-03-18T08:00:00.000Z")
     },
     lowStock: true
+  });
+  inventoryMocks.createInventoryTransactionCorrection.mockResolvedValue({
+    transaction: {
+      id: "clkeepertxn0000000000004",
+      inventoryItemId,
+      type: "correction",
+      quantity: 9,
+      quantityAfter: 10,
+      referenceType: "inventory_transaction",
+      referenceId: "clkeepertxn0000000000002",
+      correctionOfTransactionId: "clkeepertxn0000000000002",
+      unitCost: 12.5,
+      notes: "Corrected accidental over-consumption",
+      userId,
+      createdAt: new Date("2026-03-18T09:00:00.000Z")
+    },
+    item: {
+      ...inventoryItem,
+      quantityOnHand: 10,
+      updatedAt: new Date("2026-03-18T09:00:00.000Z")
+    }
   });
 });
 
@@ -238,6 +264,72 @@ describe("household inventory transaction routes", () => {
 
       expect(response.statusCode).toBe(400);
       expect(response.json().message).toBe("Not enough stock on hand.");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("creates a linked correction transaction for an existing inventory entry", async () => {
+    const app = await createApp();
+
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/households/${householdId}/inventory/transactions/clkeepertxn0000000000002/corrections`,
+        payload: {
+          replacementQuantity: -1,
+          notes: "Corrected accidental over-consumption"
+        }
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(inventoryMocks.createInventoryTransactionCorrection).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          householdId,
+          transactionId: "clkeepertxn0000000000002",
+          userId,
+          input: {
+            replacementQuantity: -1,
+            notes: "Corrected accidental over-consumption"
+          }
+        })
+      );
+      expect(response.json()).toMatchObject({
+        transaction: {
+          id: "clkeepertxn0000000000004",
+          type: "correction",
+          referenceId: "clkeepertxn0000000000002",
+          correctionOfTransactionId: "clkeepertxn0000000000002"
+        },
+        inventoryItem: {
+          id: inventoryItemId,
+          quantityOnHand: 10
+        }
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns a 404 when correcting a transaction that is not found", async () => {
+    inventoryMocks.createInventoryTransactionCorrection.mockRejectedValueOnce(
+      new inventoryMocks.InventoryError("INVENTORY_TRANSACTION_NOT_FOUND", "Inventory transaction not found.")
+    );
+
+    const app = await createApp();
+
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/households/${householdId}/inventory/transactions/clkeepertxn0000000000999/corrections`,
+        payload: {
+          replacementQuantity: 0
+        }
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe("Inventory transaction not found.");
     } finally {
       await app.close();
     }

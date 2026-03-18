@@ -3,6 +3,7 @@ import type {
   PrismaClient,
 } from "@prisma/client";
 import {
+  type CreateInventoryTransactionCorrectionInput,
   type CreateMaintenanceLogPartInput,
   type CreateInventoryTransactionInput,
   type InventoryTransactionType,
@@ -23,6 +24,10 @@ export {
 };
 
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
+
+type InventoryTransactionWriteInput = CreateInventoryTransactionInput & {
+  correctionOfTransactionId?: string | null;
+};
 
 export class InventoryError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -168,7 +173,7 @@ export const applyInventoryTransaction = async (
   options: {
     inventoryItemId: string;
     userId: string;
-    input: CreateInventoryTransactionInput;
+    input: InventoryTransactionWriteInput;
     preventNegative?: boolean;
     clampToZero?: boolean;
   }
@@ -206,6 +211,7 @@ export const applyInventoryTransaction = async (
       quantityAfter,
       referenceType: options.input.referenceType ?? null,
       referenceId: options.input.referenceId ?? null,
+      correctionOfTransactionId: options.input.correctionOfTransactionId ?? null,
       unitCost: options.input.unitCost ?? null,
       notes: options.input.notes ?? null,
       userId: options.userId
@@ -218,6 +224,52 @@ export const applyInventoryTransaction = async (
     stockClamped,
     lowStock: isInventoryLowStock(updatedItem.quantityOnHand, updatedItem.reorderThreshold)
   };
+};
+
+export const createInventoryTransactionCorrection = async (
+  prisma: Prisma.TransactionClient,
+  options: {
+    householdId: string;
+    transactionId: string;
+    userId: string;
+    input: CreateInventoryTransactionCorrectionInput;
+  }
+) => {
+  const original = await prisma.inventoryTransaction.findFirst({
+    where: {
+      id: options.transactionId,
+      inventoryItem: {
+        householdId: options.householdId,
+        deletedAt: null
+      }
+    }
+  });
+
+  if (!original) {
+    throw new InventoryError("INVENTORY_TRANSACTION_NOT_FOUND", "Inventory transaction not found.");
+  }
+
+  const correctionQuantity = options.input.replacementQuantity - original.quantity;
+
+  if (correctionQuantity === 0) {
+    throw new InventoryError("NO_CORRECTION_REQUIRED", "The replacement quantity matches the original transaction.");
+  }
+
+  return applyInventoryTransaction(prisma, {
+    inventoryItemId: original.inventoryItemId,
+    userId: options.userId,
+    input: {
+      type: "correction" satisfies InventoryTransactionType,
+      quantity: correctionQuantity,
+      unitCost: original.unitCost ?? undefined,
+      referenceType: "inventory_transaction",
+      referenceId: original.id,
+      correctionOfTransactionId: original.id,
+      notes: options.input.notes
+    },
+    preventNegative: false,
+    clampToZero: false
+  });
 };
 
 export const createMaintenanceLogPartWithInventory = async (

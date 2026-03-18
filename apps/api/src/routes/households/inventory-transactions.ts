@@ -1,13 +1,17 @@
 import {
+  createInventoryTransactionCorrectionSchema,
   createInventoryTransactionSchema,
+  inventoryTransactionCorrectionResultSchema,
   inventoryTransactionListSchema,
   inventoryTransactionQuerySchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { logActivity } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
+  createInventoryTransactionCorrection,
   getHouseholdInventoryItem,
   InventoryError
 } from "../../lib/inventory.js";
@@ -24,6 +28,11 @@ const inventoryTransactionParamsSchema = z.object({
 
 const householdInventoryTransactionParamsSchema = z.object({
   householdId: z.string().cuid()
+});
+
+const inventoryTransactionCorrectionParamsSchema = z.object({
+  householdId: z.string().cuid(),
+  transactionId: z.string().cuid()
 });
 
 export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (app) => {
@@ -54,6 +63,26 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
         ...(query.cursor ? { id: { lt: query.cursor } } : {})
       },
       include: {
+        correctionOfTransaction: {
+          select: {
+            id: true,
+            type: true,
+            quantity: true,
+            createdAt: true
+          }
+        },
+        correctedByTransactions: {
+          select: {
+            id: true,
+            type: true,
+            quantity: true,
+            createdAt: true
+          },
+          orderBy: [
+            { createdAt: "asc" },
+            { id: "asc" }
+          ]
+        },
         inventoryItem: {
           select: {
             name: true,
@@ -110,6 +139,53 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
       });
     } catch (error) {
       if (error instanceof InventoryError && error.code === "INSUFFICIENT_STOCK") {
+        return reply.code(400).send({ message: error.message });
+      }
+
+      throw error;
+    }
+  });
+
+  app.post("/v1/households/:householdId/inventory/transactions/:transactionId/corrections", async (request, reply) => {
+    const params = inventoryTransactionCorrectionParamsSchema.parse(request.params);
+    const input = createInventoryTransactionCorrectionSchema.parse(request.body);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    try {
+      const result = await app.prisma.$transaction((tx) => createInventoryTransactionCorrection(tx, {
+        householdId: params.householdId,
+        transactionId: params.transactionId,
+        userId: request.auth.userId,
+        input
+      }));
+
+      await logActivity(app.prisma, {
+        householdId: params.householdId,
+        userId: request.auth.userId,
+        action: "inventory.transaction.corrected",
+        entityType: "inventory_transaction",
+        entityId: result.transaction.id,
+        metadata: {
+          correctedTransactionId: params.transactionId,
+          inventoryItemId: result.item.id,
+          correctionQuantity: result.transaction.quantity,
+          replacementQuantity: input.replacementQuantity
+        }
+      });
+
+      return reply.code(201).send(inventoryTransactionCorrectionResultSchema.parse({
+        transaction: toInventoryTransactionResponse(result.transaction),
+        inventoryItem: toInventoryItemSummaryResponse(result.item)
+      }));
+    } catch (error) {
+      if (error instanceof InventoryError && error.code === "INVENTORY_TRANSACTION_NOT_FOUND") {
+        return reply.code(404).send({ message: error.message });
+      }
+
+      if (error instanceof InventoryError && error.code === "NO_CORRECTION_REQUIRED") {
         return reply.code(400).send({ message: error.message });
       }
 
