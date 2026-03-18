@@ -1,3 +1,5 @@
+import { CompactPreview } from "./compact-preview";
+
 type TaskEntry = {
   id: string;
   title: string;
@@ -47,18 +49,16 @@ export function CompactTaskPreview({ tasks }: Props) {
         ) : null}
       </div>
       {pending.length > 0 ? (
-        <table className="compact-preview__mini-table" aria-label="Task preview">
-          <tbody>
-            {pending.map((task) => (
-              <tr key={task.id}>
-                <td>{task.title}</td>
-                <td>
-                  <span className={`status-chip status-chip--${task.status}`}>{task.status.replace("_", " ")}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <CompactPreview
+          layout="table"
+          ariaLabel="Task preview"
+          items={pending.map((task) => ({
+            id: task.id,
+            label: task.title,
+            value: <span className={`status-chip status-chip--${task.status}`}>{task.status.replace("_", " ")}</span>,
+          }))}
+          emptyMessage="No tasks added yet"
+        />
       ) : null}
       {overflow > 0 ? (
         <p className="compact-preview__overflow">+{overflow} more — expand to see all</p>

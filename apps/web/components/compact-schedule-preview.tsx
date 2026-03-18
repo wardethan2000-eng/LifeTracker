@@ -1,4 +1,5 @@
 import type { PresetScheduleTemplate } from "@lifekeeper/types";
+import { CompactPreview } from "./compact-preview";
 
 type CompactSchedulePreviewProps = {
   scheduleTemplates: PresetScheduleTemplate[];
@@ -26,41 +27,22 @@ export function CompactSchedulePreview({ scheduleTemplates }: CompactSchedulePre
   const preview = scheduleTemplates.slice(0, 4);
 
   if (count === 0) {
-    return (
-      <div className="compact-preview">
-        <p className="compact-preview__empty compact-preview__empty--action">Click to define maintenance schedules</p>
-      </div>
-    );
+    return <CompactPreview items={[]} layout="table" emptyMessage="Click to define maintenance schedules" emptyAction />;
   }
 
   return (
-    <div className="compact-preview">
-      <p className="compact-preview__summary">
-        {count} schedule{count !== 1 ? "s" : ""} from template
-      </p>
-      <table className="compact-preview__mini-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Trigger</th>
-          </tr>
-        </thead>
-        <tbody>
-          {preview.map((template, i) => (
-            <tr key={i}>
-              <td>{template.name}</td>
-              <td style={{ color: "var(--ink-muted)" }}>{triggerSummary(template)}</td>
-            </tr>
-          ))}
-          {count > 4 ? (
-            <tr>
-              <td colSpan={2} style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>
-                +{count - 4} more…
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+    <CompactPreview
+      layout="table"
+      headers={["Name", "Trigger"]}
+      summary={`${count} schedule${count !== 1 ? "s" : ""} from template`}
+      items={preview.map((template, index) => ({
+        id: `${template.key}-${index}`,
+        label: template.name,
+        value: triggerSummary(template),
+        tone: "muted",
+      }))}
+      overflowMessage={count > 4 ? `+${count - 4} more…` : undefined}
+      emptyMessage="Click to define maintenance schedules"
+    />
   );
 }

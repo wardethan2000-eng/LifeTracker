@@ -30,6 +30,7 @@ import {
   getComplianceReport,
   getRegulatoryAssets
 } from "../lib/api";
+import { AnalyticsWorkspaceShell } from "./analytics-workspace-shell";
 import { formatCategoryLabel, formatDate, formatDateTime } from "../lib/formatters";
 
 type ComplianceAnalyticsWorkspaceProps = {
@@ -135,6 +136,13 @@ const EmptyState = ({ message }: { message: string }): JSX.Element => (
     </div>
   </section>
 );
+
+const tabs: Array<{ id: ComplianceTab; label: string }> = [
+  { id: "on-time", label: "On-Time Rate" },
+  { id: "trend", label: "Overdue Trend" },
+  { id: "categories", label: "Category Adherence" },
+  { id: "report", label: "Compliance Report" }
+];
 
 const BreakdownChartPanel = ({
   title,
@@ -523,9 +531,29 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
 
   const reportHasCycles = Boolean(reportData?.regulatorySchedules.some((schedule) => schedule.cycles.length > 0));
 
+  const activeLoading = activeTab === "on-time"
+    ? onTimeLoading
+    : activeTab === "trend"
+      ? overdueLoading
+      : activeTab === "categories"
+        ? categoryLoading
+        : reportLoading;
+
   return (
-    <div className="comparative-stack">
-      <section className="panel comparative-panel">
+    <AnalyticsWorkspaceShell
+      title="Compliance Analytics"
+      activeTab={activeTab}
+      tabs={tabs.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        active: activeTab === tab.id,
+        onClick: () => setActiveTab(tab.id),
+      }))}
+      loading={activeLoading}
+      loadingFallback={<AnalyticsLoadingState />}
+    >
+      <div className="comparative-stack">
+        <section className="panel comparative-panel">
         <div className="panel__header">
           <div>
             <h2>Analytics Controls</h2>
@@ -553,25 +581,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
             </select>
           </label>
         </div>
-      </section>
-
-      <nav className="analytics-tab-bar" aria-label="Compliance analytics sections">
-        {[
-          { id: "on-time", label: "On-Time Rate" },
-          { id: "trend", label: "Overdue Trend" },
-          { id: "categories", label: "Category Adherence" },
-          { id: "report", label: "Compliance Report" }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`analytics-tab-bar__tab${activeTab === tab.id ? " analytics-tab-bar__tab--active" : ""}`}
-            onClick={() => setActiveTab(tab.id as ComplianceTab)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+        </section>
 
       {activeTab === "on-time" ? (
         onTimeLoading ? <AnalyticsLoadingState /> : onTimeError ? <EmptyState message={onTimeError} /> : !onTimeData || onTimeData.summary.totalCycles === 0 ? <EmptyState message={emptyMessage} /> : (
@@ -881,6 +891,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
           ) : null}
         </div>
       ) : null}
-    </div>
+      </div>
+    </AnalyticsWorkspaceShell>
   );
 }

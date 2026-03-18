@@ -1,3 +1,5 @@
+import { CompactPreview } from "./compact-preview";
+
 type ScheduleEntry = {
   id: string;
   name: string;
@@ -43,18 +45,16 @@ export function CompactMaintenanceSchedulePreview({ schedules }: Props) {
           <span className="compact-preview__pill compact-preview__pill--muted">{inactiveCount} paused</span>
         ) : null}
       </div>
-      <table className="compact-preview__mini-table" aria-label="Schedules preview">
-        <tbody>
-          {preview.map((s) => (
-            <tr key={s.id}>
-              <td>{s.name}</td>
-              <td>
-                <span className={`status-chip status-chip--${s.status}`}>{s.status}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <CompactPreview
+        layout="table"
+        ariaLabel="Schedules preview"
+        items={preview.map((schedule) => ({
+          id: schedule.id,
+          label: schedule.name,
+          value: <span className={`status-chip status-chip--${schedule.status}`}>{schedule.status}</span>,
+        }))}
+        emptyMessage="No active schedules"
+      />
       {overflow > 0 ? (
         <p className="compact-preview__overflow">+{overflow} more — click to expand</p>
       ) : null}

@@ -1,10 +1,7 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import {
-  archiveHobbyAction,
   createSessionFromRecipeAction,
-  deleteHobbyAction,
-  restoreHobbyAction,
 } from "../../../actions";
 import { EntryTimeline, EntryTipsSurface } from "../../../../components/entry-system";
 import { HobbyDangerActions } from "../../../../components/hobby-danger-actions";
@@ -18,6 +15,7 @@ import { HobbySeriesList } from "../../../../components/hobby-series-list";
 import { HobbySessionList } from "../../../../components/hobby-session-list";
 import { HobbySessionAdvanceButton } from "../../../../components/hobby-session-advance-button";
 import { HobbyShoppingListButton } from "../../../../components/hobby-shopping-list-button";
+import { TabNav } from "../../../../components/tab-nav";
 import {
   ApiError,
   getHobbyDetail,
@@ -546,9 +544,6 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
               householdId={household.id}
               hobbyId={hobbyId}
               isArchived={hobby.status === "archived"}
-              archiveAction={archiveHobbyAction}
-              restoreAction={restoreHobbyAction}
-              deleteAction={deleteHobbyAction}
             />
           </div>
         </section>
@@ -584,17 +579,15 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           entryHrefBuilder={(entry) => `/hobbies/${hobbyId}?tab=entries#entry-${entry.id}`}
         />
 
-        <nav aria-label="Hobby sections">
-          <ul className="hobby-tab-bar">
-            {tabs.map((item) => (
-              <li key={item.id} className={tab === item.id ? "hobby-tab-bar__item hobby-tab-bar__item--active" : "hobby-tab-bar__item"}>
-                <Link href={`/hobbies/${hobbyId}?tab=${item.id}`}>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <TabNav
+          ariaLabel="Hobby sections"
+          items={tabs.map((item) => ({
+            id: item.id,
+            label: item.label,
+            href: `/hobbies/${hobbyId}?tab=${item.id}`,
+            active: tab === item.id,
+          }))}
+        />
 
         <main>
           {tab === "overview" ? renderOverviewTab() : null}

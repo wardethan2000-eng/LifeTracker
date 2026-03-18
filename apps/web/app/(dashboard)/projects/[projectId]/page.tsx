@@ -19,7 +19,6 @@ import {
   createProjectTaskAction,
   createQuickTodoAction,
   cloneProjectAction,
-  deleteProjectAction,
   deleteProjectExpenseAction,
   deleteProjectNoteAction,
   deleteProjectTaskAction,
@@ -34,8 +33,8 @@ import {
   updateProjectTaskAction
 } from "../../../actions";
 import { Card } from "../../../../components/card";
-import { ConfirmActionForm } from "../../../../components/confirm-action-form";
 import { CompactPhasePreview } from "../../../../components/compact-phase-preview";
+import { ProjectDangerActions } from "../../../../components/project-danger-actions";
 import { CompactTaskPreview } from "../../../../components/compact-task-preview";
 import { EntryTimeline, EntryTipsSurface } from "../../../../components/entry-system";
 import { ExpandableCard } from "../../../../components/expandable-card";
@@ -47,6 +46,7 @@ import { ProjectShoppingListSection } from "../../../../components/project-shopp
 import { ProjectCoreFormFields } from "../../../../components/project-core-form-fields";
 import { ProjectSupplyStatCards } from "../../../../components/project-supply-stat-cards";
 import { ProjectSupplyRollupActions } from "../../../../components/project-supply-rollup-actions";
+import { TabNav } from "../../../../components/tab-nav";
 import { AttachmentSection } from "../../../../components/attachment-section";
 import {
   createTaskChecklistItemAction,
@@ -279,14 +279,24 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           </div>
         </header>
 
-        <nav className="entry-view-tab-bar" aria-label="Project detail views">
-          <Link href={`/projects/${project.id}?householdId=${household.id}`} className={`entry-view-tab-bar__tab${view === "overview" ? " entry-view-tab-bar__tab--active" : ""}`}>
-            Overview
-          </Link>
-          <Link href={projectEntriesHref} className={`entry-view-tab-bar__tab${view === "entries" ? " entry-view-tab-bar__tab--active" : ""}`}>
-            Entries
-          </Link>
-        </nav>
+        <TabNav
+          ariaLabel="Project detail views"
+          variant="pill"
+          items={[
+            {
+              id: "overview",
+              label: "Overview",
+              href: `/projects/${project.id}?householdId=${household.id}`,
+              active: view === "overview",
+            },
+            {
+              id: "entries",
+              label: "Entries",
+              href: projectEntriesHref,
+              active: view === "entries",
+            },
+          ]}
+        />
 
         <div className="page-body">
           <EntryTipsSurface
@@ -462,19 +472,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                     </form>
                   </div>
                   <div style={{ marginTop: 12 }}>
-                    <ConfirmActionForm
-                      action={deleteProjectAction}
-                      hiddenFields={[
-                        { name: "householdId", value: household.id },
-                        { name: "projectId", value: project.id }
-                      ]}
-                      prompt="Delete this project and all related records?"
-                      triggerLabel="Delete Project"
-                      confirmLabel="Yes, delete"
-                      triggerClassName="button button--danger"
-                      confirmClassName="button button--danger"
-                      cancelClassName="button button--ghost"
-                    />
+                    <ProjectDangerActions householdId={household.id} projectId={project.id} />
                   </div>
                 </div>
               </ExpandableCard>

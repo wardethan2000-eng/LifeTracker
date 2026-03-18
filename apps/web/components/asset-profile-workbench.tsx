@@ -13,22 +13,12 @@ import type {
   PresetUsageMetricTemplate
 } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { Fragment, useId, useState } from "react";
-import { Card } from "./card";
-import {
-  conditionSummary,
-  dispositionSummary,
-  insuranceSummary,
-  locationSummary,
-  purchaseSummary,
-  warrantySummary
-} from "./card-summary-line";
-import { CollapsibleCard } from "./collapsible-card";
-import { CompactFieldPreview } from "./compact-field-preview";
-import { CompactMetricPreview } from "./compact-metric-preview";
-import { CompactSchedulePreview } from "./compact-schedule-preview";
-import { ExpandableCard } from "./expandable-card";
-import { SectionFilterBar, SectionFilterChildren, SectionFilterProvider, SectionFilterToggle } from "./section-filter";
+import { useId, useState } from "react";
+import { AssetProfileWorkbenchAside } from "./asset-profile-workbench-aside";
+import { AssetProfileWorkbenchCoreIdentitySection } from "./asset-profile-workbench-core-identity-section";
+import { AssetProfileWorkbenchCustomFieldsSection } from "./asset-profile-workbench-custom-fields-section";
+import { AssetProfileWorkbenchMaintenanceSchedulesSection } from "./asset-profile-workbench-maintenance-schedules-section";
+import { AssetProfileWorkbenchUsageMetricsSection } from "./asset-profile-workbench-usage-metrics-section";
 
 type AssetProfileWorkbenchProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -1410,62 +1400,6 @@ export function AssetProfileWorkbench({
       ? "Choose the aircraft family that matches the asset so the details, metrics, and maintenance profile fit the mission and systems on board."
       : "Templates can pre-fill recommended details for common asset types.");
 
-  const renderSectionCustomFields = (sectionName: string): JSX.Element => {
-    const sectionFields = groupedFieldDefinitions[sectionName] ?? [];
-    return (
-      <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
-        {sectionFields.length > 0 && (
-          <table className="workbench-table" style={{ marginBottom: '6px' }}>
-            <tbody>
-              {sectionFields.map(({ field, index }) => {
-                const isExpanded = expandedFieldEditors.includes(index);
-                const optionsValue = field.options.map((opt) => opt.value).join(", ");
-                return (
-                  <Fragment key={`lc-${field.key}-${index}`}>
-                    <tr className={isExpanded ? "workbench-table__row--active" : undefined}>
-                      <td style={{ fontWeight: 500 }}>{field.label || <em style={{ color: 'var(--ink-muted)', fontStyle: 'normal' }}>New field</em>}</td>
-                      <td style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>{getFieldTypeLabel(field.type)}</td>
-                      <td>
-                        {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
-                          setFieldValues((current) => ({ ...current, [field.key]: nextValue }));
-                        })}
-                      </td>
-                      <td>
-                        <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
-                          {isExpanded ? "Done" : "Edit"}
-                        </button>
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr className="workbench-table__edit">
-                        <td colSpan={4}>
-                          <div className="workbench-grid" style={{ padding: '8px 4px' }}>
-                            <label className="field"><span>Label</span><input type="text" value={field.label} onChange={(evt) => handleFieldLabelChange(index, evt.target.value)} /></label>
-                            <label className="field"><span>Format</span><select value={field.type} onChange={(evt) => updateFieldDefinition(index, { type: evt.target.value as AssetFieldType })}>{fieldTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
-                            <label className="field"><span>Unit</span><input type="text" value={field.unit ?? ""} onChange={(evt) => updateFieldDefinition(index, { unit: evt.target.value.trim() || undefined })} /></label>
-                            {(field.type === "select" || field.type === "multiselect") && (
-                              <label className="field field--full"><span>Options (comma separated)</span><input type="text" value={optionsValue} onChange={(evt) => updateFieldDefinition(index, { options: evt.target.value.split(",").map((s) => s.trim()).filter(Boolean).map((o) => ({ label: o, value: o })) })} /></label>
-                            )}
-                            <label className="field field--full"><span>Help text</span><input type="text" value={field.helpText ?? ""} onChange={(evt) => updateFieldDefinition(index, { helpText: evt.target.value.trim() || undefined })} /></label>
-                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between' }}>
-                              <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
-                              <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>Done</button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        <button type="button" className="button button--ghost button--sm" onClick={() => addFieldDefinitionToSection(sectionName)}>+ Add field</button>
-      </div>
-    );
-  };
-
   return (
     <form action={action} className="workbench-form">
       {initialAsset ? <input type="hidden" name="assetId" value={initialAsset.id} /> : null}
@@ -1493,934 +1427,103 @@ export function AssetProfileWorkbench({
       </datalist>
 
       <div className="resource-layout">
-        {/* â”€â”€ Primary Column â”€â”€ */}
         <div className="resource-layout__primary">
+          <AssetProfileWorkbenchCoreIdentitySection
+            initialAsset={initialAsset}
+            category={category}
+            templateLabel={templateLabel}
+            templateDescription={templateDescription}
+            selectedBlueprintId={selectedBlueprintId}
+            selectedBlueprint={selectedBlueprint}
+            categoryOptions={categoryOptions}
+            categoryLibraryBlueprints={categoryLibraryBlueprints}
+            categoryCustomBlueprints={categoryCustomBlueprints}
+            availableParentAssets={availableParentAssets}
+            onCategoryChange={handleCategoryChange}
+            onBlueprintChange={handleBlueprintChange}
+          />
 
-          {/* Card 1: Core Identity */}
-          <Card title="Core Identity">
-            <div className="workbench-grid">
-              <label className="field field--full">
-                <span>Asset Name *</span>
-                <input type="text" name="name" defaultValue={initialAsset?.name ?? ""} placeholder='e.g. "Riding Mower", "Family SUV"' required />
-              </label>
+          <AssetProfileWorkbenchCustomFieldsSection
+            inputIdPrefix={inputIdPrefix}
+            fieldDefinitions={fieldDefinitions}
+            fieldValues={fieldValues}
+            detailSections={detailSections}
+            lifecycleSectionNames={LIFECYCLE_SECTION_NAMES}
+            groupedFieldDefinitions={groupedFieldDefinitions}
+            unsectionedFieldDefinitions={unsectionedFieldDefinitions}
+            customFieldSearchItems={customFieldSearchItems}
+            availableSuggestedFields={availableSuggestedFields}
+            detailPickerValue={detailPickerValue}
+            detailTargetSection={detailTargetSection}
+            newSectionName={newSectionName}
+            expandedFieldEditors={expandedFieldEditors}
+            fieldTypeOptions={fieldTypeOptions}
+            setDetailPickerValue={setDetailPickerValue}
+            setDetailTargetSection={setDetailTargetSection}
+            setNewSectionName={setNewSectionName}
+            setFieldValues={setFieldValues}
+            toggleFieldEditor={toggleFieldEditor}
+            handleFieldLabelChange={handleFieldLabelChange}
+            updateFieldDefinition={updateFieldDefinition}
+            removeFieldDefinition={removeFieldDefinition}
+            removeSection={removeSection}
+            addFieldDefinition={addFieldDefinition}
+            addSuggestedField={addSuggestedField}
+            addSection={addSection}
+            addFieldDefinitionToSection={addFieldDefinitionToSection}
+            getFieldTypeLabel={getFieldTypeLabel}
+            buildDefaultFieldValue={buildDefaultFieldValue}
+            renderFieldValueInput={renderFieldValueInput}
+          />
 
-              <label className="field">
-                <span>Category</span>
-                <select name="category" value={category} onChange={(event) => handleCategoryChange(event.target.value as AssetCategory)}>
-                  {categoryOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
+          <AssetProfileWorkbenchUsageMetricsSection
+            isCreateMode={isCreateMode}
+            metricDrafts={metricDrafts}
+            metricTemplates={metricTemplates}
+            onAddMetricDraft={addMetricDraft}
+            onUpdateMetricDraft={updateMetricDraft}
+            onToggleMetricEnabled={(index, enabled, metricKey) => {
+              updateMetricDraft(index, { enabled });
 
-              <label className="field">
-                <span>{templateLabel}</span>
-                <select value={selectedBlueprintId} onChange={(event) => handleBlueprintChange(event.target.value)}>
-                  <option value="">None (blank)</option>
-                  {categoryLibraryBlueprints.length > 0 && (
-                    <optgroup label="Built-in Templates">
-                      {categoryLibraryBlueprints.map((preset) => (
-                        <option key={preset.id} value={preset.id}>{preset.label}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {categoryCustomBlueprints.length > 0 && (
-                    <optgroup label="My Templates">
-                      {categoryCustomBlueprints.map((preset) => (
-                        <option key={preset.id} value={preset.id}>{preset.label}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                {selectedBlueprint ? <small>{templateDescription}</small> : null}
-              </label>
+              if (!enabled) {
+                setScheduleDrafts((current) => current.map((scheduleDraft) => (
+                  getScheduleMetricKey(scheduleDraft) === metricKey
+                    ? { ...scheduleDraft, enabled: false }
+                    : scheduleDraft
+                )));
+              }
+            }}
+          />
 
-              <label className="field">
-                <span>Manufacturer / Brand</span>
-                <input type="text" name="manufacturer" defaultValue={initialAsset?.manufacturer ?? ""} placeholder='e.g. "Honda", "Samsung"' />
-              </label>
-              <label className="field">
-                <span>Model</span>
-                <input type="text" name="model" defaultValue={initialAsset?.model ?? ""} placeholder='e.g. "HRX217"' />
-              </label>
-              <label className="field">
-                <span>Serial Number</span>
-                <input type="text" name="serialNumber" defaultValue={initialAsset?.serialNumber ?? ""} placeholder="For warranty claims" />
-              </label>
-              <label className="field">
-                <span>Parent Asset</span>
-                <select name="parentAssetId" defaultValue={initialAsset?.parentAssetId ?? ""}>
-                  <option value="">No parent asset</option>
-                  {availableParentAssets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>{asset.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field field--full">
-                <span>Description & Notes</span>
-                <textarea name="description" rows={3} defaultValue={initialAsset?.description ?? ""} placeholder="Anything helpful..." />
-              </label>
-            </div>
-          </Card>
+          <AssetProfileWorkbenchMaintenanceSchedulesSection
+            isCreateMode={isCreateMode}
+            scheduleDrafts={scheduleDrafts}
+            scheduleTemplates={scheduleTemplates}
+            metricDrafts={metricDrafts}
+            enabledMetricKeys={enabledMetricKeys}
+            onAddScheduleDraft={addScheduleDraft}
+            onUpdateScheduleDraft={updateScheduleDraft}
+            onSetScheduleTriggerTemplate={setScheduleTriggerTemplate}
+            getScheduleMetricKey={getScheduleMetricKey}
+            createTriggerTemplate={createTriggerTemplate}
+            toLocalDateTimeValue={toLocalDateTimeValue}
+            toOptionalIsoString={toOptionalIsoString}
+            formatPresetTriggerSummary={formatPresetTriggerSummary}
+          />
 
-          {/* Card 2: Custom Fields (expandable) */}
-          <SectionFilterProvider items={customFieldSearchItems} keys={["label", "group", "type"]} placeholder="Filter custom fields by label, section, or type">
-            <ExpandableCard
-              title="Custom Fields"
-              modalTitle="Custom Field Definitions"
-              actions={<SectionFilterToggle />}
-              headerContent={<SectionFilterBar />}
-              previewContent={<CompactFieldPreview fieldDefinitions={fieldDefinitions} />}
-            >
-              <SectionFilterChildren<(typeof customFieldSearchItems)[number]>>
-                {(filteredFieldItems) => {
-                  const filteredIndexes = new Set(filteredFieldItems.map((item) => item.index));
-                  const filteredUnsectionedFieldDefinitions = unsectionedFieldDefinitions.filter(({ index }) => filteredIndexes.has(index));
-                  const filteredGroupedFieldDefinitions = detailSections
-                    .filter((sectionName) => !LIFECYCLE_SECTION_NAMES.includes(sectionName))
-                    .map((sectionName) => ({
-                      sectionName,
-                      fields: (groupedFieldDefinitions[sectionName] ?? []).filter(({ index }) => filteredIndexes.has(index))
-                    }))
-                    .filter(({ fields }) => fields.length > 0);
-
-                  return (
-                    <div>
-              {/* Field picker toolbar */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <label className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
-                  <span>Add built-in field</span>
-                  <select value={detailPickerValue} onChange={(event) => setDetailPickerValue(event.target.value)}>
-                    <option value="">Select built-in detail...</option>
-                    {availableSuggestedFields.map((field) => (
-                      <option key={field.key} value={field.key}>{field.label}{field.group ? ` (${field.group})` : ""}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field" style={{ flex: '0 1 180px', minWidth: 0 }}>
-                  <span>Section</span>
-                  <input
-                    type="text"
-                    list={`${inputIdPrefix}-detail-sections`}
-                    value={detailTargetSection}
-                    onChange={(event) => setDetailTargetSection(event.target.value)}
-                    placeholder="Optional section..."
-                  />
-                </label>
-                <div style={{ display: 'flex', gap: '6px', paddingBottom: '1px' }}>
-                  <button type="button" className="button button--secondary button--sm" onClick={addSuggestedField} disabled={!detailPickerValue}>Add Field</button>
-                  <button type="button" className="button button--ghost button--sm" onClick={addFieldDefinition}>+ Custom</button>
-                </div>
-              </div>
-
-              {/* Add new section row */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '16px' }}>
-                <label className="field" style={{ flex: 1 }}>
-                  <span>New section name</span>
-                  <input type="text" value={newSectionName} onChange={(event) => setNewSectionName(event.target.value)} placeholder="e.g. Specifications" />
-                </label>
-                <button type="button" className="button button--ghost button--sm" style={{ paddingBottom: '1px' }} onClick={addSection} disabled={!newSectionName.trim()}>+ Add Section</button>
-              </div>
-
-              <table className="workbench-table">
-                <thead>
-                  <tr>
-                    <th>Label</th>
-                    <th>Type</th>
-                    <th>Value</th>
-                    <th style={{ width: '72px' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fieldDefinitions.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="workbench-table__empty">No custom fields yet - add one above</td>
-                    </tr>
-                  ) : null}
-
-                  {fieldDefinitions.length > 0 && filteredFieldItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="workbench-table__empty">No custom fields match that search.</td>
-                    </tr>
-                  ) : null}
-
-                  {filteredUnsectionedFieldDefinitions.map(({ field, index }) => {
-                    const isExpanded = expandedFieldEditors.includes(index);
-                    const optionsValue = field.options.map((opt) => opt.value).join(", ");
-                    return (
-                      <Fragment key={`row-${field.key}-${index}`}>
-                        <tr className={isExpanded ? "workbench-table__row--active" : undefined}>
-                          <td style={{ fontWeight: 500 }}>{field.label || <em style={{ color: 'var(--ink-muted)', fontStyle: 'normal' }}>New field</em>}</td>
-                          <td style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>{getFieldTypeLabel(field.type)}</td>
-                          <td>
-                            {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
-                              setFieldValues((current) => ({ ...current, [field.key]: nextValue }));
-                            })}
-                          </td>
-                          <td>
-                            <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
-                              {isExpanded ? "Done" : "Edit"}
-                            </button>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr className="workbench-table__edit">
-                            <td colSpan={4}>
-                              <div className="workbench-grid" style={{ padding: '8px 4px' }}>
-                                <label className="field"><span>Label</span><input type="text" value={field.label} onChange={(evt) => handleFieldLabelChange(index, evt.target.value)} placeholder="e.g. VIN" /></label>
-                                <label className="field"><span>Format</span><select value={field.type} onChange={(evt) => updateFieldDefinition(index, { type: evt.target.value as AssetFieldType })}>{fieldTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
-                                <label className="field"><span>Section</span><input type="text" list={`${inputIdPrefix}-detail-sections`} value={field.group ?? ""} onChange={(evt) => updateFieldDefinition(index, { group: evt.target.value.trim() || undefined })} /></label>
-                                <label className="field"><span>Unit</span><input type="text" value={field.unit ?? ""} onChange={(evt) => updateFieldDefinition(index, { unit: evt.target.value.trim() || undefined })} /></label>
-                                {(field.type === "select" || field.type === "multiselect") && (
-                                  <label className="field field--full"><span>Options (comma separated)</span><input type="text" value={optionsValue} onChange={(evt) => updateFieldDefinition(index, { options: evt.target.value.split(",").map((s) => s.trim()).filter(Boolean).map((o) => ({ label: o, value: o })) })} /></label>
-                                )}
-                                <label className="field field--full"><span>Help text</span><input type="text" value={field.helpText ?? ""} onChange={(evt) => updateFieldDefinition(index, { helpText: evt.target.value.trim() || undefined })} /></label>
-                                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between' }}>
-                                  <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
-                                  <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>Done</button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-
-                  {filteredGroupedFieldDefinitions.map(({ sectionName: groupLabel, fields }) => {
-                    return (
-                      <Fragment key={`section-${groupLabel}`}>
-                        <tr className="workbench-table__section-head">
-                          <td colSpan={3}>{groupLabel}</td>
-                          <td>
-                            <button type="button" className="button button--ghost button--xs" onClick={() => removeSection(groupLabel)} title="Remove section">x Remove</button>
-                          </td>
-                        </tr>
-                        {fields.map(({ field, index }) => {
-                          const isExpanded = expandedFieldEditors.includes(index);
-                          const optionsValue = field.options.map((opt) => opt.value).join(", ");
-                          return (
-                            <Fragment key={`row-${field.key}-${index}`}>
-                              <tr className={isExpanded ? "workbench-table__row--active" : undefined}>
-                                <td style={{ fontWeight: 500 }}>{field.label || <em style={{ color: 'var(--ink-muted)', fontStyle: 'normal' }}>New field</em>}</td>
-                                <td style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>{getFieldTypeLabel(field.type)}</td>
-                                <td>
-                                  {renderFieldValueInput(field, fieldValues[field.key] ?? buildDefaultFieldValue(field), (nextValue) => {
-                                    setFieldValues((current) => ({ ...current, [field.key]: nextValue }));
-                                  })}
-                                </td>
-                                <td>
-                                  <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>
-                                    {isExpanded ? "Done" : "Edit"}
-                                  </button>
-                                </td>
-                              </tr>
-                              {isExpanded && (
-                                <tr className="workbench-table__edit">
-                                  <td colSpan={4}>
-                                    <div className="workbench-grid" style={{ padding: '8px 4px' }}>
-                                      <label className="field"><span>Label</span><input type="text" value={field.label} onChange={(evt) => handleFieldLabelChange(index, evt.target.value)} /></label>
-                                      <label className="field"><span>Format</span><select value={field.type} onChange={(evt) => updateFieldDefinition(index, { type: evt.target.value as AssetFieldType })}>{fieldTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
-                                      <label className="field"><span>Section</span><input type="text" list={`${inputIdPrefix}-detail-sections`} value={field.group ?? ""} onChange={(evt) => updateFieldDefinition(index, { group: evt.target.value.trim() || undefined })} /></label>
-                                      <label className="field"><span>Unit</span><input type="text" value={field.unit ?? ""} onChange={(evt) => updateFieldDefinition(index, { unit: evt.target.value.trim() || undefined })} /></label>
-                                      {(field.type === "select" || field.type === "multiselect") && (
-                                        <label className="field field--full"><span>Options (comma separated)</span><input type="text" value={optionsValue} onChange={(evt) => updateFieldDefinition(index, { options: evt.target.value.split(",").map((s) => s.trim()).filter(Boolean).map((o) => ({ label: o, value: o })) })} /></label>
-                                      )}
-                                      <label className="field field--full"><span>Help text</span><input type="text" value={field.helpText ?? ""} onChange={(evt) => updateFieldDefinition(index, { helpText: evt.target.value.trim() || undefined })} /></label>
-                                      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between' }}>
-                                        <button type="button" className="button button--danger button--sm" onClick={() => removeFieldDefinition(index)}>Remove</button>
-                                        <button type="button" className="button button--ghost button--sm" onClick={() => toggleFieldEditor(index)}>Done</button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </Fragment>
-                          );
-                        })}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-                    </div>
-                  );
-                }}
-              </SectionFilterChildren>
-            </ExpandableCard>
-          </SectionFilterProvider>
-
-          {/* Card 3: Usage Metrics (expandable) */}
-          <ExpandableCard
-            title="Usage Metrics"
-            modalTitle="Usage Metric Templates"
-            previewContent={<CompactMetricPreview metricTemplates={metricTemplates} />}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: 0, flex: '1 1 320px' }}>
-                {isCreateMode
-                  ? 'Choose which preset metrics to track and set their initial readings before the asset is created, or add your own metrics manually.'
-                  : 'These template-derived metrics describe the preset profile. Live readings are managed in the asset Usage Metrics tab.'}
-              </p>
-              {isCreateMode ? <button type="button" className="button button--secondary button--sm" onClick={addMetricDraft}>+ Add Metric</button> : null}
-            </div>
-            {metricDrafts.length === 0 ? (
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No metrics yet - select a template in Core Identity to populate these, or add one manually.</p>
-            ) : (
-              <div className="workbench-table-wrap">
-                <table className="workbench-table">
-                  <thead>
-                    <tr>
-                      <th>Use</th>
-                      <th>Metric</th>
-                      <th>Unit</th>
-                      <th>Current Value</th>
-                      <th>Recorded At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {metricDrafts.map((draft, index) => (
-                      <tr key={draft.key}>
-                        <td className="workbench-table__checkbox">
-                          <input
-                            type="checkbox"
-                            checked={draft.enabled}
-                            disabled={!isCreateMode}
-                            aria-label={`Use metric ${draft.name}`}
-                            onChange={(event) => {
-                              const nextEnabled = event.target.checked;
-                              updateMetricDraft(index, { enabled: nextEnabled });
-
-                              if (!nextEnabled) {
-                                setScheduleDrafts((current) => current.map((scheduleDraft) => (
-                                  getScheduleMetricKey(scheduleDraft) === draft.key
-                                    ? { ...scheduleDraft, enabled: false }
-                                    : scheduleDraft
-                                )));
-                              }
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <div className="workbench-table__control">
-                            <input
-                              type="text"
-                              value={draft.name}
-                              disabled={!isCreateMode || !draft.enabled}
-                              onChange={(event) => updateMetricDraft(index, { name: event.target.value })}
-                            />
-                            {isCreateMode ? (
-                              <input
-                                type="text"
-                                value={draft.helpText ?? ""}
-                                disabled={!draft.enabled}
-                                placeholder="Optional help text"
-                                onChange={(event) => updateMetricDraft(index, { helpText: event.target.value.trim() || undefined })}
-                              />
-                            ) : null}
-                            {draft.helpText ? <small className="workbench-table__hint">{draft.helpText}</small> : null}
-                          </div>
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={draft.unit}
-                            disabled={!isCreateMode || !draft.enabled}
-                            onChange={(event) => updateMetricDraft(index, { unit: event.target.value })}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={draft.currentValue}
-                            disabled={!isCreateMode || !draft.enabled}
-                            onChange={(event) => updateMetricDraft(index, {
-                              currentValue: event.target.value === '' ? 0 : Number(event.target.value)
-                            })}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="datetime-local"
-                            value={draft.lastRecordedAt}
-                            disabled={!isCreateMode || !draft.enabled}
-                            onChange={(event) => updateMetricDraft(index, { lastRecordedAt: event.target.value })}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ExpandableCard>
-
-          {/* Card 4: Maintenance Schedules (expandable) */}
-          <ExpandableCard
-            title="Maintenance Schedules"
-            modalTitle="Schedule Templates"
-            previewContent={<CompactSchedulePreview scheduleTemplates={scheduleTemplates} />}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: 0, flex: '1 1 320px' }}>
-                {isCreateMode
-                  ? 'Choose which preset schedules to create, rename them if needed, optionally record when they were last completed, or add your own schedules manually. Usage-based schedules can reference the metrics configured above.'
-                  : 'These template-derived schedules describe the preset profile. Live schedules are managed in the asset Maintenance tab.'}
-              </p>
-              {isCreateMode ? <button type="button" className="button button--secondary button--sm" onClick={addScheduleDraft}>+ Add Schedule</button> : null}
-            </div>
-            {scheduleDrafts.length === 0 ? (
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>No schedules yet - select a template in Core Identity to populate these, or add one manually.</p>
-            ) : (
-              <div className="workbench-table-wrap">
-                <table className="workbench-table">
-                  <thead>
-                    <tr>
-                      <th>Use</th>
-                      <th>Name</th>
-                      <th>Trigger</th>
-                      <th>Last Completed</th>
-                      <th>Usage at Completion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scheduleDrafts.map((draft, index) => {
-                      const availableMetricOptions = metricDrafts.filter((metricDraft) => metricDraft.enabled);
-                      const metricKey = getScheduleMetricKey(draft);
-                      const dependsOnDisabledMetric = metricKey ? !enabledMetricKeys.has(metricKey) : false;
-                      const isEnabled = draft.enabled && !dependsOnDisabledMetric;
-                      const intervalTrigger = draft.triggerTemplate.type === "interval" ? draft.triggerTemplate : undefined;
-                      const usageTrigger = draft.triggerTemplate.type === "usage" ? draft.triggerTemplate : undefined;
-                      const seasonalTrigger = draft.triggerTemplate.type === "seasonal" ? draft.triggerTemplate : undefined;
-                      const compoundTrigger = draft.triggerTemplate.type === "compound" ? draft.triggerTemplate : undefined;
-                      const oneTimeTrigger = draft.triggerTemplate.type === "one_time" ? draft.triggerTemplate : undefined;
-
-                      return (
-                        <tr key={draft.key}>
-                          <td className="workbench-table__checkbox">
-                            <input
-                              type="checkbox"
-                              checked={isEnabled}
-                              disabled={!isCreateMode || dependsOnDisabledMetric}
-                              aria-label={`Use schedule ${draft.name}`}
-                              onChange={(event) => updateScheduleDraft(index, { enabled: event.target.checked })}
-                            />
-                          </td>
-                          <td>
-                            <div className="workbench-table__control">
-                              <input
-                                type="text"
-                                value={draft.name}
-                                disabled={!isCreateMode || !isEnabled}
-                                onChange={(event) => updateScheduleDraft(index, { name: event.target.value })}
-                              />
-                              {isCreateMode ? (
-                                <input
-                                  type="text"
-                                  value={draft.description ?? ""}
-                                  disabled={!isEnabled}
-                                  placeholder="Optional description"
-                                  onChange={(event) => updateScheduleDraft(index, { description: event.target.value.trim() || undefined })}
-                                />
-                              ) : null}
-                              {metricKey ? (
-                                <small className="workbench-table__hint">
-                                  Depends on usage metric: {metricKey}
-                                  {dependsOnDisabledMetric ? ' — enable that metric to create this schedule.' : ''}
-                                </small>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="workbench-table__control">
-                              <select
-                                value={draft.triggerTemplate.type}
-                                disabled={!isCreateMode || !isEnabled}
-                                onChange={(event) => {
-                                  const nextType = event.target.value as PresetScheduleTemplate["triggerTemplate"]["type"];
-                                  const fallbackMetricKey = availableMetricOptions[0]?.key;
-                                  setScheduleTriggerTemplate(index, createTriggerTemplate(nextType, fallbackMetricKey));
-                                }}
-                              >
-                                <option value="interval">Interval</option>
-                                <option value="usage" disabled={availableMetricOptions.length === 0}>Usage</option>
-                                <option value="seasonal">Seasonal</option>
-                                <option value="compound" disabled={availableMetricOptions.length === 0}>Compound</option>
-                                <option value="one_time">One Time</option>
-                              </select>
-                              {intervalTrigger ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
-                                  <label className="field">
-                                    <span>Every Days</span>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      value={intervalTrigger.intervalDays}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "interval",
-                                        intervalDays: Math.max(1, Number(event.target.value) || 1),
-                                        leadTimeDays: intervalTrigger.leadTimeDays,
-                                        ...(intervalTrigger.anchorDate ? { anchorDate: intervalTrigger.anchorDate } : {})
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Lead Days</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="1"
-                                      value={intervalTrigger.leadTimeDays}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "interval",
-                                        intervalDays: intervalTrigger.intervalDays,
-                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0),
-                                        ...(intervalTrigger.anchorDate ? { anchorDate: intervalTrigger.anchorDate } : {})
-                                      })}
-                                    />
-                                  </label>
-                                </div>
-                              ) : null}
-                              {usageTrigger ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
-                                  <label className="field">
-                                    <span>Metric</span>
-                                    <select
-                                      value={usageTrigger.metricKey}
-                                      disabled={!isEnabled || availableMetricOptions.length === 0}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "usage",
-                                        metricKey: event.target.value,
-                                        intervalValue: usageTrigger.intervalValue,
-                                        leadTimeValue: usageTrigger.leadTimeValue
-                                      })}
-                                    >
-                                      {availableMetricOptions.map((metricDraft) => (
-                                        <option key={metricDraft.key} value={metricDraft.key}>{metricDraft.name}</option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="field">
-                                    <span>Interval Value</span>
-                                    <input
-                                      type="number"
-                                      min="0.1"
-                                      step="0.1"
-                                      value={usageTrigger.intervalValue}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "usage",
-                                        metricKey: usageTrigger.metricKey,
-                                        intervalValue: Math.max(0.1, Number(event.target.value) || 0.1),
-                                        leadTimeValue: usageTrigger.leadTimeValue
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Lead Value</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.1"
-                                      value={usageTrigger.leadTimeValue}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "usage",
-                                        metricKey: usageTrigger.metricKey,
-                                        intervalValue: usageTrigger.intervalValue,
-                                        leadTimeValue: Math.max(0, Number(event.target.value) || 0)
-                                      })}
-                                    />
-                                  </label>
-                                </div>
-                              ) : null}
-                              {seasonalTrigger ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
-                                  <label className="field">
-                                    <span>Month</span>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max="12"
-                                      step="1"
-                                      value={seasonalTrigger.month}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "seasonal",
-                                        month: Math.min(12, Math.max(1, Number(event.target.value) || 1)),
-                                        day: seasonalTrigger.day,
-                                        leadTimeDays: seasonalTrigger.leadTimeDays
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Day</span>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max="31"
-                                      step="1"
-                                      value={seasonalTrigger.day}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "seasonal",
-                                        month: seasonalTrigger.month,
-                                        day: Math.min(31, Math.max(1, Number(event.target.value) || 1)),
-                                        leadTimeDays: seasonalTrigger.leadTimeDays
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Lead Days</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="1"
-                                      value={seasonalTrigger.leadTimeDays}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "seasonal",
-                                        month: seasonalTrigger.month,
-                                        day: seasonalTrigger.day,
-                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0)
-                                      })}
-                                    />
-                                  </label>
-                                </div>
-                              ) : null}
-                              {compoundTrigger ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
-                                  <label className="field">
-                                    <span>Metric</span>
-                                    <select
-                                      value={compoundTrigger.metricKey}
-                                      disabled={!isEnabled || availableMetricOptions.length === 0}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "compound",
-                                        metricKey: event.target.value,
-                                        intervalDays: compoundTrigger.intervalDays,
-                                        intervalValue: compoundTrigger.intervalValue,
-                                        logic: compoundTrigger.logic,
-                                        leadTimeDays: compoundTrigger.leadTimeDays,
-                                        leadTimeValue: compoundTrigger.leadTimeValue
-                                      })}
-                                    >
-                                      {availableMetricOptions.map((metricDraft) => (
-                                        <option key={metricDraft.key} value={metricDraft.key}>{metricDraft.name}</option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="field">
-                                    <span>Logic</span>
-                                    <select
-                                      value={compoundTrigger.logic}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "compound",
-                                        metricKey: compoundTrigger.metricKey,
-                                        intervalDays: compoundTrigger.intervalDays,
-                                        intervalValue: compoundTrigger.intervalValue,
-                                        logic: event.target.value as "whichever_first" | "whichever_last",
-                                        leadTimeDays: compoundTrigger.leadTimeDays,
-                                        leadTimeValue: compoundTrigger.leadTimeValue
-                                      })}
-                                    >
-                                      <option value="whichever_first">Whichever first</option>
-                                      <option value="whichever_last">Whichever last</option>
-                                    </select>
-                                  </label>
-                                  <label className="field">
-                                    <span>Every Days</span>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      value={compoundTrigger.intervalDays}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "compound",
-                                        metricKey: compoundTrigger.metricKey,
-                                        intervalDays: Math.max(1, Number(event.target.value) || 1),
-                                        intervalValue: compoundTrigger.intervalValue,
-                                        logic: compoundTrigger.logic,
-                                        leadTimeDays: compoundTrigger.leadTimeDays,
-                                        leadTimeValue: compoundTrigger.leadTimeValue
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Usage Interval</span>
-                                    <input
-                                      type="number"
-                                      min="0.1"
-                                      step="0.1"
-                                      value={compoundTrigger.intervalValue}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "compound",
-                                        metricKey: compoundTrigger.metricKey,
-                                        intervalDays: compoundTrigger.intervalDays,
-                                        intervalValue: Math.max(0.1, Number(event.target.value) || 0.1),
-                                        logic: compoundTrigger.logic,
-                                        leadTimeDays: compoundTrigger.leadTimeDays,
-                                        leadTimeValue: compoundTrigger.leadTimeValue
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Lead Days</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="1"
-                                      value={compoundTrigger.leadTimeDays}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "compound",
-                                        metricKey: compoundTrigger.metricKey,
-                                        intervalDays: compoundTrigger.intervalDays,
-                                        intervalValue: compoundTrigger.intervalValue,
-                                        logic: compoundTrigger.logic,
-                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0),
-                                        leadTimeValue: compoundTrigger.leadTimeValue
-                                      })}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Lead Value</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.1"
-                                      value={compoundTrigger.leadTimeValue}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "compound",
-                                        metricKey: compoundTrigger.metricKey,
-                                        intervalDays: compoundTrigger.intervalDays,
-                                        intervalValue: compoundTrigger.intervalValue,
-                                        logic: compoundTrigger.logic,
-                                        leadTimeDays: compoundTrigger.leadTimeDays,
-                                        leadTimeValue: Math.max(0, Number(event.target.value) || 0)
-                                      })}
-                                    />
-                                  </label>
-                                </div>
-                              ) : null}
-                              {oneTimeTrigger ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
-                                  <label className="field">
-                                    <span>Due At</span>
-                                    <input
-                                      type="datetime-local"
-                                      value={toLocalDateTimeValue(oneTimeTrigger.dueAt)}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => {
-                                        const nextDueAt = toOptionalIsoString(event.target.value);
-                                        if (!nextDueAt) {
-                                          return;
-                                        }
-
-                                        setScheduleTriggerTemplate(index, {
-                                          type: "one_time",
-                                          dueAt: nextDueAt,
-                                          leadTimeDays: oneTimeTrigger.leadTimeDays
-                                        });
-                                      }}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span>Lead Days</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="1"
-                                      value={oneTimeTrigger.leadTimeDays}
-                                      disabled={!isEnabled}
-                                      onChange={(event) => setScheduleTriggerTemplate(index, {
-                                        type: "one_time",
-                                        dueAt: oneTimeTrigger.dueAt,
-                                        leadTimeDays: Math.max(0, Number(event.target.value) || 0)
-                                      })}
-                                    />
-                                  </label>
-                                </div>
-                              ) : null}
-                              <small className="workbench-table__hint">{formatPresetTriggerSummary(draft)}</small>
-                              {draft.tags.length > 0 ? (
-                                <small className="workbench-table__hint">{draft.tags.join(', ')}</small>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>
-                            <input
-                              type="datetime-local"
-                              value={draft.lastCompletedAt}
-                              disabled={!isCreateMode || !isEnabled}
-                              onChange={(event) => updateScheduleDraft(index, { lastCompletedAt: event.target.value })}
-                            />
-                          </td>
-                          <td>
-                            {metricKey ? (
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                value={draft.usageValue}
-                                disabled={!isCreateMode || !isEnabled}
-                                placeholder="Optional"
-                                onChange={(event) => updateScheduleDraft(index, { usageValue: event.target.value })}
-                              />
-                            ) : (
-                              <span style={{ color: 'var(--ink-muted)' }}>—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ExpandableCard>
+          <div className="workbench-bar">
+            <button type="submit" className="button button--primary">{submitLabel}</button>
+          </div>
         </div>
 
-        {/* â”€â”€ Aside Column â”€â”€ */}
-        <div className="resource-layout__aside">
-
-          {/* Aside Card 1: Visibility */}
-          <Card title="Visibility">
-            <label className="field">
-              <span>Who can see this asset</span>
-              <select name="visibility" defaultValue={initialAsset?.visibility ?? "shared"}>
-                <option value="shared">Shared (visible to household)</option>
-                <option value="personal">Personal (only you)</option>
-              </select>
-            </label>
-          </Card>
-
-          {/* Aside Card 2: Save as Template */}
-          <Card title="Template">
-            <label className="checkbox-field">
-              <input type="checkbox" checked={saveAsPreset} onChange={(event) => setSaveAsPreset(event.target.checked)} />
-              <span>Save this setup as a reusable template</span>
-            </label>
-            {saveAsPreset && (
-              <div className="workbench-grid" style={{ marginTop: '12px' }}>
-                <label className="field">
-                  <span>Template Name</span>
-                  <input type="text" name="presetLabel" defaultValue={assetTypeLabel} placeholder='e.g. "My Vehicle Profile"' required={saveAsPreset} />
-                </label>
-                <label className="field field--full">
-                  <span>Description</span>
-                  <textarea name="presetDescription" rows={2} defaultValue={assetTypeDescription} placeholder="What this template is for" />
-                </label>
-                <label className="field field--full">
-                  <span>Tags (comma separated)</span>
-                  <input type="text" name="presetTags" placeholder="vehicle, outdoor, power-tool" />
-                </label>
-                <input type="hidden" name="presetKeyOverride" value={assetTypeKey} />
-              </div>
-            )}
-          </Card>
-
-          {/* ── Lifecycle aside cards (editing only) ── */}
-          {initialAsset ? (
-            <>
-              <CollapsibleCard
-                title="Purchase Details"
-                summary={purchaseSummary(initialAsset)}
-              >
-                <div className="workbench-grid">
-                  <label className="field"><span>Purchase Date</span><input type="date" name="purchaseDate" defaultValue={initialAsset.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : ""} /></label>
-                  <label className="field"><span>Purchase Price</span><input type="number" name="purchaseDetails.price" min="0" step="0.01" defaultValue={initialAsset.purchaseDetails?.price ?? ""} /></label>
-                  <label className="field"><span>Vendor</span><input type="text" name="purchaseDetails.vendor" defaultValue={initialAsset.purchaseDetails?.vendor ?? ""} /></label>
-                  <label className="field"><span>Condition at Purchase</span><select name="purchaseDetails.condition" defaultValue={initialAsset.purchaseDetails?.condition ?? ""}><option value="">Unknown</option><option value="new">New</option><option value="used">Used</option><option value="refurbished">Refurbished</option></select></label>
-                  <label className="field"><span>Financing</span><input type="text" name="purchaseDetails.financing" defaultValue={initialAsset.purchaseDetails?.financing ?? ""} /></label>
-                  <label className="field field--full"><span>Receipt Reference</span><input type="text" name="purchaseDetails.receiptRef" defaultValue={initialAsset.purchaseDetails?.receiptRef ?? ""} /></label>
-                </div>
-              </CollapsibleCard>
-
-              <CollapsibleCard
-                title="Warranty Info"
-                summary={warrantySummary(initialAsset)}
-              >
-                <div className="workbench-grid">
-                  <label className="field"><span>Provider</span><input type="text" name="warrantyDetails.provider" defaultValue={initialAsset.warrantyDetails?.provider ?? ""} /></label>
-                  <label className="field"><span>Policy / Contract</span><input type="text" name="warrantyDetails.policyNumber" defaultValue={initialAsset.warrantyDetails?.policyNumber ?? ""} /></label>
-                  <label className="field"><span>Start Date</span><input type="date" name="warrantyDetails.startDate" defaultValue={initialAsset.warrantyDetails?.startDate ? initialAsset.warrantyDetails.startDate.slice(0, 10) : ""} /></label>
-                  <label className="field"><span>End Date</span><input type="date" name="warrantyDetails.endDate" defaultValue={initialAsset.warrantyDetails?.endDate ? initialAsset.warrantyDetails.endDate.slice(0, 10) : ""} /></label>
-                  <label className="field"><span>Coverage Type</span><input type="text" name="warrantyDetails.coverageType" defaultValue={initialAsset.warrantyDetails?.coverageType ?? ""} /></label>
-                  <label className="field field--full"><span>Notes</span><textarea name="warrantyDetails.notes" rows={2} defaultValue={initialAsset.warrantyDetails?.notes ?? ""} /></label>
-                </div>
-              </CollapsibleCard>
-
-              <CollapsibleCard
-                title="Location Details"
-                summary={locationSummary(initialAsset)}
-              >
-                <div className="workbench-grid">
-                  <label className="field"><span>Property</span><input type="text" name="locationDetails.propertyName" defaultValue={initialAsset.locationDetails?.propertyName ?? ""} /></label>
-                  <label className="field"><span>Building</span><input type="text" name="locationDetails.building" defaultValue={initialAsset.locationDetails?.building ?? ""} /></label>
-                  <label className="field"><span>Room / Area</span><input type="text" name="locationDetails.room" defaultValue={initialAsset.locationDetails?.room ?? ""} /></label>
-                  <label className="field"><span>Latitude</span><input type="number" name="locationDetails.latitude" min="-90" max="90" step="0.000001" defaultValue={initialAsset.locationDetails?.latitude ?? ""} /></label>
-                  <label className="field"><span>Longitude</span><input type="number" name="locationDetails.longitude" min="-180" max="180" step="0.000001" defaultValue={initialAsset.locationDetails?.longitude ?? ""} /></label>
-                  <label className="field field--full"><span>Notes</span><textarea name="locationDetails.notes" rows={2} defaultValue={initialAsset.locationDetails?.notes ?? ""} /></label>
-                </div>
-              </CollapsibleCard>
-
-              <CollapsibleCard
-                title="Insurance Details"
-                summary={insuranceSummary(initialAsset)}
-              >
-                <div className="workbench-grid">
-                  <label className="field"><span>Provider</span><input type="text" name="insuranceDetails.provider" defaultValue={initialAsset.insuranceDetails?.provider ?? ""} /></label>
-                  <label className="field"><span>Policy Number</span><input type="text" name="insuranceDetails.policyNumber" defaultValue={initialAsset.insuranceDetails?.policyNumber ?? ""} /></label>
-                  <label className="field"><span>Coverage Amount</span><input type="number" name="insuranceDetails.coverageAmount" min="0" step="0.01" defaultValue={initialAsset.insuranceDetails?.coverageAmount ?? ""} /></label>
-                  <label className="field"><span>Deductible</span><input type="number" name="insuranceDetails.deductible" min="0" step="0.01" defaultValue={initialAsset.insuranceDetails?.deductible ?? ""} /></label>
-                  <label className="field"><span>Renewal Date</span><input type="date" name="insuranceDetails.renewalDate" defaultValue={initialAsset.insuranceDetails?.renewalDate ? initialAsset.insuranceDetails.renewalDate.slice(0, 10) : ""} /></label>
-                  <label className="field field--full"><span>Notes</span><textarea name="insuranceDetails.notes" rows={2} defaultValue={initialAsset.insuranceDetails?.notes ?? ""} /></label>
-                </div>
-              </CollapsibleCard>
-
-              <CollapsibleCard
-                title="Condition"
-                summary={conditionSummary(initialAsset)}
-              >
-                <div className="workbench-grid">
-                  <label className="field">
-                    <span>Condition Score (1–10)</span>
-                    <input type="number" name="conditionScore" min="1" max="10" step="1" defaultValue={initialAsset.conditionScore ?? ""} placeholder="1-10" />
-                  </label>
-                </div>
-              </CollapsibleCard>
-
-              <CollapsibleCard
-                title="Disposition"
-                summary={dispositionSummary(initialAsset)}
-              >
-                <div className="workbench-grid">
-                  <label className="field"><span>Method</span><select name="dispositionDetails.method" defaultValue={initialAsset.dispositionDetails?.method ?? ""}><option value="">None</option><option value="sold">Sold</option><option value="donated">Donated</option><option value="scrapped">Scrapped</option><option value="recycled">Recycled</option><option value="lost">Lost</option></select></label>
-                  <label className="field"><span>Date</span><input type="date" name="dispositionDetails.date" defaultValue={initialAsset.dispositionDetails?.date ? initialAsset.dispositionDetails.date.slice(0, 10) : ""} /></label>
-                  <label className="field"><span>Sale Price</span><input type="number" name="dispositionDetails.salePrice" min="0" step="0.01" defaultValue={initialAsset.dispositionDetails?.salePrice ?? ""} /></label>
-                  <label className="field"><span>Buyer Info</span><input type="text" name="dispositionDetails.buyerInfo" defaultValue={initialAsset.dispositionDetails?.buyerInfo ?? ""} /></label>
-                  <label className="field field--full"><span>Notes</span><textarea name="dispositionDetails.notes" rows={2} defaultValue={initialAsset.dispositionDetails?.notes ?? ""} /></label>
-                </div>
-              </CollapsibleCard>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      {/* â”€â”€ Sticky Action Bar â”€â”€ */}
-      <div className="workbench-bar">
-        <div></div>
-        <button type="submit" className="button button--primary">{submitLabel}</button>
+        <AssetProfileWorkbenchAside
+          initialAsset={initialAsset}
+          saveAsPreset={saveAsPreset}
+          assetTypeLabel={assetTypeLabel}
+          assetTypeDescription={assetTypeDescription}
+          assetTypeKey={assetTypeKey}
+          onSaveAsPresetChange={setSaveAsPreset}
+        />
       </div>
     </form>
   );

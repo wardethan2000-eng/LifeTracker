@@ -27,6 +27,7 @@ import {
   getMemberContributionAnalytics,
   getYearOverYearAnalytics
 } from "../lib/api";
+import { AnalyticsWorkspaceShell } from "./analytics-workspace-shell";
 import { formatCategoryLabel, formatCurrency } from "../lib/formatters";
 
 type ComparativeAnalyticsWorkspaceProps = {
@@ -146,6 +147,12 @@ const EmptyState = ({ message }: { message: string }): JSX.Element => (
     </div>
   </div>
 );
+
+const tabs: Array<{ id: AnalyticsTab; label: string }> = [
+  { id: "assets", label: "Asset Comparison" },
+  { id: "yoy", label: "Year Over Year" },
+  { id: "members", label: "Member Contributions" }
+];
 
 export function ComparativeAnalyticsWorkspace({ householdId, assets }: ComparativeAnalyticsWorkspaceProps): JSX.Element {
   const currentYear = new Date().getUTCFullYear();
@@ -363,25 +370,27 @@ export function ComparativeAnalyticsWorkspace({ householdId, assets }: Comparati
   const yearOverYearHasData = Boolean(yearData?.years.some((year) => year.totalLogCount > 0));
   const memberContributionHasData = Boolean(memberData?.householdTotals.totalLogs);
 
-  return (
-    <>
-      <nav className="analytics-tab-bar" aria-label="Comparative analytics sections">
-        {[
-          { id: "assets", label: "Asset Comparison" },
-          { id: "yoy", label: "Year Over Year" },
-          { id: "members", label: "Member Contributions" }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`analytics-tab-bar__tab${activeTab === tab.id ? " analytics-tab-bar__tab--active" : ""}`}
-            onClick={() => setActiveTab(tab.id as AnalyticsTab)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+  const activeLoading = activeTab === "assets"
+    ? assetLoading
+    : activeTab === "yoy"
+      ? yearLoading
+      : memberLoading;
 
+  const loadingRows = activeTab === "members" ? 6 : activeTab === "assets" ? 5 : 4;
+
+  return (
+    <AnalyticsWorkspaceShell
+      title="Comparative Analytics"
+      activeTab={activeTab}
+      tabs={tabs.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        active: activeTab === tab.id,
+        onClick: () => setActiveTab(tab.id),
+      }))}
+      loading={activeLoading}
+      loadingFallback={<AnalyticsLoadingState rows={loadingRows} />}
+    >
       {activeTab === "assets" ? (
         <div className="comparative-stack">
           <section className="panel comparative-panel">
@@ -782,6 +791,6 @@ export function ComparativeAnalyticsWorkspace({ householdId, assets }: Comparati
           )}
         </div>
       ) : null}
-    </>
+    </AnalyticsWorkspaceShell>
   );
 }

@@ -10,6 +10,7 @@ import type {
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { chartColors, LkAreaChart, LkBarChart, LkDonutChart, LkLineChart } from "./charts";
+import { AnalyticsWorkspaceShell } from "./analytics-workspace-shell";
 import {
   getHobbyAnalyticsOverview,
   getHobbyGoalProgress,
@@ -636,25 +637,31 @@ export function HobbyAnalyticsWorkspace({ householdId, hobbies }: HobbyAnalytics
     );
   };
 
-  return (
-    <div style={{ display: "grid", gap: 24 }}>
-      <nav className="analytics-tab-bar" aria-label="Hobby analytics tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`analytics-tab-bar__tab${activeTab === tab.value ? " analytics-tab-bar__tab--active" : ""}`}
-            onClick={() => setActiveTab(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+  const activeLoading = activeTab === "overview"
+    ? overviewLoading
+    : activeTab === "sessions"
+      ? sessionLoading
+      : activeTab === "practice"
+        ? practiceLoading
+        : goalLoading;
 
+  return (
+    <AnalyticsWorkspaceShell
+      title="Hobby Analytics"
+      activeTab={activeTab}
+      tabs={tabs.map((tab) => ({
+        id: tab.value,
+        label: tab.label,
+        active: activeTab === tab.value,
+        onClick: () => setActiveTab(tab.value),
+      }))}
+      loading={activeLoading}
+      loadingFallback={<AnalyticsLoadingState rows={activeTab === "practice" ? 5 : 4} />}
+    >
       {activeTab === "overview" ? renderOverviewTab() : null}
       {activeTab === "sessions" ? renderSessionsTab() : null}
       {activeTab === "practice" ? renderPracticeTab() : null}
       {activeTab === "goals" ? renderGoalsTab() : null}
-    </div>
+    </AnalyticsWorkspaceShell>
   );
 }

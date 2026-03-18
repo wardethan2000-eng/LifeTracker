@@ -1,3 +1,5 @@
+import { CompactPreview } from "./compact-preview";
+
 type SupplyEntry = {
   id: string;
   name: string;
@@ -50,18 +52,17 @@ export function CompactSupplyPreview({ supplies, estimatedCost, remainingCost }:
         <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{procurementPct}% done</span>
       </div>
       {unprocured.length > 0 ? (
-        <table className="compact-preview__mini-table" aria-label="Supplies preview">
-          <tbody>
-            {unprocured.map((supply) => (
-              <tr key={supply.id}>
-                <td>{supply.name}</td>
-                <td style={{ textAlign: "right", color: "var(--ink-muted)", fontSize: "0.82rem" }}>
-                  {supply.quantityOnHand}/{supply.quantityNeeded}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <CompactPreview
+          layout="table"
+          ariaLabel="Supplies preview"
+          items={unprocured.map((supply) => ({
+            id: supply.id,
+            label: supply.name,
+            value: `${supply.quantityOnHand}/${supply.quantityNeeded}`,
+            tone: "muted",
+          }))}
+          emptyMessage="No supplies added yet"
+        />
       ) : null}
       {overflow > 0 ? (
         <p className="compact-preview__overflow">+{overflow} more — expand to manage</p>

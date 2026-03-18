@@ -1,4 +1,5 @@
 import type { PresetUsageMetricTemplate } from "@lifekeeper/types";
+import { CompactPreview } from "./compact-preview";
 
 type CompactMetricPreviewProps = {
   metricTemplates: PresetUsageMetricTemplate[];
@@ -9,41 +10,22 @@ export function CompactMetricPreview({ metricTemplates }: CompactMetricPreviewPr
   const preview = metricTemplates.slice(0, 4);
 
   if (count === 0) {
-    return (
-      <div className="compact-preview">
-        <p className="compact-preview__empty compact-preview__empty--action">Click to define usage metrics</p>
-      </div>
-    );
+    return <CompactPreview items={[]} layout="table" emptyMessage="Click to define usage metrics" emptyAction />;
   }
 
   return (
-    <div className="compact-preview">
-      <p className="compact-preview__summary">
-        {count} metric{count !== 1 ? "s" : ""} tracked
-      </p>
-      <table className="compact-preview__mini-table">
-        <thead>
-          <tr>
-            <th>Metric</th>
-            <th>Unit</th>
-          </tr>
-        </thead>
-        <tbody>
-          {preview.map((template, i) => (
-            <tr key={i}>
-              <td>{template.name}</td>
-              <td style={{ color: "var(--ink-muted)" }}>{template.unit ?? "—"}</td>
-            </tr>
-          ))}
-          {count > 4 ? (
-            <tr>
-              <td colSpan={2} style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>
-                +{count - 4} more…
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+    <CompactPreview
+      layout="table"
+      headers={["Metric", "Unit"]}
+      summary={`${count} metric${count !== 1 ? "s" : ""} tracked`}
+      items={preview.map((template, index) => ({
+        id: `${template.key}-${index}`,
+        label: template.name,
+        value: template.unit ?? "—",
+        tone: template.unit ? "default" : "muted",
+      }))}
+      overflowMessage={count > 4 ? `+${count - 4} more…` : undefined}
+      emptyMessage="Click to define usage metrics"
+    />
   );
 }

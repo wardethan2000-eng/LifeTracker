@@ -1,3 +1,5 @@
+import { CompactPreview } from "./compact-preview";
+
 type BudgetCategory = {
   id: string;
   name: string;
@@ -53,16 +55,16 @@ export function CompactBudgetPreview({ budgetAmount, totalSpent, categories, exp
         ) : null}
       </div>
       {topCategories.length > 0 ? (
-        <table className="compact-preview__mini-table" aria-label="Budget categories preview">
-          <tbody>
-            {topCategories.map((cat) => (
-              <tr key={cat.id}>
-                <td>{cat.name}</td>
-                <td style={{ textAlign: "right" }}>{formatCurrencySimple(cat.spent)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <CompactPreview
+          layout="table"
+          ariaLabel="Budget categories preview"
+          items={topCategories.map((cat) => ({
+            id: cat.id,
+            label: cat.name,
+            value: formatCurrencySimple(cat.spent),
+          }))}
+          emptyMessage="No expenses logged yet"
+        />
       ) : (
         <p className="compact-preview__empty">No expenses logged yet</p>
       )}

@@ -1,3 +1,5 @@
+import { CompactPreview } from "./compact-preview";
+
 type PhaseEntry = {
   id: string;
   name: string;
@@ -40,20 +42,16 @@ export function CompactPhasePreview({ phases }: Props) {
         ) : null}
         <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{progressPct}%</span>
       </div>
-      <table className="compact-preview__mini-table" aria-label="Phases preview">
-        <tbody>
-          {preview.map((phase) => (
-            <tr key={phase.id}>
-              <td>{phase.name}</td>
-              <td>
-                <span className={`status-chip status-chip--${phase.status}`}>
-                  {statusLabels[phase.status]}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <CompactPreview
+        layout="table"
+        ariaLabel="Phases preview"
+        items={preview.map((phase) => ({
+          id: phase.id,
+          label: phase.name,
+          value: <span className={`status-chip status-chip--${phase.status}`}>{statusLabels[phase.status]}</span>,
+        }))}
+        emptyMessage="No phases defined yet"
+      />
       {overflow > 0 ? (
         <p className="compact-preview__overflow">+{overflow} more phases — expand to manage</p>
       ) : null}

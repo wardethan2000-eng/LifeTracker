@@ -7,7 +7,6 @@ import type {
   HobbySessionDetail,
   HobbySessionDetailIngredient,
   HobbySessionDetailMetricReading,
-  HobbySessionStep,
 } from "@lifekeeper/types";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition, type FormEvent, type JSX } from "react";
@@ -31,8 +30,12 @@ import {
   updateHobbySessionStep,
 } from "../lib/api";
 import { Card } from "./card";
-import { EntryTimeline, EntryTipsSurface } from "./entry-system";
+import { EntryTipsSurface } from "./entry-system";
 import { InlineError } from "./inline-error";
+import { SessionActivityLogSection } from "./session-activity-log-section";
+import { SessionPhaseManager } from "./session-phase-manager";
+import { SessionRatingForm } from "./session-rating-form";
+import { SessionStepList } from "./session-step-list";
 
 type HobbySessionDetailProps = {
   householdId: string;
@@ -221,9 +224,6 @@ export function HobbySessionDetail({
   const [notesDraft, setNotesDraft] = useState(session.notes ?? "");
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
-  const [statusPending, setStatusPending] = useState(false);
-  const [ratingPending, setRatingPending] = useState<number | null>(null);
-  const [isAdvancePending, startAdvanceTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
 
   useEffect(() => {
@@ -331,26 +331,7 @@ export function HobbySessionDetail({
     return hobby.inventoryLinks.find((link) => link.inventoryItemId === inventoryItemId)?.inventoryItem ?? null;
   };
 
-  const handleBinaryStatusChange = async (status: "active" | "completed") => {
-    if (statusPending || sessionState.status === status) {
-      return;
-    }
-
-    setStatusPending(true);
-    setErrorMessage(null);
-
-    try {
-      const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, { status });
-      updateSessionSummary(updated);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update session status.");
-    } finally {
-      setStatusPending(false);
-    }
-  };
-
-  const handleAdvance = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const advanceSession = async (formData: FormData) => {
     if (!currentPipelineStep || currentPipelineStep.isFinal) {
       return;
     }
@@ -360,21 +341,18 @@ export function HobbySessionDetail({
       return;
     }
 
-    setErrorMessage(null);
-    const formData = new FormData(event.currentTarget);
-    startAdvanceTransition(async () => {
-      try {
-        await advanceHobbySessionAction(formData);
-        setSessionState((previous) => ({
-          ...previous,
-          status: nextStep.label,
-          pipelineStepId: nextStep.id,
-          completedDate: nextStep.isFinal ? new Date().toISOString() : previous.completedDate,
-        }));
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to advance session.");
-      }
-    });
+    await advanceHobbySessionAction(formData);
+    setSessionState((previous) => ({
+      ...previous,
+      status: nextStep.label,
+      pipelineStepId: nextStep.id,
+      completedDate: nextStep.isFinal ? new Date().toISOString() : previous.completedDate,
+    }));
+  };
+
+  const updateBinaryStatus = async (status: "active" | "completed") => {
+    const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, { status });
+    updateSessionSummary(updated);
   };
 
   const handleDelete = (event: FormEvent<HTMLFormElement>) => {
@@ -390,32 +368,19 @@ export function HobbySessionDetail({
     });
   };
 
-  const handleToggleStep = async (step: HobbySessionStep) => {
-    if (pendingStepIds.includes(step.id)) {
-      return;
-    }
+  const toggleStep = async (step: HobbySessionDetail["steps"][number]) => {
+    const updated = await updateHobbySessionStep(
+      householdId,
+      hobbyId,
+      sessionState.id,
+      step.id,
+      { isCompleted: !step.isCompleted },
+    );
 
-    setPendingStepIds((previous) => [...previous, step.id]);
-    setErrorMessage(null);
-
-    try {
-      const updated = await updateHobbySessionStep(
-        householdId,
-        hobbyId,
-        sessionState.id,
-        step.id,
-        { isCompleted: !step.isCompleted },
-      );
-
-      setSessionState((previous) => ({
-        ...previous,
-        steps: previous.steps.map((candidate) => candidate.id === step.id ? updated : candidate),
-      }));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update session step.");
-    } finally {
-      setPendingStepIds((previous) => previous.filter((stepId) => stepId !== step.id));
-    }
+    setSessionState((previous) => ({
+      ...previous,
+      steps: previous.steps.map((candidate) => candidate.id === step.id ? updated : candidate),
+    }));
   };
 
   const handleIngredientSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -611,22 +576,9 @@ export function HobbySessionDetail({
     }
   };
 
-  const handleRating = async (rating: number) => {
-    if (ratingPending === rating) {
-      return;
-    }
-
-    setRatingPending(rating);
-    setErrorMessage(null);
-
-    try {
-      const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, { rating });
-      updateSessionSummary(updated);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update rating.");
-    } finally {
-      setRatingPending(null);
-    }
+  const updateRating = async (rating: number) => {
+    const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, { rating });
+    updateSessionSummary(updated);
   };
 
   return (
@@ -643,67 +595,20 @@ export function HobbySessionDetail({
       <div className="resource-layout__primary session-detail-stack">
         <InlineError message={errorMessage} />
 
-        <Card title={hobby.lifecycleMode === "pipeline" ? "Pipeline" : "Status"}>
-          <div className="session-flow-stack">
-            {hobby.lifecycleMode === "pipeline" ? (
-              <>
-                <div className="hobby-pipeline-indicator">
-                  {pipelineSteps.map((step, index) => {
-                    const variant = index < currentPipelineIndex
-                      ? "completed"
-                      : index === currentPipelineIndex
-                        ? "active"
-                        : "upcoming";
-                    return (
-                      <div
-                        key={step.id}
-                        className={`hobby-pipeline-step hobby-pipeline-step--${variant}`}
-                      >
-                        {step.label}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {sessionState.completedDate ? (
-                  <p className="session-flow-caption">Session Completed</p>
-                ) : (
-                  <form onSubmit={handleAdvance}>
-                    <input type="hidden" name="householdId" value={householdId} />
-                    <input type="hidden" name="hobbyId" value={hobbyId} />
-                    <input type="hidden" name="sessionId" value={sessionState.id} />
-                    <button
-                      type="submit"
-                      className="button"
-                      disabled={isAdvancePending || currentPipelineStep?.isFinal}
-                    >
-                      {isAdvancePending ? "Advancing..." : "Advance to Next Step"}
-                    </button>
-                  </form>
-                )}
-              </>
-            ) : (
-              <div className="session-status-toggle">
-                <button
-                  type="button"
-                  className={sessionState.status === "active" ? "button" : "button button--secondary"}
-                  onClick={() => void handleBinaryStatusChange("active")}
-                  disabled={statusPending}
-                >
-                  Active
-                </button>
-                <button
-                  type="button"
-                  className={sessionState.status === "completed" ? "button" : "button button--secondary"}
-                  onClick={() => void handleBinaryStatusChange("completed")}
-                  disabled={statusPending}
-                >
-                  {statusPending && sessionState.status !== "completed" ? "Saving..." : "Completed"}
-                </button>
-              </div>
-            )}
-          </div>
-        </Card>
+        <SessionPhaseManager
+          householdId={householdId}
+          hobbyId={hobbyId}
+          sessionId={sessionState.id}
+          lifecycleMode={hobby.lifecycleMode}
+          pipelineSteps={pipelineSteps}
+          currentPipelineIndex={currentPipelineIndex}
+          currentPipelineStep={currentPipelineStep}
+          sessionStatus={sessionState.status}
+          completedDate={sessionState.completedDate}
+          onAdvance={advanceSession}
+          onStatusChange={updateBinaryStatus}
+          onError={setErrorMessage}
+        />
 
         {series ? (
           <Card title="Series Context">
@@ -881,63 +786,15 @@ export function HobbySessionDetail({
           </div>
         ) : null}
 
-        <Card
-          title="Steps"
-          actions={<span className="pill">{completedSteps} / {sortedSteps.length}</span>}
-        >
-          <div className="session-step-stack">
-            <div className="session-progress-summary">
-              <strong>{completedSteps} of {sortedSteps.length} steps completed</strong>
-              <div className="session-progress-bar" aria-hidden="true">
-                <span style={{ width: `${progressPercent}%` }} />
-              </div>
-            </div>
-
-            {sortedSteps.length === 0 ? <p className="panel__empty">No steps in this session.</p> : null}
-
-            <div className="session-step-list">
-              {sortedSteps.map((step) => {
-                const isPending = pendingStepIds.includes(step.id);
-                return (
-                  <div
-                    key={step.id}
-                    className={`session-step session-step--clickable${isPending ? " session-step--pending" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      className={`session-step__checkbox${step.isCompleted ? " is-complete" : ""}`}
-                      onClick={() => void handleToggleStep(step)}
-                      disabled={isPending}
-                      aria-label={step.isCompleted ? `Mark ${step.title} incomplete` : `Mark ${step.title} complete`}
-                    >
-                      {step.isCompleted ? "✓" : "○"}
-                    </button>
-
-                    <div className="session-step__content">
-                      <div className="session-step__header">
-                        <div className="session-step__title-group">
-                          <strong className={`session-step__title${step.isCompleted ? " is-complete" : ""}`}>{step.title}</strong>
-                          <span className="pill">{titleCase(step.stepType)}</span>
-                          {step.durationMinutes != null ? <span className="pill">{step.durationMinutes} min</span> : null}
-                        </div>
-                        {step.completedAt ? <span className="pill">Completed {formatDateTime(step.completedAt)}</span> : null}
-                      </div>
-
-                      {step.description ? (
-                        <details>
-                          <summary>Description</summary>
-                          <p className="session-step__description">{step.description}</p>
-                        </details>
-                      ) : null}
-
-                      {step.notes ? <p className="session-step__notes">{step.notes}</p> : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Card>
+        <SessionStepList
+          steps={sortedSteps}
+          completedSteps={completedSteps}
+          progressPercent={progressPercent}
+          onToggleStep={toggleStep}
+          onError={setErrorMessage}
+          formatDateTime={formatDateTime}
+          titleCase={titleCase}
+        />
 
         <Card
           title="Ingredients"
@@ -1168,13 +1025,10 @@ export function HobbySessionDetail({
           </div>
         </Card>
 
-        <EntryTimeline
+        <SessionActivityLogSection
           householdId={householdId}
-          entityType="hobby_session"
-          entityId={sessionState.id}
-          title="Entry Timeline"
-          quickAddLabel="Entry"
-          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/sessions/${sessionState.id}#entry-${entry.id}`}
+          hobbyId={hobbyId}
+          sessionId={sessionState.id}
         />
       </div>
 
@@ -1211,27 +1065,7 @@ export function HobbySessionDetail({
             ) : null}
           </div>
 
-          <div className="session-rating-block" style={{ marginTop: 16 }}>
-            <strong>Rating</strong>
-            <div className="session-rating" role="radiogroup" aria-label="Session rating">
-              {Array.from({ length: 5 }, (_, index) => {
-                const value = index + 1;
-                const filled = (sessionState.rating ?? 0) >= value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`session-rating__star${filled ? " is-filled" : ""}`}
-                    onClick={() => void handleRating(value)}
-                    disabled={ratingPending != null}
-                    aria-label={`Rate session ${value} out of 5`}
-                  >
-                    ★
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <SessionRatingForm rating={sessionState.rating} onRate={updateRating} onError={setErrorMessage} />
 
           <form onSubmit={handleDelete} style={{ marginTop: 16 }}>
             <input type="hidden" name="householdId" value={householdId} />
