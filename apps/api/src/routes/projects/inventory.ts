@@ -280,7 +280,30 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project inventory link not found." });
     }
 
-    await app.prisma.projectInventoryItem.delete({ where: { id: existing.id } });
+    const inventoryItem = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
+
+    if (!inventoryItem) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      if (existing.quantityAllocated > 0) {
+        await applyInventoryTransaction(tx, {
+          inventoryItemId: inventoryItem.id,
+          userId: request.auth.userId,
+          input: {
+            type: "return",
+            quantity: existing.quantityAllocated,
+            unitCost: existing.budgetedUnitCost ?? inventoryItem.unitCost ?? undefined,
+            referenceType: "project",
+            referenceId: project.id,
+            notes: `Returned allocated inventory after removing ${project.name} inventory link.`
+          }
+        });
+      }
+
+      await tx.projectInventoryItem.delete({ where: { id: existing.id } });
+    });
 
     return reply.code(204).send();
   });

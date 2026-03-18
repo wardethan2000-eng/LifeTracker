@@ -67,6 +67,32 @@ const createApp = async () => {
     householdMember: {
       findUnique: async () => ({ householdId, userId, role: "owner" })
     },
+    maintenanceLog: {
+      findMany: async () => [
+        {
+          id: "clkeeperlog0000000000002",
+          title: "Oil change",
+          assetId: "clkeeperasset00000000001",
+          asset: {
+            name: "Truck"
+          }
+        },
+        {
+          id: "clkeeperlog0000000000003",
+          title: "Filter service",
+          assetId: "clkeeperasset00000000001",
+          asset: {
+            name: "Truck"
+          }
+        }
+      ]
+    },
+    project: {
+      findMany: async () => []
+    },
+    hobbySession: {
+      findMany: async () => []
+    },
     inventoryTransaction: {
       findMany: async () => [
         {
@@ -188,7 +214,12 @@ describe("household inventory transaction routes", () => {
             id: "clkeepertxn0000000000002",
             itemName: "Oil Filter",
             itemPartNumber: "OF-123",
-            type: "consume"
+            type: "consume",
+            referenceLink: {
+              href: "/assets/clkeeperasset00000000001/maintenance#maintenance-log-clkeeperlog0000000000002",
+              label: "Oil change",
+              secondaryLabel: "Truck"
+            }
           }
         ],
         nextCursor: "clkeepertxn0000000000002"
@@ -231,7 +262,12 @@ describe("household inventory transaction routes", () => {
         transaction: {
           id: "clkeepertxn0000000000003",
           type: "consume",
-          quantityAfter: 1
+          quantityAfter: 1,
+          referenceLink: {
+            href: "/assets/clkeeperasset00000000001/maintenance#maintenance-log-clkeeperlog0000000000003",
+            label: "Filter service",
+            secondaryLabel: "Truck"
+          }
         },
         inventoryItem: {
           id: inventoryItemId,

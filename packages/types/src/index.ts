@@ -1291,9 +1291,31 @@ export const createInventoryItemSchema = z.object({
 
 export const updateInventoryItemSchema = createInventoryItemSchema.partial();
 
+export const mergeInventoryItemsSchema = z.object({
+  sourceInventoryItemId: z.string().cuid()
+});
+
 export const inventoryItemSummarySchema = inventoryItemSchema.extend({
   totalValue: z.number().nullable(),
   lowStock: z.boolean()
+});
+
+export const inventoryItemMergeResultSchema = z.object({
+  sourceInventoryItemId: z.string().cuid(),
+  targetInventoryItem: inventoryItemSummarySchema,
+  reassignedCounts: z.object({
+    transactions: z.number().int().min(0),
+    purchaseLines: z.number().int().min(0),
+    assetLinks: z.number().int().min(0),
+    scheduleLinks: z.number().int().min(0),
+    projectLinks: z.number().int().min(0),
+    hobbyLinks: z.number().int().min(0),
+    maintenanceLogParts: z.number().int().min(0),
+    projectPhaseSupplies: z.number().int().min(0),
+    hobbyRecipeIngredients: z.number().int().min(0),
+    hobbySessionIngredients: z.number().int().min(0),
+    comments: z.number().int().min(0)
+  })
 });
 
 export const inventoryTransactionLinkSchema = z.object({
@@ -1301,6 +1323,12 @@ export const inventoryTransactionLinkSchema = z.object({
   type: inventoryTransactionTypeSchema,
   quantity: z.number(),
   createdAt: z.string().datetime()
+});
+
+export const inventoryTransactionReferenceLinkSchema = z.object({
+  href: z.string(),
+  label: z.string(),
+  secondaryLabel: z.string().nullable()
 });
 
 export const inventoryTransactionSchema = z.object({
@@ -1311,6 +1339,7 @@ export const inventoryTransactionSchema = z.object({
   quantityAfter: z.number(),
   referenceType: z.string().nullable(),
   referenceId: z.string().nullable(),
+  referenceLink: inventoryTransactionReferenceLinkSchema.nullable(),
   correctionOfTransactionId: z.string().cuid().nullable(),
   correctionOfTransaction: inventoryTransactionLinkSchema.nullable(),
   correctedByTransactions: z.array(inventoryTransactionLinkSchema),
@@ -2753,8 +2782,11 @@ export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 export type InventoryItemType = z.infer<typeof inventoryItemTypeSchema>;
 export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
+export type MergeInventoryItemsInput = z.infer<typeof mergeInventoryItemsSchema>;
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
+export type InventoryItemMergeResult = z.infer<typeof inventoryItemMergeResultSchema>;
 export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
+export type InventoryTransactionReferenceLink = z.infer<typeof inventoryTransactionReferenceLinkSchema>;
 export type CreateInventoryTransactionInput = z.infer<typeof createInventoryTransactionSchema>;
 export type CreateInventoryTransactionCorrectionInput = z.infer<typeof createInventoryTransactionCorrectionSchema>;
 export type InventoryTransactionCorrectionResult = z.infer<typeof inventoryTransactionCorrectionResultSchema>;

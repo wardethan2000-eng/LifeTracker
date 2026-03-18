@@ -23,7 +23,6 @@ export const computeAverageConsumptionPerMonth = (transactions: TransactionWithD
   }
 
   const earliest = consumeTransactions[0]?.createdAt ?? new Date();
-  const latest = consumeTransactions[consumeTransactions.length - 1]?.createdAt ?? earliest;
   const now = new Date();
   const spanInMonths = Math.max(
     1,
@@ -31,8 +30,6 @@ export const computeAverageConsumptionPerMonth = (transactions: TransactionWithD
       + (now.getUTCMonth() - earliest.getUTCMonth())
       + 1
   );
-  const _latestConsumeAt = latest;
-  void _latestConsumeAt;
   const totalConsumed = consumeTransactions.reduce((sum, transaction) => sum + Math.abs(transaction.quantity), 0);
 
   return totalConsumed / spanInMonths;

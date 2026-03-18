@@ -730,7 +730,7 @@ model InventoryPurchaseLine {
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
   purchase         InventoryPurchase           @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  inventoryItem    InventoryItem               @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem    InventoryItem               @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
 
   @@unique([purchaseId, inventoryItemId])
   @@index([purchaseId, status])
@@ -747,7 +747,7 @@ model AssetInventoryItem {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   asset             Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
 
   @@unique([assetId, inventoryItemId])
   @@index([assetId])
@@ -764,7 +764,7 @@ model ScheduleInventoryItem {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   schedule           MaintenanceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  inventoryItem      InventoryItem       @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem      InventoryItem       @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
 
   @@unique([scheduleId, inventoryItemId])
   @@index([inventoryItemId])
@@ -782,7 +782,7 @@ model ProjectInventoryItem {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   project           Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem     InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
 
   @@unique([projectId, inventoryItemId])
   @@index([projectId])
@@ -803,7 +803,7 @@ model InventoryTransaction {
   notes           String?
   userId          String
   createdAt       DateTime      @default(now())
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
   correctionOfTransaction InventoryTransaction? @relation("InventoryTransactionCorrections", fields: [correctionOfTransactionId], references: [id], onDelete: SetNull)
   correctedByTransactions InventoryTransaction[] @relation("InventoryTransactionCorrections")
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1174,7 +1174,7 @@ model Comment {
   asset           Asset?    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   hobby           Hobby?    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
-  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
   author          User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   parentComment   Comment?  @relation("CommentThread", fields: [parentCommentId], references: [id], onDelete: SetNull)
   replies         Comment[] @relation("CommentThread")
@@ -1332,7 +1332,7 @@ model HobbyInventoryItem {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   hobby           Hobby         @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
 
   @@unique([hobbyId, inventoryItemId])
   @@index([hobbyId])

@@ -16,6 +16,10 @@ import {
   InventoryError
 } from "../../lib/inventory.js";
 import {
+  getInventoryTransactionReferenceKey,
+  resolveInventoryTransactionReferenceLinks
+} from "../../lib/inventory-transaction-references.js";
+import {
   toInventoryItemSummaryResponse,
   toInventoryTransactionResponse,
   toInventoryTransactionWithItemResponse
@@ -97,6 +101,8 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
       take: query.limit + 1
     });
 
+    const referenceLinks = await resolveInventoryTransactionReferenceLinks(app.prisma, params.householdId, transactions);
+
     const hasNextPage = transactions.length > query.limit;
 
     if (hasNextPage) {
@@ -104,7 +110,10 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
     }
 
     return reply.send(inventoryTransactionListSchema.parse({
-      transactions: transactions.map(toInventoryTransactionWithItemResponse),
+      transactions: transactions.map((transaction) => toInventoryTransactionWithItemResponse(
+        transaction,
+        referenceLinks.get(getInventoryTransactionReferenceKey(transaction.referenceType, transaction.referenceId) ?? "") ?? null
+      )),
       nextCursor: hasNextPage && transactions.length > 0
         ? transactions[transactions.length - 1]?.id ?? null
         : null
@@ -132,8 +141,13 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
         input
       }));
 
+      const referenceLinks = await resolveInventoryTransactionReferenceLinks(app.prisma, params.householdId, [result.transaction]);
+
       return reply.code(201).send({
-        transaction: toInventoryTransactionResponse(result.transaction),
+        transaction: toInventoryTransactionResponse(
+          result.transaction,
+          referenceLinks.get(getInventoryTransactionReferenceKey(result.transaction.referenceType, result.transaction.referenceId) ?? "") ?? null
+        ),
         inventoryItem: toInventoryItemSummaryResponse(result.item),
         lowStockWarning: input.type === "consume" && result.lowStock
       });
@@ -162,6 +176,8 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
         input
       }));
 
+      const referenceLinks = await resolveInventoryTransactionReferenceLinks(app.prisma, params.householdId, [result.transaction]);
+
       await logActivity(app.prisma, {
         householdId: params.householdId,
         userId: request.auth.userId,
@@ -177,7 +193,10 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
       });
 
       return reply.code(201).send(inventoryTransactionCorrectionResultSchema.parse({
-        transaction: toInventoryTransactionResponse(result.transaction),
+        transaction: toInventoryTransactionResponse(
+          result.transaction,
+          referenceLinks.get(getInventoryTransactionReferenceKey(result.transaction.referenceType, result.transaction.referenceId) ?? "") ?? null
+        ),
         inventoryItem: toInventoryItemSummaryResponse(result.item)
       }));
     } catch (error) {

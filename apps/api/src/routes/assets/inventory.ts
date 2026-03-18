@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { createAssetInventoryItemSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -6,7 +7,6 @@ import {
   getHouseholdInventoryItem
 } from "../../lib/inventory.js";
 import { toAssetInventoryLinkDetailResponse } from "../../lib/serializers/index.js";
-import { isInventoryLowStock } from "@lifekeeper/utils";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -21,6 +21,11 @@ const assetInventoryQuerySchema = z.object({
 });
 
 export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
+  const lowStockInventoryWhere = {
+    reorderThreshold: { not: null },
+    quantityOnHand: { lte: app.prisma.inventoryItem.fields.reorderThreshold }
+  } satisfies Prisma.InventoryItemWhereInput;
+
   app.get("/v1/assets/:assetId/inventory", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);
     const query = assetInventoryQuerySchema.parse(request.query);
@@ -31,7 +36,12 @@ export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const links = await app.prisma.assetInventoryItem.findMany({
-      where: { assetId: asset.id },
+      where: {
+        assetId: asset.id,
+        ...(query.lowStock ? {
+          inventoryItem: lowStockInventoryWhere
+        } : {})
+      },
       include: {
         inventoryItem: true,
         asset: {
@@ -41,11 +51,7 @@ export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
       orderBy: { createdAt: "desc" }
     });
 
-    const filtered = query.lowStock
-      ? links.filter((link) => isInventoryLowStock(link.inventoryItem.quantityOnHand, link.inventoryItem.reorderThreshold))
-      : links;
-
-    return filtered.map(toAssetInventoryLinkDetailResponse);
+    return links.map(toAssetInventoryLinkDetailResponse);
   });
 
   app.post("/v1/assets/:assetId/inventory", async (request, reply) => {

@@ -33,6 +33,7 @@ import {
   partCommonalitySchema,
   projectInventoryItemSchema
 } from "@lifekeeper/types";
+import type { InventoryTransactionReferenceLink } from "@lifekeeper/types";
 import {
   calculateInventoryDeficit,
   calculateInventoryTotalValue,
@@ -168,10 +169,14 @@ const toInventoryTransactionLinkResponse = (
   createdAt: transaction.createdAt.toISOString()
 });
 
-export const toInventoryTransactionResponse = (transaction: InventoryTransactionRecord) => inventoryTransactionSchema.parse({
+export const toInventoryTransactionResponse = (
+  transaction: InventoryTransactionRecord,
+  referenceLink: InventoryTransactionReferenceLink | null = null
+) => inventoryTransactionSchema.parse({
   ...transaction,
   referenceType: transaction.referenceType ?? null,
   referenceId: transaction.referenceId ?? null,
+  referenceLink,
   correctionOfTransactionId: transaction.correctionOfTransactionId ?? null,
   correctionOfTransaction: transaction.correctionOfTransaction
     ? toInventoryTransactionLinkResponse(transaction.correctionOfTransaction)
@@ -188,9 +193,10 @@ export const toInventoryTransactionWithItemResponse = (
       name: string;
       partNumber: string | null;
     };
-  }
+  },
+  referenceLink: InventoryTransactionReferenceLink | null = null
 ) => inventoryTransactionWithItemSchema.parse({
-  ...toInventoryTransactionResponse(transaction),
+  ...toInventoryTransactionResponse(transaction, referenceLink),
   itemName: transaction.inventoryItem.name,
   itemPartNumber: transaction.inventoryItem.partNumber ?? null
 });
@@ -357,7 +363,7 @@ export const toInventoryItemDetailResponse = (
   }
 ) => inventoryItemDetailSchema.parse({
   ...toInventoryItemSummaryResponse(item),
-  transactions: item.transactions.map(toInventoryTransactionResponse),
+  transactions: item.transactions.map((transaction) => toInventoryTransactionResponse(transaction)),
   assets: item.assetLinks.map((link) => ({
     ...toAssetInventoryItemResponse(link),
     asset: link.asset

@@ -7,6 +7,7 @@ import type {
 } from "@lifekeeper/types";
 import { Fragment, type JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createInventoryTransactionCorrection, getHouseholdInventoryTransactions } from "../lib/api";
 import { formatCurrency, formatDateTime } from "../lib/formatters";
@@ -60,6 +61,34 @@ const formatQuantity = (value: number): string => (value > 0 ? `+${value}` : Str
 const formatReferenceLabel = (value: string): string => value
   .replace(/_/g, " ")
   .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const renderReferenceCell = (transaction: InventoryTransactionWithItem): JSX.Element | string => {
+  if (!transaction.referenceType) {
+    return "—";
+  }
+
+  if (transaction.referenceLink) {
+    return (
+      <>
+        <div className="data-table__primary">
+          <Link href={transaction.referenceLink.href} className="data-table__link">
+            {transaction.referenceLink.label}
+          </Link>
+        </div>
+        <div className="data-table__secondary">
+          {transaction.referenceLink.secondaryLabel ?? formatReferenceLabel(transaction.referenceType)}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="data-table__primary">{formatReferenceLabel(transaction.referenceType)}</div>
+      <div className="data-table__secondary">{transaction.referenceId ?? "—"}</div>
+    </>
+  );
+};
 
 const getCorrectionSummary = (transaction: InventoryTransactionWithItem): string | null => {
   if (transaction.correctionOfTransaction) {
@@ -297,7 +326,7 @@ export function InventoryTransactionHistory({ householdId, inventoryItemId, titl
 
                   return (
                     <Fragment key={transaction.id}>
-                      <tr key={transaction.id}>
+                      <tr key={transaction.id} id={`inventory-transaction-${transaction.id}`}>
                         <td>{formatDateTime(transaction.createdAt, "—")}</td>
                         {showItemColumn ? (
                           <td>
@@ -314,14 +343,7 @@ export function InventoryTransactionHistory({ householdId, inventoryItemId, titl
                         </td>
                         <td>{formatQuantity(transaction.quantity)}</td>
                         <td>{transaction.quantityAfter}</td>
-                        <td>
-                          {transaction.referenceType ? (
-                            <>
-                              <div className="data-table__primary">{formatReferenceLabel(transaction.referenceType)}</div>
-                              <div className="data-table__secondary">{transaction.referenceId ?? "—"}</div>
-                            </>
-                          ) : "—"}
-                        </td>
+                        <td>{renderReferenceCell(transaction)}</td>
                         <td>{formatCurrency(transaction.unitCost, "—")}</td>
                         <td title={transaction.notes ?? undefined}>{truncateText(transaction.notes)}</td>
                         <td>

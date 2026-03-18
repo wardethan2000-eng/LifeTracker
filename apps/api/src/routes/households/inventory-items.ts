@@ -2,8 +2,10 @@ import type { Prisma } from "@prisma/client";
 import {
   bulkPartsReadinessSchema,
   createInventoryItemSchema,
+  inventoryItemMergeResultSchema,
   inventoryItemSummarySchema,
   inventoryItemTypeSchema,
+  mergeInventoryItemsSchema,
   updateInventoryItemSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
@@ -13,7 +15,9 @@ import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
   applyInventoryTransaction,
   computeBulkSchedulePartsReadiness,
-  getHouseholdInventoryItem
+  getHouseholdInventoryItem,
+  InventoryError,
+  mergeHouseholdInventoryItems
 } from "../../lib/inventory.js";
 import { toMaintenanceScheduleResponse } from "../../lib/schedule-state.js";
 import {
@@ -21,7 +25,7 @@ import {
   toInventoryItemSummaryResponse,
   toLowStockInventoryItemResponse
 } from "../../lib/serializers/index.js";
-import { calculateInventoryDeficit, isInventoryLowStock } from "@lifekeeper/utils";
+import { calculateInventoryDeficit } from "@lifekeeper/utils";
 import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
@@ -118,6 +122,11 @@ const csvValue = (value: string | number | null | undefined): string => {
 };
 
 export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
+  const lowStockWhere = {
+    reorderThreshold: { not: null },
+    quantityOnHand: { lte: app.prisma.inventoryItem.fields.reorderThreshold }
+  } satisfies Prisma.InventoryItemWhereInput;
+
   app.post("/v1/households/:householdId/inventory", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
     const input = createInventoryItemSchema.parse(request.body);
@@ -357,6 +366,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const where: Prisma.InventoryItemWhereInput = {
       householdId: params.householdId,
       deletedAt: null,
+      ...(query.lowStock ? lowStockWhere : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.itemType ? { itemType: query.itemType } : {}),
       ...(query.search ? {
@@ -368,10 +378,9 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       } : {})
     };
 
-    const take = query.lowStock ? Math.min(query.limit * 5, 250) : query.limit + 1;
     const items = await app.prisma.inventoryItem.findMany({
       where,
-      take,
+      take: query.limit + 1,
       ...(query.cursor ? {
         cursor: { id: query.cursor },
         skip: 1
@@ -382,12 +391,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       ]
     });
 
-    const filtered = query.lowStock
-      ? items.filter((item) => isInventoryLowStock(item.quantityOnHand, item.reorderThreshold))
-      : items;
-
-    const page = filtered.slice(0, query.limit);
-    const nextCursor = filtered.length > query.limit ? filtered[query.limit]?.id ?? null : null;
+    const page = items.slice(0, query.limit);
+    const nextCursor = items.length > query.limit ? items[query.limit]?.id ?? null : null;
 
     return {
       items: page.map(toInventoryItemSummaryResponse),
@@ -407,14 +412,13 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
         householdId: params.householdId,
         deletedAt: null,
         itemType: "consumable",
-        reorderThreshold: { not: null }
+        ...lowStockWhere
       },
       orderBy: { createdAt: "desc" }
     });
 
     // This shopping-list endpoint should eventually feed inventory alert scanning once notifications support inventory events.
     return items
-      .filter((item) => isInventoryLowStock(item.quantityOnHand, item.reorderThreshold))
       .sort((left, right) => calculateInventoryDeficit(right.quantityOnHand, right.reorderThreshold) - calculateInventoryDeficit(left.quantityOnHand, left.reorderThreshold))
       .map(toLowStockInventoryItemResponse);
   });
@@ -557,6 +561,86 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
 
     return toInventoryItemSummaryResponse(item);
+  });
+
+  app.post("/v1/households/:householdId/inventory/:inventoryItemId/restore", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.inventoryItem.findFirst({
+      where: {
+        id: params.inventoryItemId,
+        householdId: params.householdId
+      }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    const restored = await app.prisma.inventoryItem.update({
+      where: { id: existing.id },
+      data: { deletedAt: null }
+    });
+
+    await emitDomainEvent(app.prisma, {
+      householdId: params.householdId,
+      eventType: "inventory_item.restored",
+      entityType: "inventory_item",
+      entityId: restored.id,
+      payload: {
+        name: restored.name
+      }
+    });
+
+    void syncInventoryItemToSearchIndex(app.prisma, restored.id).catch(console.error);
+
+    return reply.send(toInventoryItemSummaryResponse(restored));
+  });
+
+  app.post("/v1/households/:householdId/inventory/:inventoryItemId/merge", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+    const input = mergeInventoryItemsSchema.parse(request.body);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    try {
+      const result = await app.prisma.$transaction((tx) => mergeHouseholdInventoryItems(tx, {
+        householdId: params.householdId,
+        targetInventoryItemId: params.inventoryItemId,
+        sourceInventoryItemId: input.sourceInventoryItemId
+      }));
+
+      await emitDomainEvent(app.prisma, {
+        householdId: params.householdId,
+        eventType: "inventory_item.merged",
+        entityType: "inventory_item",
+        entityId: params.inventoryItemId,
+        payload: {
+          sourceInventoryItemId: input.sourceInventoryItemId,
+          targetInventoryItemId: params.inventoryItemId
+        }
+      });
+
+      void removeSearchIndexEntry(app.prisma, "inventory_item", input.sourceInventoryItemId).catch(console.error);
+      void syncInventoryItemToSearchIndex(app.prisma, params.inventoryItemId).catch(console.error);
+
+      return reply.send(inventoryItemMergeResultSchema.parse(result));
+    } catch (error) {
+      if (error instanceof InventoryError) {
+        const statusCode = error.code === "INVENTORY_ITEM_NOT_FOUND"
+          ? 404
+          : 400;
+        return reply.code(statusCode).send({ message: error.message });
+      }
+
+      throw error;
+    }
   });
 
   app.delete("/v1/households/:householdId/inventory/:inventoryItemId", async (request, reply) => {

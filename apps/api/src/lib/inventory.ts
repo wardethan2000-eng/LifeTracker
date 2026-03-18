@@ -6,6 +6,7 @@ import {
   type CreateInventoryTransactionCorrectionInput,
   type CreateMaintenanceLogPartInput,
   type CreateInventoryTransactionInput,
+  type InventoryItemMergeResult,
   type InventoryTransactionType,
   type SchedulePartReadinessItem,
   type SchedulePartsReadiness
@@ -46,6 +47,371 @@ export const getHouseholdInventoryItem = async (
     deletedAt: null
   }
 });
+
+const mergeText = (primary: string | null, secondary: string | null): string | null => {
+  const values = [primary, secondary]
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean);
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  return Array.from(new Set(values)).join("\n\n");
+};
+
+const mergeNumber = (primary: number | null, secondary: number | null): number | null => {
+  if (primary !== null) {
+    return primary;
+  }
+
+  return secondary;
+};
+
+const mergeAssetLinks = async (
+  prisma: Prisma.TransactionClient,
+  targetInventoryItemId: string,
+  sourceInventoryItemId: string
+): Promise<number> => {
+  const [sourceLinks, targetLinks] = await Promise.all([
+    prisma.assetInventoryItem.findMany({ where: { inventoryItemId: sourceInventoryItemId } }),
+    prisma.assetInventoryItem.findMany({ where: { inventoryItemId: targetInventoryItemId } })
+  ]);
+
+  const targetByAssetId = new Map(targetLinks.map((link) => [link.assetId, link]));
+
+  for (const sourceLink of sourceLinks) {
+    const existingTarget = targetByAssetId.get(sourceLink.assetId);
+
+    if (existingTarget) {
+      await prisma.assetInventoryItem.update({
+        where: { id: existingTarget.id },
+        data: {
+          notes: mergeText(existingTarget.notes, sourceLink.notes),
+          recommendedQuantity: Math.max(existingTarget.recommendedQuantity ?? 0, sourceLink.recommendedQuantity ?? 0) || null
+        }
+      });
+      await prisma.assetInventoryItem.delete({ where: { id: sourceLink.id } });
+      continue;
+    }
+
+    await prisma.assetInventoryItem.update({
+      where: { id: sourceLink.id },
+      data: { inventoryItemId: targetInventoryItemId }
+    });
+  }
+
+  return sourceLinks.length;
+};
+
+const mergeScheduleLinks = async (
+  prisma: Prisma.TransactionClient,
+  targetInventoryItemId: string,
+  sourceInventoryItemId: string
+): Promise<number> => {
+  const [sourceLinks, targetLinks] = await Promise.all([
+    prisma.scheduleInventoryItem.findMany({ where: { inventoryItemId: sourceInventoryItemId } }),
+    prisma.scheduleInventoryItem.findMany({ where: { inventoryItemId: targetInventoryItemId } })
+  ]);
+
+  const targetByScheduleId = new Map(targetLinks.map((link) => [link.scheduleId, link]));
+
+  for (const sourceLink of sourceLinks) {
+    const existingTarget = targetByScheduleId.get(sourceLink.scheduleId);
+
+    if (existingTarget) {
+      await prisma.scheduleInventoryItem.update({
+        where: { id: existingTarget.id },
+        data: {
+          quantityPerService: existingTarget.quantityPerService + sourceLink.quantityPerService,
+          notes: mergeText(existingTarget.notes, sourceLink.notes)
+        }
+      });
+      await prisma.scheduleInventoryItem.delete({ where: { id: sourceLink.id } });
+      continue;
+    }
+
+    await prisma.scheduleInventoryItem.update({
+      where: { id: sourceLink.id },
+      data: { inventoryItemId: targetInventoryItemId }
+    });
+  }
+
+  return sourceLinks.length;
+};
+
+const mergeProjectLinks = async (
+  prisma: Prisma.TransactionClient,
+  targetInventoryItemId: string,
+  sourceInventoryItemId: string
+): Promise<number> => {
+  const [sourceLinks, targetLinks] = await Promise.all([
+    prisma.projectInventoryItem.findMany({ where: { inventoryItemId: sourceInventoryItemId } }),
+    prisma.projectInventoryItem.findMany({ where: { inventoryItemId: targetInventoryItemId } })
+  ]);
+
+  const targetByProjectId = new Map(targetLinks.map((link) => [link.projectId, link]));
+
+  for (const sourceLink of sourceLinks) {
+    const existingTarget = targetByProjectId.get(sourceLink.projectId);
+
+    if (existingTarget) {
+      await prisma.projectInventoryItem.update({
+        where: { id: existingTarget.id },
+        data: {
+          quantityNeeded: existingTarget.quantityNeeded + sourceLink.quantityNeeded,
+          quantityAllocated: existingTarget.quantityAllocated + sourceLink.quantityAllocated,
+          budgetedUnitCost: mergeNumber(existingTarget.budgetedUnitCost, sourceLink.budgetedUnitCost),
+          notes: mergeText(existingTarget.notes, sourceLink.notes)
+        }
+      });
+      await prisma.projectInventoryItem.delete({ where: { id: sourceLink.id } });
+      continue;
+    }
+
+    await prisma.projectInventoryItem.update({
+      where: { id: sourceLink.id },
+      data: { inventoryItemId: targetInventoryItemId }
+    });
+  }
+
+  return sourceLinks.length;
+};
+
+const mergeHobbyLinks = async (
+  prisma: Prisma.TransactionClient,
+  targetInventoryItemId: string,
+  sourceInventoryItemId: string
+): Promise<number> => {
+  const [sourceLinks, targetLinks] = await Promise.all([
+    prisma.hobbyInventoryItem.findMany({ where: { inventoryItemId: sourceInventoryItemId } }),
+    prisma.hobbyInventoryItem.findMany({ where: { inventoryItemId: targetInventoryItemId } })
+  ]);
+
+  const targetByHobbyId = new Map(targetLinks.map((link) => [link.hobbyId, link]));
+
+  for (const sourceLink of sourceLinks) {
+    const existingTarget = targetByHobbyId.get(sourceLink.hobbyId);
+
+    if (existingTarget) {
+      await prisma.hobbyInventoryItem.update({
+        where: { id: existingTarget.id },
+        data: {
+          notes: mergeText(existingTarget.notes, sourceLink.notes)
+        }
+      });
+      await prisma.hobbyInventoryItem.delete({ where: { id: sourceLink.id } });
+      continue;
+    }
+
+    await prisma.hobbyInventoryItem.update({
+      where: { id: sourceLink.id },
+      data: { inventoryItemId: targetInventoryItemId }
+    });
+  }
+
+  return sourceLinks.length;
+};
+
+const mergePurchaseLines = async (
+  prisma: Prisma.TransactionClient,
+  targetInventoryItemId: string,
+  sourceInventoryItemId: string
+): Promise<number> => {
+  const [sourceLines, targetLines] = await Promise.all([
+    prisma.inventoryPurchaseLine.findMany({ where: { inventoryItemId: sourceInventoryItemId } }),
+    prisma.inventoryPurchaseLine.findMany({ where: { inventoryItemId: targetInventoryItemId } })
+  ]);
+
+  const targetByPurchaseId = new Map(targetLines.map((line) => [line.purchaseId, line]));
+
+  for (const sourceLine of sourceLines) {
+    const existingTarget = targetByPurchaseId.get(sourceLine.purchaseId);
+
+    if (existingTarget) {
+      const mergedOrderedAt = [existingTarget.orderedAt, sourceLine.orderedAt]
+        .filter((value): value is Date => value !== null)
+        .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
+      const mergedReceivedAt = [existingTarget.receivedAt, sourceLine.receivedAt]
+        .filter((value): value is Date => value !== null)
+        .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
+      const orderedQuantity = (existingTarget.orderedQuantity ?? 0) + (sourceLine.orderedQuantity ?? 0);
+      const receivedQuantity = (existingTarget.receivedQuantity ?? 0) + (sourceLine.receivedQuantity ?? 0);
+
+      await prisma.inventoryPurchaseLine.update({
+        where: { id: existingTarget.id },
+        data: {
+          plannedQuantity: existingTarget.plannedQuantity + sourceLine.plannedQuantity,
+          orderedQuantity: orderedQuantity > 0 ? orderedQuantity : null,
+          receivedQuantity: receivedQuantity > 0 ? receivedQuantity : null,
+          unitCost: mergeNumber(existingTarget.unitCost, sourceLine.unitCost),
+          notes: mergeText(existingTarget.notes, sourceLine.notes),
+          status: existingTarget.status === "received" || sourceLine.status === "received"
+            ? "received"
+            : (existingTarget.status === "ordered" || sourceLine.status === "ordered" ? "ordered" : "draft"),
+          orderedAt: mergedOrderedAt,
+          receivedAt: mergedReceivedAt
+        }
+      });
+      await prisma.inventoryPurchaseLine.delete({ where: { id: sourceLine.id } });
+      continue;
+    }
+
+    await prisma.inventoryPurchaseLine.update({
+      where: { id: sourceLine.id },
+      data: { inventoryItemId: targetInventoryItemId }
+    });
+  }
+
+  return sourceLines.length;
+};
+
+export const mergeHouseholdInventoryItems = async (
+  prisma: Prisma.TransactionClient,
+  options: {
+    householdId: string;
+    sourceInventoryItemId: string;
+    targetInventoryItemId: string;
+  }
+): Promise<InventoryItemMergeResult> => {
+  if (options.sourceInventoryItemId === options.targetInventoryItemId) {
+    throw new InventoryError("INVENTORY_ITEM_MERGE_SAME_ITEM", "Source and target inventory items must be different.");
+  }
+
+  const [sourceItem, targetItem] = await Promise.all([
+    prisma.inventoryItem.findFirst({
+      where: {
+        id: options.sourceInventoryItemId,
+        householdId: options.householdId,
+        deletedAt: null
+      }
+    }),
+    prisma.inventoryItem.findFirst({
+      where: {
+        id: options.targetInventoryItemId,
+        householdId: options.householdId,
+        deletedAt: null
+      }
+    })
+  ]);
+
+  if (!sourceItem || !targetItem) {
+    throw new InventoryError("INVENTORY_ITEM_NOT_FOUND", "Inventory item not found.");
+  }
+
+  if (sourceItem.itemType !== targetItem.itemType) {
+    throw new InventoryError("INVENTORY_ITEM_MERGE_TYPE_MISMATCH", "Inventory items with different item types cannot be merged.");
+  }
+
+  if (sourceItem.unit.trim().toLowerCase() !== targetItem.unit.trim().toLowerCase()) {
+    throw new InventoryError("INVENTORY_ITEM_MERGE_UNIT_MISMATCH", "Inventory items with different units cannot be merged.");
+  }
+
+  const [assetLinks, scheduleLinks, projectLinks, hobbyLinks, purchaseLines] = await Promise.all([
+    mergeAssetLinks(prisma, targetItem.id, sourceItem.id),
+    mergeScheduleLinks(prisma, targetItem.id, sourceItem.id),
+    mergeProjectLinks(prisma, targetItem.id, sourceItem.id),
+    mergeHobbyLinks(prisma, targetItem.id, sourceItem.id),
+    mergePurchaseLines(prisma, targetItem.id, sourceItem.id)
+  ]);
+
+  const [transactions, maintenanceLogParts, projectPhaseSupplies, hobbyRecipeIngredients, hobbySessionIngredients, comments] = await Promise.all([
+    prisma.inventoryTransaction.updateMany({
+      where: { inventoryItemId: sourceItem.id },
+      data: { inventoryItemId: targetItem.id }
+    }),
+    prisma.maintenanceLogPart.updateMany({
+      where: { inventoryItemId: sourceItem.id },
+      data: { inventoryItemId: targetItem.id }
+    }),
+    prisma.projectPhaseSupply.updateMany({
+      where: { inventoryItemId: sourceItem.id },
+      data: { inventoryItemId: targetItem.id }
+    }),
+    prisma.hobbyRecipeIngredient.updateMany({
+      where: { inventoryItemId: sourceItem.id },
+      data: { inventoryItemId: targetItem.id }
+    }),
+    prisma.hobbySessionIngredient.updateMany({
+      where: { inventoryItemId: sourceItem.id },
+      data: { inventoryItemId: targetItem.id }
+    }),
+    prisma.comment.updateMany({
+      where: { inventoryItemId: sourceItem.id },
+      data: { inventoryItemId: targetItem.id }
+    })
+  ]);
+
+  const mergedTargetItem = await prisma.inventoryItem.update({
+    where: { id: targetItem.id },
+    data: {
+      quantityOnHand: targetItem.quantityOnHand + sourceItem.quantityOnHand,
+      conditionStatus: targetItem.conditionStatus ?? sourceItem.conditionStatus,
+      partNumber: targetItem.partNumber ?? sourceItem.partNumber,
+      description: mergeText(targetItem.description, sourceItem.description),
+      category: targetItem.category ?? sourceItem.category,
+      manufacturer: targetItem.manufacturer ?? sourceItem.manufacturer,
+      reorderThreshold: mergeNumber(targetItem.reorderThreshold, sourceItem.reorderThreshold),
+      reorderQuantity: mergeNumber(targetItem.reorderQuantity, sourceItem.reorderQuantity),
+      preferredSupplier: targetItem.preferredSupplier ?? sourceItem.preferredSupplier,
+      supplierUrl: targetItem.supplierUrl ?? sourceItem.supplierUrl,
+      unitCost: mergeNumber(targetItem.unitCost, sourceItem.unitCost),
+      storageLocation: targetItem.storageLocation ?? sourceItem.storageLocation,
+      notes: mergeText(targetItem.notes, sourceItem.notes)
+    }
+  });
+
+  await prisma.inventoryItem.update({
+    where: { id: sourceItem.id },
+    data: {
+      quantityOnHand: 0,
+      deletedAt: new Date(),
+      notes: mergeText(sourceItem.notes, `Merged into ${targetItem.name} (${targetItem.id}).`)
+    }
+  });
+
+  return {
+    sourceInventoryItemId: sourceItem.id,
+    targetInventoryItem: {
+      id: mergedTargetItem.id,
+      householdId: mergedTargetItem.householdId,
+      itemType: mergedTargetItem.itemType,
+      conditionStatus: mergedTargetItem.conditionStatus,
+      name: mergedTargetItem.name,
+      partNumber: mergedTargetItem.partNumber,
+      description: mergedTargetItem.description,
+      category: mergedTargetItem.category,
+      manufacturer: mergedTargetItem.manufacturer,
+      quantityOnHand: mergedTargetItem.quantityOnHand,
+      unit: mergedTargetItem.unit,
+      reorderThreshold: mergedTargetItem.reorderThreshold,
+      reorderQuantity: mergedTargetItem.reorderQuantity,
+      preferredSupplier: mergedTargetItem.preferredSupplier,
+      supplierUrl: mergedTargetItem.supplierUrl,
+      unitCost: mergedTargetItem.unitCost,
+      storageLocation: mergedTargetItem.storageLocation,
+      notes: mergedTargetItem.notes,
+      deletedAt: null,
+      totalValue: calculateInventoryTotalValue(mergedTargetItem.quantityOnHand, mergedTargetItem.unitCost),
+      lowStock: isInventoryLowStock(mergedTargetItem.quantityOnHand, mergedTargetItem.reorderThreshold),
+      createdAt: mergedTargetItem.createdAt.toISOString(),
+      updatedAt: mergedTargetItem.updatedAt.toISOString()
+    },
+    reassignedCounts: {
+      transactions: transactions.count,
+      purchaseLines,
+      assetLinks,
+      scheduleLinks,
+      projectLinks,
+      hobbyLinks,
+      maintenanceLogParts: maintenanceLogParts.count,
+      projectPhaseSupplies: projectPhaseSupplies.count,
+      hobbyRecipeIngredients: hobbyRecipeIngredients.count,
+      hobbySessionIngredients: hobbySessionIngredients.count,
+      comments: comments.count
+    }
+  };
+};
 
 type ScheduleInventoryReadinessRecord = {
   scheduleId: string;

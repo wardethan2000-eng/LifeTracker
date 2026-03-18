@@ -30,7 +30,7 @@ type AssetMaintenanceSectionsProps = {
 };
 
 const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
-  <article key={log.id} className="log-card">
+  <article key={log.id} id={`maintenance-log-${log.id}`} className="log-card">
     <div>
       <h4>{log.title}</h4>
       <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>
