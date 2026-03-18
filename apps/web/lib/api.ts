@@ -1079,6 +1079,49 @@ export const deleteComment = async (assetId: string, commentId: string): Promise
   });
 };
 
+export const getInventoryItemComments = async (
+  householdId: string,
+  inventoryItemId: string
+): Promise<ThreadedComment[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/${inventoryItemId}/comments`,
+  schema: threadedCommentListSchema,
+  revalidate: 15
+});
+
+export const createInventoryComment = async (
+  householdId: string,
+  inventoryItemId: string,
+  input: CreateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/${inventoryItemId}/comments`,
+  method: "POST",
+  body: input,
+  schema: commentWithRepliesSchema
+});
+
+export const updateInventoryComment = async (
+  householdId: string,
+  inventoryItemId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/${inventoryItemId}/comments/${commentId}`,
+  method: "PATCH",
+  body: input,
+  schema: commentWithRepliesSchema
+});
+
+export const deleteInventoryComment = async (
+  householdId: string,
+  inventoryItemId: string,
+  commentId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/inventory/${inventoryItemId}/comments/${commentId}`,
+    method: "DELETE"
+  });
+};
+
 export const getAssetTimeline = async (
   assetId: string,
   query?: Partial<AssetTimelineQuery>

@@ -1300,6 +1300,26 @@ export const inventoryItemSummarySchema = inventoryItemSchema.extend({
   lowStock: z.boolean()
 });
 
+export const inventoryItemRevisionValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+export const inventoryItemRevisionChangeSchema = z.object({
+  field: z.string(),
+  label: z.string(),
+  previousValue: inventoryItemRevisionValueSchema,
+  nextValue: inventoryItemRevisionValueSchema
+});
+
+export const inventoryItemRevisionSchema = z.object({
+  id: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  householdId: z.string().cuid(),
+  userId: z.string().cuid(),
+  action: z.string(),
+  changes: z.array(inventoryItemRevisionChangeSchema),
+  user: shallowUserSchema,
+  createdAt: z.string().datetime()
+});
+
 export const inventoryItemMergeResultSchema = z.object({
   sourceInventoryItemId: z.string().cuid(),
   targetInventoryItem: inventoryItemSummarySchema,
@@ -1582,7 +1602,8 @@ export const inventoryItemDetailSchema = inventoryItemSummarySchema.extend({
       name: z.string()
     })
   })),
-  hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema))
+  hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema)),
+  revisions: z.array(inventoryItemRevisionSchema)
 });
 
 export const lowStockInventoryItemSchema = z.object({
@@ -2784,6 +2805,9 @@ export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
 export type MergeInventoryItemsInput = z.infer<typeof mergeInventoryItemsSchema>;
 export type InventoryItemSummary = z.infer<typeof inventoryItemSummarySchema>;
+export type InventoryItemRevisionValue = z.infer<typeof inventoryItemRevisionValueSchema>;
+export type InventoryItemRevisionChange = z.infer<typeof inventoryItemRevisionChangeSchema>;
+export type InventoryItemRevision = z.infer<typeof inventoryItemRevisionSchema>;
 export type InventoryItemMergeResult = z.infer<typeof inventoryItemMergeResultSchema>;
 export type InventoryTransaction = z.infer<typeof inventoryTransactionSchema>;
 export type InventoryTransactionReferenceLink = z.infer<typeof inventoryTransactionReferenceLinkSchema>;

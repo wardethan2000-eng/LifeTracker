@@ -106,6 +106,9 @@ const createApp = async () => {
         updatedAt: new Date("2026-03-17T12:00:00.000Z")
       })
     },
+    activityLog: {
+      create: async () => ({ id: "clkeeperactivity00000000001" })
+    },
     maintenanceSchedule: {
       findMany: async () => []
     },

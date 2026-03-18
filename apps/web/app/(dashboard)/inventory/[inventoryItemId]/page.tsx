@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { AttachmentSection } from "../../../../components/attachment-section";
+import { InventoryCommentsPanel } from "../../../../components/inventory-comments-panel";
 import { InventoryItemDetailEditor } from "../../../../components/inventory-item-detail-editor";
 import { InventoryTransactionHistory } from "../../../../components/inventory-transaction-history";
 import { deleteInventoryItemAction } from "../../../actions";
 import {
   ApiError,
+  getInventoryItemComments,
   getInventoryItemConsumption,
   getInventoryItemDetail,
   getMe
@@ -29,6 +31,34 @@ const formatConditionLabel = (value: string | null): string => value
   ? value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
   : "Not set";
 
+const formatRevisionValue = (field: string, value: string | number | boolean | null): string => {
+  if (value === null) {
+    return "blank";
+  }
+
+  if (field === "unitCost" && typeof value === "number") {
+    return formatCurrency(value, "blank");
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (field === "conditionStatus") {
+    return formatConditionLabel(value);
+  }
+
+  if (field === "itemType") {
+    return value === "equipment" ? "Equipment" : "Consumable";
+  }
+
+  return value;
+};
+
 export default async function InventoryItemDetailPage({ params, searchParams }: InventoryItemDetailPageProps): Promise<JSX.Element> {
   const { inventoryItemId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
@@ -49,9 +79,10 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
       );
     }
 
-    const [item, analytics] = await Promise.all([
+    const [item, analytics, comments] = await Promise.all([
       getInventoryItemDetail(household.id, inventoryItemId, { transactionLimit: 20 }),
-      getInventoryItemConsumption(household.id, inventoryItemId)
+      getInventoryItemConsumption(household.id, inventoryItemId),
+      getInventoryItemComments(household.id, inventoryItemId)
     ]);
     const backHref = `/inventory?householdId=${household.id}`;
     const linkedEntityCount = item.assets.length + item.projects.length + item.hobbyLinks.length;
@@ -233,6 +264,51 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
             entityType="inventory_item"
             entityId={item.id}
           />
+
+          <InventoryCommentsPanel
+            householdId={household.id}
+            inventoryItemId={item.id}
+            comments={comments}
+          />
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Metadata History</h2>
+              <span className="pill">{item.revisions.length}</span>
+            </div>
+            <div className="panel__body">
+              {item.revisions.length === 0 ? (
+                <p className="panel__empty">No metadata changes recorded yet.</p>
+              ) : (
+                <div className="schedule-stack">
+                  {item.revisions.map((revision) => (
+                    <article key={revision.id} className="schedule-card">
+                      <div className="schedule-card__summary">
+                        <div>
+                          <h3>{revision.user.displayName ?? "Household member"}</h3>
+                          <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                            {formatDateTime(revision.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {revision.changes.map((change) => (
+                          <div key={`${revision.id}-${change.field}`} style={{ display: "grid", gap: 4 }}>
+                            <strong>{change.label}</strong>
+                            <div style={{ color: "var(--ink-muted)", fontSize: "0.92rem" }}>
+                              {formatRevisionValue(change.field, change.previousValue)}
+                              {" → "}
+                              {formatRevisionValue(change.field, change.nextValue)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
 
           <InventoryTransactionHistory householdId={household.id} inventoryItemId={item.id} title="Item Transaction History" />
         </div>

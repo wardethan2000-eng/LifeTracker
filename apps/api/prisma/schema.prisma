@@ -224,6 +224,7 @@ model User {
   incomingAssetTransfers  AssetTransfer[]       @relation("AssetTransferToUser")
   inventoryTransactions   InventoryTransaction[]
   inventoryPurchases      InventoryPurchase[]   @relation("InventoryPurchaseCreator")
+  inventoryItemRevisions  InventoryItemRevision[]
   sentInvitations         HouseholdInvitation[] @relation("InvitationSender")
   acceptedInvitations     HouseholdInvitation[] @relation("InvitationAcceptor")
   authoredComments        Comment[]             @relation("CommentAuthor")
@@ -250,6 +251,7 @@ model Household {
   projects         Project[]
   inventoryItems   InventoryItem[]
   inventoryPurchases InventoryPurchase[]
+  inventoryItemRevisions InventoryItemRevision[]
   activityLogs     ActivityLog[]
   outgoingAssetTransfers AssetTransfer[]        @relation("AssetTransferFromHousehold")
   incomingAssetTransfers AssetTransfer[]        @relation("AssetTransferToHousehold")
@@ -683,6 +685,7 @@ model InventoryItem {
   hobbyLinks          HobbyInventoryItem[]
   hobbyRecipeIngredients HobbyRecipeIngredient[]
   hobbySessionIngredients HobbySessionIngredient[]
+  revisions          InventoryItemRevision[]
   comments           Comment[]
 
   @@index([householdId])
@@ -811,6 +814,24 @@ model InventoryTransaction {
   @@index([inventoryItemId, createdAt])
   @@index([correctionOfTransactionId])
   @@index([referenceType, referenceId])
+  @@index([userId])
+}
+
+// Append-only metadata history for inventory item edits.
+model InventoryItemRevision {
+  id              String        @id @default(cuid())
+  inventoryItemId String
+  householdId     String
+  userId          String
+  action          String        @default("updated")
+  changes         Json          @default("[]")
+  createdAt       DateTime      @default(now())
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  household       Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([householdId, createdAt])
   @@index([userId])
 }
 

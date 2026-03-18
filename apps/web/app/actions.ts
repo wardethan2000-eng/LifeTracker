@@ -84,6 +84,7 @@ import {
   archiveAsset,
   completeSchedule,
   createComment,
+  createInventoryComment,
   createAssetTimelineEntry,
   createInvitation,
   createAssetTransfer,
@@ -113,6 +114,7 @@ import {
   createServiceProvider,
   deleteInventoryItem,
   deleteComment,
+  deleteInventoryComment,
   deleteAssetTimelineEntry,
   deleteHobby,
   deleteHobbyRecipe,
@@ -143,6 +145,7 @@ import {
   unarchiveAsset,
   updateAsset,
   updateComment,
+  updateInventoryComment,
   updateAssetTimelineEntry,
   updateHobby,
   updateHobbyRecipe,
@@ -1443,6 +1446,50 @@ export async function deleteCommentAction(formData: FormData): Promise<void> {
   if (householdId) {
     revalidateActivityPaths(householdId);
   }
+}
+
+export async function createInventoryCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const input: CreateCommentInput = {
+    body: getRequiredString(formData, "body")
+  };
+
+  const parentCommentId = getOptionalString(formData, "parentCommentId");
+
+  if (parentCommentId) {
+    input.parentCommentId = parentCommentId;
+  }
+
+  await createInventoryComment(householdId, inventoryItemId, input);
+  revalidateInventoryDetailPath(inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function updateInventoryCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const commentId = getRequiredString(formData, "commentId");
+  const input: UpdateCommentInput = {
+    body: getRequiredString(formData, "body")
+  };
+
+  await updateInventoryComment(householdId, inventoryItemId, commentId, input);
+  revalidateInventoryDetailPath(inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function deleteInventoryCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const commentId = getRequiredString(formData, "commentId");
+
+  await deleteInventoryComment(householdId, inventoryItemId, commentId);
+  revalidateInventoryDetailPath(inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidateActivityPaths(householdId);
 }
 
 export async function createTimelineEntryAction(formData: FormData): Promise<void> {

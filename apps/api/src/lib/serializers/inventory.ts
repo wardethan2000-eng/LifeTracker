@@ -2,6 +2,7 @@ import type {
   Asset,
   AssetInventoryItem,
   InventoryItem,
+  InventoryItemRevision,
   InventoryPurchase,
   InventoryPurchaseLine,
   InventoryTransaction,
@@ -15,6 +16,7 @@ import {
   assetPartsConsumptionSchema,
   householdInventoryAnalyticsSchema,
   inventoryItemConsumptionSchema,
+  inventoryItemRevisionSchema,
   inventoryPurchaseLineSchema,
   inventoryPurchaseSchema,
   inventoryShoppingListSummarySchema,
@@ -134,6 +136,22 @@ type MaintenanceLogPartRecord = Pick<
   | "createdAt"
   | "updatedAt"
 >;
+
+type InventoryItemRevisionRecord = Pick<
+  InventoryItemRevision,
+  | "id"
+  | "inventoryItemId"
+  | "householdId"
+  | "userId"
+  | "action"
+  | "changes"
+  | "createdAt"
+> & {
+  user: {
+    id: string;
+    displayName: string | null;
+  };
+};
 
 export const toInventoryItemSummaryResponse = (item: InventorySummaryRecord) => inventoryItemSummarySchema.parse({
   id: item.id,
@@ -337,6 +355,17 @@ export const toProjectInventoryLinkDetailResponse = (
   quantityRemaining: link.quantityNeeded - link.quantityAllocated
 });
 
+export const toInventoryItemRevisionResponse = (revision: InventoryItemRevisionRecord) => inventoryItemRevisionSchema.parse({
+  id: revision.id,
+  inventoryItemId: revision.inventoryItemId,
+  householdId: revision.householdId,
+  userId: revision.userId,
+  action: revision.action,
+  changes: revision.changes,
+  user: revision.user,
+  createdAt: revision.createdAt.toISOString()
+});
+
 export const toInventoryItemDetailResponse = (
   item: InventorySummaryRecord & {
     transactions: InventoryTransactionRecord[];
@@ -360,6 +389,7 @@ export const toInventoryItemDetailResponse = (
         status: string;
       };
     }>;
+    revisions: InventoryItemRevisionRecord[];
   }
 ) => inventoryItemDetailSchema.parse({
   ...toInventoryItemSummaryResponse(item),
@@ -381,7 +411,8 @@ export const toInventoryItemDetailResponse = (
     hobbyStatus: link.hobby.status,
     role: null,
     notes: link.notes ?? null
-  }))
+  })),
+  revisions: item.revisions.map(toInventoryItemRevisionResponse)
 });
 
 export const toLowStockInventoryItemResponse = (item: InventorySummaryRecord) => lowStockInventoryItemSchema.parse({

@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import {
   assetPartsConsumptionSchema,
   householdInventoryAnalyticsSchema,
@@ -15,6 +16,10 @@ import {
   computeAverageConsumptionPerMonth,
   computeProjectedDate,
   computeTurnoverRate,
+  getHouseholdInventoryCategorySpend,
+  getHouseholdInventoryItemSpend,
+  getHouseholdInventoryMonthlySpending,
+  getHouseholdInventorySpendTotals,
   groupTransactionsByMonth
 } from "../../lib/inventory-analytics.js";
 import { getHouseholdInventoryItem } from "../../lib/inventory.js";
@@ -96,6 +101,14 @@ const normalizePartKey = (name: string, partNumber: string | null): string => {
   return `${normalizedName}::${normalizedPartNumber}`;
 };
 
+const toFiniteNumber = (value: number | null | undefined): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return Number.isFinite(value) ? value : null;
+};
+
 export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/inventory/analytics/summary", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
@@ -105,10 +118,11 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
     const last30DaysStart = startOfDaysAgo(30);
     const last90DaysStart = startOfDaysAgo(90);
 
-    const [items, last12MonthsTransactions, last30DayTransactions, last90DayTransactions, lastConsumeByItem] = await Promise.all([
+    const [items, spendTotals, consumedByItem, spendByItem, spendByCategory, monthlySpendingRows, lastConsumeByItem] = await Promise.all([
       app.prisma.inventoryItem.findMany({
         where: {
-          householdId: params.householdId
+          householdId: params.householdId,
+          deletedAt: null
         },
         select: {
           id: true,
@@ -119,55 +133,10 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
           unitCost: true
         }
       }),
-      app.prisma.inventoryTransaction.findMany({
-        where: {
-          inventoryItem: {
-            householdId: params.householdId
-          },
-          createdAt: {
-            gte: last12MonthsStart
-          }
-        },
-        select: {
-          inventoryItemId: true,
-          quantity: true,
-          unitCost: true,
-          createdAt: true,
-          inventoryItem: {
-            select: {
-              name: true,
-              category: true
-            }
-          }
-        }
-      }),
-      app.prisma.inventoryTransaction.findMany({
-        where: {
-          inventoryItem: {
-            householdId: params.householdId
-          },
-          createdAt: {
-            gte: last30DaysStart
-          }
-        },
-        select: {
-          quantity: true,
-          unitCost: true
-        }
-      }),
-      app.prisma.inventoryTransaction.findMany({
-        where: {
-          inventoryItem: {
-            householdId: params.householdId
-          },
-          createdAt: {
-            gte: last90DaysStart
-          }
-        },
-        select: {
-          quantity: true,
-          unitCost: true
-        }
+      getHouseholdInventorySpendTotals(app.prisma, params.householdId, {
+        last30DaysStart,
+        last90DaysStart,
+        last12MonthsStart
       }),
       app.prisma.inventoryTransaction.groupBy({
         by: ["inventoryItemId"],
@@ -175,8 +144,30 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
           quantity: {
             lt: 0
           },
+          createdAt: {
+            gte: last12MonthsStart
+          },
           inventoryItem: {
-            householdId: params.householdId
+            householdId: params.householdId,
+            deletedAt: null
+          }
+        },
+        _sum: {
+          quantity: true
+        }
+      }),
+      getHouseholdInventoryItemSpend(app.prisma, params.householdId, last12MonthsStart),
+      getHouseholdInventoryCategorySpend(app.prisma, params.householdId, last12MonthsStart),
+      getHouseholdInventoryMonthlySpending(app.prisma, params.householdId, last12MonthsStart),
+      app.prisma.inventoryTransaction.groupBy({
+        by: ["inventoryItemId"],
+        where: {
+          quantity: {
+            lt: 0
+          },
+          inventoryItem: {
+            householdId: params.householdId,
+            deletedAt: null
           }
         },
         _max: {
@@ -184,65 +175,14 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
         }
       })
     ]);
-
-    const spendForTransactions = (transactions: Array<{ quantity: number; unitCost: number | null }>): number => (
-      transactions.reduce((sum, transaction) => (
-        transaction.quantity < 0 && transaction.unitCost !== null
-          ? sum + (Math.abs(transaction.quantity) * transaction.unitCost)
-          : sum
-      ), 0)
-    );
-
-    const consumerMap = new Map<string, {
-      inventoryItemId: string;
-      itemName: string;
-      totalConsumed: number;
-      totalSpent: number;
-    }>();
-    const topCostMap = new Map<string, {
-      inventoryItemId: string;
-      itemName: string;
-      totalSpent: number;
-    }>();
-    const categorySpendMap = new Map<string, number>();
-
-    for (const transaction of last12MonthsTransactions) {
-      if (transaction.quantity >= 0) {
-        continue;
-      }
-
-      const quantity = Math.abs(transaction.quantity);
-      const cost = transaction.unitCost !== null ? quantity * transaction.unitCost : 0;
-      const existingConsumer = consumerMap.get(transaction.inventoryItemId);
-
-      if (existingConsumer) {
-        existingConsumer.totalConsumed += quantity;
-        existingConsumer.totalSpent += cost;
-      } else {
-        consumerMap.set(transaction.inventoryItemId, {
-          inventoryItemId: transaction.inventoryItemId,
-          itemName: transaction.inventoryItem.name,
-          totalConsumed: quantity,
-          totalSpent: cost
-        });
-      }
-
-      const existingCost = topCostMap.get(transaction.inventoryItemId);
-
-      if (existingCost) {
-        existingCost.totalSpent += cost;
-      } else {
-        topCostMap.set(transaction.inventoryItemId, {
-          inventoryItemId: transaction.inventoryItemId,
-          itemName: transaction.inventoryItem.name,
-          totalSpent: cost
-        });
-      }
-
-      const categoryLabel = transaction.inventoryItem.category?.trim() || "Uncategorized";
-      categorySpendMap.set(categoryLabel, (categorySpendMap.get(categoryLabel) ?? 0) + cost);
-    }
-
+    const itemMap = new Map(items.map((item) => [item.id, item]));
+    const consumedByItemMap = new Map(consumedByItem.map((entry) => [
+      entry.inventoryItemId,
+      Math.abs(entry._sum.quantity ?? 0)
+    ]));
+    const spendByItemMap = new Map(spendByItem.map((entry) => [entry.inventoryItemId, entry.totalSpent]));
+    const categorySpendMap = new Map(spendByCategory.map((entry) => [entry.category, entry.totalSpentLast12Months]));
+    const monthlySpendingMap = new Map(monthlySpendingRows.map((entry) => [entry.month, entry]));
     const lastConsumeMap = new Map(lastConsumeByItem.map((entry) => [entry.inventoryItemId, entry._max.createdAt]));
     const staleCutoff = startOfDaysAgo(365);
     const categoryItemMap = items.reduce<Map<string, typeof items>>((map, item) => {
@@ -261,19 +201,48 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
     return reply.send(toHouseholdInventoryAnalyticsResponse({
       totalItems: items.length,
       totalValue: items.reduce((sum, item) => sum + (item.unitCost !== null ? item.quantityOnHand * item.unitCost : 0), 0),
-      totalSpentLast30Days: spendForTransactions(last30DayTransactions),
-      totalSpentLast90Days: spendForTransactions(last90DayTransactions),
-      totalSpentLast12Months: spendForTransactions(last12MonthsTransactions),
+      totalSpentLast30Days: spendTotals.totalSpentLast30Days,
+      totalSpentLast90Days: spendTotals.totalSpentLast90Days,
+      totalSpentLast12Months: spendTotals.totalSpentLast12Months,
       lowStockCount: items.filter((item) => item.reorderThreshold !== null && item.quantityOnHand <= item.reorderThreshold).length,
       outOfStockCount: items.filter((item) => item.quantityOnHand <= 0).length,
       staleItemCount: items.filter((item) => {
         const lastConsumeDate = lastConsumeMap.get(item.id) ?? null;
         return !lastConsumeDate || lastConsumeDate < staleCutoff;
       }).length,
-      topConsumers: Array.from(consumerMap.values())
+      topConsumers: Array.from(consumedByItemMap.entries())
+        .map(([inventoryItemId, totalConsumed]) => {
+          const item = itemMap.get(inventoryItemId);
+
+          if (!item) {
+            return null;
+          }
+
+          return {
+            inventoryItemId,
+            itemName: item.name,
+            totalConsumed,
+            totalSpent: spendByItemMap.get(inventoryItemId) ?? 0
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
         .sort((left, right) => right.totalConsumed - left.totalConsumed)
         .slice(0, 10),
-      topCostItems: Array.from(topCostMap.values())
+      topCostItems: Array.from(spendByItemMap.entries())
+        .map(([inventoryItemId, totalSpent]) => {
+          const item = itemMap.get(inventoryItemId);
+
+          if (!item) {
+            return null;
+          }
+
+          return {
+            inventoryItemId,
+            itemName: item.name,
+            totalSpent
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
         .sort((left, right) => right.totalSpent - left.totalSpent)
         .slice(0, 10),
       categoryBreakdown: Array.from(categoryItemMap.entries())
@@ -284,11 +253,15 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
           totalSpentLast12Months: categorySpendMap.get(category) ?? 0
         }))
         .sort((left, right) => right.totalSpentLast12Months - left.totalSpentLast12Months),
-      monthlySpending: groupTransactionsByMonth(last12MonthsTransactions, 12).map((entry) => ({
-        month: entry.month,
-        totalSpent: entry.totalCost,
-        transactionCount: entry.transactionCount
-      }))
+      monthlySpending: getLastMonths(12).map((month) => {
+        const entry = monthlySpendingMap.get(month);
+
+        return {
+          month,
+          totalSpent: entry?.totalSpent ?? 0,
+          transactionCount: entry?.transactionCount ?? 0
+        };
+      })
     }));
   });
 
@@ -380,7 +353,8 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
     const [items, last12MonthsTransactions, latestTransactionByItem, latestConsumeByItem] = await Promise.all([
       app.prisma.inventoryItem.findMany({
         where: {
-          householdId: params.householdId
+          householdId: params.householdId,
+          deletedAt: null
         },
         select: {
           id: true,
@@ -392,38 +366,48 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
           unitCost: true
         }
       }),
-      app.prisma.inventoryTransaction.findMany({
+      app.prisma.inventoryTransaction.groupBy({
+        by: ["inventoryItemId"],
         where: {
           inventoryItem: {
-            householdId: params.householdId
+            householdId: params.householdId,
+            deletedAt: null
           },
           createdAt: {
             gte: last12MonthsStart
           }
         },
-        select: {
-          inventoryItemId: true,
-          quantity: true,
-          quantityAfter: true,
-          createdAt: true
+        _avg: {
+          quantityAfter: true
+        },
+        _count: {
+          inventoryItemId: true
         }
       }),
       app.prisma.inventoryTransaction.groupBy({
         by: ["inventoryItemId"],
         where: {
           inventoryItem: {
-            householdId: params.householdId
+            householdId: params.householdId,
+            deletedAt: null
           }
         },
         _max: {
           createdAt: true
+        },
+        _avg: {
+          quantityAfter: true
+        },
+        _count: {
+          inventoryItemId: true
         }
       }),
       app.prisma.inventoryTransaction.groupBy({
         by: ["inventoryItemId"],
         where: {
           inventoryItem: {
-            householdId: params.householdId
+            householdId: params.householdId,
+            deletedAt: null
           },
           quantity: {
             lt: 0
@@ -431,40 +415,31 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
         },
         _max: {
           createdAt: true
+        },
+        _sum: {
+          quantity: true
         }
       })
     ]);
 
     const lastTransactionMap = new Map(latestTransactionByItem.map((entry) => [entry.inventoryItemId, entry._max.createdAt]));
+    const last12MonthsStats = new Map(last12MonthsTransactions.map((entry) => [entry.inventoryItemId, entry]));
     const lastConsumeMap = new Map(latestConsumeByItem.map((entry) => [entry.inventoryItemId, entry._max.createdAt]));
-    const last12MonthsStats = last12MonthsTransactions.reduce<Map<string, {
-      consumed: number;
-      quantitySnapshots: number[];
-    }>>((map, transaction) => {
-      const existing = map.get(transaction.inventoryItemId) ?? {
-        consumed: 0,
-        quantitySnapshots: []
-      };
-
-      existing.quantitySnapshots.push(transaction.quantityAfter);
-
-      if (transaction.quantity < 0) {
-        existing.consumed += Math.abs(transaction.quantity);
-      }
-
-      map.set(transaction.inventoryItemId, existing);
-      return map;
-    }, new Map());
+    const consumedByItemMap = new Map(latestConsumeByItem.map((entry) => [
+      entry.inventoryItemId,
+      Math.abs(entry._sum.quantity ?? 0)
+    ]));
 
     const rows = items.map((item) => {
       const stats = last12MonthsStats.get(item.id);
-      const averageOnHand = stats && stats.quantitySnapshots.length > 0
-        ? ([...stats.quantitySnapshots, item.quantityOnHand].reduce((sum, value) => sum + value, 0) / (stats.quantitySnapshots.length + 1))
+      const averageOnHand = stats && stats._count.inventoryItemId > 0
+        ? ((((stats._avg.quantityAfter ?? item.quantityOnHand) * stats._count.inventoryItemId) + item.quantityOnHand) / (stats._count.inventoryItemId + 1))
         : item.quantityOnHand;
       const daysSinceLastTransaction = daysSince(lastTransactionMap.get(item.id) ?? null);
       const daysSinceLastConsumption = daysSince(lastConsumeMap.get(item.id) ?? null);
-      const turnoverRate = stats && stats.consumed > 0
-        ? computeTurnoverRate(stats.consumed, averageOnHand)
+      const consumedLast12Months = consumedByItemMap.get(item.id) ?? 0;
+      const turnoverRate = consumedLast12Months > 0
+        ? computeTurnoverRate(consumedLast12Months, averageOnHand)
         : null;
       const velocityCategory = classifyVelocity(daysSinceLastConsumption);
 
@@ -503,6 +478,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
     const items = await app.prisma.inventoryItem.findMany({
       where: {
         householdId: params.householdId,
+        deletedAt: null,
         itemType: "consumable",
         reorderThreshold: {
           not: null
@@ -521,9 +497,10 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       }
     });
 
-    const transactions = items.length === 0
+    const consumeStats = items.length === 0
       ? []
-      : await app.prisma.inventoryTransaction.findMany({
+      : await app.prisma.inventoryTransaction.groupBy({
+          by: ["inventoryItemId"],
           where: {
             inventoryItemId: {
               in: items.map((item) => item.id)
@@ -535,30 +512,30 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
               gte: last12MonthsStart
             }
           },
-          select: {
-            inventoryItemId: true,
-            quantity: true,
-            createdAt: true
+          _sum: {
+            quantity: true
           },
-          orderBy: {
-            createdAt: "asc"
+          _min: {
+            createdAt: true
           }
         });
 
-    const transactionMap = transactions.reduce<Map<string, Array<{ quantity: number; createdAt: Date }>>>((map, transaction) => {
-      const existing = map.get(transaction.inventoryItemId);
-
-      if (existing) {
-        existing.push(transaction);
-      } else {
-        map.set(transaction.inventoryItemId, [transaction]);
-      }
-
-      return map;
-    }, new Map());
+    const consumeStatsMap = new Map(consumeStats.map((entry) => [entry.inventoryItemId, entry]));
 
     const result = items.map((item) => {
-      const averageConsumptionPerMonth = computeAverageConsumptionPerMonth(transactionMap.get(item.id) ?? []) ?? 0;
+      const consumeStat = consumeStatsMap.get(item.id);
+      const earliestConsumption = consumeStat?._min.createdAt ?? null;
+      const spanInMonths = earliestConsumption
+        ? Math.max(
+            1,
+            ((new Date().getUTCFullYear() - earliestConsumption.getUTCFullYear()) * 12)
+              + (new Date().getUTCMonth() - earliestConsumption.getUTCMonth())
+              + 1
+          )
+        : 0;
+      const averageConsumptionPerMonth = consumeStat && spanInMonths > 0
+        ? Math.abs(consumeStat._sum.quantity ?? 0) / spanInMonths
+        : 0;
       const projectedReorderDate = computeProjectedDate(item.quantityOnHand, averageConsumptionPerMonth, item.reorderThreshold ?? 0);
       const projectedDepletionDate = computeProjectedDate(item.quantityOnHand, averageConsumptionPerMonth, 0);
       const daysUntilReorder = daysUntil(projectedReorderDate);

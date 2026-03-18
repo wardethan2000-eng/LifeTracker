@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 type TransactionWithDate = {
   quantity: number;
@@ -8,6 +8,8 @@ type TransactionWithDate = {
 type TransactionWithCost = TransactionWithDate & {
   unitCost: number | null;
 };
+
+type InventoryAnalyticsPrisma = PrismaClient | Prisma.TransactionClient;
 
 const AVERAGE_DAYS_PER_MONTH = 30.4375;
 
@@ -164,6 +166,177 @@ export const groupTransactionsByMonth = (
       averageCost: bucket.quantity > 0 ? bucket.totalCost / bucket.quantity : 0
     };
   });
+};
+
+const toNumber = (value: bigint | number | string | null | undefined): number => {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return value;
+};
+
+export const getHouseholdInventorySpendTotals = async (
+  prisma: InventoryAnalyticsPrisma,
+  householdId: string,
+  ranges: {
+    last30DaysStart: Date;
+    last90DaysStart: Date;
+    last12MonthsStart: Date;
+  }
+): Promise<{
+  totalSpentLast30Days: number;
+  totalSpentLast90Days: number;
+  totalSpentLast12Months: number;
+}> => {
+  const rows = await prisma.$queryRaw<Array<{
+    totalSpentLast30Days: number | null;
+    totalSpentLast90Days: number | null;
+    totalSpentLast12Months: number | null;
+  }>>`
+    SELECT
+      COALESCE(SUM(CASE
+        WHEN transaction.quantity < 0
+          AND transaction."unitCost" IS NOT NULL
+          AND transaction."createdAt" >= ${ranges.last30DaysStart}
+        THEN ABS(transaction.quantity) * transaction."unitCost"
+        ELSE 0
+      END), 0) AS "totalSpentLast30Days",
+      COALESCE(SUM(CASE
+        WHEN transaction.quantity < 0
+          AND transaction."unitCost" IS NOT NULL
+          AND transaction."createdAt" >= ${ranges.last90DaysStart}
+        THEN ABS(transaction.quantity) * transaction."unitCost"
+        ELSE 0
+      END), 0) AS "totalSpentLast90Days",
+      COALESCE(SUM(CASE
+        WHEN transaction.quantity < 0
+          AND transaction."unitCost" IS NOT NULL
+          AND transaction."createdAt" >= ${ranges.last12MonthsStart}
+        THEN ABS(transaction.quantity) * transaction."unitCost"
+        ELSE 0
+      END), 0) AS "totalSpentLast12Months"
+    FROM "InventoryTransaction" transaction
+    INNER JOIN "InventoryItem" item ON item.id = transaction."inventoryItemId"
+    WHERE item."householdId" = ${householdId}
+      AND item."deletedAt" IS NULL
+      AND transaction."createdAt" >= ${ranges.last12MonthsStart}
+  `;
+
+  const row = rows[0];
+
+  return {
+    totalSpentLast30Days: toNumber(row?.totalSpentLast30Days),
+    totalSpentLast90Days: toNumber(row?.totalSpentLast90Days),
+    totalSpentLast12Months: toNumber(row?.totalSpentLast12Months)
+  };
+};
+
+export const getHouseholdInventoryItemSpend = async (
+  prisma: InventoryAnalyticsPrisma,
+  householdId: string,
+  since: Date
+): Promise<Array<{
+  inventoryItemId: string;
+  totalSpent: number;
+}>> => {
+  const rows = await prisma.$queryRaw<Array<{
+    inventoryItemId: string;
+    totalSpent: number | null;
+  }>>`
+    SELECT
+      transaction."inventoryItemId" AS "inventoryItemId",
+      COALESCE(SUM(ABS(transaction.quantity) * transaction."unitCost"), 0) AS "totalSpent"
+    FROM "InventoryTransaction" transaction
+    INNER JOIN "InventoryItem" item ON item.id = transaction."inventoryItemId"
+    WHERE item."householdId" = ${householdId}
+      AND item."deletedAt" IS NULL
+      AND transaction.quantity < 0
+      AND transaction."unitCost" IS NOT NULL
+      AND transaction."createdAt" >= ${since}
+    GROUP BY transaction."inventoryItemId"
+  `;
+
+  return rows.map((row) => ({
+    inventoryItemId: row.inventoryItemId,
+    totalSpent: toNumber(row.totalSpent)
+  }));
+};
+
+export const getHouseholdInventoryCategorySpend = async (
+  prisma: InventoryAnalyticsPrisma,
+  householdId: string,
+  since: Date
+): Promise<Array<{
+  category: string;
+  totalSpentLast12Months: number;
+}>> => {
+  const rows = await prisma.$queryRaw<Array<{
+    category: string;
+    totalSpentLast12Months: number | null;
+  }>>`
+    SELECT
+      COALESCE(NULLIF(BTRIM(item.category), ''), 'Uncategorized') AS category,
+      COALESCE(SUM(ABS(transaction.quantity) * transaction."unitCost"), 0) AS "totalSpentLast12Months"
+    FROM "InventoryTransaction" transaction
+    INNER JOIN "InventoryItem" item ON item.id = transaction."inventoryItemId"
+    WHERE item."householdId" = ${householdId}
+      AND item."deletedAt" IS NULL
+      AND transaction.quantity < 0
+      AND transaction."unitCost" IS NOT NULL
+      AND transaction."createdAt" >= ${since}
+    GROUP BY COALESCE(NULLIF(BTRIM(item.category), ''), 'Uncategorized')
+  `;
+
+  return rows.map((row) => ({
+    category: row.category,
+    totalSpentLast12Months: toNumber(row.totalSpentLast12Months)
+  }));
+};
+
+export const getHouseholdInventoryMonthlySpending = async (
+  prisma: InventoryAnalyticsPrisma,
+  householdId: string,
+  since: Date
+): Promise<Array<{
+  month: string;
+  totalSpent: number;
+  transactionCount: number;
+}>> => {
+  const rows = await prisma.$queryRaw<Array<{
+    month: string;
+    totalSpent: number | null;
+    transactionCount: number | null;
+  }>>`
+    SELECT
+      TO_CHAR(DATE_TRUNC('month', transaction."createdAt"), 'YYYY-MM') AS month,
+      COALESCE(SUM(ABS(transaction.quantity) * transaction."unitCost"), 0) AS "totalSpent",
+      COUNT(*)::int AS "transactionCount"
+    FROM "InventoryTransaction" transaction
+    INNER JOIN "InventoryItem" item ON item.id = transaction."inventoryItemId"
+    WHERE item."householdId" = ${householdId}
+      AND item."deletedAt" IS NULL
+      AND transaction.quantity < 0
+      AND transaction."unitCost" IS NOT NULL
+      AND transaction."createdAt" >= ${since}
+    GROUP BY DATE_TRUNC('month', transaction."createdAt")
+    ORDER BY DATE_TRUNC('month', transaction."createdAt") ASC
+  `;
+
+  return rows.map((row) => ({
+    month: row.month,
+    totalSpent: toNumber(row.totalSpent),
+    transactionCount: toNumber(row.transactionCount)
+  }));
 };
 
 export type InventoryAnalyticsTransactionPoint = Pick<

@@ -11,6 +11,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { logActivity } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
   applyInventoryTransaction,
@@ -121,6 +122,83 @@ const csvValue = (value: string | number | null | undefined): string => {
   return csvEscape(String(value));
 };
 
+type InventoryRevisionValue = string | number | boolean | null;
+
+type InventoryRevisionChange = {
+  field: string;
+  label: string;
+  previousValue: InventoryRevisionValue;
+  nextValue: InventoryRevisionValue;
+};
+
+type InventoryMetadataSnapshot = {
+  name: string;
+  itemType: string;
+  conditionStatus: string | null;
+  partNumber: string | null;
+  description: string | null;
+  category: string | null;
+  manufacturer: string | null;
+  unit: string;
+  reorderThreshold: number | null;
+  reorderQuantity: number | null;
+  preferredSupplier: string | null;
+  supplierUrl: string | null;
+  storageLocation: string | null;
+  notes: string | null;
+  unitCost: number | null;
+};
+
+const metadataValue = (value: string | number | null | undefined): string | number | null => value ?? null;
+
+const inventoryRevisionFields: Array<{
+  field: keyof InventoryMetadataSnapshot;
+  label: string;
+}> = [
+  { field: "name", label: "Name" },
+  { field: "itemType", label: "Item Type" },
+  { field: "conditionStatus", label: "Condition" },
+  { field: "partNumber", label: "Part Number" },
+  { field: "description", label: "Description" },
+  { field: "category", label: "Category" },
+  { field: "manufacturer", label: "Manufacturer" },
+  { field: "unit", label: "Unit" },
+  { field: "reorderThreshold", label: "Reorder Threshold" },
+  { field: "reorderQuantity", label: "Reorder Quantity" },
+  { field: "preferredSupplier", label: "Preferred Supplier" },
+  { field: "supplierUrl", label: "Supplier Link" },
+  { field: "storageLocation", label: "Storage Location" },
+  { field: "notes", label: "Notes" },
+  { field: "unitCost", label: "Last Price" }
+];
+
+const buildInventoryRevisionChanges = (
+  existing: InventoryMetadataSnapshot,
+  input: z.infer<typeof updateInventoryItemSchema>
+): InventoryRevisionChange[] => inventoryRevisionFields.reduce<InventoryRevisionChange[]>((changes, descriptor) => {
+  const nextRawValue = input[descriptor.field];
+
+  if (nextRawValue === undefined) {
+    return changes;
+  }
+
+  const previousValue = metadataValue(existing[descriptor.field]);
+  const nextValue = metadataValue(nextRawValue as string | number | null | undefined);
+
+  if (Object.is(previousValue, nextValue)) {
+    return changes;
+  }
+
+  changes.push({
+    field: descriptor.field,
+    label: descriptor.label,
+    previousValue,
+    nextValue
+  });
+
+  return changes;
+}, []);
+
 export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   const lowStockWhere = {
     reorderThreshold: { not: null },
@@ -176,6 +254,29 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       }
 
       return created;
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "inventory_item.created",
+      entityType: "inventory_item",
+      entityId: item.id,
+      metadata: {
+        name: item.name,
+        itemType: item.itemType
+      }
+    });
+
+    await emitDomainEvent(app.prisma, {
+      householdId: params.householdId,
+      eventType: "inventory_item.created",
+      entityType: "inventory_item",
+      entityId: item.id,
+      payload: {
+        name: item.name,
+        itemType: item.itemType
+      }
     });
 
     void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
@@ -487,6 +588,21 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
             }
           },
           orderBy: { createdAt: "desc" }
+        },
+        revisions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                displayName: true
+              }
+            }
+          },
+          orderBy: [
+            { createdAt: "desc" },
+            { id: "desc" }
+          ],
+          take: 25
         }
       }
     });
@@ -512,6 +628,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Inventory item not found." });
     }
 
+    const metadataChanges = buildInventoryRevisionChanges(existing, input);
     const item = await app.prisma.$transaction(async (tx) => {
       const quantityChanged = input.quantityOnHand !== undefined && input.quantityOnHand !== existing.quantityOnHand;
 
@@ -536,6 +653,18 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
+      if (metadataChanges.length > 0) {
+        await tx.inventoryItemRevision.create({
+          data: {
+            inventoryItemId: existing.id,
+            householdId: params.householdId,
+            userId: request.auth.userId,
+            action: "updated",
+            changes: metadataChanges as Prisma.InputJsonValue
+          }
+        });
+      }
+
       if (!quantityChanged) {
         return updated;
       }
@@ -557,6 +686,33 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
 
       return result.item;
     });
+
+    if (metadataChanges.length > 0 || input.quantityOnHand !== undefined) {
+      await logActivity(app.prisma, {
+        householdId: params.householdId,
+        userId: request.auth.userId,
+        action: "inventory_item.updated",
+        entityType: "inventory_item",
+        entityId: item.id,
+        metadata: {
+          name: item.name,
+          quantityAdjusted: input.quantityOnHand !== undefined,
+          metadataChanges
+        }
+      });
+
+      await emitDomainEvent(app.prisma, {
+        householdId: params.householdId,
+        eventType: "inventory_item.updated",
+        entityType: "inventory_item",
+        entityId: item.id,
+        payload: {
+          name: item.name,
+          quantityAdjusted: input.quantityOnHand !== undefined,
+          metadataChanges
+        }
+      });
+    }
 
     void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
 
@@ -584,6 +740,17 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const restored = await app.prisma.inventoryItem.update({
       where: { id: existing.id },
       data: { deletedAt: null }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "inventory_item.restored",
+      entityType: "inventory_item",
+      entityId: restored.id,
+      metadata: {
+        name: restored.name
+      }
     });
 
     await emitDomainEvent(app.prisma, {
@@ -627,6 +794,18 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
+      await logActivity(app.prisma, {
+        householdId: params.householdId,
+        userId: request.auth.userId,
+        action: "inventory_item.merged",
+        entityType: "inventory_item",
+        entityId: params.inventoryItemId,
+        metadata: {
+          sourceInventoryItemId: input.sourceInventoryItemId,
+          targetInventoryItemId: params.inventoryItemId
+        }
+      });
+
       void removeSearchIndexEntry(app.prisma, "inventory_item", input.sourceInventoryItemId).catch(console.error);
       void syncInventoryItemToSearchIndex(app.prisma, params.inventoryItemId).catch(console.error);
 
@@ -659,6 +838,17 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     await app.prisma.inventoryItem.update({
       where: { id: existing.id },
       data: { deletedAt: new Date() }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "inventory_item.deleted",
+      entityType: "inventory_item",
+      entityId: existing.id,
+      metadata: {
+        name: existing.name
+      }
     });
 
     await emitDomainEvent(app.prisma, {
