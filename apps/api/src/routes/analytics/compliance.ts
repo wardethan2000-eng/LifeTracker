@@ -9,14 +9,13 @@ import {
   toOverdueTrendPayloadResponse,
   toRegulatoryAssetOptionsResponse
 } from "../../lib/serializers/index.js";
+import { getComplianceStatus } from "../../lib/compliance-monitor.js";
 import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
 import type {
   CompletionCycleRecord,
   ComplianceStatus,
   RegulatoryAssetOption
 } from "@lifekeeper/types";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const householdAnalyticsQuerySchema = z.object({
   householdId: z.string().cuid(),
@@ -205,36 +204,6 @@ const getTrendDirection = (points: Array<{ overdueCount: number }>): "improving"
 
   return "stable";
 };
-
-const getComplianceStatus = (cycles: CompletionCycleRecord[], gracePeriodDays: number): ComplianceStatus => {
-  const now = new Date();
-  const lateCycles = cycles.filter((cycle) => cycle.deltaInDays !== null && cycle.deltaInDays > gracePeriodDays);
-
-  if (lateCycles.length > 0) {
-    return "non-compliant";
-  }
-
-  const overdueOpenCycle = cycles.find((cycle) => {
-    if (cycle.completedAt !== null || cycle.dueDate === null) {
-      return false;
-    }
-
-    const dueDate = new Date(cycle.dueDate);
-    return now.getTime() > addDays(dueDate, gracePeriodDays).getTime();
-  });
-
-  if (overdueOpenCycle) {
-    return "non-compliant";
-  }
-
-  if (cycles.some((cycle) => cycle.completedAt === null)) {
-    return "current";
-  }
-
-  return "compliant";
-};
-
-const addDays = (date: Date, days: number): Date => new Date(date.getTime() + (days * MS_PER_DAY));
 
 export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/analytics/compliance/on-time-rate", async (request, reply) => {
@@ -498,7 +467,9 @@ export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const regulatorySchedules = await app.prisma.maintenanceSchedule.findMany({
       where: {
         assetId: asset.id,
-        isRegulatory: true
+        deletedAt: null,
+        isRegulatory: true,
+        isActive: true
       },
       select: {
         id: true,
@@ -595,6 +566,8 @@ export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
         ...personalAssetAccessWhere(request.auth.userId),
         schedules: {
           some: {
+            deletedAt: null,
+            isActive: true,
             isRegulatory: true
           }
         }
@@ -607,6 +580,8 @@ export const complianceAnalyticsRoutes: FastifyPluginAsync = async (app) => {
           select: {
             schedules: {
               where: {
+                deletedAt: null,
+                isActive: true,
                 isRegulatory: true
               }
             }

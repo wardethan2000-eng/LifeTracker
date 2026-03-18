@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { HouseholdDashboard } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
-import { createHouseholdAction, enqueueNotificationScanAction } from "../actions";
+import { createHouseholdAction } from "../actions";
 import { DashboardDueWork } from "../../components/dashboard-due-work";
 import { getDashboardData } from "../../components/dashboard-data";
 import { DashboardNotificationsAside } from "../../components/dashboard-notifications-aside";
@@ -331,10 +331,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                 ))}
               </div>
             )}
-            <form action={enqueueNotificationScanAction}>
-              <input type="hidden" name="householdId" value={selectedHousehold.id} />
-              <button type="submit" className="button button--ghost button--sm">Scan notifications</button>
-            </form>
+            <p className="note">Notifications and low-stock checks run automatically in the background.</p>
           </div>
         </header>
 

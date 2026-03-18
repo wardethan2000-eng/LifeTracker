@@ -472,8 +472,10 @@ export const scanAndCreateNotifications = async (
   const now = options.now ?? new Date();
   const schedules = await prisma.maintenanceSchedule.findMany({
     where: {
+      deletedAt: null,
       isActive: true,
       asset: {
+        deletedAt: null,
         isArchived: false,
         ...(options.householdId ? { householdId: options.householdId } : {})
       }
@@ -561,6 +563,7 @@ export const scanAndCreateNotifications = async (
 
   const lowStockItems = await prisma.inventoryItem.findMany({
     where: {
+      deletedAt: null,
       itemType: "consumable",
       reorderThreshold: {
         not: null

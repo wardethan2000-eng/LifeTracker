@@ -87,6 +87,8 @@ Current web flows include:
 
 The notification worker stack uses BullMQ with Redis.
 
+Recurring background jobs are registered by the worker process. By default, notification and low-stock scans run hourly and compliance checks run 15 minutes later. Override them with `NOTIFICATION_SCAN_CRON`, `COMPLIANCE_SCAN_CRON`, and `COMPLIANCE_GRACE_PERIOD_DAYS` in `apps/api/.env` if needed.
+
 Useful local commands:
 
 1. Start workers with `pnpm --filter @lifekeeper/api notifications:worker`.

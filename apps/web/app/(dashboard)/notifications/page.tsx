@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Notification } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
-  enqueueNotificationScanAction,
   markNotificationReadAction,
   markNotificationUnreadAction,
   markNotificationsReadAction,
@@ -193,10 +192,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                 <button type="submit" className="button button--ghost">Undo Visible Read</button>
               </form>
             ) : null}
-            <form action={enqueueNotificationScanAction}>
-              <input type="hidden" name="householdId" value={household.id} />
-              <button type="submit" className="button button--ghost">Run Notification Scan</button>
-            </form>
+            <p className="note">Recurring background jobs keep notifications, low-stock alerts, and compliance checks up to date.</p>
           </div>
         </header>
 

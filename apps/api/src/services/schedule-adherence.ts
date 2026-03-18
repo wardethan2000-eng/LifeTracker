@@ -337,6 +337,7 @@ export const buildCompletionCycleLedger = async (
   const [schedules, logs] = await Promise.all([
     prisma.maintenanceSchedule.findMany({
       where: {
+        deletedAt: null,
         id: {
           in: scheduleIds
         }
@@ -361,6 +362,7 @@ export const buildCompletionCycleLedger = async (
     }),
     prisma.maintenanceLog.findMany({
       where: {
+        deletedAt: null,
         scheduleId: {
           in: scheduleIds
         }

@@ -127,7 +127,6 @@ import {
   deleteTaskChecklistItem,
   deleteServiceProvider,
   deleteSchedule,
-  enqueueNotificationScan,
   markNotificationRead,
   markNotificationUnread,
   recordConditionAssessment,
@@ -1104,11 +1103,6 @@ export async function markNotificationsUnreadAction(formData: FormData): Promise
     .filter(Boolean);
 
   await Promise.all(notificationIds.map((notificationId) => markNotificationUnread(notificationId)));
-  revalidatePath("/notifications");
-}
-
-export async function enqueueNotificationScanAction(formData: FormData): Promise<void> {
-  await enqueueNotificationScan(getRequiredString(formData, "householdId"));
   revalidatePath("/notifications");
 }
 
