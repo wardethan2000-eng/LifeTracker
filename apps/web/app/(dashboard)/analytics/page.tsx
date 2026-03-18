@@ -617,6 +617,11 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   description: "Compare assets, seasonal cost shifts, and household member contribution patterns."
                 },
                 {
+                  href: `/analytics/projects?householdId=${household.id}`,
+                  title: "Projects",
+                  description: "Timeline tracking, budget burn analysis, and task velocity."
+                },
+                {
                   href: `/analytics/hobbies?householdId=${household.id}`,
                   title: "Hobbies",
                   description: "Session trends, practice streaks, and goal tracking."

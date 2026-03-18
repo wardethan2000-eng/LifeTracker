@@ -258,6 +258,253 @@ export interface UsageAnomalyBucket extends UsageRateBucket {
   deviationFactor: number;
 }
 
+export const LEGACY_ENTRY_SOURCE_TYPES = {
+  assetTimelineEntry: "asset_timeline_entry",
+  projectNote: "project_note",
+  hobbyLog: "hobby_log"
+} as const;
+
+const ASSET_CATEGORY_PREFIX = "lk:asset-category:";
+const ASSET_VENDOR_TAG = "lk:asset-vendor";
+const PROJECT_NOTE_CATEGORY_PREFIX = "lk:project-note-category:";
+const HOBBY_LOG_TYPE_PREFIX = "lk:hobby-log-type:";
+const ASSET_COST_MEASUREMENT_NAME = "asset_cost";
+const ASSET_COST_MEASUREMENT_UNIT = "currency";
+
+type LegacyEntryMeasurement = {
+  name: string;
+  value: number;
+  unit: string;
+};
+
+type AssetEntryPayload = {
+  body: string;
+  entryType: "note" | "observation" | "issue" | "milestone" | "reference" | "comparison";
+  tags: string[];
+  measurements: LegacyEntryMeasurement[];
+  attachmentName: string | null;
+};
+
+type ProjectEntryPayload = {
+  body: string;
+  entryType: "note" | "measurement" | "decision" | "reference";
+  tags: string[];
+  flags: Array<"pinned">;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+};
+
+const normalizeText = (value: string | null | undefined): string => value?.trim() ?? "";
+
+const dedupeStrings = (values: Array<string | null | undefined>): string[] => Array.from(new Set(
+  values
+    .map((value) => normalizeText(value))
+    .filter(Boolean)
+));
+
+const hostnameFromUrl = (value: string): string | null => {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
+};
+
+export const isLegacyImportedEntrySourceType = (sourceType: string | null | undefined): boolean => (
+  sourceType === LEGACY_ENTRY_SOURCE_TYPES.assetTimelineEntry
+  || sourceType === LEGACY_ENTRY_SOURCE_TYPES.projectNote
+  || sourceType === LEGACY_ENTRY_SOURCE_TYPES.hobbyLog
+);
+
+const mapAssetCategoryToEntryType = (category: string | null | undefined): AssetEntryPayload["entryType"] => {
+  switch (normalizeText(category).toLowerCase()) {
+    case "observation":
+    case "inspection":
+      return "observation";
+    case "incident":
+    case "repair":
+      return "issue";
+    case "purchase":
+      return "reference";
+    case "modification":
+      return "milestone";
+    default:
+      return "note";
+  }
+};
+
+const mapEntryTypeToAssetCategory = (entryType: string): string => {
+  switch (entryType) {
+    case "observation":
+      return "observation";
+    case "issue":
+      return "incident";
+    case "milestone":
+      return "modification";
+    case "reference":
+      return "purchase";
+    default:
+      return "note";
+  }
+};
+
+const mapProjectNoteCategoryToEntryType = (category: string | null | undefined): ProjectEntryPayload["entryType"] => {
+  switch (normalizeText(category).toLowerCase()) {
+    case "measurement":
+      return "measurement";
+    case "decision":
+      return "decision";
+    case "reference":
+      return "reference";
+    default:
+      return "note";
+  }
+};
+
+const mapEntryTypeToProjectNoteCategory = (entryType: string): "research" | "reference" | "decision" | "measurement" | "general" => {
+  switch (entryType) {
+    case "measurement":
+      return "measurement";
+    case "decision":
+      return "decision";
+    case "reference":
+      return "reference";
+    default:
+      return "general";
+  }
+};
+
+export const mapHobbyLogTypeToEntryType = (logType: string | null | undefined): "note" | "lesson" | "milestone" => {
+  switch (normalizeText(logType).toLowerCase()) {
+    case "lesson":
+      return "lesson";
+    case "milestone":
+      return "milestone";
+    default:
+      return "note";
+  }
+};
+
+export const buildAssetEntryPayload = (input: {
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  cost?: number | null;
+  vendor?: string | null;
+  tags?: string[];
+}): AssetEntryPayload => {
+  const title = normalizeText(input.title);
+  const description = normalizeText(input.description);
+  const category = normalizeText(input.category);
+  const vendor = normalizeText(input.vendor);
+  const tags = dedupeStrings([
+    ...(input.tags ?? []),
+    category ? `${ASSET_CATEGORY_PREFIX}${category}` : null,
+    vendor ? ASSET_VENDOR_TAG : null
+  ]);
+
+  return {
+    body: description || title,
+    entryType: mapAssetCategoryToEntryType(category || undefined),
+    tags,
+    measurements: typeof input.cost === "number"
+      ? [{ name: ASSET_COST_MEASUREMENT_NAME, value: input.cost, unit: ASSET_COST_MEASUREMENT_UNIT }]
+      : [],
+    attachmentName: vendor || null
+  };
+};
+
+export const parseAssetEntryPayload = (input: {
+  title: string | null | undefined;
+  body: string | null | undefined;
+  entryType: string;
+  tags?: string[] | null;
+  measurements?: Array<{ name: string; value: number; unit: string }> | null;
+  attachmentName?: string | null;
+}): {
+  description: string | null;
+  category: string;
+  cost: number | null;
+  vendor: string | null;
+  tags: string[];
+} => {
+  const title = normalizeText(input.title);
+  const body = normalizeText(input.body);
+  const tags = input.tags ?? [];
+  const categoryTag = tags.find((tag) => tag.startsWith(ASSET_CATEGORY_PREFIX));
+  const category = categoryTag
+    ? categoryTag.slice(ASSET_CATEGORY_PREFIX.length)
+    : mapEntryTypeToAssetCategory(input.entryType);
+  const costMeasurement = (input.measurements ?? []).find((measurement) => (
+    measurement.name === ASSET_COST_MEASUREMENT_NAME && measurement.unit === ASSET_COST_MEASUREMENT_UNIT
+  ));
+  const vendor = tags.includes(ASSET_VENDOR_TAG) ? normalizeText(input.attachmentName) || null : null;
+
+  return {
+    description: body && body !== title ? body : null,
+    category,
+    cost: typeof costMeasurement?.value === "number" ? costMeasurement.value : null,
+    vendor,
+    tags: tags.filter((tag) => tag !== ASSET_VENDOR_TAG && !tag.startsWith(ASSET_CATEGORY_PREFIX))
+  };
+};
+
+export const buildProjectEntryPayload = (input: {
+  title: string;
+  body?: string | null;
+  category?: string | null;
+  url?: string | null;
+  isPinned?: boolean;
+}): ProjectEntryPayload => {
+  const title = normalizeText(input.title);
+  const body = normalizeText(input.body);
+  const category = normalizeText(input.category) || "general";
+  const url = normalizeText(input.url);
+
+  return {
+    body: body || title,
+    entryType: mapProjectNoteCategoryToEntryType(category),
+    tags: dedupeStrings([`${PROJECT_NOTE_CATEGORY_PREFIX}${category}`]),
+    flags: input.isPinned ? ["pinned"] : [],
+    attachmentUrl: url || null,
+    attachmentName: url ? hostnameFromUrl(url) ?? url : null
+  };
+};
+
+export const parseProjectEntryPayload = (input: {
+  title: string | null | undefined;
+  body: string | null | undefined;
+  entryType: string;
+  tags?: string[] | null;
+  flags?: string[] | null;
+  attachmentUrl?: string | null;
+}): {
+  body: string;
+  category: "research" | "reference" | "decision" | "measurement" | "general";
+  isPinned: boolean;
+  url: string | null;
+} => {
+  const tags = input.tags ?? [];
+  const categoryTag = tags.find((tag) => tag.startsWith(PROJECT_NOTE_CATEGORY_PREFIX));
+  const category = categoryTag
+    ? categoryTag.slice(PROJECT_NOTE_CATEGORY_PREFIX.length)
+    : mapEntryTypeToProjectNoteCategory(input.entryType);
+
+  return {
+    body: normalizeText(input.body),
+    category: (category || "general") as "research" | "reference" | "decision" | "measurement" | "general",
+    isPinned: (input.flags ?? []).includes("pinned"),
+    url: normalizeText(input.attachmentUrl) || null
+  };
+};
+
+export const buildHobbyLogEntryTags = (logType: string | null | undefined): string[] => {
+  const normalized = normalizeText(logType);
+  return normalized ? [`${HOBBY_LOG_TYPE_PREFIX}${normalized}`] : [];
+};
+
+export * from "./project-risk.js";
+
 export interface UsageAnomalyResult {
   mean: number;
   stddev: number;

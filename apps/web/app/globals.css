@@ -7770,7 +7770,426 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ═══ 58. Compliance Analytics
+   ═══ 58. Project Analytics
+   ═══════════════════════════════════════════════════════════════════ */
+
+.project-analytics-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.project-analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 20px;
+}
+
+.project-analytics-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.project-analytics-filter-grid--single {
+  grid-template-columns: minmax(0, 360px);
+}
+
+.project-analytics-note {
+  margin: 6px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.88rem;
+}
+
+.project-analytics-loading {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.project-analytics-gantt {
+  display: grid;
+  gap: 14px;
+}
+
+.project-analytics-timeline-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-analytics-timeline-summary__card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.project-analytics-timeline-summary__card span {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
+.project-analytics-timeline-summary__card strong {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.project-analytics-timeline-summary__card--neutral {
+  background: linear-gradient(180deg, rgba(79, 110, 247, 0.05), var(--surface));
+}
+
+.project-analytics-timeline-summary__card--warning {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), var(--surface));
+}
+
+.project-analytics-timeline-summary__card--danger {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.1), var(--surface));
+}
+
+.project-analytics-timeline-legend {
+  display: flex;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.project-analytics-timeline-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  text-transform: capitalize;
+}
+
+.project-analytics-timeline-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.project-analytics-timeline-ruler {
+  position: relative;
+  height: 34px;
+  border-bottom: 1px dashed var(--border);
+  margin: 0 0 4px 218px;
+}
+
+.project-analytics-timeline-ruler__tick {
+  position: absolute;
+  bottom: -10px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.project-analytics-timeline-ruler__tick::before {
+  content: "";
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+}
+
+.project-analytics-timeline-ruler__today {
+  position: absolute;
+  top: 0;
+  bottom: -6px;
+  transform: translateX(-50%);
+  display: block;
+  width: 2px;
+  background: #b91c1c;
+}
+
+.project-analytics-timeline-ruler__today::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #991b1b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.project-analytics-timeline-ruler__today::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #b91c1c;
+  box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.12);
+}
+
+.project-analytics-gantt__row {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.85fr) minmax(0, 2.15fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.project-analytics-gantt__row--overdue .project-analytics-gantt__meta strong {
+  color: #991b1b;
+}
+
+.project-analytics-gantt__row--late .project-analytics-gantt__meta strong {
+  color: #9a3412;
+}
+
+.project-analytics-gantt__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.project-analytics-gantt__meta span,
+.project-analytics-gantt__meta small {
+  color: var(--ink-muted);
+}
+
+.project-analytics-gantt__status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.project-analytics-delay-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.project-analytics-delay-pill--overdue {
+  background: rgba(239, 68, 68, 0.14);
+  color: #991b1b;
+}
+
+.project-analytics-delay-pill--late {
+  background: rgba(245, 158, 11, 0.16);
+  color: #9a3412;
+}
+
+.project-analytics-gantt__track {
+  position: relative;
+  min-height: 60px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0%, rgba(79, 110, 247, 0.04) 100%),
+    var(--surface-alt);
+}
+
+.project-analytics-gantt__today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(185, 28, 28, 0.9);
+  z-index: 1;
+}
+
+.project-analytics-gantt__today::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #b91c1c;
+  box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.12);
+}
+
+.project-analytics-gantt__bar {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  min-width: 160px;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18);
+}
+
+.project-analytics-gantt__bar--overdue {
+  box-shadow: 0 10px 22px rgba(153, 27, 27, 0.24);
+  outline: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+.project-analytics-gantt__bar--late {
+  box-shadow: 0 10px 22px rgba(154, 52, 18, 0.22);
+}
+
+.project-analytics-gantt__progress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  max-width: 100%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
+}
+
+.project-analytics-gantt__bar span {
+  font-size: 0.82rem;
+  opacity: 0.92;
+  position: relative;
+  z-index: 1;
+}
+
+.project-analytics-gantt__bar strong {
+  font-size: 0.95rem;
+  position: relative;
+  z-index: 1;
+}
+
+.project-analytics-milestones {
+  display: grid;
+  gap: 10px;
+}
+
+.project-analytics-milestone {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-alt);
+}
+
+.project-analytics-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(79, 110, 247, 0.12);
+  color: #3654cf;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-analytics-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.project-analytics-variance {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.project-analytics-variance--on-track {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.project-analytics-variance--over {
+  background: rgba(239, 68, 68, 0.14);
+  color: #991b1b;
+}
+
+.project-analytics-variance--unknown {
+  background: var(--surface-alt);
+  color: var(--ink-muted);
+}
+
+.project-analytics-budget-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.project-analytics-budget-highlights__card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(79, 110, 247, 0.04), var(--surface));
+}
+
+.project-analytics-budget-highlights__card span,
+.project-analytics-budget-highlights__card small {
+  color: var(--ink-muted);
+}
+
+.project-analytics-budget-highlights__card strong {
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.project-analytics-budget-highlights__value--danger {
+  color: #b91c1c;
+}
+
+.project-analytics-budget-highlights__value--good {
+  color: #166534;
+}
+
+.project-analytics-series-key {
+  display: flex;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+}
+
+.project-analytics-series-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-analytics-series-key i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 59. Compliance Analytics
    ═══════════════════════════════════════════════════════════════════ */
 
 .compliance-filter-grid {
@@ -8094,6 +8513,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 @media (max-width: 1200px) {
+  .project-analytics-grid,
   .compliance-breakdown-grid,
   .compliance-report-header,
   .compliance-hero__body,
@@ -8103,6 +8523,9 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 @media (max-width: 960px) {
+  .project-analytics-timeline-summary,
+  .project-analytics-budget-highlights,
+  .project-analytics-filter-grid,
   .compliance-filter-grid,
   .compliance-contributor-grid,
   .compliance-kpi-grid,
@@ -8120,6 +8543,16 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 @media (max-width: 720px) {
+  .project-analytics-timeline-ruler {
+    margin-left: 0;
+  }
+
+  .project-analytics-timeline-ruler__today {
+    display: none;
+  }
+
+  .project-analytics-gantt__row,
+  .project-analytics-milestone,
   .compliance-category-row__bar-shell,
   .compliance-cycle-table__row,
   .compliance-report-table__row {
@@ -8150,12 +8583,18 @@ html[data-ui-density="compact"] .resource-layout__aside {
   .analytics-grid,
   .analytics-inline-metrics,
   .analytics-detail-grid,
-  .comparative-filter-grid {
+  .comparative-filter-grid,
+  .project-analytics-filter-grid,
+  .project-analytics-grid {
     grid-template-columns: 1fr;
   }
 
   .analytics-chart-bar__label {
     flex: 0 0 120px;
+  }
+
+  .project-analytics-gantt__bar {
+    min-width: 0;
   }
 
   .comparative-chart-shell,

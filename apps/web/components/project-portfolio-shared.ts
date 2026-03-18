@@ -1,4 +1,5 @@
 import type { ProjectPortfolioItem } from "@lifekeeper/types";
+import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@lifekeeper/utils";
 
 export const projectSortValues = ["risk", "target", "budget", "progress"] as const;
 
@@ -12,15 +13,6 @@ export type PortfolioProject = ProjectPortfolioItem & {
   isLate: boolean;
   isAtRisk: boolean;
   riskScore: number;
-};
-
-const getTargetDays = (targetEndDate: string | null, now: number): number | null => {
-  if (!targetEndDate) {
-    return null;
-  }
-
-  const distance = new Date(targetEndDate).getTime() - now;
-  return Math.ceil(distance / 86_400_000);
 };
 
 const compareNullableNumbersAsc = (left: number | null, right: number | null): number => {
@@ -85,15 +77,15 @@ export const buildPortfolioProjects = (
     const materialCoverage = totalInventoryNeeded > 0
       ? totalInventoryAllocated / totalInventoryNeeded
       : null;
-    const daysToTarget = getTargetDays(project.targetEndDate, now);
-    const isLate = daysToTarget !== null
-      && daysToTarget < 0
-      && project.status !== "completed"
-      && project.status !== "cancelled";
-    const riskScore = (isLate ? 3 : 0)
-      + (budgetRatio !== null && budgetRatio >= 1 ? 3 : budgetRatio !== null && budgetRatio >= 0.9 ? 2 : 0)
-      + (materialCoverage !== null && materialCoverage < 0.5 ? 2 : materialCoverage !== null && materialCoverage < 1 ? 1 : 0)
-      + (project.percentComplete < 50 && daysToTarget !== null && daysToTarget <= 14 ? 1 : 0);
+    const daysToTarget = getProjectDaysToTarget(project.targetEndDate, now);
+    const isLate = isProjectLate({ status: project.status, daysToTarget });
+    const riskScore = calculateProjectRiskScore({
+      status: project.status,
+      percentComplete: project.percentComplete,
+      budgetRatio,
+      materialCoverage,
+      daysToTarget
+    });
 
     return {
       ...project,
@@ -107,7 +99,7 @@ export const buildPortfolioProjects = (
       materialCoverage,
       daysToTarget,
       isLate,
-      isAtRisk: riskScore >= 2,
+      isAtRisk: isProjectAtRisk(riskScore),
       riskScore
     };
   }), selectedSort);

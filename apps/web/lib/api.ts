@@ -52,6 +52,10 @@ import {
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
   memberContributionPayloadSchema,
+  projectBudgetBurnPayloadSchema,
+  projectPortfolioHealthPayloadSchema,
+  projectTaskVelocityPayloadSchema,
+  projectTimelinePayloadSchema,
   libraryPresetSchema,
   linkPreviewResponseSchema,
   lowStockInventoryItemSchema,
@@ -197,6 +201,7 @@ import {
   type HouseholdNotificationList,
   type OnTimeRatePayload,
   type OverdueTrendPayload,
+  type ProjectBudgetBurnPayload,
   type ProjectAsset,
   type ProjectBudgetCategory,
   type ProjectBudgetAnalysis,
@@ -205,9 +210,11 @@ import {
   type ProjectDetail,
   type ProjectExpense,
   type ProjectInventoryRollup,
+  type ProjectPortfolioHealthPayload,
   type ProjectPhaseDetail,
   type ProjectPhaseSupply,
   type ProjectPhaseSummary,
+  type ProjectTimelinePayload,
   type ProjectTemplate,
   type ProjectShoppingList,
   type CreateProjectPurchaseRequestInput,
@@ -222,6 +229,7 @@ import {
   type ProjectSummary,
   type ProjectTask,
   type ProjectTaskChecklistItem,
+  type ProjectTaskVelocityPayload,
   type ProjectStatus,
   type CloneProjectInput,
   type CreateProjectTemplateInput,
@@ -1736,6 +1744,62 @@ export const getMemberContributionAnalytics = async (
     schema: memberContributionPayloadSchema
   });
 };
+
+export const getProjectTimeline = async (
+  householdId: string,
+  options?: {
+    projectId?: string;
+  }
+): Promise<ProjectTimelinePayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.projectId) {
+    query.set("projectId", options.projectId);
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/projects/timeline?${query.toString()}`,
+    schema: projectTimelinePayloadSchema
+  });
+};
+
+export const getProjectBudgetBurn = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectBudgetBurnPayload> => apiRequest({
+  path: `/v1/analytics/projects/budget-burn?${new URLSearchParams({ householdId, projectId }).toString()}`,
+  schema: projectBudgetBurnPayloadSchema
+});
+
+export const getProjectTaskVelocity = async (
+  householdId: string,
+  options?: {
+    projectId?: string;
+    months?: number;
+  }
+): Promise<ProjectTaskVelocityPayload> => {
+  const query = new URLSearchParams({ householdId });
+
+  if (options?.projectId) {
+    query.set("projectId", options.projectId);
+  }
+
+  if (options?.months !== undefined) {
+    query.set("months", String(options.months));
+  }
+
+  return apiRequest({
+    path: `/v1/analytics/projects/task-velocity?${query.toString()}`,
+    schema: projectTaskVelocityPayloadSchema
+  });
+};
+
+export const getProjectPortfolioHealth = async (
+  householdId: string
+): Promise<ProjectPortfolioHealthPayload> => apiRequest({
+  path: `/v1/analytics/projects/portfolio-health?${new URLSearchParams({ householdId }).toString()}`,
+  schema: projectPortfolioHealthPayloadSchema
+});
 
 export const getHobbySessionFrequency = async (
   householdId: string,

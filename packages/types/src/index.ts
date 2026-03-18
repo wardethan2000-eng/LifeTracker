@@ -3,6 +3,7 @@ import { z } from "zod";
 export * from "./analytics/comparative.js";
 export * from "./analytics/compliance.js";
 export * from "./analytics/hobbies.js";
+export * from "./analytics/projects.js";
 export * from "./dev-fixtures.js";
 
 export const createOffsetPaginationQuerySchema = (
