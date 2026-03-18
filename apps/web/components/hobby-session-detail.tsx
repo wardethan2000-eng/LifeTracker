@@ -32,6 +32,7 @@ import {
 } from "../lib/api";
 import { Card } from "./card";
 import { EntryTimeline, EntryTipsSurface } from "./entry-system";
+import { InlineError } from "./inline-error";
 
 type HobbySessionDetailProps = {
   householdId: string;
@@ -640,13 +641,7 @@ export function HobbySessionDetail({
     />
     <div className="resource-layout">
       <div className="resource-layout__primary session-detail-stack">
-        {errorMessage ? (
-          <div className="panel">
-            <div className="panel__body--padded">
-              <p>{errorMessage}</p>
-            </div>
-          </div>
-        ) : null}
+        <InlineError message={errorMessage} />
 
         <Card title={hobby.lifecycleMode === "pipeline" ? "Pipeline" : "Status"}>
           <div className="session-flow-stack">

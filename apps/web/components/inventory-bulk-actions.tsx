@@ -10,6 +10,7 @@ import {
   type ImportInventoryResult
 } from "../lib/api";
 import { generateCSVDownload, parseCSV } from "../lib/csv";
+import { InlineError } from "./inline-error";
 
 type InventoryBulkActionsProps = {
   householdId: string;
@@ -205,11 +206,7 @@ export function InventoryBulkActions({ householdId }: InventoryBulkActionsProps)
         </button>
       </div>
 
-      {errorMessage && (
-        <div className="inventory-bulk-actions__result inventory-bulk-actions__result--warning">
-          <p>{errorMessage}</p>
-        </div>
-      )}
+      <InlineError message={errorMessage} className="inventory-bulk-actions__error" />
 
       {importResult && resultTone && (
         <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${resultTone}`}>

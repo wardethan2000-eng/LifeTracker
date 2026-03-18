@@ -14,6 +14,7 @@ import {
 } from "../lib/api";
 import { Card } from "./card";
 import { EntryTimeline } from "./entry-system";
+import { InlineError } from "./inline-error";
 
 type HobbySeriesDetailProps = {
   householdId: string;
@@ -237,19 +238,13 @@ export function HobbySeriesDetail({
   return (
     <div className="resource-layout">
       <div className="resource-layout__primary hobby-series-detail-stack">
-        {errorMessage ? (
-          <div className="panel">
-            <div className="panel__body--padded">
-              <p>{errorMessage}</p>
-            </div>
-          </div>
-        ) : null}
+        <InlineError message={errorMessage} />
 
         <Card title="Series Header">
           <div className="hobby-series-hero">
             <div className="hobby-series-hero__media">
               {seriesState.coverImageUrl ? (
-                <img src={seriesState.coverImageUrl} alt="" className="hobby-series-hero__image" />
+                <img src={seriesState.coverImageUrl} alt={`${seriesState.name} cover artwork`} className="hobby-series-hero__image" />
               ) : (
                 <div className="hobby-series-hero__placeholder">Series</div>
               )}

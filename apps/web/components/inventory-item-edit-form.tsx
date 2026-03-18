@@ -6,6 +6,7 @@ import { useCallback, useState } from "react";
 import { updateInventoryItem } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { BarcodeLookupField } from "./barcode-lookup-field";
+import { InlineError } from "./inline-error";
 
 type InventoryItemEditFormProps = {
   householdId: string;
@@ -253,7 +254,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
         <span>Notes</span>
         <textarea name="notes" rows={3} defaultValue={item.notes ?? ""} />
       </label>
-      {error && <div className="field field--full" style={{ color: "var(--danger)", fontSize: "0.85rem" }}>{error}</div>}
+      <InlineError message={error} className="field field--full" size="sm" />
       <div className="inline-actions inline-actions--end field field--full">
         <button type="button" className="button button--ghost" onClick={onCancel} disabled={saving}>Cancel</button>
         <button type="submit" className="button button--primary" disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>

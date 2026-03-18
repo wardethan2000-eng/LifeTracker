@@ -14,6 +14,7 @@ import {
   revokeShareLink
 } from "../lib/api";
 import { formatDate, formatDateTime } from "../lib/formatters";
+import { InlineError } from "./inline-error";
 
 type AssetExportActionsProps = {
   assetId: string;
@@ -184,7 +185,7 @@ export function AssetExportActions({ assetId, assetTag, assetName, householdId }
   };
 
   return (
-    <div style={{ display: "grid", gap: "12px" }}>
+    <div className="inline-stack inline-stack--sm">
       <div className="export-actions">
         <button type="button" className="button button--primary button--sm" onClick={() => { void handleExportPdf(); }} disabled={isExportingPdf}>
           {isExportingPdf ? "Exporting PDF..." : "Export PDF"}
@@ -200,11 +201,11 @@ export function AssetExportActions({ assetId, assetTag, assetName, householdId }
         </button>
       </div>
 
-      {errorMessage ? <p style={{ margin: 0, color: "var(--danger)" }}>{errorMessage}</p> : null}
+      <InlineError message={errorMessage} />
 
       {isShareFormVisible ? (
         <div className="share-link-form">
-          <form onSubmit={(event) => { void handleCreateLink(event); }} style={{ display: "grid", gap: "12px" }}>
+          <form onSubmit={(event) => { void handleCreateLink(event); }} className="inline-stack inline-stack--sm">
             <label className="field field--full">
               <span>Link Label</span>
               <input className="form-input" type="text" value={label} onChange={(event) => setLabel(event.target.value)} maxLength={200} placeholder={`Share ${assetName}`} />
@@ -213,11 +214,11 @@ export function AssetExportActions({ assetId, assetTag, assetName, householdId }
               <span>Expiration Date</span>
               <input className="form-input" type="date" value={expirationDate} onChange={(event) => setExpirationDate(event.target.value)} />
             </label>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="inline-cluster inline-cluster--sm inline-cluster--center inline-cluster--wrap">
               <button type="submit" className="button button--primary button--sm" disabled={isCreatingLink}>
                 {isCreatingLink ? "Creating..." : "Create Link"}
               </button>
-              {(since || until) ? <span style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>Uses the current history date filter.</span> : null}
+              {(since || until) ? <span className="inline-note">Uses the current history date filter.</span> : null}
             </div>
           </form>
 
@@ -275,11 +276,11 @@ export function HouseholdCsvExportButton({ householdId, dataset, label = "Export
   };
 
   return (
-    <div style={{ display: "grid", gap: "6px" }}>
+    <div className="inline-stack inline-stack--xs">
       <button type="button" className="button button--ghost button--sm" onClick={() => { void handleExport(); }} disabled={isExporting}>
         {isExporting ? "Exporting..." : label}
       </button>
-      {errorMessage ? <p style={{ margin: 0, color: "var(--danger)", fontSize: "0.82rem" }}>{errorMessage}</p> : null}
+      <InlineError message={errorMessage} size="sm" />
     </div>
   );
 }

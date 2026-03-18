@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import type { Attachment, AttachmentEntityType } from "@lifekeeper/types";
 import { requestAttachmentUpload, confirmAttachmentUpload } from "../lib/api";
+import { InlineError } from "./inline-error";
 
 type AttachmentUploaderProps = {
   householdId: string;
@@ -169,7 +170,7 @@ export function AttachmentUploader({
         </>
       )}
 
-      {error && <div className="attachment-upload__error">{error}</div>}
+      <InlineError message={error} className="attachment-upload__error" size="sm" />
     </div>
   );
 }

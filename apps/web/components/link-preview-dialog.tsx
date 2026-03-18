@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import type { LinkPreviewField, LinkPreviewResponse } from "@lifekeeper/types";
 import { fetchLinkPreview } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
+import { InlineError } from "./inline-error";
 
 type LinkPreviewConfirmData = {
   fields: Record<string, string>;
@@ -153,7 +154,7 @@ export function LinkPreviewDialog({
                 {state.phase === "loading" ? "Fetching…" : "Fetch"}
               </button>
             </div>
-            {error && <p className="link-preview--error">{error}</p>}
+            <InlineError message={error} className="link-preview--error" />
             {state.phase === "loading" && (
               <div className="link-preview--loading">
                 <span className="search-palette__spinner" aria-hidden="true" />
@@ -179,7 +180,7 @@ export function LinkPreviewDialog({
                     alt="Product preview"
                   />
                 ) : (
-                  <div className="link-preview--thumb" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-muted)", fontSize: "0.82rem" }}>
+                  <div className="link-preview--thumb link-preview--thumb-placeholder">
                     No image
                   </div>
                 )}
@@ -220,7 +221,7 @@ export function LinkPreviewDialog({
                   </div>
                 ))}
                 {state.data.fields.length === 0 && (
-                  <p style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>
+                  <p className="link-preview--empty-copy">
                     {state.data.extractionMode === "fallback"
                       ? "Only limited details could be inferred from the link."
                       : "No product metadata could be extracted from this page."}
