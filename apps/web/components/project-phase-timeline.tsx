@@ -26,6 +26,7 @@ type ProjectPhaseTimelineProps = {
   focusedPhaseId?: string | undefined;
   phases: ProjectPhaseSummary[];
   phaseDetails: ProjectPhaseDetail[];
+  allTasks: ProjectPhaseDetail["tasks"];
   householdMembers: HouseholdMember[];
   serviceProviders: ServiceProvider[];
   budgetCategories: ProjectBudgetCategorySummary[];
@@ -39,6 +40,7 @@ export function ProjectPhaseTimeline({
   focusedPhaseId,
   phases,
   phaseDetails,
+  allTasks,
   householdMembers,
   serviceProviders,
   budgetCategories,
@@ -83,6 +85,7 @@ export function ProjectPhaseTimeline({
                           householdId={householdId}
                           projectId={projectId}
                           phase={phaseDetail}
+                          allTasks={allTasks}
                           householdMembers={householdMembers}
                           serviceProviders={serviceProviders}
                           budgetCategories={budgetCategories}

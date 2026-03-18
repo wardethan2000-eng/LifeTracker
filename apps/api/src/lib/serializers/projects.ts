@@ -1,4 +1,5 @@
 import {
+  projectCriticalPathSchema,
   projectAssetSchema,
   projectBudgetCategorySummarySchema,
   projectExpenseSchema,
@@ -11,10 +12,52 @@ import {
   projectPhaseSummarySchema,
   projectPhaseSupplySchema,
   projectSchema,
+  projectTemplateSchema,
   projectTaskChecklistItemSchema,
   projectTaskSchema
 } from "@lifekeeper/types";
+import { buildProjectTaskGraphSummary } from "../project-task-graph.js";
 import { toShallowUserResponse } from "./users.js";
+
+type TaskGraphDisplayNode = {
+  predecessorTaskIds: string[];
+  successorTaskIds: string[];
+  blockingTaskIds: string[];
+  isBlocked: boolean;
+  isCriticalPath: boolean;
+};
+
+const emptyTaskGraphNode: TaskGraphDisplayNode = {
+  predecessorTaskIds: [],
+  successorTaskIds: [],
+  blockingTaskIds: [],
+  isBlocked: false,
+  isCriticalPath: false
+};
+
+const buildTaskGraphContext = (tasks: Array<{
+  id: string;
+  status: string;
+  taskType?: string | null;
+  isCompleted?: boolean | null;
+  estimatedHours?: number | null;
+  actualHours?: number | null;
+  predecessorLinks?: Array<{ predecessorTaskId: string }>;
+}>) => buildProjectTaskGraphSummary(
+  tasks.map((task) => ({
+    id: task.id,
+    status: task.status,
+    taskType: task.taskType ?? "full",
+    isCompleted: task.isCompleted ?? false,
+    estimatedHours: task.estimatedHours ?? null,
+    predecessorTaskIds: (task.predecessorLinks ?? []).map((dependency) => dependency.predecessorTaskId)
+  })),
+  tasks.flatMap((task) => (task.predecessorLinks ?? []).map((dependency) => ({
+    predecessorTaskId: dependency.predecessorTaskId,
+    successorTaskId: task.id
+  }))),
+  new Map(tasks.map((task) => [task.id, task.actualHours ?? 0]))
+);
 
 export const toProjectResponse = (project: {
   id: string;
@@ -124,11 +167,15 @@ export const toProjectTaskResponse = (task: {
   completedAt: Date | null;
   estimatedCost: number | null;
   actualCost: number | null;
+  estimatedHours?: number | null;
+  actualHours?: number | null;
   sortOrder: number | null;
   scheduleId: string | null;
   createdAt: Date;
   updatedAt: Date;
   assignedTo?: { id: string; displayName: string | null } | null;
+  predecessorLinks?: Array<{ predecessorTaskId: string }>;
+  successorLinks?: Array<{ successorTaskId: string }>;
   checklistItems?: Array<{
     id: string;
     taskId: string;
@@ -139,7 +186,15 @@ export const toProjectTaskResponse = (task: {
     createdAt: Date;
     updatedAt: Date;
   }>;
-}) => projectTaskSchema.parse({
+},
+taskGraphNode?: TaskGraphDisplayNode) => {
+  const graphNode = taskGraphNode ?? {
+    ...emptyTaskGraphNode,
+    predecessorTaskIds: (task.predecessorLinks ?? []).map((dependency) => dependency.predecessorTaskId),
+    successorTaskIds: (task.successorLinks ?? []).map((dependency) => dependency.successorTaskId)
+  };
+
+  return projectTaskSchema.parse({
   id: task.id,
   projectId: task.projectId,
   phaseId: task.phaseId,
@@ -154,12 +209,20 @@ export const toProjectTaskResponse = (task: {
   completedAt: task.completedAt?.toISOString() ?? null,
   estimatedCost: task.estimatedCost,
   actualCost: task.actualCost,
+  estimatedHours: task.estimatedHours ?? null,
+  actualHours: task.actualHours ?? null,
   sortOrder: task.sortOrder,
   scheduleId: task.scheduleId,
+  predecessorTaskIds: graphNode.predecessorTaskIds,
+  successorTaskIds: graphNode.successorTaskIds,
+  blockingTaskIds: graphNode.blockingTaskIds,
+  isBlocked: graphNode.isBlocked,
+  isCriticalPath: graphNode.isCriticalPath,
   checklistItems: (task.checklistItems ?? []).map(toProjectTaskChecklistItemResponse),
   createdAt: task.createdAt.toISOString(),
   updatedAt: task.updatedAt.toISOString()
-});
+  });
+};
 
 export const toProjectExpenseResponse = (expense: {
   id: string;
@@ -258,11 +321,22 @@ export const toProjectPhaseSummaryResponse = (phase: {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
-  tasks: { status: string }[];
+  tasks: Array<{
+    id: string;
+    status: string;
+    taskType?: string | null;
+    isCompleted?: boolean | null;
+    estimatedHours?: number | null;
+    actualHours?: number | null;
+    predecessorLinks?: Array<{ predecessorTaskId: string }>;
+  }>;
   checklistItems: { isCompleted: boolean }[];
   supplies: { isProcured: boolean }[];
   expenses: { amount: number }[];
-}) => projectPhaseSummarySchema.parse({
+}) => {
+  const taskGraph = buildTaskGraphContext(phase.tasks);
+
+  return projectPhaseSummarySchema.parse({
   ...toProjectPhaseResponse(phase),
   taskCount: phase.tasks.length,
   completedTaskCount: phase.tasks.filter((task) => task.status === "completed").length,
@@ -270,8 +344,14 @@ export const toProjectPhaseSummaryResponse = (phase: {
   completedChecklistItemCount: phase.checklistItems.filter((item) => item.isCompleted).length,
   supplyCount: phase.supplies.length,
   procuredSupplyCount: phase.supplies.filter((supply) => supply.isProcured).length,
-  expenseTotal: phase.expenses.reduce((sum, expense) => sum + expense.amount, 0)
-});
+  expenseTotal: phase.expenses.reduce((sum, expense) => sum + expense.amount, 0),
+  totalEstimatedHours: taskGraph.totalEstimatedHours,
+  totalActualHours: taskGraph.totalActualHours,
+  remainingEstimatedHours: taskGraph.remainingEstimatedHours,
+  blockedTaskCount: taskGraph.blockedTaskCount,
+  criticalTaskCount: taskGraph.criticalTaskCount
+  });
+};
 
 export const toProjectPhaseDetailResponse = (phase: {
   id: string;
@@ -301,11 +381,15 @@ export const toProjectPhaseDetailResponse = (phase: {
     completedAt: Date | null;
     estimatedCost: number | null;
     actualCost: number | null;
+    estimatedHours?: number | null;
+    actualHours?: number | null;
     sortOrder: number | null;
     scheduleId: string | null;
     createdAt: Date;
     updatedAt: Date;
     assignedTo?: { id: string; displayName: string | null } | null;
+    predecessorLinks?: Array<{ predecessorTaskId: string }>;
+    successorLinks?: Array<{ successorTaskId: string }>;
     checklistItems?: Array<{
       id: string;
       taskId: string;
@@ -371,13 +455,21 @@ export const toProjectPhaseDetailResponse = (phase: {
     createdAt: Date;
     updatedAt: Date;
   }>;
-}) => projectPhaseDetailSchema.parse({
+}) => {
+  const taskGraph = buildTaskGraphContext(phase.tasks);
+
+  return projectPhaseDetailSchema.parse({
   ...toProjectPhaseSummaryResponse(phase),
-  tasks: phase.tasks.map(toProjectTaskResponse),
+  tasks: phase.tasks.map((task) => toProjectTaskResponse(task, taskGraph.byTaskId.get(task.id) ?? emptyTaskGraphNode)),
   checklistItems: phase.checklistItems.map(toProjectPhaseChecklistItemResponse),
   supplies: phase.supplies.map(toProjectPhaseSupplyResponse),
-  expenses: phase.expenses.map(toProjectExpenseResponse)
-});
+  expenses: phase.expenses.map(toProjectExpenseResponse),
+  criticalPath: projectCriticalPathSchema.parse({
+    taskIds: taskGraph.criticalPathTaskIds,
+    totalEstimatedHours: taskGraph.criticalPathHours
+  })
+  });
+};
 
 export const toProjectInventoryRollupResponse = (rollup: {
   projectId: string;
@@ -410,6 +502,11 @@ export const toProjectPortfolioItemResponse = (item: {
   phaseCount: number;
   completedPhaseCount: number;
   percentComplete: number;
+  totalEstimatedHours: number;
+  totalActualHours: number;
+  remainingEstimatedHours: number;
+  blockedTaskCount: number;
+  criticalTaskCount: number;
   phaseProgress: Array<{
     name: string;
     status: string;
@@ -515,4 +612,30 @@ export const toProjectNoteResponse = (note: {
   phaseName: note.phase?.name ?? null,
   createdAt: note.createdAt.toISOString(),
   updatedAt: note.updatedAt.toISOString()
+});
+
+export const toProjectTemplateResponse = (template: {
+  id: string;
+  householdId: string;
+  sourceProjectId: string | null;
+  name: string;
+  description: string | null;
+  notes: string | null;
+  phaseCount: number;
+  taskCount: number;
+  assetCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) => projectTemplateSchema.parse({
+  id: template.id,
+  householdId: template.householdId,
+  sourceProjectId: template.sourceProjectId,
+  name: template.name,
+  description: template.description,
+  notes: template.notes,
+  phaseCount: template.phaseCount,
+  taskCount: template.taskCount,
+  assetCount: template.assetCount,
+  createdAt: template.createdAt.toISOString(),
+  updatedAt: template.updatedAt.toISOString()
 });

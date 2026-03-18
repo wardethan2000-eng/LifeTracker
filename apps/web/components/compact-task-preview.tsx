@@ -3,6 +3,8 @@ type TaskEntry = {
   title: string;
   status: "pending" | "in_progress" | "completed" | "skipped";
   phaseId: string | null;
+  isBlocked?: boolean;
+  isCriticalPath?: boolean;
 };
 
 type Props = {
@@ -21,6 +23,8 @@ export function CompactTaskPreview({ tasks }: Props) {
   const completedCount = tasks.filter((t) => t.status === "completed").length;
   const inProgressCount = tasks.filter((t) => t.status === "in_progress").length;
   const unphasedCount = tasks.filter((t) => t.phaseId === null).length;
+  const blockedCount = tasks.filter((t) => t.isBlocked).length;
+  const criticalCount = tasks.filter((t) => t.isCriticalPath).length;
 
   const pending = tasks.filter((t) => t.status === "pending" || t.status === "in_progress").slice(0, 4);
   const overflow = Math.max(tasks.length - 4, 0);
@@ -34,6 +38,12 @@ export function CompactTaskPreview({ tasks }: Props) {
         ) : null}
         {unphasedCount > 0 ? (
           <span className="compact-preview__pill compact-preview__pill--muted">{unphasedCount} unphased</span>
+        ) : null}
+        {blockedCount > 0 ? (
+          <span className="status-chip status-chip--overdue">{blockedCount} blocked</span>
+        ) : null}
+        {criticalCount > 0 ? (
+          <span className="compact-preview__pill">{criticalCount} critical</span>
         ) : null}
       </div>
       {pending.length > 0 ? (

@@ -73,9 +73,13 @@ import {
   projectInventoryRollupListSchema,
   projectPortfolioListSchema,
   projectStatusCountListSchema,
+  projectTemplateListSchema,
+  projectTemplateSchema,
   projectShoppingListSchema,
   projectSchema,
+  cloneProjectSchema,
   reorderProjectPhasesSchema,
+  instantiateProjectTemplateSchema,
   projectSummarySchema,
   projectTaskSchema,
   projectTaskChecklistItemSchema,
@@ -187,6 +191,7 @@ import {
   type ProjectPhaseDetail,
   type ProjectPhaseSupply,
   type ProjectPhaseSummary,
+  type ProjectTemplate,
   type ProjectShoppingList,
   type ProjectChildSummary,
   type ProjectBreadcrumb,
@@ -199,6 +204,9 @@ import {
   type ProjectTask,
   type ProjectTaskChecklistItem,
   type ProjectStatus,
+  type CloneProjectInput,
+  type CreateProjectTemplateInput,
+  type InstantiateProjectTemplateInput,
   type PublicAssetReport,
   type ReorderProjectPhasesInput,
   type ShareLink,
@@ -2043,6 +2051,43 @@ export const createProject = async (
   path: `/v1/households/${householdId}/projects`,
   method: "POST",
   body: input,
+  schema: projectSchema
+});
+
+export const getProjectTemplates = async (householdId: string): Promise<ProjectTemplate[]> => apiRequest({
+  path: `/v1/households/${householdId}/project-templates`,
+  schema: projectTemplateListSchema
+});
+
+export const createProjectTemplate = async (
+  householdId: string,
+  input: CreateProjectTemplateInput
+): Promise<ProjectTemplate> => apiRequest({
+  path: `/v1/households/${householdId}/project-templates`,
+  method: "POST",
+  body: input,
+  schema: projectTemplateSchema
+});
+
+export const instantiateProjectTemplate = async (
+  householdId: string,
+  templateId: string,
+  input: InstantiateProjectTemplateInput
+): Promise<Project> => apiRequest({
+  path: `/v1/households/${householdId}/project-templates/${templateId}/instantiate`,
+  method: "POST",
+  body: instantiateProjectTemplateSchema.parse(input),
+  schema: projectSchema
+});
+
+export const cloneProject = async (
+  householdId: string,
+  projectId: string,
+  input: CloneProjectInput
+): Promise<Project> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/clone`,
+  method: "POST",
+  body: cloneProjectSchema.parse(input),
   schema: projectSchema
 });
 

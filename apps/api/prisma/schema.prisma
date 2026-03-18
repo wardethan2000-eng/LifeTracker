@@ -125,6 +125,7 @@ enum NoteCategory {
 // Polymorphic target type for universal structured entries.
 enum EntryEntityType {
   hobby
+  hobby_series
   hobby_session
   hobby_project
   hobby_project_milestone
@@ -201,10 +202,25 @@ enum HobbyStatus {
   archived
 }
 
+// High-level activity classification used to tailor hobby UI surfaces.
+enum HobbyActivityMode {
+  session
+  project
+  practice
+  collection
+}
+
 // Controls whether sessions use a simple status or a custom pipeline.
 enum HobbySessionLifecycleMode {
   binary   // Sessions are simply active/completed without pipeline stages
   pipeline // Sessions move through hobby-defined workflow steps
+}
+
+// Lifecycle state for a tracked hobby series or lineage of sessions.
+enum SeriesStatus {
+  active
+  completed
+  archived
 }
 
 // Identifies whether a recipe came from the library, the user, or an import.
@@ -289,6 +305,7 @@ model Household {
   notifications    Notification[]
   serviceProviders ServiceProvider[]
   projects         Project[]
+  projectTemplates ProjectTemplate[]
   inventoryItems   InventoryItem[]
   inventoryPurchases InventoryPurchase[]
   inventoryItemRevisions InventoryItemRevision[]
@@ -299,9 +316,10 @@ model Household {
   attachments      Attachment[]
   shareLinks       ShareLink[]
   hobbies          Hobby[]
+  hobbySeries      HobbySeries[]
   comments         Comment[]
-  domainEvents     DomainEvent[]
   entries          Entry[]
+  domainEvents     DomainEvent[]
   webhookEndpoints WebhookEndpoint[]
 
   @@index([createdById])
@@ -617,7 +635,6 @@ model AssetTimelineEntry {
   @@index([category])
 }
 
-// A generated alert for a user about asset or schedule activity within a household.
 // A universal structured entry that can be attached to any major household entity.
 model Entry {
   id             String          @id @default(cuid())
@@ -658,6 +675,7 @@ model EntryFlagEntry {
   @@index([flag])
 }
 
+// A generated alert for a user about asset or schedule activity within a household.
 model Notification {
   id              String               @id @default(cuid())
   userId          String
@@ -720,6 +738,7 @@ model Project {
   tasks           ProjectTask[]
   expenses        ProjectExpense[]
   noteEntries     ProjectNote[]
+  templates       ProjectTemplate[]
   hobbyLinks       HobbyProject[]
   comments         Comment[]
 
@@ -953,6 +972,8 @@ model ProjectTask {
   completedAt   DateTime?
   estimatedCost Float?
   actualCost    Float?
+  estimatedHours Float?
+  actualHours    Float?
   sortOrder     Int?
   scheduleId    String?              // Links task generation back to a maintenance schedule
   createdAt     DateTime             @default(now())
@@ -962,11 +983,25 @@ model ProjectTask {
   assignedTo    User?                @relation("ProjectTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   schedule      MaintenanceSchedule? @relation("ProjectTaskSchedule", fields: [scheduleId], references: [id], onDelete: SetNull)
   checklistItems ProjectTaskChecklistItem[]
+  predecessorLinks ProjectTaskDependency[] @relation("ProjectTaskDependencySuccessor")
+  successorLinks   ProjectTaskDependency[] @relation("ProjectTaskDependencyPredecessor")
 
   @@index([projectId, status])
   @@index([projectId, taskType])
   @@index([phaseId, sortOrder])
   @@index([assignedToId])
+}
+
+// A finish-to-start dependency between two tasks in the same project.
+model ProjectTaskDependency {
+  predecessorTaskId String
+  successorTaskId   String
+  createdAt         DateTime    @default(now())
+  predecessorTask   ProjectTask @relation("ProjectTaskDependencyPredecessor", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
+  successorTask     ProjectTask @relation("ProjectTaskDependencySuccessor", fields: [successorTaskId], references: [id], onDelete: Cascade)
+
+  @@id([predecessorTaskId, successorTaskId])
+  @@index([successorTaskId])
 }
 
 // A free-form note attached to a Project, optionally scoped to a single phase.
@@ -1119,6 +1154,24 @@ model ProjectPhaseSupply {
   @@index([phaseId, sortOrder])
   @@index([phaseId, isProcured])
   @@index([inventoryItemId])
+}
+
+// A reusable household-scoped project blueprint built from a live project snapshot.
+model ProjectTemplate {
+  id              String    @id @default(cuid())
+  householdId     String
+  sourceProjectId String?
+  name            String
+  description     String?
+  notes           String?
+  snapshot        Json
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  household       Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  sourceProject   Project?  @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, createdAt])
+  @@index([sourceProjectId])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -1383,6 +1436,7 @@ model Hobby {
   name             String
   description      String?
   status           HobbyStatus               @default(active)
+  activityMode     HobbyActivityMode         @default(session)
   hobbyType        String?
   lifecycleMode    HobbySessionLifecycleMode @default(binary)
   customFields     Json                      @default("{}")
@@ -1394,6 +1448,7 @@ model Hobby {
   household        Household                 @relation(fields: [householdId], references: [id], onDelete: Cascade)
   createdBy        User                      @relation("HobbyCreator", fields: [createdById], references: [id], onDelete: Restrict)
   recipes          HobbyRecipe[]
+  series           HobbySeries[]
   sessions         HobbySession[]
   metricDefinitions HobbyMetricDefinition[]
   statusPipeline   HobbySessionStatusStep[]
@@ -1405,6 +1460,7 @@ model Hobby {
   comments         Comment[]
 
   @@index([householdId, status])
+  @@index([householdId, activityMode])
   @@index([createdById])
 }
 
@@ -1549,11 +1605,37 @@ model HobbyRecipeStep {
   @@index([recipeId, sortOrder])
 }
 
+// A lineage of related sessions used to compare repeat batches or iterations.
+model HobbySeries {
+  id                 String        @id @default(cuid())
+  hobbyId            String
+  householdId        String
+  name               String
+  description        String?
+  status             SeriesStatus  @default(active)
+  batchCount         Int           @default(0)
+  bestBatchSessionId String?
+  tags               Json          @default("[]")
+  notes              String?
+  coverImageUrl      String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  hobby              Hobby         @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  household          Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  sessions           HobbySession[] @relation("HobbySeriesSessions")
+  bestBatchSession   HobbySession? @relation("HobbySeriesBestBatchSession", fields: [bestBatchSessionId], references: [id], onDelete: SetNull)
+
+  @@index([hobbyId, status])
+  @@index([householdId, status])
+}
+
 // A single execution of a Hobby, optionally derived from a recipe and workflow pipeline.
 model HobbySession {
   id              String       @id @default(cuid())
   hobbyId         String
   recipeId        String?
+  seriesId        String?
+  batchNumber     Int?
   name            String
   status          String       @default("active")
   startDate       DateTime?
@@ -1567,6 +1649,8 @@ model HobbySession {
   updatedAt       DateTime     @updatedAt
   hobby           Hobby        @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
   recipe          HobbyRecipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  series          HobbySeries? @relation("HobbySeriesSessions", fields: [seriesId], references: [id], onDelete: SetNull)
+  bestOfSeries    HobbySeries[] @relation("HobbySeriesBestBatchSession")
   ingredients     HobbySessionIngredient[]
   steps           HobbySessionStep[]
   metricReadings  HobbyMetricReading[]
@@ -1575,6 +1659,7 @@ model HobbySession {
   @@index([hobbyId, status])
   @@index([hobbyId, createdAt])
   @@index([recipeId])
+  @@index([seriesId, batchNumber])
 }
 
 // A material actually consumed during a HobbySession, optionally traced to recipe and inventory rows.

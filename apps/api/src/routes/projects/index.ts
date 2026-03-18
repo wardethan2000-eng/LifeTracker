@@ -1,9 +1,12 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
+  cloneProjectSchema,
   createOffsetPaginationQuerySchema,
   createProjectSchema,
+  createProjectTemplateSchema,
   projectStatusCountListSchema,
   projectStatusValues,
+  instantiateProjectTemplateSchema,
   updateProjectSchema,
   createProjectAssetSchema,
   updateProjectAssetSchema,
@@ -21,6 +24,8 @@ import { assertMembership, requireHouseholdMembership } from "../../lib/asset-ac
 import { logActivity } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { buildOffsetPage } from "../../lib/pagination.js";
+import { buildProjectTemplateSnapshot, instantiateProjectFromTemplateSnapshot, summarizeProjectTemplateSnapshot, type ProjectTemplateSnapshot } from "../../lib/project-templates.js";
+import { assertTaskDependenciesAcyclic, buildProjectTaskGraphSummary } from "../../lib/project-task-graph.js";
 import {
   ProjectHierarchyValidationError,
   resolveProjectHierarchyInput,
@@ -37,7 +42,8 @@ import {
   toProjectPortfolioItemResponse,
   toProjectPhaseSummaryResponse,
   toProjectResponse,
-  toProjectTaskResponse
+  toProjectTaskResponse,
+  toProjectTemplateResponse
 } from "../../lib/serializers/index.js";
 import { syncLogToSearchIndex, syncProjectToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 
@@ -73,6 +79,34 @@ const projectPortfolioQuerySchema = z.object({
   status: projectStatusSchema.optional()
 });
 
+const projectTemplateParamsSchema = householdParamsSchema.extend({
+  templateId: z.string().cuid()
+});
+
+const projectTaskSummarySelect = {
+  id: true,
+  status: true,
+  taskType: true,
+  isCompleted: true,
+  phaseId: true,
+  estimatedHours: true,
+  actualHours: true,
+  predecessorLinks: {
+    select: { predecessorTaskId: true }
+  }
+} satisfies Prisma.ProjectTaskSelect;
+
+const projectTaskDetailInclude = {
+  assignedTo: { select: { id: true, displayName: true } },
+  predecessorLinks: { select: { predecessorTaskId: true } },
+  successorLinks: { select: { successorTaskId: true } },
+  checklistItems: {
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+  }
+} satisfies Prisma.ProjectTaskInclude;
+
+const parseTemplateSnapshot = (value: Prisma.JsonValue): ProjectTemplateSnapshot => value as ProjectTemplateSnapshot;
+
 const activeProjectWhere = (
   householdId: string,
   projectId?: string
@@ -106,7 +140,16 @@ const toProjectSummary = (
     updatedAt: Date;
     expenses: { amount: number }[];
     _count: { tasks: number };
-    tasks: { status: string; taskType: string; isCompleted: boolean; phaseId: string | null }[];
+    tasks: {
+      id: string;
+      status: string;
+      taskType: string;
+      isCompleted: boolean;
+      phaseId: string | null;
+      estimatedHours: number | null;
+      actualHours: number | null;
+      predecessorLinks: { predecessorTaskId: string }[];
+    }[];
     phases: {
       id: string;
       name: string;
@@ -114,6 +157,21 @@ const toProjectSummary = (
     }[];
   }
 ) => {
+  const taskGraph = buildProjectTaskGraphSummary(
+    project.tasks.map((task) => ({
+      id: task.id,
+      status: task.status,
+      taskType: task.taskType,
+      isCompleted: task.isCompleted,
+      estimatedHours: task.estimatedHours,
+      predecessorTaskIds: task.predecessorLinks.map((dependency) => dependency.predecessorTaskId)
+    })),
+    project.tasks.flatMap((task) => task.predecessorLinks.map((dependency) => ({
+      predecessorTaskId: dependency.predecessorTaskId,
+      successorTaskId: task.id
+    }))),
+    new Map(project.tasks.map((task) => [task.id, task.actualHours ?? 0]))
+  );
   const totalSpent = project.expenses.reduce((sum, e) => sum + e.amount, 0);
   const taskCount = project._count.tasks;
   const completedTaskCount = project.tasks.filter(isProjectSummaryTaskCompleted).length;
@@ -169,7 +227,12 @@ const toProjectSummary = (
     phaseCount,
     completedPhaseCount,
     percentComplete,
-    phaseProgress
+    phaseProgress,
+    totalEstimatedHours: taskGraph.totalEstimatedHours,
+    totalActualHours: taskGraph.totalActualHours,
+    remainingEstimatedHours: taskGraph.remainingEstimatedHours,
+    blockedTaskCount: taskGraph.blockedTaskCount,
+    criticalTaskCount: taskGraph.criticalTaskCount
   };
 };
 
@@ -340,7 +403,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       where,
       include: {
         expenses: { select: { amount: true } },
-        tasks: { select: { status: true, taskType: true, isCompleted: true, phaseId: true } },
+        tasks: { select: projectTaskSummarySelect },
         phases: {
           select: {
             id: true,
@@ -392,7 +455,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       },
       include: {
         expenses: { select: { amount: true } },
-        tasks: { select: { status: true, taskType: true, isCompleted: true, phaseId: true } },
+        tasks: { select: projectTaskSummarySelect },
         phases: {
           select: {
             id: true,
@@ -520,12 +583,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
           }
         },
         tasks: {
-          include: {
-            assignedTo: { select: { id: true, displayName: true } },
-            checklistItems: {
-              orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-            }
-          },
+          include: projectTaskDetailInclude,
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
         },
         expenses: {
@@ -533,7 +591,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         },
         phases: {
           include: {
-            tasks: { select: { status: true } },
+            tasks: { select: projectTaskSummarySelect },
             checklistItems: { select: { isCompleted: true } },
             supplies: { select: { isProcured: true } },
             expenses: { select: { amount: true } }
@@ -558,7 +616,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       app.prisma.project.findMany({
         where: { parentProjectId: project.id, householdId: params.householdId, deletedAt: null },
         include: {
-          tasks: { select: { status: true, taskType: true, isCompleted: true } },
+          tasks: { select: projectTaskSummarySelect },
           expenses: { select: { amount: true } },
           _count: { select: { childProjects: true } }
         },
@@ -590,6 +648,21 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const treeStats = childSummaries.length > 0
       ? await getProjectTreeStats(app.prisma as PrismaClient, project.id)
       : null;
+    const taskGraph = buildProjectTaskGraphSummary(
+      project.tasks.map((task) => ({
+        id: task.id,
+        status: task.status,
+        taskType: task.taskType ?? "full",
+        isCompleted: task.isCompleted ?? false,
+        estimatedHours: task.estimatedHours ?? null,
+        predecessorTaskIds: (task.predecessorLinks ?? []).map((dependency) => dependency.predecessorTaskId)
+      })),
+      project.tasks.flatMap((task) => (task.predecessorLinks ?? []).map((dependency) => ({
+        predecessorTaskId: dependency.predecessorTaskId,
+        successorTaskId: task.id
+      }))),
+      new Map(project.tasks.map((task) => [task.id, task.actualHours ?? 0]))
+    );
 
     return {
       ...toProjectResponse(project),
@@ -603,13 +676,17 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         role: null,
         notes: link.notes ?? null
       })),
-      tasks: project.tasks.map(toProjectTaskResponse),
+      tasks: project.tasks.map((task) => toProjectTaskResponse(task, taskGraph.byTaskId.get(task.id))),
       expenses: project.expenses.map(toProjectExpenseResponse),
       phases: project.phases.map(toProjectPhaseSummaryResponse),
       budgetCategories: project.budgetCategories.map(toProjectBudgetCategoryResponse),
       breadcrumbs,
       childProjects: childSummaries,
-      treeStats
+      treeStats,
+      criticalPath: {
+        taskIds: taskGraph.criticalPathTaskIds,
+        totalEstimatedHours: taskGraph.criticalPathHours
+      }
     };
   });
 
@@ -723,6 +800,305 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     void removeSearchIndexEntry(app.prisma, "project", existing.id).catch(console.error);
 
     return reply.code(204).send();
+  });
+
+  // ── Project Templates & Cloning ────────────────────────────────
+
+  app.get("/v1/households/:householdId/project-templates", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const templates = await app.prisma.projectTemplate.findMany({
+      where: { householdId: params.householdId },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
+    });
+
+    return templates.map((template) => {
+      const summary = summarizeProjectTemplateSnapshot(parseTemplateSnapshot(template.snapshot));
+      return toProjectTemplateResponse({
+        id: template.id,
+        householdId: template.householdId,
+        sourceProjectId: template.sourceProjectId,
+        name: template.name,
+        description: template.description,
+        notes: template.notes,
+        phaseCount: summary.phaseCount,
+        taskCount: summary.taskCount,
+        assetCount: summary.assetCount,
+        createdAt: template.createdAt,
+        updatedAt: template.updatedAt
+      });
+    });
+  });
+
+  app.post("/v1/households/:householdId/project-templates", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const input = createProjectTemplateSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const sourceProject = await app.prisma.project.findFirst({
+      where: activeProjectWhere(params.householdId, input.sourceProjectId),
+      include: {
+        assets: {
+          select: {
+            assetId: true,
+            relationship: true,
+            role: true,
+            notes: true
+          }
+        },
+        budgetCategories: {
+          select: {
+            name: true,
+            budgetAmount: true,
+            sortOrder: true,
+            notes: true
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
+        phases: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            status: true,
+            sortOrder: true,
+            startDate: true,
+            targetEndDate: true,
+            budgetAmount: true,
+            notes: true
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
+        tasks: {
+          select: {
+            id: true,
+            phaseId: true,
+            title: true,
+            description: true,
+            taskType: true,
+            assignedToId: true,
+            dueDate: true,
+            estimatedCost: true,
+            estimatedHours: true,
+            sortOrder: true,
+            predecessorLinks: { select: { predecessorTaskId: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
+      }
+    });
+
+    if (!sourceProject) {
+      return reply.code(404).send({ message: "Source project not found." });
+    }
+
+    const snapshot = buildProjectTemplateSnapshot(sourceProject);
+    const summary = summarizeProjectTemplateSnapshot(snapshot);
+    const template = await app.prisma.projectTemplate.create({
+      data: {
+        householdId: params.householdId,
+        sourceProjectId: sourceProject.id,
+        name: input.name,
+        description: input.description ?? sourceProject.description,
+        notes: input.notes ?? sourceProject.notes,
+        snapshot
+      }
+    });
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.template.created",
+      entityType: "project",
+      entityId: sourceProject.id,
+      metadata: { templateId: template.id, templateName: template.name }
+    });
+
+    return reply.code(201).send(toProjectTemplateResponse({
+      id: template.id,
+      householdId: template.householdId,
+      sourceProjectId: template.sourceProjectId,
+      name: template.name,
+      description: template.description,
+      notes: template.notes,
+      phaseCount: summary.phaseCount,
+      taskCount: summary.taskCount,
+      assetCount: summary.assetCount,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt
+    }));
+  });
+
+  app.post("/v1/households/:householdId/project-templates/:templateId/instantiate", async (request, reply) => {
+    const params = projectTemplateParamsSchema.parse(request.params);
+    const input = instantiateProjectTemplateSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const template = await app.prisma.projectTemplate.findFirst({
+      where: { id: params.templateId, householdId: params.householdId }
+    });
+
+    if (!template) {
+      return reply.code(404).send({ message: "Project template not found." });
+    }
+
+    let hierarchy: { parentProjectId: string | null; depth: number };
+
+    try {
+      hierarchy = await resolveProjectHierarchyInput(app.prisma, {
+        householdId: params.householdId,
+        parentProjectId: input.parentProjectId ?? null
+      });
+    } catch (error) {
+      if (error instanceof ProjectHierarchyValidationError) {
+        return reply.code(400).send({ message: error.message });
+      }
+
+      throw error;
+    }
+
+    const project = await app.prisma.$transaction((tx) => instantiateProjectFromTemplateSnapshot(
+      tx,
+      params.householdId,
+      parseTemplateSnapshot(template.snapshot),
+      {
+        name: input.name,
+        parentProjectId: hierarchy.parentProjectId,
+        depth: hierarchy.depth,
+        ...(input.startDate ? { startDate: input.startDate } : {}),
+        ...(input.targetEndDate ? { targetEndDate: input.targetEndDate } : {})
+      }
+    ));
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.template.instantiated",
+      entityType: "project",
+      entityId: project.id,
+      metadata: { templateId: template.id, templateName: template.name }
+    });
+
+    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+
+    return reply.code(201).send(toProjectResponse(project));
+  });
+
+  app.post("/v1/households/:householdId/projects/:projectId/clone", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+    const input = cloneProjectSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const sourceProject = await app.prisma.project.findFirst({
+      where: activeProjectWhere(params.householdId, params.projectId),
+      include: {
+        assets: {
+          select: {
+            assetId: true,
+            relationship: true,
+            role: true,
+            notes: true
+          }
+        },
+        budgetCategories: {
+          select: {
+            name: true,
+            budgetAmount: true,
+            sortOrder: true,
+            notes: true
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
+        phases: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            status: true,
+            sortOrder: true,
+            startDate: true,
+            targetEndDate: true,
+            budgetAmount: true,
+            notes: true
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        },
+        tasks: {
+          select: {
+            id: true,
+            phaseId: true,
+            title: true,
+            description: true,
+            taskType: true,
+            assignedToId: true,
+            dueDate: true,
+            estimatedCost: true,
+            estimatedHours: true,
+            sortOrder: true,
+            predecessorLinks: { select: { predecessorTaskId: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
+      }
+    });
+
+    if (!sourceProject) {
+      return reply.code(404).send({ message: "Project not found." });
+    }
+
+    let hierarchy: { parentProjectId: string | null; depth: number };
+
+    try {
+      hierarchy = await resolveProjectHierarchyInput(app.prisma, {
+        householdId: params.householdId,
+        parentProjectId: input.parentProjectId ?? null
+      });
+    } catch (error) {
+      if (error instanceof ProjectHierarchyValidationError) {
+        return reply.code(400).send({ message: error.message });
+      }
+
+      throw error;
+    }
+
+    const project = await app.prisma.$transaction((tx) => instantiateProjectFromTemplateSnapshot(
+      tx,
+      params.householdId,
+      buildProjectTemplateSnapshot(sourceProject),
+      {
+        name: input.name,
+        parentProjectId: hierarchy.parentProjectId,
+        depth: hierarchy.depth,
+        ...(input.startDate ? { startDate: input.startDate } : {}),
+        ...(input.targetEndDate ? { targetEndDate: input.targetEndDate } : {})
+      }
+    ));
+
+    await logActivity(app.prisma, {
+      householdId: params.householdId,
+      userId: request.auth.userId,
+      action: "project.cloned",
+      entityType: "project",
+      entityId: project.id,
+      metadata: { sourceProjectId: sourceProject.id, sourceProjectName: sourceProject.name }
+    });
+
+    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+
+    return reply.code(201).send(toProjectResponse(project));
   });
 
   // ── Project Status Update ────────────────────────────────────────
@@ -923,16 +1299,27 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const tasks = await app.prisma.projectTask.findMany({
       where: { projectId: project.id },
-      include: {
-        assignedTo: { select: { id: true, displayName: true } },
-        checklistItems: {
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-        }
-      },
+      include: projectTaskDetailInclude,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
     });
 
-    return tasks.map(toProjectTaskResponse);
+    const taskGraph = buildProjectTaskGraphSummary(
+      tasks.map((task) => ({
+        id: task.id,
+        status: task.status,
+        taskType: task.taskType ?? "full",
+        isCompleted: task.isCompleted ?? false,
+        estimatedHours: task.estimatedHours ?? null,
+        predecessorTaskIds: (task.predecessorLinks ?? []).map((dependency) => dependency.predecessorTaskId)
+      })),
+      tasks.flatMap((task) => (task.predecessorLinks ?? []).map((dependency) => ({
+        predecessorTaskId: dependency.predecessorTaskId,
+        successorTaskId: task.id
+      }))),
+      new Map(tasks.map((task) => [task.id, task.actualHours ?? 0]))
+    );
+
+    return tasks.map((task) => toProjectTaskResponse(task, taskGraph.byTaskId.get(task.id)));
   });
 
   app.post("/v1/households/:householdId/projects/:projectId/tasks", async (request, reply) => {
@@ -990,31 +1377,61 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.predecessorTaskIds && input.predecessorTaskIds.length > 0) {
+      const projectTasks = await app.prisma.projectTask.findMany({
+        where: { projectId: project.id },
+        select: {
+          id: true,
+          predecessorLinks: { select: { predecessorTaskId: true, successorTaskId: true } }
+        }
+      });
+
+      for (const predecessorTaskId of input.predecessorTaskIds) {
+        if (!projectTasks.some((task) => task.id === predecessorTaskId)) {
+          return reply.code(400).send({ message: "Referenced dependency task not found in this project." });
+        }
+      }
+    }
+
     const taskType = input.taskType ?? "full";
     const isQuick = taskType === "quick";
 
-    const task = await app.prisma.projectTask.create({
-      data: {
-        projectId: project.id,
-        phaseId: input.phaseId ?? null,
-        title: input.title,
-        description: isQuick ? null : (input.description ?? null),
-        status: input.status ?? "pending",
-        taskType,
-        isCompleted: input.isCompleted ?? false,
-        assignedToId: isQuick ? null : (input.assignedToId ?? null),
-        dueDate: isQuick ? null : (input.dueDate ? new Date(input.dueDate) : null),
-        estimatedCost: isQuick ? null : (input.estimatedCost ?? null),
-        actualCost: isQuick ? null : (input.actualCost ?? null),
-        sortOrder: input.sortOrder ?? null,
-        scheduleId: isQuick ? null : (input.scheduleId ?? null)
-      },
-      include: {
-        assignedTo: { select: { id: true, displayName: true } },
-        checklistItems: {
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    const task = await app.prisma.$transaction(async (tx) => {
+      const createdTask = await tx.projectTask.create({
+        data: {
+          projectId: project.id,
+          phaseId: input.phaseId ?? null,
+          title: input.title,
+          description: isQuick ? null : (input.description ?? null),
+          status: input.status ?? "pending",
+          taskType,
+          isCompleted: input.isCompleted ?? false,
+          assignedToId: isQuick ? null : (input.assignedToId ?? null),
+          dueDate: isQuick ? null : (input.dueDate ? new Date(input.dueDate) : null),
+          estimatedCost: isQuick ? null : (input.estimatedCost ?? null),
+          actualCost: isQuick ? null : (input.actualCost ?? null),
+          estimatedHours: isQuick ? null : (input.estimatedHours ?? null),
+          actualHours: isQuick ? null : (input.actualHours ?? null),
+          sortOrder: input.sortOrder ?? null,
+          scheduleId: isQuick ? null : (input.scheduleId ?? null)
+        }
+      });
+
+      if (!isQuick) {
+        for (const predecessorTaskId of input.predecessorTaskIds ?? []) {
+          await tx.projectTaskDependency.create({
+            data: {
+              predecessorTaskId,
+              successorTaskId: createdTask.id
+            }
+          });
         }
       }
+
+      return tx.projectTask.findUniqueOrThrow({
+        where: { id: createdTask.id },
+        include: projectTaskDetailInclude
+      });
     });
 
     if (input.assignedToId) {
@@ -1088,6 +1505,30 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    if (input.predecessorTaskIds !== undefined) {
+      const projectTasks = await app.prisma.projectTask.findMany({
+        where: { projectId: params.projectId },
+        select: {
+          id: true,
+          predecessorLinks: { select: { predecessorTaskId: true, successorTaskId: true } }
+        }
+      });
+
+      try {
+        assertTaskDependenciesAcyclic(
+          projectTasks,
+          projectTasks.flatMap((task) => task.predecessorLinks.map((dependency) => ({
+            predecessorTaskId: dependency.predecessorTaskId,
+            successorTaskId: dependency.successorTaskId
+          }))),
+          existing.id,
+          input.predecessorTaskIds
+        );
+      } catch (error) {
+        return reply.code(400).send({ message: error instanceof Error ? error.message : "Invalid task dependencies." });
+      }
+    }
+
     const data: Prisma.ProjectTaskUncheckedUpdateInput = {};
 
     if (input.title !== undefined) data.title = input.title;
@@ -1097,6 +1538,8 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
     if (input.estimatedCost !== undefined) data.estimatedCost = input.estimatedCost ?? null;
     if (input.actualCost !== undefined) data.actualCost = input.actualCost ?? null;
+    if (input.estimatedHours !== undefined) data.estimatedHours = input.estimatedHours ?? null;
+    if (input.actualHours !== undefined) data.actualHours = input.actualHours ?? null;
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder ?? null;
     if (input.scheduleId !== undefined) data.scheduleId = input.scheduleId ?? null;
     if (input.taskType !== undefined) data.taskType = input.taskType;
@@ -1184,15 +1627,31 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const task = await app.prisma.projectTask.update({
-      where: { id: existing.id },
-      data,
-      include: {
-        assignedTo: { select: { id: true, displayName: true } },
-        checklistItems: {
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    const task = await app.prisma.$transaction(async (tx) => {
+      await tx.projectTask.update({
+        where: { id: existing.id },
+        data
+      });
+
+      if (input.predecessorTaskIds !== undefined) {
+        await tx.projectTaskDependency.deleteMany({
+          where: { successorTaskId: existing.id }
+        });
+
+        for (const predecessorTaskId of input.predecessorTaskIds) {
+          await tx.projectTaskDependency.create({
+            data: {
+              predecessorTaskId,
+              successorTaskId: existing.id
+            }
+          });
         }
       }
+
+      return tx.projectTask.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: projectTaskDetailInclude
+      });
     });
 
     return toProjectTaskResponse(task);

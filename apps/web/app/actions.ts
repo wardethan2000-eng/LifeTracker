@@ -25,6 +25,7 @@ import type {
   CreateProjectPhaseChecklistItemInput,
   CreateProjectPhaseInput,
   CreateProjectPhaseSupplyInput,
+  CreateProjectTemplateInput,
   CreateProjectInventoryItemInput,
   CreateProjectInput,
   CreateProjectTaskChecklistItemInput,
@@ -58,6 +59,8 @@ import type {
   UpdateProjectInput,
   UpdateProjectTaskChecklistItemInput,
   UpdateProjectTaskInput,
+  CloneProjectInput,
+  InstantiateProjectTemplateInput,
   UpdateHobbyInput,
   UpdateHobbyRecipeInput,
   UpdateInventoryPurchaseLineInput,
@@ -96,6 +99,7 @@ import {
   createProjectPhase,
   createPhaseChecklistItem,
   createProjectPhaseSupply,
+  createProjectTemplate,
   createProjectTask,
   createQuickTodo,
   createTaskChecklistItem,
@@ -112,6 +116,7 @@ import {
   createProjectInventoryItem,
   createSchedule,
   createServiceProvider,
+  cloneProject,
   deleteInventoryItem,
   deleteComment,
   deleteInventoryComment,
@@ -160,6 +165,7 @@ import {
   updateProjectStatus,
   updateProjectTask,
   updateTaskChecklistItem,
+  instantiateProjectTemplate,
   promoteTask,
   updateSchedule,
   updateServiceProvider,
@@ -1930,6 +1936,34 @@ export async function createProjectAction(formData: FormData): Promise<void> {
   redirect(`/projects/${project.id}?householdId=${householdId}`);
 }
 
+export async function createProjectFromTemplateAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const templateId = getRequiredString(formData, "templateId");
+  const input: InstantiateProjectTemplateInput = {
+    name: getRequiredString(formData, "name")
+  };
+
+  const startDate = toIsoString(getOptionalString(formData, "startDate"));
+  const targetEndDate = toIsoString(getOptionalString(formData, "targetEndDate"));
+  const parentProjectId = getOptionalString(formData, "parentProjectId");
+
+  if (startDate) {
+    input.startDate = startDate;
+  }
+
+  if (targetEndDate) {
+    input.targetEndDate = targetEndDate;
+  }
+
+  if (parentProjectId) {
+    input.parentProjectId = parentProjectId;
+  }
+
+  const project = await instantiateProjectTemplate(householdId, templateId, input);
+  revalidateProjectPaths(householdId, project.id);
+  redirect(`/projects/${project.id}?householdId=${householdId}`);
+}
+
 export async function updateProjectAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
@@ -1946,6 +1980,57 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
 
   await updateProject(householdId, projectId, input);
   revalidateProjectPaths(householdId, projectId);
+}
+
+export async function saveProjectAsTemplateAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const sourceProjectId = getRequiredString(formData, "projectId");
+  const input: CreateProjectTemplateInput = {
+    sourceProjectId,
+    name: getRequiredString(formData, "templateName")
+  };
+
+  const description = getOptionalString(formData, "templateDescription");
+  const notes = getOptionalString(formData, "templateNotes");
+
+  if (description) {
+    input.description = description;
+  }
+
+  if (notes) {
+    input.notes = notes;
+  }
+
+  await createProjectTemplate(householdId, input);
+  revalidateProjectPaths(householdId, sourceProjectId);
+}
+
+export async function cloneProjectAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CloneProjectInput = {
+    name: getRequiredString(formData, "name")
+  };
+
+  const startDate = toIsoString(getOptionalString(formData, "startDate"));
+  const targetEndDate = toIsoString(getOptionalString(formData, "targetEndDate"));
+  const parentProjectId = getOptionalString(formData, "parentProjectId");
+
+  if (startDate) {
+    input.startDate = startDate;
+  }
+
+  if (targetEndDate) {
+    input.targetEndDate = targetEndDate;
+  }
+
+  if (parentProjectId) {
+    input.parentProjectId = parentProjectId;
+  }
+
+  const project = await cloneProject(householdId, projectId, input);
+  revalidateProjectPaths(householdId, project.id);
+  redirect(`/projects/${project.id}?householdId=${householdId}`);
 }
 
 export async function updateProjectStatusAction(formData: FormData): Promise<void> {
@@ -2035,14 +2120,22 @@ export async function createProjectTaskAction(formData: FormData): Promise<void>
   };
 
   const description = getOptionalString(formData, "description");
+  const phaseId = getOptionalString(formData, "phaseId");
   const assignedToId = getOptionalString(formData, "assignedToId");
   const dueDate = toIsoString(getOptionalString(formData, "dueDate"));
   const estimatedCost = getOptionalNumber(formData, "estimatedCost");
   const actualCost = getOptionalNumber(formData, "actualCost");
+  const estimatedHours = getOptionalNumber(formData, "estimatedHours");
+  const actualHours = getOptionalNumber(formData, "actualHours");
   const sortOrder = getOptionalNumber(formData, "sortOrder");
+  const predecessorTaskIds = getRepeatedStrings(formData, "predecessorTaskIds");
 
   if (description) {
     input.description = description;
+  }
+
+  if (phaseId) {
+    input.phaseId = phaseId;
   }
 
   if (assignedToId) {
@@ -2061,8 +2154,20 @@ export async function createProjectTaskAction(formData: FormData): Promise<void>
     input.actualCost = actualCost;
   }
 
+  if (estimatedHours !== undefined) {
+    input.estimatedHours = estimatedHours;
+  }
+
+  if (actualHours !== undefined) {
+    input.actualHours = actualHours;
+  }
+
   if (sortOrder !== undefined) {
     input.sortOrder = sortOrder;
+  }
+
+  if (predecessorTaskIds.length > 0) {
+    input.predecessorTaskIds = predecessorTaskIds;
   }
 
   await createProjectTask(householdId, projectId, input);
@@ -2077,11 +2182,15 @@ export async function updateProjectTaskAction(formData: FormData): Promise<void>
     title: getRequiredString(formData, "title"),
     status: getRequiredString(formData, "status") as ProjectTaskStatus,
     description: getNullableString(formData, "description"),
+    phaseId: getNullableString(formData, "phaseId"),
     assignedToId: getNullableString(formData, "assignedToId"),
     dueDate: toNullableIsoString(getNullableString(formData, "dueDate")),
     estimatedCost: getNullableNumber(formData, "estimatedCost"),
     actualCost: getNullableNumber(formData, "actualCost"),
+    estimatedHours: getNullableNumber(formData, "estimatedHours"),
+    actualHours: getNullableNumber(formData, "actualHours"),
     sortOrder: getNullableNumber(formData, "sortOrder"),
+    predecessorTaskIds: getRepeatedStrings(formData, "predecessorTaskIds"),
     completedAt: null
   };
 

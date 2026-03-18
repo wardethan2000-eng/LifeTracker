@@ -88,6 +88,8 @@ const projectPhaseDetailInclude = {
   tasks: {
     include: {
       assignedTo: { select: { id: true, displayName: true } },
+      predecessorLinks: { select: { predecessorTaskId: true } },
+      successorLinks: { select: { successorTaskId: true } },
       checklistItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
@@ -121,7 +123,17 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phases = await app.prisma.projectPhase.findMany({
       where: { projectId: project.id },
       include: {
-        tasks: { select: { status: true } },
+        tasks: {
+          select: {
+            id: true,
+            status: true,
+            taskType: true,
+            isCompleted: true,
+            estimatedHours: true,
+            actualHours: true,
+            predecessorLinks: { select: { predecessorTaskId: true } }
+          }
+        },
         checklistItems: { select: { isCompleted: true } },
         supplies: { select: { isProcured: true } },
         expenses: { select: { amount: true } }
@@ -164,7 +176,17 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         notes: input.notes ?? null
       },
       include: {
-        tasks: { select: { status: true } },
+        tasks: {
+          select: {
+            id: true,
+            status: true,
+            taskType: true,
+            isCompleted: true,
+            estimatedHours: true,
+            actualHours: true,
+            predecessorLinks: { select: { predecessorTaskId: true } }
+          }
+        },
         checklistItems: { select: { isCompleted: true } },
         supplies: { select: { isProcured: true } },
         expenses: { select: { amount: true } }
@@ -272,7 +294,17 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       where: { id: phase.id },
       data,
       include: {
-        tasks: { select: { status: true } },
+        tasks: {
+          select: {
+            id: true,
+            status: true,
+            taskType: true,
+            isCompleted: true,
+            estimatedHours: true,
+            actualHours: true,
+            predecessorLinks: { select: { predecessorTaskId: true } }
+          }
+        },
         checklistItems: { select: { isCompleted: true } },
         supplies: { select: { isProcured: true } },
         expenses: { select: { amount: true } }

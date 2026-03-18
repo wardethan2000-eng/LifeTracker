@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { createProjectAction } from "../../../actions";
+import { createProjectAction, createProjectFromTemplateAction } from "../../../actions";
 import { ProjectCoreFormFields } from "../../../../components/project-core-form-fields";
-import { ApiError, getMe, getProjectDetail } from "../../../../lib/api";
+import { ApiError, getMe, getProjectDetail, getProjectTemplates } from "../../../../lib/api";
 
 type NewProjectPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -31,6 +31,7 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
     const parentProject = parentProjectId
       ? await getProjectDetail(household.id, parentProjectId).catch(() => null)
       : null;
+    const projectTemplates = await getProjectTemplates(household.id).catch(() => []);
 
     return (
       <>
@@ -49,6 +50,43 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
             <div className="note" style={{ marginBottom: 16 }}>
               Creating a sub-project under <Link href={`/projects/${parentProjectId}?householdId=${household.id}`} className="text-link"><strong>{parentProject.name}</strong></Link>
             </div>
+          )}
+          {projectTemplates.length > 0 && (
+            <section className="panel" style={{ marginBottom: 24 }}>
+              <div className="panel__header">
+                <h2>Start From Saved Template</h2>
+              </div>
+              <div className="panel__body--padded" style={{ display: "grid", gap: 16 }}>
+                <form action={createProjectFromTemplateAction} className="workbench-grid">
+                  <input type="hidden" name="householdId" value={household.id} />
+                  {parentProjectId ? <input type="hidden" name="parentProjectId" value={parentProjectId} /> : null}
+                  <label className="field">
+                    <span>Template</span>
+                    <select name="templateId" defaultValue="" required>
+                      <option value="" disabled>Select a saved template</option>
+                      {projectTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>{template.name} · {template.phaseCount} phases · {template.taskCount} tasks</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Project Name</span>
+                    <input name="name" placeholder="Winterize 2026" required />
+                  </label>
+                  <label className="field">
+                    <span>Start Date</span>
+                    <input name="startDate" type="date" />
+                  </label>
+                  <label className="field">
+                    <span>Target End Date</span>
+                    <input name="targetEndDate" type="date" />
+                  </label>
+                  <div className="inline-actions" style={{ marginTop: 8 }}>
+                    <button type="submit" className="button button--ghost">Create From Template</button>
+                  </div>
+                </form>
+              </div>
+            </section>
           )}
           <form action={createProjectAction} className="workbench-form">
             <ProjectCoreFormFields householdId={household.id} />

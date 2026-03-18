@@ -67,6 +67,14 @@ export function ProjectPhaseCard({ phase }: ProjectPhaseCardProps) {
           <dd>{phase.procuredSupplyCount} of {phase.supplyCount} procured</dd>
         </div>
         <div>
+          <dt>Labor</dt>
+          <dd>{phase.totalActualHours.toFixed(1)}h / {phase.totalEstimatedHours.toFixed(1)}h</dd>
+        </div>
+        <div>
+          <dt>Blockers</dt>
+          <dd>{phase.blockedTaskCount} blocked · {phase.criticalTaskCount} critical</dd>
+        </div>
+        <div>
           <dt>Target</dt>
           <dd>{formatDate(phase.targetEndDate, "No target")}</dd>
         </div>

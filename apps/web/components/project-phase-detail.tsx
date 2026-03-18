@@ -51,6 +51,7 @@ type ProjectPhaseDetailProps = {
   householdId: string;
   projectId: string;
   phase: ProjectPhaseDetail;
+  allTasks: ProjectTask[];
   householdMembers: HouseholdMember[];
   serviceProviders: ServiceProvider[];
   budgetCategories: ProjectBudgetCategorySummary[];
@@ -63,12 +64,14 @@ export function ProjectPhaseDetail({
   householdId,
   projectId,
   phase,
+  allTasks,
   householdMembers,
   serviceProviders,
   budgetCategories,
   inventoryItems
 }: ProjectPhaseDetailProps) {
   const inventoryLookup = new Map(inventoryItems.map((item) => [item.id, item]));
+  const dependencyCandidates = allTasks.filter((task) => task.taskType !== "quick");
 
   return (
     <div className="schedule-stack" style={{ marginTop: 16 }}>
@@ -175,6 +178,8 @@ export function ProjectPhaseDetail({
           <div className="panel__header">
             <h2>Phase Tasks ({phase.tasks.length})</h2>
             <div className="panel__header-actions">
+              {phase.blockedTaskCount > 0 ? <span className="pill pill--warning">{phase.blockedTaskCount} blocked</span> : null}
+              {phase.criticalTaskCount > 0 ? <span className="pill pill--accent">{phase.criticalTaskCount} on critical path</span> : null}
               <SectionFilterToggle />
             </div>
           </div>
@@ -194,6 +199,7 @@ export function ProjectPhaseDetail({
                         phaseId={phase.id}
                         task={task}
                         householdMembers={householdMembers}
+                        dependencyCandidates={dependencyCandidates}
                       />
                     ))}
                   </div>
@@ -239,6 +245,18 @@ export function ProjectPhaseDetail({
                   <label className="field">
                     <span>Estimated Cost</span>
                     <input name="estimatedCost" type="number" min="0" step="0.01" />
+                  </label>
+                  <label className="field">
+                    <span>Estimated Hours</span>
+                    <input name="estimatedHours" type="number" min="0" step="0.25" />
+                  </label>
+                  <label className="field field--full">
+                    <span>Depends On</span>
+                    <select name="predecessorTaskIds" multiple size={Math.min(Math.max(dependencyCandidates.length, 2), 6)}>
+                      {dependencyCandidates.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>{candidate.title}</option>
+                      ))}
+                    </select>
                   </label>
                 </div>
                 <div className="inline-actions" style={{ marginTop: 16 }}>
@@ -387,14 +405,18 @@ function TaskCard({
   projectId,
   phaseId,
   task,
-  householdMembers
+  householdMembers,
+  dependencyCandidates
 }: {
   householdId: string;
   projectId: string;
   phaseId: string;
   task: ProjectTask;
   householdMembers: HouseholdMember[];
+  dependencyCandidates: ProjectTask[];
 }) {
+  const availableDependencyCandidates = dependencyCandidates.filter((candidate) => candidate.id !== task.id);
+
   return (
     <div className="schedule-card">
       <form action={updateProjectTaskAction}>
@@ -402,6 +424,13 @@ function TaskCard({
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="taskId" value={task.id} />
         <input type="hidden" name="phaseId" value={phaseId} />
+        <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {task.isBlocked ? <span className="pill pill--warning">Blocked</span> : null}
+            {task.isCriticalPath ? <span className="pill pill--accent">Critical path</span> : null}
+            {task.blockingTaskIds.length > 0 ? <span className="pill pill--muted">{task.blockingTaskIds.length} blockers</span> : null}
+          </div>
+        </div>
         <div className="form-grid">
           <label className="field field--full">
             <span>Task Title</span>
@@ -433,6 +462,14 @@ function TaskCard({
             <input name="dueDate" type="date" defaultValue={toDateInputValue(task.dueDate)} />
           </label>
           <label className="field">
+            <span>Estimated Hours</span>
+            <input name="estimatedHours" type="number" min="0" step="0.25" defaultValue={task.estimatedHours ?? ""} />
+          </label>
+          <label className="field">
+            <span>Actual Hours</span>
+            <input name="actualHours" type="number" min="0" step="0.25" defaultValue={task.actualHours ?? ""} />
+          </label>
+          <label className="field">
             <span>Sort Order</span>
             <input name="sortOrder" type="number" step="1" defaultValue={task.sortOrder ?? ""} />
           </label>
@@ -443,6 +480,19 @@ function TaskCard({
           <label className="field">
             <span>Actual Cost</span>
             <input name="actualCost" type="number" min="0" step="0.01" defaultValue={task.actualCost ?? ""} />
+          </label>
+          <label className="field field--full">
+            <span>Depends On</span>
+            <select
+              name="predecessorTaskIds"
+              multiple
+              size={Math.min(Math.max(availableDependencyCandidates.length, 2), 6)}
+              defaultValue={task.predecessorTaskIds}
+            >
+              {availableDependencyCandidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>{candidate.title}</option>
+              ))}
+            </select>
           </label>
         </div>
         <div className="inline-actions" style={{ marginTop: 16 }}>

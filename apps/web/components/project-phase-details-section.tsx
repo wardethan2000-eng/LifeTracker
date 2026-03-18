@@ -156,6 +156,7 @@ export async function ProjectPhaseDetailsSection({
         focusedPhaseId={focusedPhaseId}
         phases={project.phases}
         phaseDetails={phaseDetails}
+        allTasks={project.tasks.filter((task) => task.taskType !== "quick")}
         householdMembers={householdMembers}
         serviceProviders={serviceProviders}
         budgetCategories={project.budgetCategories}

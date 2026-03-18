@@ -1828,6 +1828,17 @@ export const projectTaskStatusSchema = z.enum(projectTaskStatusValues);
 export const projectPhaseStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
 export const projectPhaseStatusSchema = z.enum(projectPhaseStatusValues);
 
+export const projectTaskDependencySchema = z.object({
+  predecessorTaskId: z.string().cuid(),
+  successorTaskId: z.string().cuid(),
+  createdAt: z.string().datetime()
+});
+
+export const projectCriticalPathSchema = z.object({
+  taskIds: z.array(z.string().cuid()),
+  totalEstimatedHours: z.number().min(0)
+});
+
 export const projectSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
@@ -2105,8 +2116,15 @@ export const projectTaskSchema = z.object({
   completedAt: z.string().datetime().nullable(),
   estimatedCost: z.number().nullable(),
   actualCost: z.number().nullable(),
+  estimatedHours: z.number().nullable(),
+  actualHours: z.number().nullable(),
   sortOrder: z.number().int().nullable(),
   scheduleId: z.string().cuid().nullable(),
+  predecessorTaskIds: z.array(z.string().cuid()).default([]),
+  successorTaskIds: z.array(z.string().cuid()).default([]),
+  blockingTaskIds: z.array(z.string().cuid()).default([]),
+  isBlocked: z.boolean().default(false),
+  isCriticalPath: z.boolean().default(false),
   checklistItems: z.array(projectTaskChecklistItemSchema).default([]),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
@@ -2123,8 +2141,11 @@ export const createProjectTaskSchema = z.object({
   dueDate: z.string().datetime().optional(),
   estimatedCost: z.number().min(0).optional(),
   actualCost: z.number().min(0).optional(),
+  estimatedHours: z.number().min(0).optional(),
+  actualHours: z.number().min(0).optional(),
   sortOrder: z.number().int().optional(),
-  scheduleId: z.string().cuid().optional()
+  scheduleId: z.string().cuid().optional(),
+  predecessorTaskIds: z.array(z.string().cuid()).max(50).optional()
 });
 
 export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend({
@@ -2136,8 +2157,11 @@ export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend(
   dueDate: z.string().datetime().nullable().optional(),
   estimatedCost: z.number().min(0).nullable().optional(),
   actualCost: z.number().min(0).nullable().optional(),
+  estimatedHours: z.number().min(0).nullable().optional(),
+  actualHours: z.number().min(0).nullable().optional(),
   sortOrder: z.number().int().nullable().optional(),
   scheduleId: z.string().cuid().nullable().optional(),
+  predecessorTaskIds: z.array(z.string().cuid()).max(50).optional(),
   completedAt: z.string().datetime().nullable().optional()
 });
 
@@ -2151,7 +2175,8 @@ export const promoteTaskSchema = z.object({
   status: projectTaskStatusSchema.optional(),
   assignedToId: z.string().cuid().optional(),
   dueDate: z.string().datetime().optional(),
-  estimatedCost: z.number().min(0).optional()
+  estimatedCost: z.number().min(0).optional(),
+  estimatedHours: z.number().min(0).optional()
 });
 
 export const projectExpenseSchema = z.object({
@@ -2199,7 +2224,12 @@ export const projectPhaseSummarySchema = projectPhaseSchema.extend({
   completedChecklistItemCount: z.number().int(),
   supplyCount: z.number().int(),
   procuredSupplyCount: z.number().int(),
-  expenseTotal: z.number()
+  expenseTotal: z.number(),
+  totalEstimatedHours: z.number().min(0),
+  totalActualHours: z.number().min(0),
+  remainingEstimatedHours: z.number().min(0),
+  blockedTaskCount: z.number().int().min(0),
+  criticalTaskCount: z.number().int().min(0)
 });
 
 export const projectPhaseProgressSchema = z.object({
@@ -2218,7 +2248,8 @@ export const projectPhaseDetailSchema = projectPhaseSummarySchema.extend({
   tasks: z.array(projectTaskSchema),
   checklistItems: z.array(projectPhaseChecklistItemSchema),
   supplies: z.array(projectPhaseSupplySchema),
-  expenses: z.array(projectExpenseSchema)
+  expenses: z.array(projectExpenseSchema),
+  criticalPath: projectCriticalPathSchema
 });
 
 export const projectInventoryRollupSchema = z.object({
@@ -2238,7 +2269,12 @@ export const projectSummarySchema = projectSchema.extend({
   phaseCount: z.number().int(),
   completedPhaseCount: z.number().int(),
   percentComplete: z.number(),
-  phaseProgress: z.array(projectPhaseProgressSchema).default([])
+  phaseProgress: z.array(projectPhaseProgressSchema).default([]),
+  totalEstimatedHours: z.number().min(0),
+  totalActualHours: z.number().min(0),
+  remainingEstimatedHours: z.number().min(0),
+  blockedTaskCount: z.number().int().min(0),
+  criticalTaskCount: z.number().int().min(0)
 });
 
 export const projectSummaryPageSchema = createOffsetPageSchema(projectSummarySchema);
@@ -2260,7 +2296,8 @@ export const projectDetailSchema = projectSchema.extend({
   budgetCategories: z.array(projectBudgetCategorySummarySchema),
   breadcrumbs: z.array(projectBreadcrumbSchema).default([]),
   childProjects: z.array(projectChildSummarySchema).default([]),
-  treeStats: projectTreeStatsSchema.nullable().default(null)
+  treeStats: projectTreeStatsSchema.nullable().default(null),
+  criticalPath: projectCriticalPathSchema
 });
 
 export const projectPhaseListSchema = z.array(projectPhaseSummarySchema);
@@ -2272,6 +2309,38 @@ export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 export const projectInventoryRollupListSchema = z.array(projectInventoryRollupSchema);
 export const projectPortfolioListSchema = z.array(projectPortfolioItemSchema);
 export const projectStatusCountListSchema = z.array(projectStatusCountSchema);
+
+export const projectTemplateSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  sourceProjectId: z.string().cuid().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  notes: z.string().nullable(),
+  phaseCount: z.number().int().min(0),
+  taskCount: z.number().int().min(0),
+  assetCount: z.number().int().min(0),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const projectTemplateListSchema = z.array(projectTemplateSchema);
+
+export const createProjectTemplateSchema = z.object({
+  sourceProjectId: z.string().cuid(),
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  notes: z.string().max(5000).optional()
+});
+
+export const instantiateProjectTemplateSchema = z.object({
+  name: z.string().min(1).max(200),
+  startDate: z.string().datetime().optional(),
+  targetEndDate: z.string().datetime().optional(),
+  parentProjectId: z.string().cuid().optional()
+});
+
+export const cloneProjectSchema = instantiateProjectTemplateSchema;
 
 export const projectShoppingListItemSchema = z.object({
   id: z.string().cuid(),
@@ -2434,76 +2503,7 @@ export const updateCommentSchema = z.object({
   body: z.string().min(1).max(5000)
 });
 
-export const webhookEndpointSchema = z.object({
-  id: z.string().cuid(),
-  householdId: z.string().cuid(),
-  label: z.string(),
-  url: z.string().url(),
-  secret: z.string().nullable().default(null),
-  subscribedEventTypes: z.array(z.string()).default([]),
-  isActive: z.boolean(),
-  deletedAt: z.string().datetime().nullable().default(null),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
-});
-
-export const createWebhookEndpointSchema = z.object({
-  label: z.string().min(1).max(120),
-  url: z.string().url().max(2000),
-  secret: z.string().max(200).optional(),
-  subscribedEventTypes: z.array(z.string().min(1).max(160)).default(["*"]),
-  isActive: z.boolean().default(true)
-});
-
-export const updateWebhookEndpointSchema = createWebhookEndpointSchema.partial();
-
-export const domainEventSchema = z.object({
-  id: z.string().cuid(),
-  householdId: z.string().cuid(),
-  eventType: z.string(),
-  entityType: z.string(),
-  entityId: z.string(),
-  payload: z.record(z.string(), z.unknown()),
-  createdAt: z.string().datetime()
-});
-
-export const webhookDeliverySchema = z.object({
-  id: z.string().cuid(),
-  webhookEndpointId: z.string().cuid(),
-  domainEventId: z.string().cuid(),
-  status: webhookDeliveryStatusSchema,
-  responseStatus: z.number().int().nullable().default(null),
-  responseBody: z.string().nullable().default(null),
-  attemptedAt: z.string().datetime().nullable().default(null),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
-});
-
-// ── Asset Timeline Schemas ────────────────────────────────────────────
-
-export const assetTimelineEntrySchema = z.object({
-  id: z.string().cuid(),
-  assetId: z.string().cuid(),
-  createdById: z.string().cuid(),
-  title: z.string(),
-  description: z.string().nullable(),
-  entryDate: z.string().datetime(),
-  category: z.string(),
-  cost: z.number().nullable(),
-  vendor: z.string().nullable(),
-  tags: z.array(z.string()).default([]),
-  metadata: z.unknown(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
-});
-
-export const createAssetTimelineEntrySchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().max(5000).optional(),
-  entryDate: z.string().datetime(),
-  category: z.string().max(100).optional(),
-  cost: z.number().min(0).optional(),
-// -- Entry Schemas ---------------------------------------------------
+// ── Entry Schemas ───────────────────────────────────────────────────
 
 const normalizedEntryStringSchema = z.string().trim().min(1);
 const optionalEntryTitleSchema = z.string().trim().max(500);
@@ -2690,6 +2690,76 @@ export const entrySurfaceQuerySchema = z.object({
   entityType: entryEntityTypeSchema,
   entityId: z.string().trim().min(1).max(191)
 });
+
+export const webhookEndpointSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  label: z.string(),
+  url: z.string().url(),
+  secret: z.string().nullable().default(null),
+  subscribedEventTypes: z.array(z.string()).default([]),
+  isActive: z.boolean(),
+  deletedAt: z.string().datetime().nullable().default(null),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createWebhookEndpointSchema = z.object({
+  label: z.string().min(1).max(120),
+  url: z.string().url().max(2000),
+  secret: z.string().max(200).optional(),
+  subscribedEventTypes: z.array(z.string().min(1).max(160)).default(["*"]),
+  isActive: z.boolean().default(true)
+});
+
+export const updateWebhookEndpointSchema = createWebhookEndpointSchema.partial();
+
+export const domainEventSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  eventType: z.string(),
+  entityType: z.string(),
+  entityId: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.string().datetime()
+});
+
+export const webhookDeliverySchema = z.object({
+  id: z.string().cuid(),
+  webhookEndpointId: z.string().cuid(),
+  domainEventId: z.string().cuid(),
+  status: webhookDeliveryStatusSchema,
+  responseStatus: z.number().int().nullable().default(null),
+  responseBody: z.string().nullable().default(null),
+  attemptedAt: z.string().datetime().nullable().default(null),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+// ── Asset Timeline Schemas ────────────────────────────────────────────
+
+export const assetTimelineEntrySchema = z.object({
+  id: z.string().cuid(),
+  assetId: z.string().cuid(),
+  createdById: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  entryDate: z.string().datetime(),
+  category: z.string(),
+  cost: z.number().nullable(),
+  vendor: z.string().nullable(),
+  tags: z.array(z.string()).default([]),
+  metadata: z.unknown(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createAssetTimelineEntrySchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+  entryDate: z.string().datetime(),
+  category: z.string().max(100).optional(),
+  cost: z.number().min(0).optional(),
   vendor: z.string().max(500).optional(),
   tags: z.array(z.string().max(100)).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional()
@@ -2753,6 +2823,7 @@ export const searchEntityTypeValues = [
   "service_provider",
   "inventory_item",
   "comment",
+  "entry",
   "invitation",
   "hobby"
 ] as const;
@@ -2823,7 +2894,6 @@ export const searchQuerySchema = z.object({
     return parsed;
   })
 });
-  "entry",
 
 export const searchResponseSchema = z.object({
   query: z.string(),
@@ -3073,6 +3143,8 @@ export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 export type ProjectStatusCount = z.infer<typeof projectStatusCountSchema>;
 export type ProjectTaskStatus = z.infer<typeof projectTaskStatusSchema>;
 export type ProjectPhaseStatus = z.infer<typeof projectPhaseStatusSchema>;
+export type ProjectTaskDependency = z.infer<typeof projectTaskDependencySchema>;
+export type ProjectCriticalPath = z.infer<typeof projectCriticalPathSchema>;
 export type NoteCategory = z.infer<typeof noteCategorySchema>;
 export type ProjectNote = z.infer<typeof projectNoteSchema>;
 export type CreateProjectNoteInput = z.infer<typeof createProjectNoteSchema>;
@@ -3080,6 +3152,11 @@ export type UpdateProjectNoteInput = z.infer<typeof updateProjectNoteSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type ProjectTemplate = z.infer<typeof projectTemplateSchema>;
+export type ProjectTemplateList = z.infer<typeof projectTemplateListSchema>;
+export type CreateProjectTemplateInput = z.infer<typeof createProjectTemplateSchema>;
+export type InstantiateProjectTemplateInput = z.infer<typeof instantiateProjectTemplateSchema>;
+export type CloneProjectInput = z.infer<typeof cloneProjectSchema>;
 export type ProjectChildSummary = z.infer<typeof projectChildSummarySchema>;
 export type ProjectBreadcrumb = z.infer<typeof projectBreadcrumbSchema>;
 export type ProjectTreeStats = z.infer<typeof projectTreeStatsSchema>;
@@ -3133,6 +3210,19 @@ export type ThreadedCommentPage = z.infer<typeof threadedCommentPageSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type UpdateCommentInput = z.infer<typeof updateCommentSchema>;
 export type CommentEntityType = z.infer<typeof commentEntityTypeSchema>;
+export type EntryEntityType = z.infer<typeof entryEntityTypeSchema>;
+export type EntryType = z.infer<typeof entryTypeSchema>;
+export type EntryFlag = z.infer<typeof entryFlagSchema>;
+export type EntrySortBy = z.infer<typeof entrySortBySchema>;
+export type EntryMeasurement = z.infer<typeof entryMeasurementSchema>;
+export type EntryResolvedEntity = z.infer<typeof entryResolvedEntitySchema>;
+export type Entry = z.infer<typeof entrySchema>;
+export type EntryListResponse = z.infer<typeof entryListResponseSchema>;
+export type ActionableEntryGroup = z.infer<typeof actionableEntryGroupSchema>;
+export type CreateEntryInput = z.infer<typeof createEntrySchema>;
+export type UpdateEntryInput = z.infer<typeof updateEntrySchema>;
+export type EntryListQuery = z.infer<typeof entryListQuerySchema>;
+export type EntrySurfaceQuery = z.infer<typeof entrySurfaceQuerySchema>;
 export type AssetTimelineEntry = z.infer<typeof assetTimelineEntrySchema>;
 export type CreateAssetTimelineEntryInput = z.infer<typeof createAssetTimelineEntrySchema>;
 export type UpdateAssetTimelineEntryInput = z.infer<typeof updateAssetTimelineEntrySchema>;
@@ -3210,19 +3300,6 @@ export type BarcodeLookupResult = z.infer<typeof barcodeLookupResultSchema>;
 
 // ── Attachment Schemas ───────────────────────────────────────────────
 
-export type EntryEntityType = z.infer<typeof entryEntityTypeSchema>;
-export type EntryType = z.infer<typeof entryTypeSchema>;
-export type EntryFlag = z.infer<typeof entryFlagSchema>;
-export type EntrySortBy = z.infer<typeof entrySortBySchema>;
-export type EntryMeasurement = z.infer<typeof entryMeasurementSchema>;
-export type EntryResolvedEntity = z.infer<typeof entryResolvedEntitySchema>;
-export type Entry = z.infer<typeof entrySchema>;
-export type EntryListResponse = z.infer<typeof entryListResponseSchema>;
-export type ActionableEntryGroup = z.infer<typeof actionableEntryGroupSchema>;
-export type CreateEntryInput = z.infer<typeof createEntrySchema>;
-export type UpdateEntryInput = z.infer<typeof updateEntrySchema>;
-export type EntryListQuery = z.infer<typeof entryListQuerySchema>;
-export type EntrySurfaceQuery = z.infer<typeof entrySurfaceQuerySchema>;
 export const attachmentEntityTypeValues = [
   "maintenance_log",
   "asset",

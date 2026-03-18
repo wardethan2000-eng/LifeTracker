@@ -15,6 +15,7 @@ import {
   createProjectExpenseAction,
   createProjectTaskAction,
   createQuickTodoAction,
+  cloneProjectAction,
   deleteProjectAction,
   deleteProjectExpenseAction,
   deleteProjectNoteAction,
@@ -23,6 +24,7 @@ import {
   removeProjectAssetAction,
   toggleProjectNotePinAction,
   toggleQuickTodoAction,
+  saveProjectAsTemplateAction,
   updateProjectAction,
   updateProjectAssetAction,
   updateProjectExpenseAction,
@@ -212,6 +214,13 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const completedQuickTodoCount = quickTodos.filter((task) => task.isCompleted).length;
     const fullTasks = project.tasks.filter((task) => task.taskType !== "quick");
+    const totalEstimatedHours = fullTasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+    const totalActualHours = fullTasks.reduce((sum, task) => sum + (task.actualHours ?? 0), 0);
+    const remainingEstimatedHours = fullTasks
+      .filter((task) => task.status !== "completed" && task.status !== "skipped")
+      .reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+    const blockedTasks = fullTasks.filter((task) => task.isBlocked);
+    const criticalPathTasks = fullTasks.filter((task) => task.isCriticalPath);
     const unphasedTasks = fullTasks.filter((task) => task.phaseId === null);
     const completedFullTaskCount = fullTasks.filter((task) => task.status === "completed").length;
     const completedTaskCount = completedQuickTodoCount + completedFullTaskCount;
@@ -271,6 +280,17 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               <span>Budget: {formatCurrency(project.treeStats.treeBudgetTotal, "No budget")}</span>
               <span>Spent: {formatCurrency(project.treeStats.treeSpentTotal, "$0.00")}</span>
               <span>Tasks: {project.treeStats.treeCompletedTaskCount}/{project.treeStats.treeTaskCount} ({project.treeStats.treePercentComplete}%)</span>
+            </div>
+          )}
+
+          {(blockedTasks.length > 0 || criticalPathTasks.length > 0 || totalEstimatedHours > 0 || totalActualHours > 0) && (
+            <div className="note" style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", marginBottom: "12px" }}>
+              <span><strong>Execution signals:</strong></span>
+              <span>Estimated labor: {totalEstimatedHours.toFixed(1)}h</span>
+              <span>Actual labor: {totalActualHours.toFixed(1)}h</span>
+              <span>Labor left: {remainingEstimatedHours.toFixed(1)}h</span>
+              {blockedTasks.length > 0 ? <span>{blockedTasks.length} blocked task{blockedTasks.length === 1 ? "" : "s"}</span> : null}
+              {criticalPathTasks.length > 0 ? <span>{criticalPathTasks.length} critical-path task{criticalPathTasks.length === 1 ? "" : "s"}</span> : null}
             </div>
           )}
 
@@ -369,6 +389,47 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       <button type="submit" className="button">Save Project</button>
                     </div>
                   </form>
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)", display: "grid", gap: 16 }}>
+                    <form action={saveProjectAsTemplateAction} className="workbench-grid">
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <label className="field">
+                        <span>Save as Template</span>
+                        <input name="templateName" defaultValue={`${project.name} Template`} required />
+                      </label>
+                      <label className="field field--full">
+                        <span>Template Description</span>
+                        <input name="templateDescription" defaultValue={project.description ?? ""} />
+                      </label>
+                      <label className="field field--full">
+                        <span>Template Notes</span>
+                        <textarea name="templateNotes" rows={2} defaultValue={project.notes ?? ""} />
+                      </label>
+                      <div className="inline-actions" style={{ marginTop: 8 }}>
+                        <button type="submit" className="button button--ghost">Save Template</button>
+                      </div>
+                    </form>
+
+                    <form action={cloneProjectAction} className="workbench-grid">
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <label className="field">
+                        <span>Clone Project</span>
+                        <input name="name" defaultValue={`${project.name} Copy`} required />
+                      </label>
+                      <label className="field">
+                        <span>Clone Start Date</span>
+                        <input name="startDate" type="date" />
+                      </label>
+                      <label className="field">
+                        <span>Clone Target End</span>
+                        <input name="targetEndDate" type="date" />
+                      </label>
+                      <div className="inline-actions" style={{ marginTop: 8 }}>
+                        <button type="submit" className="button button--ghost">Create Clone</button>
+                      </div>
+                    </form>
+                  </div>
                   <div style={{ marginTop: 12 }}>
                     <ConfirmActionForm
                       action={deleteProjectAction}
@@ -518,6 +579,9 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   {project.targetEndDate ? <div><dt>Target end</dt><dd>{formatDate(project.targetEndDate, "—")}</dd></div> : null}
                   <div><dt>Budget</dt><dd>{project.budgetAmount ? formatCurrency(project.budgetAmount, "$0.00") : "Not set"}</dd></div>
                   <div><dt>Spent</dt><dd>{formatCurrency(totalSpent, "$0.00")}</dd></div>
+                  <div><dt>Labor</dt><dd>{totalActualHours.toFixed(1)}h actual / {totalEstimatedHours.toFixed(1)}h estimated</dd></div>
+                  <div><dt>Blocked tasks</dt><dd>{blockedTasks.length}</dd></div>
+                  <div><dt>Critical path</dt><dd>{criticalPathTasks.length} task{criticalPathTasks.length === 1 ? "" : "s"}</dd></div>
                 </dl>
               </Card>
 
@@ -690,6 +754,18 @@ async function ProjectTasksPanel({
                   ))}
                 </select>
               </label>
+              <label className="field">
+                <span>Estimated Hours</span>
+                <input name="estimatedHours" type="number" min="0" step="0.25" />
+              </label>
+              <label className="field field--full">
+                <span>Depends On</span>
+                <select name="predecessorTaskIds" multiple size={Math.min(Math.max(fullTasks.length, 2), 6)}>
+                  {fullTasks.map((task) => (
+                    <option key={task.id} value={task.id}>{task.title}</option>
+                  ))}
+                </select>
+              </label>
             </div>
             <div className="inline-actions" style={{ marginTop: 16 }}>
               <button type="submit" className="button">Add Task</button>
@@ -705,6 +781,7 @@ async function ProjectTasksPanel({
               projectId={project.id}
               task={task}
               householdMembers={householdMembers}
+              dependencyCandidates={fullTasks}
             />
           ))}
         </div>
@@ -1025,19 +1102,29 @@ function UnphasedTaskCard({
   householdId,
   projectId,
   task,
-  householdMembers
+  householdMembers,
+  dependencyCandidates
 }: {
   householdId: string;
   projectId: string;
   task: Awaited<ReturnType<typeof getProjectDetail>>["tasks"][number];
   householdMembers: Awaited<ReturnType<typeof getHouseholdMembers>>;
+  dependencyCandidates: Awaited<ReturnType<typeof getProjectDetail>>["tasks"];
 }) {
+  const availableDependencyCandidates = dependencyCandidates.filter((candidate) => candidate.id !== task.id);
+
   return (
     <div className="schedule-card">
       <form action={updateProjectTaskAction}>
         <input type="hidden" name="householdId" value={householdId} />
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="taskId" value={task.id} />
+        <div className="schedule-card__summary" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {task.isBlocked ? <span className="pill pill--warning">Blocked</span> : null}
+            {task.isCriticalPath ? <span className="pill pill--accent">Critical path</span> : null}
+          </div>
+        </div>
         <div className="form-grid">
           <label className="field field--full">
             <span>Task Title</span>
@@ -1069,8 +1156,29 @@ function UnphasedTaskCard({
             <input name="dueDate" type="date" defaultValue={toDateInputValue(task.dueDate)} />
           </label>
           <label className="field">
+            <span>Estimated Hours</span>
+            <input name="estimatedHours" type="number" min="0" step="0.25" defaultValue={task.estimatedHours ?? ""} />
+          </label>
+          <label className="field">
+            <span>Actual Hours</span>
+            <input name="actualHours" type="number" min="0" step="0.25" defaultValue={task.actualHours ?? ""} />
+          </label>
+          <label className="field">
             <span>Sort Order</span>
             <input name="sortOrder" type="number" step="1" defaultValue={task.sortOrder ?? ""} />
+          </label>
+          <label className="field field--full">
+            <span>Depends On</span>
+            <select
+              name="predecessorTaskIds"
+              multiple
+              size={Math.min(Math.max(availableDependencyCandidates.length, 2), 6)}
+              defaultValue={task.predecessorTaskIds}
+            >
+              {availableDependencyCandidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>{candidate.title}</option>
+              ))}
+            </select>
           </label>
         </div>
         <div className="inline-actions" style={{ marginTop: 16 }}>
