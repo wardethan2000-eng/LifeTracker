@@ -1,4 +1,4 @@
-import type { Prisma, Space, SpaceGeneralItem, SpaceInventoryItem } from "@prisma/client";
+import type { Prisma, Space, SpaceGeneralItem, SpaceInventoryItem, SpaceType } from "@prisma/client";
 import {
   spaceGeneralItemSchema,
   spaceInventoryLinkDetailSchema,
@@ -71,7 +71,7 @@ type SpaceRecord = Pick<
   children?: SpaceRecord[];
   spaceItems?: SpaceItemRecord[];
   generalItems?: SpaceGeneralItemRecord[];
-  breadcrumb?: Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }>;
+  breadcrumb?: Array<{ id: string; name: string; type: SpaceType }>;
   itemCount?: number;
   generalItemCount?: number;
   totalItemCount?: number;
@@ -120,7 +120,7 @@ const toSpaceItem = (item: SpaceItemRecord) => spaceInventoryLinkDetailSchema.pa
 export const serializeSpace = (
   space: SpaceRecord,
   options: {
-    breadcrumb?: Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }>;
+    breadcrumb?: Array<{ id: string; name: string; type: SpaceType }>;
   } = {}
 ): SpaceResponse => {
   const breadcrumb = options.breadcrumb ?? space.breadcrumb ?? [{ id: space.id, name: space.name, type: space.type }];
@@ -128,7 +128,7 @@ export const serializeSpace = (
   const generalItemCount = space.generalItemCount ?? space.generalItems?.filter((item) => item.deletedAt === null).length ?? 0;
   const totalItemCount = space.totalItemCount ?? itemCount + generalItemCount;
 
-  return spaceResponseSchema.parse({
+  const payload: Record<string, unknown> = {
     id: space.id,
     householdId: space.householdId,
     shortCode: space.shortCode,
@@ -142,26 +142,44 @@ export const serializeSpace = (
     createdAt: space.createdAt.toISOString(),
     updatedAt: space.updatedAt.toISOString(),
     deletedAt: space.deletedAt?.toISOString() ?? null,
-    parent: space.parent ? toSpaceReference(space.parent) : undefined,
-    children: space.children?.map((child) => serializeSpace(child, {
-      breadcrumb: [...breadcrumb, { id: child.id, name: child.name, type: child.type }]
-    })),
     breadcrumb,
-    spaceItems: space.spaceItems?.map(toSpaceItem),
-    generalItems: space.generalItems
-      ?.filter((item) => item.deletedAt === null)
-      .map(toSpaceGeneralItem),
     itemCount,
     generalItemCount,
     totalItemCount
-  });
+  };
+
+  if (space.parent) {
+    payload.parent = toSpaceReference(space.parent);
+  }
+
+  if (space.children) {
+    payload.children = space.children.map((child) => serializeSpace(child, {
+      breadcrumb: [...breadcrumb, { id: child.id, name: child.name, type: child.type }]
+    }));
+  }
+
+  if (space.spaceItems) {
+    payload.spaceItems = space.spaceItems.map(toSpaceItem);
+  }
+
+  if (space.generalItems) {
+    payload.generalItems = space.generalItems
+      .filter((item) => item.deletedAt === null)
+      .map(toSpaceGeneralItem);
+  }
+
+  return spaceResponseSchema.parse(payload);
 };
 
 export const serializeSpaceList = (
   spaces: SpaceRecord[],
   options: {
-    breadcrumbsById?: Record<string, Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }>>;
+    breadcrumbsById?: Record<string, Array<{ id: string; name: string; type: SpaceType }> | undefined>;
   } = {}
-): SpaceResponse[] => spaces.map((space) => serializeSpace(space, {
-  breadcrumb: options.breadcrumbsById?.[space.id] ?? space.breadcrumb
-}));
+): SpaceResponse[] => spaces.map((space) => {
+  const breadcrumb = options.breadcrumbsById?.[space.id] ?? space.breadcrumb;
+
+  return breadcrumb
+    ? serializeSpace(space, { breadcrumb })
+    : serializeSpace(space);
+});

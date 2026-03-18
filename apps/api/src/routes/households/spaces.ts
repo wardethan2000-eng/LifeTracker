@@ -11,15 +11,19 @@ import {
   updateSpaceInputSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
+import QRCode from "qrcode";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { createBatchLabelPdf, createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
 import {
   serializeSpace,
   serializeSpaceList,
   toInventoryItemSummaryResponse
 } from "../../lib/serializers/index.js";
 import {
+  buildSpaceScanUrl,
+  ensureSpaceScanTag,
   generateShortCode,
   generateSpaceScanTag,
   getSpaceBreadcrumb,
@@ -49,6 +53,15 @@ const spaceListQuerySchema = z.object({
   includeDeleted: z.coerce.boolean().default(false),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   cursor: z.string().cuid().optional()
+});
+
+const qrCodeQuerySchema = z.object({
+  format: z.enum(["png", "svg"]).default("svg"),
+  size: z.coerce.number().int().min(100).max(1000).default(300)
+});
+
+const batchLabelBodySchema = z.object({
+  spaceIds: z.array(z.string().cuid()).min(1).max(240)
 });
 
 const spaceContentsSchema = z.object({
@@ -183,7 +196,7 @@ const assertParentCandidate = async (
 
     visited.add(currentSpaceId);
 
-    const currentSpace = await prisma.space.findFirst({
+    const currentSpace: { id: string; parentSpaceId: string | null } | null = await prisma.space.findFirst({
       where: {
         id: currentSpaceId,
         householdId,
@@ -303,7 +316,14 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       householdId: params.householdId,
       ...(query.includeDeleted ? {} : { deletedAt: null }),
       ...(query.type ? { type: query.type } : {}),
-      ...(query.search ? { name: { contains: query.search, mode: "insensitive" } } : {})
+      ...(query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: "insensitive" } },
+              { shortCode: { contains: query.search.toUpperCase(), mode: "insensitive" } }
+            ]
+          }
+        : {})
     };
 
     if (query.parentSpaceId !== undefined) {
@@ -334,10 +354,19 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const page = spaces.slice(0, query.limit);
     const nextCursor = spaces.length > query.limit ? spaces[query.limit]?.id ?? null : null;
     const breadcrumbs = await Promise.all(page.map((space) => getSpaceBreadcrumb(app.prisma, space.id)));
+    const breadcrumbsById = page.reduce<Record<string, Awaited<ReturnType<typeof getSpaceBreadcrumb>>>>((accumulator, space, index) => {
+      const breadcrumb = breadcrumbs[index];
+
+      if (breadcrumb) {
+        accumulator[space.id] = breadcrumb;
+      }
+
+      return accumulator;
+    }, {});
 
     return {
       items: serializeSpaceList(page, {
-        breadcrumbsById: Object.fromEntries(page.map((space, index) => [space.id, breadcrumbs[index]]))
+        breadcrumbsById
       }),
       nextCursor
     };
@@ -352,6 +381,126 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
 
     const tree = await getSpaceTree(app.prisma, params.householdId);
     return serializeSpaceList(tree);
+  });
+
+  app.post("/v1/households/:householdId/spaces/labels/batch", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const input = batchLabelBodySchema.parse(request.body);
+
+    if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const spaces = await app.prisma.space.findMany({
+      where: {
+        householdId: params.householdId,
+        id: { in: input.spaceIds },
+        deletedAt: null
+      },
+      orderBy: [
+        { sortOrder: "asc" },
+        { name: "asc" }
+      ]
+    });
+
+    if (spaces.length !== input.spaceIds.length) {
+      return reply.code(404).send({ message: "One or more spaces were not found." });
+    }
+
+    const breadcrumbs = await Promise.all(spaces.map((space) => getSpaceBreadcrumb(app.prisma, space.id)));
+    const labels = await Promise.all(spaces.map(async (space, index) => {
+      const scanTag = space.scanTag ?? await ensureSpaceScanTag(app.prisma, space.id);
+      const breadcrumb = breadcrumbs[index] ?? [];
+
+      return {
+        code: space.shortCode,
+        title: space.name,
+        footer: breadcrumb.map((segment) => segment.name).join(" > "),
+        qrPayloadUrl: buildSpaceScanUrl(scanTag)
+      };
+    }));
+
+    const doc = await createBatchLabelPdf(labels);
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `inline; filename="space-labels-${params.householdId}.pdf"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
+  });
+
+  app.get("/v1/households/:householdId/spaces/:spaceId/qr", async (request, reply) => {
+    const params = spaceParamsSchema.parse(request.params);
+    const query = qrCodeQuerySchema.parse(request.query);
+
+    if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
+
+    if (!space) {
+      return reply.code(404).send({ message: "Space not found." });
+    }
+
+    const scanTag = space.scanTag ?? await ensureSpaceScanTag(app.prisma, space.id);
+    const payloadUrl = buildSpaceScanUrl(scanTag);
+
+    if (query.format === "svg") {
+      const svg = await QRCode.toString(payloadUrl, {
+        type: "svg",
+        width: query.size,
+        margin: 1
+      });
+
+      return reply
+        .header("content-type", "image/svg+xml; charset=utf-8")
+        .send(svg);
+    }
+
+    const png = await QRCode.toBuffer(payloadUrl, {
+      type: "png",
+      width: query.size,
+      margin: 1
+    });
+
+    return reply
+      .header("content-type", "image/png")
+      .send(png);
+  });
+
+  app.get("/v1/households/:householdId/spaces/:spaceId/label", async (request, reply) => {
+    const params = spaceParamsSchema.parse(request.params);
+
+    if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
+
+    if (!space) {
+      return reply.code(404).send({ message: "Space not found." });
+    }
+
+    const [scanTag, breadcrumb] = await Promise.all([
+      space.scanTag ?? ensureSpaceScanTag(app.prisma, space.id),
+      getSpaceBreadcrumb(app.prisma, space.id)
+    ]);
+
+    const doc = await createSingleLabelPdf({
+      code: space.shortCode,
+      title: space.name,
+      footer: breadcrumb.map((segment) => segment.name).join(" > "),
+      qrPayloadUrl: buildSpaceScanUrl(scanTag)
+    });
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `inline; filename="space-label-${space.shortCode.toLowerCase()}.pdf"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
   });
 
   app.get("/v1/households/:householdId/spaces/:spaceId", async (request, reply) => {

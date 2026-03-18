@@ -4,7 +4,7 @@ import type { SearchResult, SearchResultGroup } from "@lifekeeper/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { searchHousehold } from "../lib/api";
+import { getHouseholdSpaces, searchHousehold } from "../lib/api";
 
 type SearchCommandPaletteProps = {
   fallbackHouseholdId: string | null;
@@ -73,10 +73,14 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
   const [shortcutLabel, setShortcutLabel] = useState("Ctrl K");
 
   const householdId = searchParams.get("householdId") ?? fallbackHouseholdId;
+  const normalizedCodeQuery = query.trim().toUpperCase();
+  const canLookupSpaceCode = Boolean(householdId) && /^[A-Z0-9]{4,6}$/.test(normalizedCodeQuery);
+  const actionCount = canLookupSpaceCode ? 1 : 0;
   const results = useMemo(
     () => groups.flatMap((group) => group.results),
     [groups]
   );
+  const totalItems = actionCount + results.length;
 
   useEffect(() => {
     if (typeof navigator !== "undefined" && /mac/i.test(navigator.platform)) {
@@ -176,15 +180,15 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
   }, [debouncedQuery, householdId, isOpen]);
 
   useEffect(() => {
-    if (results.length === 0) {
+    if (totalItems === 0) {
       setActiveIndex(0);
       return;
     }
 
-    if (activeIndex >= results.length) {
+    if (activeIndex >= totalItems) {
       setActiveIndex(0);
     }
-  }, [activeIndex, results.length]);
+  }, [activeIndex, totalItems]);
 
   const close = (): void => {
     setIsOpen(false);
@@ -206,28 +210,67 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
     router.push(result.entityUrl);
   };
 
+  const handleSpaceCodeLookup = async (): Promise<void> => {
+    if (!householdId) {
+      return;
+    }
+
+    try {
+      setFetchError(null);
+      const response = await getHouseholdSpaces(householdId, { search: normalizedCodeQuery, limit: 12 });
+      const exactMatches = response.items.filter((space) => space.shortCode === normalizedCodeQuery);
+      const [exactMatch] = exactMatches;
+      const [onlyMatch] = response.items;
+
+      if (exactMatch) {
+        rememberQuery(query || debouncedQuery);
+        close();
+        router.push(`/inventory/spaces/${exactMatch.id}?householdId=${householdId}`);
+        return;
+      }
+
+      if (onlyMatch && response.items.length === 1) {
+        rememberQuery(query || debouncedQuery);
+        close();
+        router.push(`/inventory/spaces/${onlyMatch.id}?householdId=${householdId}`);
+        return;
+      }
+
+      setFetchError(response.items.length === 0 ? "No spaces matched that code." : "Multiple spaces matched that code. Use the Spaces lookup to choose one.");
+    } catch (error) {
+      setFetchError(error instanceof Error ? error.message : "Space lookup failed.");
+    }
+  };
+
   const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>): void => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
 
-      if (results.length > 0) {
-        setActiveIndex((current) => (current + 1) % results.length);
+      if (totalItems > 0) {
+        setActiveIndex((current) => (current + 1) % totalItems);
       }
     }
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
 
-      if (results.length > 0) {
-        setActiveIndex((current) => (current - 1 + results.length) % results.length);
+      if (totalItems > 0) {
+        setActiveIndex((current) => (current - 1 + totalItems) % totalItems);
       }
     }
 
     if (event.key === "Enter") {
       event.preventDefault();
 
-      if (results[activeIndex]) {
-        selectResult(results[activeIndex]);
+      if (canLookupSpaceCode && activeIndex === 0) {
+        void handleSpaceCodeLookup();
+        return;
+      }
+
+      const resultIndex = activeIndex - actionCount;
+
+      if (resultIndex >= 0 && results[resultIndex]) {
+        selectResult(results[resultIndex]);
       }
     }
 
@@ -319,6 +362,25 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                 <div className="search-palette__empty">{fetchError}</div>
               ) : null}
 
+              {canLookupSpaceCode ? (
+                <section className="search-palette__group">
+                  <div className="search-palette__section-title">Quick Actions</div>
+                  <div className="search-palette__results">
+                    <button
+                      type="button"
+                      className={`search-palette__result${activeIndex === 0 ? " search-palette__result--active" : ""}`}
+                      onClick={() => {
+                        void handleSpaceCodeLookup();
+                      }}
+                      onMouseEnter={() => setActiveIndex(0)}
+                    >
+                      <span className="search-palette__result-title">Lookup Space Code</span>
+                      <span className="search-palette__result-subtitle">Jump directly to space {normalizedCodeQuery}</span>
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
               {householdId && debouncedQuery && !isLoading && !fetchError && groups.length === 0 ? (
                 <div className="search-palette__empty">No results found.</div>
               ) : null}
@@ -346,9 +408,9 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                           <button
                             key={`${result.entityType}:${result.entityId}`}
                             type="button"
-                            className={`search-palette__result${absoluteIndex === activeIndex ? " search-palette__result--active" : ""}`}
+                            className={`search-palette__result${absoluteIndex + actionCount === activeIndex ? " search-palette__result--active" : ""}`}
                             onClick={() => selectResult(result)}
-                            onMouseEnter={() => setActiveIndex(absoluteIndex)}
+                            onMouseEnter={() => setActiveIndex(absoluteIndex + actionCount)}
                           >
                             <span className="search-palette__result-title">{result.title}</span>
                             {result.subtitle ? (

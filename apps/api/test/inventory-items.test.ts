@@ -57,6 +57,7 @@ const userId = "clkeeperuser0000000000001";
 const restoredItem = {
   id: targetInventoryItemId,
   householdId,
+  scanTag: "inv_TESTITEM01",
   itemType: "consumable",
   conditionStatus: null,
   name: "Oil Filter",
@@ -89,7 +90,7 @@ const createApp = async () => {
       fields: {
         reorderThreshold: Symbol("reorderThreshold")
       },
-      findFirst: async ({ where }: { where: { id: string; householdId: string } }) => {
+      findFirst: async ({ where }: { where: { id: string; householdId: string; deletedAt?: null } }) => {
         if (where.id !== targetInventoryItemId) {
           return null;
         }
@@ -159,6 +160,40 @@ beforeEach(() => {
 });
 
 describe("household inventory item routes", () => {
+  it("returns an SVG QR code for an inventory item", async () => {
+    const app = await createApp();
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/households/${householdId}/inventory/${targetInventoryItemId}/qr?format=svg&size=240`
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("image/svg+xml");
+      expect(response.body).toContain("<svg");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns a printable PDF label for an inventory item", async () => {
+    const app = await createApp();
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/households/${householdId}/inventory/${targetInventoryItemId}/label`
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("application/pdf");
+      expect(response.body.slice(0, 4)).toBe("%PDF");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("restores a soft-deleted inventory item", async () => {
     const app = await createApp();
 

@@ -5,6 +5,7 @@ import { InventoryCommentsPanel } from "../../../../components/inventory-comment
 import { InventoryDangerActions } from "../../../../components/inventory-danger-actions";
 import { InventoryItemDetailEditor } from "../../../../components/inventory-item-detail-editor";
 import { InventoryItemLocationsPanel } from "../../../../components/inventory-item-locations-panel";
+import { QrCodeDialog } from "../../../../components/qr-code-dialog";
 import { InventoryTransactionHistory } from "../../../../components/inventory-transaction-history";
 import {
   ApiError,
@@ -100,6 +101,19 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
             </p>
           </div>
           <div className="page-header__actions">
+            <QrCodeDialog
+              dialogTitle={`${item.name} QR Code`}
+              dialogDescription="Open the printable label, download the QR image, or copy the scan identifier for this inventory item."
+              imageAlt={`QR code for ${item.name}`}
+              svgPath={`/api/households/${household.id}/inventory/${item.id}/qr?format=svg&size=360`}
+              pngPath={`/api/households/${household.id}/inventory/${item.id}/qr?format=png&size=720`}
+              labelPath={`/api/households/${household.id}/inventory/${item.id}/label`}
+              fileBaseName={`${item.name}-${item.partNumber ?? item.scanTag ?? item.id}`}
+              codeLabel="Scan ID"
+              codeValue={item.scanTag ?? item.partNumber ?? item.id}
+              details={[item.name, ...(item.partNumber ? [`Part ${item.partNumber}`] : [])]}
+              copyValue={item.scanTag ?? item.id}
+            />
             <Link href={backHref} className="button button--ghost button--sm">Back to Inventory</Link>
           </div>
         </header>

@@ -848,6 +848,7 @@ model Project {
 model InventoryItem {
   id                 String                  @id @default(cuid())
   householdId        String
+  scanTag            String?                 @unique
   itemType           InventoryItemType       @default(consumable)
   conditionStatus    String?
   name               String
@@ -888,6 +889,7 @@ model InventoryItem {
   @@index([householdId, category])
   @@index([householdId, partNumber])
   @@index([householdId, itemType])
+  @@index([householdId, scanTag])
 }
 
 model SpaceInventoryItem {

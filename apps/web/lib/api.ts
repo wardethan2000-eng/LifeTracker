@@ -7,6 +7,7 @@ import {
   assetDetailResponseSchema,
   assetTransferListSchema,
   assetLabelDataSchema,
+  scanResolutionResponseSchema,
   assetTimelineEntrySchema,
   assetTimelineItemSchema,
   assetSchema,
@@ -116,6 +117,7 @@ import {
   type AssetTransferList,
   type AssetDetailResponse,
   type AssetLabelData,
+  type ScanResolutionResponse,
   type AssetTimelineEntry,
   type AssetTimelineItem,
   type AssetTimelineQuery,
@@ -968,6 +970,16 @@ export const lookupAssetByTag = async (tag: string): Promise<Asset> => {
   return apiRequest({
     path: `/v1/assets/lookup?${query.toString()}`,
     schema: assetSchema
+  });
+};
+
+export const resolveScanTag = async (tag: string): Promise<ScanResolutionResponse> => {
+  const query = new URLSearchParams({ tag });
+
+  return apiRequest({
+    path: `/v1/scan/resolve?${query.toString()}`,
+    schema: scanResolutionResponseSchema,
+    cacheOptions: "no-store"
   });
 };
 

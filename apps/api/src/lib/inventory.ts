@@ -375,6 +375,7 @@ export const mergeHouseholdInventoryItems = async (
     targetInventoryItem: {
       id: mergedTargetItem.id,
       householdId: mergedTargetItem.householdId,
+      scanTag: mergedTargetItem.scanTag,
       itemType: mergedTargetItem.itemType,
       conditionStatus: mergedTargetItem.conditionStatus,
       name: mergedTargetItem.name,

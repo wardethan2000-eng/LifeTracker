@@ -9,10 +9,12 @@ import {
   updateInventoryItemSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
+import QRCode from "qrcode";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
+import { buildInventoryItemScanUrl, ensureInventoryItemScanTag } from "../../lib/inventory-tags.js";
 import {
   applyInventoryTransaction,
   computeBulkSchedulePartsReadiness,
@@ -20,6 +22,7 @@ import {
   InventoryError,
   mergeHouseholdInventoryItems
 } from "../../lib/inventory.js";
+import { createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
 import { getSpaceBreadcrumb } from "../../lib/spaces.js";
 import { toMaintenanceScheduleResponse } from "../../lib/schedule-state.js";
 import {
@@ -53,6 +56,11 @@ const inventoryDetailQuerySchema = z.object({
 
 const bulkInventoryReadinessQuerySchema = z.object({
   scheduleIds: z.string().optional()
+});
+
+const qrCodeQuerySchema = z.object({
+  format: z.enum(["png", "svg"]).default("svg"),
+  size: z.coerce.number().int().min(100).max(1000).default(300)
 });
 
 const inventoryExportColumns = [
@@ -525,6 +533,97 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       .map(toLowStockInventoryItemResponse);
   });
 
+  app.get("/v1/households/:householdId/inventory/:inventoryItemId/qr", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+    const query = qrCodeQuerySchema.parse(request.query);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const item = await app.prisma.inventoryItem.findFirst({
+      where: {
+        id: params.inventoryItemId,
+        householdId: params.householdId,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        scanTag: true
+      }
+    });
+
+    if (!item) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    const scanTag = item.scanTag ?? await ensureInventoryItemScanTag(app.prisma, item.id);
+    const payloadUrl = buildInventoryItemScanUrl(scanTag);
+
+    if (query.format === "svg") {
+      const svg = await QRCode.toString(payloadUrl, {
+        type: "svg",
+        width: query.size,
+        margin: 1
+      });
+
+      return reply
+        .header("content-type", "image/svg+xml; charset=utf-8")
+        .send(svg);
+    }
+
+    const png = await QRCode.toBuffer(payloadUrl, {
+      type: "png",
+      width: query.size,
+      margin: 1
+    });
+
+    return reply
+      .header("content-type", "image/png")
+      .send(png);
+  });
+
+  app.get("/v1/households/:householdId/inventory/:inventoryItemId/label", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const item = await app.prisma.inventoryItem.findFirst({
+      where: {
+        id: params.inventoryItemId,
+        householdId: params.householdId,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        name: true,
+        partNumber: true,
+        scanTag: true
+      }
+    });
+
+    if (!item) {
+      return reply.code(404).send({ message: "Inventory item not found." });
+    }
+
+    const scanTag = item.scanTag ?? await ensureInventoryItemScanTag(app.prisma, item.id);
+    const doc = await createSingleLabelPdf({
+      code: item.partNumber?.trim() || scanTag,
+      title: item.name,
+      footer: item.partNumber ? scanTag : null,
+      qrPayloadUrl: buildInventoryItemScanUrl(scanTag)
+    });
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `inline; filename="inventory-label-${item.id}.pdf"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
+  });
+
   app.get("/v1/households/:householdId/inventory/:inventoryItemId", async (request, reply) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const query = inventoryDetailQuerySchema.parse(request.query);
@@ -639,17 +738,24 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Inventory item not found." });
     }
 
+    if (!item.scanTag) {
+      item.scanTag = await ensureInventoryItemScanTag(app.prisma, item.id);
+    }
+
     const spaceBreadcrumbs = await Promise.all(item.spaceLinks.map((link) => getSpaceBreadcrumb(app.prisma, link.space.id)));
 
-    item.spaceLinks = item.spaceLinks.map((link, index) => ({
+    const itemWithBreadcrumbs = {
+      ...item,
+      spaceLinks: item.spaceLinks.map((link, index) => ({
       ...link,
       space: {
         ...link.space,
-        breadcrumb: spaceBreadcrumbs[index]
+        breadcrumb: spaceBreadcrumbs[index] ?? []
       }
-    }));
+      }))
+    };
 
-    return toInventoryItemDetailResponse(item);
+    return toInventoryItemDetailResponse(itemWithBreadcrumbs);
   });
 
   app.patch("/v1/households/:householdId/inventory/:inventoryItemId", async (request, reply) => {

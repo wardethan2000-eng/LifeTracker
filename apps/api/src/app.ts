@@ -50,6 +50,7 @@ import { searchRoutes } from "./routes/search/index.js";
 import scheduleComplianceRoutes from "./routes/schedule-compliance/index.js";
 import { attachmentRoutes } from "./routes/attachments/index.js";
 import { barcodeRoutes } from "./routes/barcode.js";
+import { scanRoutes } from "./routes/scan.js";
 import { hobbyRoutes } from "./routes/hobbies/index.js";
 import { hobbySeriesRoutes } from "./routes/hobbies/series.js";
 import { hobbyRecipeRoutes } from "./routes/hobbies/recipes.js";
@@ -73,7 +74,8 @@ const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPlugin
 
 const publicRoutePlugins: FastifyPluginAsync[] = [
   publicShareRoutes,
-  healthRoutes
+  healthRoutes,
+  scanRoutes
 ];
 
 const accountRoutePlugins: FastifyPluginAsync[] = [

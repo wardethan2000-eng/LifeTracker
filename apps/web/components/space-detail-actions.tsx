@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { addGeneralItemToSpace, addItemToSpace } from "../app/actions";
+import { QrCodeDialog } from "./qr-code-dialog";
 import { SpaceForm } from "./space-form";
 
 type SpaceDetailActionsProps = {
@@ -39,7 +40,19 @@ export function SpaceDetailActions({ householdId, space, spaces, inventoryItems 
           <button type="button" className="button button--ghost button--sm" onClick={() => setMode("item")}>Add Item</button>
           <button type="button" className="button button--ghost button--sm" onClick={() => setMode("general")}>Add General Item</button>
           <button type="button" className="button button--ghost button--sm" onClick={() => setMode("subspace")}>Add Sub-Space</button>
-          <button type="button" className="button button--ghost button--sm" disabled>Print QR</button>
+          <QrCodeDialog
+            dialogTitle={`${space.name} QR Code`}
+            dialogDescription="Download the QR code, copy the printed space code, or open the printable label."
+            imageAlt={`QR code for ${space.name}`}
+            svgPath={`/api/households/${householdId}/spaces/${space.id}/qr?format=svg&size=360`}
+            pngPath={`/api/households/${householdId}/spaces/${space.id}/qr?format=png&size=720`}
+            labelPath={`/api/households/${householdId}/spaces/${space.id}/label`}
+            fileBaseName={`${space.name}-${space.shortCode}`}
+            codeLabel="Space Code"
+            codeValue={space.shortCode}
+            details={[space.name, space.breadcrumb.map((segment) => segment.name).join(" > ")]}
+            copyValue={space.shortCode}
+          />
         </div>
 
         {mode === "edit" ? (

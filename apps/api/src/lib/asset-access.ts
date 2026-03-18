@@ -1,6 +1,8 @@
 import type { Asset, Prisma, PrismaClient } from "@prisma/client";
 import type { FastifyReply } from "fastify";
 
+type PrismaLike = PrismaClient | Prisma.TransactionClient;
+
 export class ForbiddenError extends Error {
   constructor(message = "FORBIDDEN") {
     super(message);
@@ -38,7 +40,7 @@ export const accessibleAssetWhere = (assetId: string, userId: string): Prisma.As
 });
 
 export const assertMembership = async (
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   householdId: string,
   userId: string
 ): Promise<void> => {
@@ -54,7 +56,7 @@ export const assertMembership = async (
 };
 
 export const requireHouseholdMembership = async (
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   householdId: string,
   userId: string,
   reply: FastifyReply
@@ -69,7 +71,7 @@ export const requireHouseholdMembership = async (
 };
 
 export const checkMembership = async (
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   householdId: string,
   userId: string
 ): Promise<boolean> => {
@@ -82,7 +84,7 @@ export const checkMembership = async (
 };
 
 export const getMembership = async (
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   householdId: string,
   userId: string
 ) => prisma.householdMember.findUnique({
@@ -92,7 +94,7 @@ export const getMembership = async (
 });
 
 export const assertOwner = async (
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   householdId: string,
   userId: string
 ): Promise<void> => {

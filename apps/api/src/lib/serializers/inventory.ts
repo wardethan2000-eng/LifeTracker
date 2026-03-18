@@ -49,6 +49,7 @@ type InventorySummaryRecord = Pick<
   InventoryItem,
   | "id"
   | "householdId"
+  | "scanTag"
   | "itemType"
   | "conditionStatus"
   | "name"
@@ -160,6 +161,7 @@ type InventoryItemRevisionRecord = Pick<
 export const toInventoryItemSummaryResponse = (item: InventorySummaryRecord) => inventoryItemSummarySchema.parse({
   id: item.id,
   householdId: item.householdId,
+  scanTag: item.scanTag ?? null,
   itemType: item.itemType,
   conditionStatus: item.conditionStatus ?? null,
   name: item.name,

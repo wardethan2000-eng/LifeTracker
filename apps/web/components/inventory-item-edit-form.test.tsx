@@ -20,6 +20,7 @@ import { InventoryItemEditForm } from "./inventory-item-edit-form";
 const sampleItem: InventoryItemSummary = {
   id: "inventory-item-1",
   householdId: "household-1",
+  scanTag: null,
   name: "Oil Filter",
   itemType: "consumable",
   conditionStatus: null,

@@ -1,5 +1,6 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient, SpaceType } from "@prisma/client";
 import { customAlphabet } from "nanoid";
+import { resolveAppBaseUrl } from "./asset-tags.js";
 
 const SHORT_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const SCAN_TAG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
@@ -12,7 +13,7 @@ type SpaceNodeRecord = {
   shortCode: string;
   scanTag: string;
   name: string;
-  type: Prisma.$Enums.SpaceType;
+  type: SpaceType;
   parentSpaceId: string | null;
   description: string | null;
   notes: string | null;
@@ -20,10 +21,8 @@ type SpaceNodeRecord = {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  spaceItems?: Array<{ id: string }>;
-  generalItems?: Array<{ id: string }>;
   children?: SpaceNodeRecord[];
-  breadcrumb?: Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }>;
+  breadcrumb?: Array<{ id: string; name: string; type: SpaceType }>;
   itemCount?: number;
   generalItemCount?: number;
   totalItemCount?: number;
@@ -106,11 +105,16 @@ export const ensureSpaceScanTag = async (prisma: PrismaLike, spaceId: string): P
   return scanTag;
 };
 
+export const buildSpaceScanUrl = (scanTag: string): string => new URL(
+  `/scan/s/${encodeURIComponent(scanTag)}`,
+  `${resolveAppBaseUrl()}/`
+).toString();
+
 export const getSpaceBreadcrumb = async (
   prisma: PrismaLike,
   spaceId: string
-): Promise<Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }>> => {
-  const breadcrumb: Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }> = [];
+): Promise<Array<{ id: string; name: string; type: SpaceType }>> => {
+  const breadcrumb: Array<{ id: string; name: string; type: SpaceType }> = [];
   const visited = new Set<string>();
   let currentSpaceId: string | null = spaceId;
 
@@ -121,7 +125,7 @@ export const getSpaceBreadcrumb = async (
 
     visited.add(currentSpaceId);
 
-    const space = await prisma.space.findUnique({
+    const space: { id: string; name: string; type: SpaceType; parentSpaceId: string | null } | null = await prisma.space.findUnique({
       where: { id: currentSpaceId },
       select: {
         id: true,
@@ -214,7 +218,7 @@ export const getSpaceTree = async (prisma: PrismaLike, householdId: string): Pro
 
   const assignBreadcrumbs = (
     nodes: SpaceNodeRecord[],
-    ancestors: Array<{ id: string; name: string; type: Prisma.$Enums.SpaceType }>
+    ancestors: Array<{ id: string; name: string; type: SpaceType }>
   ): void => {
     for (const node of sortSpaces(nodes)) {
       const nextBreadcrumb = [...ancestors, { id: node.id, name: node.name, type: node.type }];

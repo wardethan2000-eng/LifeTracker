@@ -1285,6 +1285,7 @@ export const scheduleComplianceDashboardSchema = z.object({
 export const inventoryItemSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
+  scanTag: z.string().nullable().default(null),
   itemType: inventoryItemTypeSchema,
   conditionStatus: z.string().nullable(),
   name: z.string(),
@@ -1335,6 +1336,36 @@ export const inventoryItemSummarySchema = inventoryItemSchema.extend({
   totalValue: z.number().nullable(),
   lowStock: z.boolean()
 });
+
+export const scanResolutionAssetSchema = z.object({
+  type: z.literal("asset"),
+  id: z.string().cuid(),
+  name: z.string(),
+  url: z.string()
+});
+
+export const scanResolutionSpaceSchema = z.object({
+  type: z.literal("space"),
+  id: z.string().cuid(),
+  name: z.string(),
+  shortCode: z.string().min(4).max(6),
+  url: z.string()
+});
+
+export const scanResolutionInventoryItemSchema = z.object({
+  type: z.literal("inventory_item"),
+  id: z.string().cuid(),
+  name: z.string(),
+  scanTag: z.string(),
+  partNumber: z.string().nullable(),
+  url: z.string()
+});
+
+export const scanResolutionResponseSchema = z.discriminatedUnion("type", [
+  scanResolutionAssetSchema,
+  scanResolutionSpaceSchema,
+  scanResolutionInventoryItemSchema
+]);
 
 export const spaceBreadcrumbSchema = z.object({
   id: z.string().cuid(),
@@ -1440,17 +1471,17 @@ export const inventoryItemSpaceLinkSchema = spaceInventoryItemSchema.extend({
 });
 
 type SpaceResponseValue = z.infer<typeof spaceSchema> & {
-  parent?: z.infer<typeof spaceReferenceSchema> | null;
-  children?: SpaceResponseValue[];
+  parent?: z.infer<typeof spaceReferenceSchema> | null | undefined;
+  children?: SpaceResponseValue[] | undefined;
   breadcrumb: Array<z.infer<typeof spaceBreadcrumbSchema>>;
-  spaceItems?: Array<z.infer<typeof spaceInventoryLinkDetailSchema>>;
-  generalItems?: Array<z.infer<typeof spaceGeneralItemSchema>>;
-  itemCount?: number;
-  generalItemCount?: number;
-  totalItemCount?: number;
+  spaceItems?: Array<z.infer<typeof spaceInventoryLinkDetailSchema>> | undefined;
+  generalItems?: Array<z.infer<typeof spaceGeneralItemSchema>> | undefined;
+  itemCount?: number | undefined;
+  generalItemCount?: number | undefined;
+  totalItemCount?: number | undefined;
 };
 
-export const spaceResponseSchema: z.ZodType<SpaceResponseValue> = z.lazy(() => spaceSchema.extend({
+export const spaceResponseSchema: z.ZodType<SpaceResponseValue, z.ZodTypeDef, unknown> = z.lazy((): z.ZodType<SpaceResponseValue, z.ZodTypeDef, unknown> => spaceSchema.extend({
   parent: spaceReferenceSchema.nullable().optional(),
   children: z.array(spaceResponseSchema).optional(),
   breadcrumb: z.array(spaceBreadcrumbSchema),
@@ -3179,6 +3210,10 @@ export type AssetTransferList = z.infer<typeof assetTransferListSchema>;
 export type AssetTag = z.infer<typeof assetTagSchema>;
 export type AssetLookupQuery = z.infer<typeof assetLookupQuerySchema>;
 export type AssetLabelData = z.infer<typeof assetLabelDataSchema>;
+export type ScanResolutionAsset = z.infer<typeof scanResolutionAssetSchema>;
+export type ScanResolutionSpace = z.infer<typeof scanResolutionSpaceSchema>;
+export type ScanResolutionInventoryItem = z.infer<typeof scanResolutionInventoryItemSchema>;
+export type ScanResolutionResponse = z.infer<typeof scanResolutionResponseSchema>;
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateHouseholdInput = z.infer<typeof createHouseholdSchema>;
@@ -3281,7 +3316,7 @@ export type UpdateSpaceGeneralItemInput = z.infer<typeof updateSpaceGeneralItemI
 export type SpaceReference = z.infer<typeof spaceReferenceSchema>;
 export type SpaceInventoryLinkDetail = z.infer<typeof spaceInventoryLinkDetailSchema>;
 export type InventoryItemSpaceLink = z.infer<typeof inventoryItemSpaceLinkSchema>;
-export type SpaceResponse = SpaceResponseValue;
+export type SpaceResponse = z.infer<typeof spaceResponseSchema>;
 export type SpaceListResponse = z.infer<typeof spaceListResponseSchema>;
 export type SpaceContentsResponse = z.infer<typeof spaceContentsResponseSchema>;
 export type MergeInventoryItemsInput = z.infer<typeof mergeInventoryItemsSchema>;
