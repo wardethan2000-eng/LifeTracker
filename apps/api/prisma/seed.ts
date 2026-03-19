@@ -2605,6 +2605,109 @@ async function main(): Promise<void> {
 
   await rebuildSearchIndex(prisma, householdId);
 
+  // ── Built-in Note Templates ──────────────────────────────────────────
+  const builtInTemplates = [
+    {
+      id: "clkeepertmpl0000000000001",
+      name: "Decision Log",
+      description: "Record a decision with context, options considered, and rationale.",
+      bodyTemplate: `<h2>Context</h2><p>What situation or problem prompted this decision?</p><h2>Options Considered</h2><ol><li><strong>Option A</strong> — </li><li><strong>Option B</strong> — </li><li><strong>Option C</strong> — </li></ol><h2>Decision</h2><p>We decided to go with…</p><h2>Rationale</h2><p>Why this option was chosen over the others.</p><h2>Follow-up Actions</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="false">Action item 1</li><li data-type="taskItem" data-checked="false">Action item 2</li></ul>`,
+      entryType: "decision" as const,
+      defaultTags: ["lk:template:decision-log"],
+      defaultFlags: ["important"],
+      sortOrder: 1
+    },
+    {
+      id: "clkeepertmpl0000000000002",
+      name: "Research Brief",
+      description: "Summarize research findings with sources and key takeaways.",
+      bodyTemplate: `<h2>Topic</h2><p>What are you researching?</p><h2>Key Findings</h2><ul><li></li><li></li><li></li></ul><h2>Sources</h2><ol><li><a href="">Source 1</a> — </li><li><a href="">Source 2</a> — </li></ol><h2>Recommendations</h2><p>Based on the findings above…</p><h2>Open Questions</h2><ul><li></li></ul>`,
+      entryType: "reference" as const,
+      defaultTags: ["lk:template:research-brief"],
+      defaultFlags: [] as string[],
+      sortOrder: 2
+    },
+    {
+      id: "clkeepertmpl0000000000003",
+      name: "Meeting Notes",
+      description: "Capture attendees, agenda, discussion points, and action items.",
+      bodyTemplate: `<h2>Meeting Details</h2><p><strong>Date:</strong> </p><p><strong>Attendees:</strong> </p><p><strong>Purpose:</strong> </p><h2>Agenda</h2><ol><li></li><li></li><li></li></ol><h2>Discussion Notes</h2><p></p><h2>Decisions Made</h2><ul><li></li></ul><h2>Action Items</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="false">[ Owner ] — Task description — Due: </li><li data-type="taskItem" data-checked="false">[ Owner ] — Task description — Due: </li></ul>`,
+      entryType: "note" as const,
+      defaultTags: ["lk:template:meeting-notes"],
+      defaultFlags: [] as string[],
+      sortOrder: 3
+    },
+    {
+      id: "clkeepertmpl0000000000004",
+      name: "Project Kickoff",
+      description: "Define project goals, scope, timeline, and stakeholders.",
+      bodyTemplate: `<h2>Project Overview</h2><p><strong>Project Name:</strong> </p><p><strong>Start Date:</strong> </p><p><strong>Target Completion:</strong> </p><h2>Goals &amp; Objectives</h2><ol><li></li><li></li></ol><h2>Scope</h2><h3>In Scope</h3><ul><li></li></ul><h3>Out of Scope</h3><ul><li></li></ul><h2>Key Stakeholders</h2><ul><li><strong>Owner:</strong> </li><li><strong>Contributors:</strong> </li></ul><h2>Risks &amp; Constraints</h2><ul><li></li></ul><h2>Success Criteria</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="false">Criterion 1</li><li data-type="taskItem" data-checked="false">Criterion 2</li></ul>`,
+      entryType: "milestone" as const,
+      defaultTags: ["lk:template:project-kickoff"],
+      defaultFlags: ["important"],
+      sortOrder: 4
+    },
+    {
+      id: "clkeepertmpl0000000000005",
+      name: "Comparison Matrix",
+      description: "Compare products, services, or approaches side by side.",
+      bodyTemplate: `<h2>What Are You Comparing?</h2><p></p><h2>Criteria</h2><ol><li><strong>Price</strong></li><li><strong>Quality</strong></li><li><strong>Features</strong></li><li><strong>Availability</strong></li></ol><h2>Options</h2><h3>Option A</h3><ul><li>Price: </li><li>Quality: </li><li>Features: </li><li>Availability: </li></ul><h3>Option B</h3><ul><li>Price: </li><li>Quality: </li><li>Features: </li><li>Availability: </li></ul><h3>Option C</h3><ul><li>Price: </li><li>Quality: </li><li>Features: </li><li>Availability: </li></ul><h2>Winner &amp; Rationale</h2><p></p>`,
+      entryType: "comparison" as const,
+      defaultTags: ["lk:template:comparison-matrix"],
+      defaultFlags: [] as string[],
+      sortOrder: 5
+    },
+    {
+      id: "clkeepertmpl0000000000006",
+      name: "Quick Checklist",
+      description: "A simple task list for tracking items to complete.",
+      bodyTemplate: `<h2>Checklist</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="false">Item 1</li><li data-type="taskItem" data-checked="false">Item 2</li><li data-type="taskItem" data-checked="false">Item 3</li><li data-type="taskItem" data-checked="false">Item 4</li><li data-type="taskItem" data-checked="false">Item 5</li></ul><h2>Notes</h2><p></p>`,
+      entryType: "note" as const,
+      defaultTags: ["lk:template:quick-checklist"],
+      defaultFlags: ["actionable"],
+      sortOrder: 6
+    },
+    {
+      id: "clkeepertmpl0000000000007",
+      name: "Measurement Log",
+      description: "Record measurements, readings, or quantitative observations.",
+      bodyTemplate: `<h2>What Are You Measuring?</h2><p></p><h2>Readings</h2><ul><li><strong>Date:</strong>  — <strong>Value:</strong>  — <strong>Unit:</strong> </li><li><strong>Date:</strong>  — <strong>Value:</strong>  — <strong>Unit:</strong> </li><li><strong>Date:</strong>  — <strong>Value:</strong>  — <strong>Unit:</strong> </li></ul><h2>Observations</h2><p></p><h2>Trends &amp; Notes</h2><p></p>`,
+      entryType: "measurement" as const,
+      defaultTags: ["lk:template:measurement-log"],
+      defaultFlags: [] as string[],
+      sortOrder: 7
+    }
+  ];
+
+  for (const tmpl of builtInTemplates) {
+    await prisma.noteTemplate.upsert({
+      where: { id: tmpl.id },
+      update: {
+        name: tmpl.name,
+        description: tmpl.description,
+        bodyTemplate: tmpl.bodyTemplate,
+        entryType: tmpl.entryType,
+        defaultTags: tmpl.defaultTags,
+        defaultFlags: tmpl.defaultFlags,
+        isBuiltIn: true,
+        sortOrder: tmpl.sortOrder
+      },
+      create: {
+        id: tmpl.id,
+        householdId,
+        createdById: ownerUserId,
+        name: tmpl.name,
+        description: tmpl.description,
+        bodyTemplate: tmpl.bodyTemplate,
+        entryType: tmpl.entryType,
+        defaultTags: tmpl.defaultTags,
+        defaultFlags: tmpl.defaultFlags,
+        isBuiltIn: true,
+        sortOrder: tmpl.sortOrder
+      }
+    });
+  }
+
   console.log(JSON.stringify({
     ownerUserId,
     memberUserId,

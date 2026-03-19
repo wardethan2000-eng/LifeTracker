@@ -10361,10 +10361,46 @@ html[data-ui-density="compact"] .resource-layout__aside {
 /* ─── Notes Hub ─── */
 
 .notes-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 500px;
+}
+
+.notes-hub__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.notes-hub__tab {
+  padding: 8px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-muted, #888);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.notes-hub__tab:hover {
+  color: var(--ink);
+}
+
+.notes-hub__tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.notes-hub__content {
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: 24px;
-  min-height: 500px;
+  flex: 1;
 }
 
 .notes-hub__sidebar {
@@ -10678,32 +10714,38 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex-wrap: wrap;
 }
 
-.note-list__delete {
+.note-list__actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.note-list__item:hover .note-list__actions {
+  opacity: 1;
+}
+
+.note-list__delete-btn {
   background: none;
   border: none;
   font-size: 1rem;
   cursor: pointer;
   color: var(--ink-muted, #aaa);
-  opacity: 0;
-  transition: opacity 0.15s;
   padding: 2px 6px;
   border-radius: 4px;
 }
 
-.note-list__item:hover .note-list__delete {
-  opacity: 1;
-}
-
-.note-list__delete:hover {
+.note-list__delete-btn:hover {
   color: var(--error, #d00);
   background: var(--surface-hover, #f5f5f5);
 }
 
 @media (max-width: 768px) {
-  .notes-hub {
+  .notes-hub__content {
     grid-template-columns: 1fr;
   }
 
@@ -12373,4 +12415,567 @@ html[data-ui-density="compact"] .resource-layout__aside {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-bottom: 4px;
+}
+
+/* ─── Template Picker ─── */
+
+.template-picker {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--surface);
+}
+
+.template-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.template-picker__filters {
+  display: flex;
+  gap: 6px;
+}
+
+.template-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.template-picker__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+}
+
+.template-picker__card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.template-picker__card--blank {
+  border-style: dashed;
+}
+
+.template-picker__card-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.template-picker__card-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.template-picker__card-desc {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.template-picker__card-meta {
+  font-size: 0.72rem;
+  color: var(--ink-subtle, var(--ink-muted));
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: auto;
+}
+
+/* ─── Save as Template (inline expand) ─── */
+
+.save-as-template {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.save-as-template__input {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.save-as-template__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.save-as-template__success {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--green, #16a34a);
+}
+
+/* ─── Canvas List ─── */
+
+.canvas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.canvas-list__create {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.canvas-list__create-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.canvas-list__create-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.canvas-list__empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--ink-muted, #888);
+  font-size: 0.95rem;
+}
+
+.canvas-list__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.canvas-list__card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+  transition: box-shadow 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+.canvas-list__card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.canvas-list__card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.canvas-list__card-preview {
+  background: var(--bg-muted, #f8f8f8);
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+}
+
+.canvas-list__card-svg {
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
+}
+
+.canvas-list__card-info {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.canvas-list__card-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-list__card-meta {
+  font-size: 0.78rem;
+  color: var(--ink-muted, #888);
+}
+
+.canvas-list__card-date {
+  font-size: 0.75rem;
+  color: var(--ink-muted, #888);
+}
+
+.canvas-list__card-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--ink-muted, #888);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.canvas-list__card:hover .canvas-list__card-delete {
+  opacity: 1;
+}
+
+.canvas-list__card-delete:hover {
+  color: var(--error, #d00);
+  border-color: var(--error, #d00);
+}
+
+/* ─── Idea Canvas Renderer ─── */
+
+.idea-canvas {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 140px);
+  min-height: 400px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+}
+
+.idea-canvas__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.idea-canvas__name {
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.idea-canvas__name:hover {
+  background: var(--surface-hover, #f0f0f0);
+}
+
+.idea-canvas__name-input {
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+  min-width: 200px;
+}
+
+.idea-canvas__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+
+.idea-canvas__tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.idea-canvas__tool-btn:hover {
+  background: var(--surface-hover, #f0f0f0);
+  border-color: var(--accent);
+}
+
+.idea-canvas__tool-btn--danger {
+  color: var(--error, #d00);
+}
+
+.idea-canvas__tool-btn--danger:hover {
+  background: color-mix(in srgb, var(--error, #d00) 8%, transparent);
+  border-color: var(--error, #d00);
+}
+
+.idea-canvas__tool-select {
+  padding: 3px 8px;
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.idea-canvas__tool-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.idea-canvas__toolbar-spacer {
+  flex: 1;
+}
+
+.idea-canvas__zoom-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-muted, #888);
+  min-width: 3.5ch;
+  text-align: center;
+  user-select: none;
+}
+
+.idea-canvas__svg {
+  flex: 1;
+  display: block;
+  cursor: grab;
+  background:
+    radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.idea-canvas__svg:active {
+  cursor: grabbing;
+}
+
+.canvas-bg {
+  fill: transparent;
+}
+
+/* Node content inside foreignObject */
+.idea-canvas__node-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 8px;
+  text-align: center;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.idea-canvas__node-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.idea-canvas__node-label-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ink);
+  outline: none;
+  padding: 4px;
+}
+
+.idea-canvas__node-linked-icon {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+/* Edge labels */
+.idea-canvas__edge-label {
+  font-size: 0.72rem;
+  fill: var(--ink-muted, #888);
+  pointer-events: none;
+  user-select: none;
+}
+
+.idea-canvas__edge-label-input {
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+  text-align: center;
+}
+
+/* Context menu */
+.idea-canvas__context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.idea-canvas__context-menu {
+  position: fixed;
+  z-index: 101;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  min-width: 160px;
+  padding: 4px 0;
+}
+
+.idea-canvas__context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.idea-canvas__context-menu button:hover {
+  background: var(--surface-hover, #f5f5f5);
+}
+
+.idea-canvas__context-danger {
+  color: var(--error, #d00) !important;
+}
+
+.idea-canvas__context-danger:hover {
+  background: color-mix(in srgb, var(--error, #d00) 8%, transparent) !important;
+}
+
+/* Note picker overlay */
+.idea-canvas__note-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.idea-canvas__note-picker {
+  background: var(--surface, #fff);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  width: 380px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.idea-canvas__note-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.idea-canvas__note-picker-header button {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--ink-muted, #888);
+  padding: 0 4px;
+}
+
+.idea-canvas__note-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.idea-canvas__note-picker-list li {
+  padding: 0;
+}
+
+.idea-canvas__note-picker-list button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  border: none;
+  background: none;
+  font-size: 0.88rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.idea-canvas__note-picker-list button:hover {
+  background: var(--surface-hover, #f5f5f5);
+}
+
+/* Edge drawing hint */
+.idea-canvas__hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0.9;
+  z-index: 10;
 }

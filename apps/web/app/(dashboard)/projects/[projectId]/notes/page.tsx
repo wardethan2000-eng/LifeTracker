@@ -14,6 +14,7 @@ import {
   ApiError,
   getEntries,
   getMe,
+  getNoteTemplates,
   getProjectDetail,
   getProjectNotes,
 } from "../../../../../lib/api";
@@ -77,7 +78,7 @@ async function ProjectNotesPanelAsync({
   householdId: string;
   project: Awaited<ReturnType<typeof getProjectDetail>>;
 }): Promise<JSX.Element> {
-  const [projectNotes, projectEntries, phaseEntryResponses] = await Promise.all([
+  const [projectNotes, projectEntries, phaseEntryResponses, templates] = await Promise.all([
     getProjectNotes(householdId, project.id),
     getEntries(householdId, {
       entityType: "project",
@@ -90,7 +91,8 @@ async function ProjectNotesPanelAsync({
       entityId: phase.id,
       includeArchived: true,
       limit: 100
-    })))
+    }))),
+    getNoteTemplates(householdId),
   ]);
 
   type ProjectNoteCard = {
@@ -198,7 +200,7 @@ async function ProjectNotesPanelAsync({
         <details style={{ marginBottom: 16 }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
           <div style={{ marginTop: 12 }}>
-            <NoteCreateForm householdId={householdId} projectId={project.id} phases={project.phases} />
+            <NoteCreateForm householdId={householdId} projectId={project.id} phases={project.phases} templates={templates} />
           </div>
         </details>
         {mergedNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}

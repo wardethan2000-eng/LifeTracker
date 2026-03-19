@@ -372,6 +372,8 @@ model User {
   createdHobbyCollectionItems HobbyCollectionItem[] @relation("HobbyCollectionItemCreator")
   createdEntries          Entry[]               @relation("EntryCreator")
   createdNoteFolders      NoteFolder[]          @relation("NoteFolderCreator")
+  createdNoteTemplates    NoteTemplate[]        @relation("NoteTemplateCreator")
+  createdIdeaCanvases     IdeaCanvas[]          @relation("IdeaCanvasCreator")
   performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
   spaceScanLogs          SpaceScanLog[]
 }
@@ -413,6 +415,8 @@ model Household {
   comments         Comment[]
   entries          Entry[]
   noteFolders      NoteFolder[]
+  noteTemplates    NoteTemplate[]
+  ideaCanvases     IdeaCanvas[]
   domainEvents     DomainEvent[]
   webhookEndpoints WebhookEndpoint[]
 
@@ -782,6 +786,7 @@ model Entry {
   createdBy      User            @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
   flags          EntryFlagEntry[]
   folder         NoteFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  canvasNodes    IdeaCanvasNode[]
 
   @@index([householdId, entityType, entityId])
   @@index([householdId, entryType])
@@ -822,6 +827,27 @@ model NoteFolder {
 
   @@index([householdId])
   @@index([parentFolderId])
+}
+
+model NoteTemplate {
+  id              String       @id @default(cuid())
+  householdId     String
+  name            String       @db.VarChar(200)
+  description     String?      @db.VarChar(500)
+  bodyTemplate    String       @db.VarChar(20000)
+  entryType       EntryType    @default(note)
+  defaultTags     Json         @default("[]")
+  defaultFlags    Json         @default("[]")
+  isBuiltIn       Boolean      @default(false)
+  sortOrder       Int          @default(0)
+  createdById     String
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  household       Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy       User         @relation("NoteTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([householdId])
 }
 
 // A generated alert for a user about asset or schedule activity within a household.
@@ -2258,4 +2284,86 @@ model HobbyLog {
 
   @@index([hobbyId, logDate])
   @@index([sessionId])
+}
+
+// ─── Idea Canvas ─────────────────────────────────────────────────────────────
+
+enum CanvasNodeShape {
+  rectangle
+  rounded
+  pill
+  diamond
+}
+
+enum CanvasEdgeStyle {
+  solid
+  dashed
+  dotted
+}
+
+// A spatial canvas for arranging and connecting ideas visually.
+model IdeaCanvas {
+  id          String            @id @default(cuid())
+  householdId String
+  name        String            @db.VarChar(200)
+  entityType  String?           @db.VarChar(50)
+  entityId    String?
+  zoom        Float             @default(1)
+  panX        Float             @default(0)
+  panY        Float             @default(0)
+  createdById String
+  deletedAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  household   Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy   User              @relation("IdeaCanvasCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  nodes       IdeaCanvasNode[]
+  edges       IdeaCanvasEdge[]
+
+  @@index([householdId])
+  @@index([householdId, entityType, entityId])
+}
+
+// A positioned node on an idea canvas, optionally linked to a note entry.
+model IdeaCanvasNode {
+  id        String          @id @default(cuid())
+  canvasId  String
+  entryId   String?
+  label     String          @db.VarChar(500)
+  body      String?         @db.VarChar(5000)
+  x         Float           @default(0)
+  y         Float           @default(0)
+  width     Float           @default(160)
+  height    Float           @default(80)
+  color     String?         @db.VarChar(30)
+  shape     CanvasNodeShape @default(rectangle)
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  canvas    IdeaCanvas      @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  entry     Entry?          @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  outEdges  IdeaCanvasEdge[] @relation("EdgeSource")
+  inEdges   IdeaCanvasEdge[] @relation("EdgeTarget")
+
+  @@index([canvasId])
+  @@index([entryId])
+}
+
+// A directed connection between two nodes on an idea canvas.
+model IdeaCanvasEdge {
+  id           String          @id @default(cuid())
+  canvasId     String
+  sourceNodeId String
+  targetNodeId String
+  label        String?         @db.VarChar(200)
+  style        CanvasEdgeStyle @default(solid)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  canvas       IdeaCanvas      @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  sourceNode   IdeaCanvasNode  @relation("EdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   IdeaCanvasNode  @relation("EdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([canvasId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
 }

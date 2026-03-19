@@ -76,6 +76,7 @@ import {
   meResponseSchema,
   notificationSchema,
   noteFolderSchema,
+  noteTemplateSchema,
   onTimeRatePayloadSchema,
   overdueTrendPayloadSchema,
   partCommonalitySchema,
@@ -233,6 +234,9 @@ import {
   type NoteFolder,
   type CreateNoteFolderInput,
   type UpdateNoteFolderInput,
+  type NoteTemplate,
+  type CreateNoteTemplateInput,
+  type UpdateNoteTemplateInput,
   type HouseholdNotificationList,
   type OnTimeRatePayload,
   type OverdueTrendPayload,
@@ -463,6 +467,21 @@ import {
   hobbySessionStageChecklistItemSchema,
   type HobbyDetail,
   type HobbySessionDetail,
+  ideaCanvasSchema,
+  ideaCanvasSummarySchema,
+  ideaCanvasNodeSchema,
+  ideaCanvasEdgeSchema,
+  type IdeaCanvas,
+  type IdeaCanvasSummary,
+  type IdeaCanvasNode,
+  type IdeaCanvasEdge,
+  type CreateIdeaCanvasInput,
+  type UpdateIdeaCanvasInput,
+  type CreateCanvasNodeInput,
+  type UpdateCanvasNodeInput,
+  type BatchUpdateCanvasNodesInput,
+  type CreateCanvasEdgeInput,
+  type UpdateCanvasEdgeInput,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -5151,6 +5170,173 @@ export const deleteNoteFolder = async (
 ): Promise<void> => {
   await apiRequest({
     path: `/v1/households/${householdId}/note-folders/${folderId}`,
+    method: "DELETE",
+  });
+};
+
+// ── Note Templates ─────────────────────────────────────────────────────
+
+export const getNoteTemplates = async (
+  householdId: string
+): Promise<NoteTemplate[]> => apiRequest({
+  path: `/v1/households/${householdId}/note-templates`,
+  schema: z.array(noteTemplateSchema),
+});
+
+export const createNoteTemplate = async (
+  householdId: string,
+  input: CreateNoteTemplateInput
+): Promise<NoteTemplate> => apiRequest({
+  path: `/v1/households/${householdId}/note-templates`,
+  method: "POST",
+  body: input,
+  schema: noteTemplateSchema,
+});
+
+export const updateNoteTemplate = async (
+  householdId: string,
+  templateId: string,
+  input: UpdateNoteTemplateInput
+): Promise<NoteTemplate> => apiRequest({
+  path: `/v1/households/${householdId}/note-templates/${templateId}`,
+  method: "PATCH",
+  body: input,
+  schema: noteTemplateSchema,
+});
+
+export const deleteNoteTemplate = async (
+  householdId: string,
+  templateId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/note-templates/${templateId}`,
+    method: "DELETE",
+  });
+};
+
+// ─── Idea Canvas ─────────────────────────────────────────────────────────────
+
+export const getCanvases = async (
+  householdId: string
+): Promise<IdeaCanvasSummary[]> => apiRequest({
+  path: `/v1/households/${householdId}/canvases`,
+  schema: z.array(ideaCanvasSummarySchema),
+});
+
+export const getCanvas = async (
+  householdId: string,
+  canvasId: string
+): Promise<IdeaCanvas> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}`,
+  schema: ideaCanvasSchema,
+});
+
+export const createCanvas = async (
+  householdId: string,
+  input: CreateIdeaCanvasInput
+): Promise<IdeaCanvas> => apiRequest({
+  path: `/v1/households/${householdId}/canvases`,
+  method: "POST",
+  body: input,
+  schema: ideaCanvasSchema,
+});
+
+export const updateCanvas = async (
+  householdId: string,
+  canvasId: string,
+  input: UpdateIdeaCanvasInput
+): Promise<IdeaCanvas> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasSchema,
+});
+
+export const deleteCanvas = async (
+  householdId: string,
+  canvasId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/canvases/${canvasId}`,
+    method: "DELETE",
+  });
+};
+
+export const createCanvasNode = async (
+  householdId: string,
+  canvasId: string,
+  input: CreateCanvasNodeInput
+): Promise<IdeaCanvasNode> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/nodes`,
+  method: "POST",
+  body: input,
+  schema: ideaCanvasNodeSchema,
+});
+
+export const updateCanvasNode = async (
+  householdId: string,
+  canvasId: string,
+  nodeId: string,
+  input: UpdateCanvasNodeInput
+): Promise<IdeaCanvasNode> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/nodes/${nodeId}`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasNodeSchema,
+});
+
+export const deleteCanvasNode = async (
+  householdId: string,
+  canvasId: string,
+  nodeId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/canvases/${canvasId}/nodes/${nodeId}`,
+    method: "DELETE",
+  });
+};
+
+export const batchUpdateCanvasNodes = async (
+  householdId: string,
+  canvasId: string,
+  input: BatchUpdateCanvasNodesInput
+): Promise<IdeaCanvas> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/nodes/batch`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasSchema,
+});
+
+export const createCanvasEdge = async (
+  householdId: string,
+  canvasId: string,
+  input: CreateCanvasEdgeInput
+): Promise<IdeaCanvasEdge> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/edges`,
+  method: "POST",
+  body: input,
+  schema: ideaCanvasEdgeSchema,
+});
+
+export const updateCanvasEdge = async (
+  householdId: string,
+  canvasId: string,
+  edgeId: string,
+  input: UpdateCanvasEdgeInput
+): Promise<IdeaCanvasEdge> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/edges/${edgeId}`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasEdgeSchema,
+});
+
+export const deleteCanvasEdge = async (
+  householdId: string,
+  canvasId: string,
+  edgeId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/canvases/${canvasId}/edges/${edgeId}`,
     method: "DELETE",
   });
 };

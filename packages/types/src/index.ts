@@ -5345,3 +5345,186 @@ export const updateNoteFolderSchema = z.object({
 });
 export type UpdateNoteFolderInput = z.infer<typeof updateNoteFolderSchema>;
 
+// ── NoteTemplate ───────────────────────────────────────────────
+
+export const noteTemplateSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  name: z.string().min(1).max(200),
+  description: z.string().max(500).nullable().default(null),
+  bodyTemplate: z.string().max(20000),
+  entryType: entryTypeSchema.default("note"),
+  defaultTags: z.array(z.string().max(100)).max(20).default([]),
+  defaultFlags: z.array(entryFlagSchema).default([]),
+  isBuiltIn: z.boolean().default(false),
+  sortOrder: z.number().int().default(0),
+  createdById: z.string().cuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type NoteTemplate = z.infer<typeof noteTemplateSchema>;
+
+export const noteTemplateListSchema = z.array(noteTemplateSchema);
+
+export const createNoteTemplateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(500).optional().nullable(),
+  bodyTemplate: z.string().max(20000),
+  entryType: entryTypeSchema.optional(),
+  defaultTags: z.array(z.string().trim().max(100)).max(20).optional(),
+  defaultFlags: z.array(entryFlagSchema).optional(),
+  sortOrder: z.number().int().optional()
+});
+export type CreateNoteTemplateInput = z.input<typeof createNoteTemplateSchema>;
+
+export const updateNoteTemplateSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(500).optional().nullable(),
+  bodyTemplate: z.string().max(20000).optional(),
+  entryType: entryTypeSchema.optional(),
+  defaultTags: z.array(z.string().trim().max(100)).max(20).optional(),
+  defaultFlags: z.array(entryFlagSchema).optional(),
+  sortOrder: z.number().int().optional()
+});
+export type UpdateNoteTemplateInput = z.infer<typeof updateNoteTemplateSchema>;
+
+// ─── Idea Canvas ─────────────────────────────────────────────────────────────
+
+export const canvasNodeShapeSchema = z.enum([
+  "rectangle", "rounded", "pill", "diamond"
+]);
+export type CanvasNodeShape = z.infer<typeof canvasNodeShapeSchema>;
+
+export const canvasEdgeStyleSchema = z.enum([
+  "solid", "dashed", "dotted"
+]);
+export type CanvasEdgeStyle = z.infer<typeof canvasEdgeStyleSchema>;
+
+export const ideaCanvasNodeSchema = z.object({
+  id: z.string(),
+  canvasId: z.string(),
+  entryId: z.string().nullable(),
+  label: z.string(),
+  body: z.string().nullable(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  color: z.string().nullable(),
+  shape: canvasNodeShapeSchema,
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type IdeaCanvasNode = z.infer<typeof ideaCanvasNodeSchema>;
+
+export const ideaCanvasEdgeSchema = z.object({
+  id: z.string(),
+  canvasId: z.string(),
+  sourceNodeId: z.string(),
+  targetNodeId: z.string(),
+  label: z.string().nullable(),
+  style: canvasEdgeStyleSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type IdeaCanvasEdge = z.infer<typeof ideaCanvasEdgeSchema>;
+
+export const ideaCanvasSchema = z.object({
+  id: z.string(),
+  householdId: z.string(),
+  name: z.string(),
+  entityType: z.string().nullable(),
+  entityId: z.string().nullable(),
+  zoom: z.number(),
+  panX: z.number(),
+  panY: z.number(),
+  createdById: z.string(),
+  nodes: z.array(ideaCanvasNodeSchema),
+  edges: z.array(ideaCanvasEdgeSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type IdeaCanvas = z.infer<typeof ideaCanvasSchema>;
+
+export const ideaCanvasSummarySchema = z.object({
+  id: z.string(),
+  householdId: z.string(),
+  name: z.string(),
+  entityType: z.string().nullable(),
+  entityId: z.string().nullable(),
+  nodeCount: z.number(),
+  edgeCount: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type IdeaCanvasSummary = z.infer<typeof ideaCanvasSummarySchema>;
+
+export const createIdeaCanvasSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  entityType: z.string().max(50).optional(),
+  entityId: z.string().optional(),
+});
+export type CreateIdeaCanvasInput = z.input<typeof createIdeaCanvasSchema>;
+
+export const updateIdeaCanvasSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  zoom: z.number().min(0.1).max(10).optional(),
+  panX: z.number().optional(),
+  panY: z.number().optional(),
+});
+export type UpdateIdeaCanvasInput = z.infer<typeof updateIdeaCanvasSchema>;
+
+export const createCanvasNodeSchema = z.object({
+  label: z.string().trim().min(1).max(500),
+  body: z.string().max(5000).optional(),
+  entryId: z.string().optional(),
+  x: z.number().default(0),
+  y: z.number().default(0),
+  width: z.number().min(40).max(800).default(160),
+  height: z.number().min(30).max(600).default(80),
+  color: z.string().max(30).optional(),
+  shape: canvasNodeShapeSchema.default("rectangle"),
+  sortOrder: z.number().int().default(0),
+});
+export type CreateCanvasNodeInput = z.input<typeof createCanvasNodeSchema>;
+
+export const updateCanvasNodeSchema = z.object({
+  label: z.string().trim().min(1).max(500).optional(),
+  body: z.string().max(5000).optional().nullable(),
+  entryId: z.string().optional().nullable(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().min(40).max(800).optional(),
+  height: z.number().min(30).max(600).optional(),
+  color: z.string().max(30).optional().nullable(),
+  shape: canvasNodeShapeSchema.optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type UpdateCanvasNodeInput = z.infer<typeof updateCanvasNodeSchema>;
+
+export const batchUpdateCanvasNodesSchema = z.object({
+  nodes: z.array(z.object({
+    id: z.string(),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    width: z.number().min(40).max(800).optional(),
+    height: z.number().min(30).max(600).optional(),
+  })).min(1).max(200),
+});
+export type BatchUpdateCanvasNodesInput = z.infer<typeof batchUpdateCanvasNodesSchema>;
+
+export const createCanvasEdgeSchema = z.object({
+  sourceNodeId: z.string(),
+  targetNodeId: z.string(),
+  label: z.string().max(200).optional(),
+  style: canvasEdgeStyleSchema.default("solid"),
+});
+export type CreateCanvasEdgeInput = z.input<typeof createCanvasEdgeSchema>;
+
+export const updateCanvasEdgeSchema = z.object({
+  label: z.string().max(200).optional().nullable(),
+  style: canvasEdgeStyleSchema.optional(),
+});
+export type UpdateCanvasEdgeInput = z.infer<typeof updateCanvasEdgeSchema>;
+

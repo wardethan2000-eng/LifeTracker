@@ -64,6 +64,8 @@ import { hobbyRoutineRoutes } from "./routes/hobbies/routines.js";
 import { hobbyCollectionRoutes } from "./routes/hobbies/collection.js";
 import { hobbyShoppingListRoutes } from "./routes/hobbies/shopping-list.js";
 import { noteFolderRoutes } from "./routes/notes/index.js";
+import { noteTemplateRoutes } from "./routes/notes/templates.js";
+import { ideaCanvasRoutes } from "./routes/canvases/index.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
@@ -123,7 +125,9 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   hobbyRoutineRoutes,
   hobbyCollectionRoutes,
   hobbyShoppingListRoutes,
-  noteFolderRoutes
+  noteFolderRoutes,
+  noteTemplateRoutes,
+  ideaCanvasRoutes
 ];
 
 const assetRoutePlugins: FastifyPluginAsync[] = [

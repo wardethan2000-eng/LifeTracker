@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { ApiError, getMe, getNoteFolders, getEntries } from "../../../lib/api";
+import { ApiError, getCanvases, getMe, getNoteFolders, getEntries, getNoteTemplates } from "../../../lib/api";
 import { NotesHub } from "../../../components/notes-hub";
 
 export default async function NotesPage(): Promise<JSX.Element> {
@@ -15,9 +15,11 @@ export default async function NotesPage(): Promise<JSX.Element> {
       );
     }
 
-    const [folders, entries] = await Promise.all([
+    const [folders, entries, templates, canvases] = await Promise.all([
       getNoteFolders(household.id),
       getEntries(household.id, { entityType: "notebook", entityId: household.id }),
+      getNoteTemplates(household.id),
+      getCanvases(household.id),
     ]);
 
     return (
@@ -36,6 +38,8 @@ export default async function NotesPage(): Promise<JSX.Element> {
             householdId={household.id}
             initialFolders={folders}
             initialEntries={entries.items}
+            templates={templates}
+            canvases={canvases}
           />
         </div>
       </>

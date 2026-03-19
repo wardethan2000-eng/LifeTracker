@@ -4,6 +4,7 @@ import type { Entry, NoteFolder } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { RichEditorDisplay } from "./rich-editor-display";
+import { SaveAsTemplateButton } from "./save-as-template-button";
 
 type NoteListProps = {
   householdId: string;
@@ -97,16 +98,25 @@ export function NoteList({
                   )}
                 </Link>
 
-                <button
-                  className="note-list__delete"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (confirm("Delete this note?")) onDelete(entry.id);
-                  }}
-                  title="Delete note"
-                >
-                  ×
-                </button>
+                <div className="note-list__actions">
+                  <SaveAsTemplateButton
+                    householdId={householdId}
+                    body={entry.body}
+                    entryType={entry.entryType}
+                    tags={Array.isArray(entry.tags) ? entry.tags as string[] : []}
+                    flags={Array.isArray(entry.flags) ? entry.flags as string[] : []}
+                  />
+                  <button
+                    className="note-list__delete-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (confirm("Delete this note?")) onDelete(entry.id);
+                    }}
+                    title="Delete note"
+                  >
+                    ×
+                  </button>
+                </div>
               </li>
             );
           })}
