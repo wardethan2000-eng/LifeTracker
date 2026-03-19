@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { InventoryItemSummary, ProjectPhaseSupply } from "@lifekeeper/types";
 import type { JSX } from "react";
@@ -27,6 +27,9 @@ type ProjectSuppliesWorkspaceProps = {
   inventoryItems: InventoryItemSummary[];
 };
 
+type SortField = "name" | "status" | "cost" | "remaining";
+type SortDirection = "asc" | "desc";
+
 const DEFAULT_CATEGORIES = ["Materials", "Hardware", "Finishes", "Fixtures", "Logistics"];
 
 const normalizeCategory = (value: string | null | undefined): string | null => {
@@ -34,20 +37,31 @@ const normalizeCategory = (value: string | null | undefined): string | null => {
   return normalized.length > 0 ? normalized : null;
 };
 
-const sortSupplies = (supplies: WorkspaceSupply[]): WorkspaceSupply[] => [...supplies].sort((left, right) => {
-  if (left.isProcured !== right.isProcured) {
-    return left.isProcured ? 1 : -1;
-  }
-
-  const leftOrder = left.sortOrder ?? Number.MAX_SAFE_INTEGER;
-  const rightOrder = right.sortOrder ?? Number.MAX_SAFE_INTEGER;
-
-  if (leftOrder !== rightOrder) {
-    return leftOrder - rightOrder;
-  }
-
-  return left.name.localeCompare(right.name);
-});
+const sortSupplies = (supplies: WorkspaceSupply[], sortField: SortField, sortDir: SortDirection): WorkspaceSupply[] => {
+  const dir = sortDir === "asc" ? 1 : -1;
+  return [...supplies].sort((left, right) => {
+    switch (sortField) {
+      case "name":
+        return dir * left.name.localeCompare(right.name);
+      case "status": {
+        if (left.isProcured !== right.isProcured) return left.isProcured ? dir : -dir;
+        return dir * left.name.localeCompare(right.name);
+      }
+      case "cost": {
+        const lCost = (left.estimatedUnitCost ?? 0) * Math.max(0, left.quantityNeeded - left.quantityOnHand);
+        const rCost = (right.estimatedUnitCost ?? 0) * Math.max(0, right.quantityNeeded - right.quantityOnHand);
+        return dir * (lCost - rCost);
+      }
+      case "remaining": {
+        const lRem = Math.max(0, left.quantityNeeded - left.quantityOnHand);
+        const rRem = Math.max(0, right.quantityNeeded - right.quantityOnHand);
+        return dir * (lRem - rRem);
+      }
+      default:
+        return 0;
+    }
+  });
+};
 
 export function ProjectSuppliesWorkspace({ householdId, projectId, phases, supplies, inventoryItems }: ProjectSuppliesWorkspaceProps): JSX.Element {
   const [customCategories, setCustomCategories] = useState<string[]>(() => Array.from(new Set(supplies.map((supply) => normalizeCategory(supply.category)).filter((category): category is string => category !== null))));
@@ -56,8 +70,14 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "purchased" | "outstanding">("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [phaseFilter, setPhaseFilter] = useState("all");
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [sortField, setSortField] = useState<SortField>("status");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set(["__uncategorized", ...DEFAULT_CATEGORIES, ...supplies.map((s) => normalizeCategory(s.category)).filter((c): c is string => c !== null)]));
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const categorySuggestions = useMemo(() => Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories])).sort((left, right) => left.localeCompare(right)), [customCategories]);
 
@@ -67,6 +87,14 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
       ? optimisticCategories[supply.id] ?? null
       : supply.category
   })), [optimisticCategories, supplies]);
+
+  const uniqueSuppliers = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of visibleSupplies) {
+      if (s.supplier) set.add(s.supplier);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [visibleSupplies]);
 
   const categories = useMemo(() => {
     const fromSupplies = visibleSupplies
@@ -83,21 +111,29 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   const purchasedCount = visibleSupplies.filter((supply) => supply.isProcured).length;
   const outstandingCount = visibleSupplies.length - purchasedCount;
 
-  const filteredSupplies = useMemo(() => sortSupplies(visibleSupplies).filter((supply) => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const fields = [supply.name, supply.category, supply.supplier, supply.description, supply.notes].filter(Boolean) as string[];
-      if (!fields.some((f) => f.toLowerCase().includes(q))) return false;
-    }
-    if (statusFilter === "purchased" && !supply.isProcured) return false;
-    if (statusFilter === "outstanding" && supply.isProcured) return false;
-    if (categoryFilter !== "all") {
-      const cat = normalizeCategory(supply.category);
-      if (categoryFilter === "uncategorized" && cat !== null) return false;
-      if (categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
-    }
-    return true;
-  }), [visibleSupplies, searchQuery, statusFilter, categoryFilter]);
+  const filteredSupplies = useMemo(() => {
+    const filtered = visibleSupplies.filter((supply) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const fields = [supply.name, supply.category, supply.supplier, supply.description, supply.notes].filter(Boolean) as string[];
+        if (!fields.some((f) => f.toLowerCase().includes(q))) return false;
+      }
+      if (statusFilter === "purchased" && !supply.isProcured) return false;
+      if (statusFilter === "outstanding" && supply.isProcured) return false;
+      if (categoryFilter !== "all") {
+        const cat = normalizeCategory(supply.category);
+        if (categoryFilter === "uncategorized" && cat !== null) return false;
+        if (categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
+      }
+      if (phaseFilter !== "all" && supply.phaseId !== phaseFilter) return false;
+      if (supplierFilter !== "all") {
+        if (supplierFilter === "none" && supply.supplier) return false;
+        if (supplierFilter !== "none" && supply.supplier !== supplierFilter) return false;
+      }
+      return true;
+    });
+    return sortSupplies(filtered, sortField, sortDir);
+  }, [visibleSupplies, searchQuery, statusFilter, categoryFilter, phaseFilter, supplierFilter, sortField, sortDir]);
 
   const suppliesByCategory = useMemo(() => {
     const map = new Map<string | null, WorkspaceSupply[]>();
@@ -111,12 +147,13 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   }, [filteredSupplies]);
 
   const sectionOrder = useMemo((): (string | null)[] => {
-    const result: (string | null)[] = [null];
+    const result: (string | null)[] = [];
+    if (suppliesByCategory.has(null)) result.push(null);
     for (const cat of categories) {
-      result.push(cat);
+      if (suppliesByCategory.has(cat)) result.push(cat);
     }
     return result;
-  }, [categories]);
+  }, [categories, suppliesByCategory]);
 
   const handleCreateCategory = () => {
     const normalized = normalizeCategory(newCategoryName);
@@ -141,6 +178,12 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
     });
   };
 
+  const expandAll = () => setCollapsedSections(new Set());
+  const collapseAll = () => {
+    const allKeys = sectionOrder.map((cat) => cat ?? "__uncategorized");
+    setCollapsedSections(new Set(allKeys));
+  };
+
   const handleCategoryChange = (supplyId: string, category: string | null) => {
     setOptimisticCategories((prev) => ({ ...prev, [supplyId]: category }));
     if (category) {
@@ -156,135 +199,220 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
     );
   };
 
+  const activeFilterCount = [
+    statusFilter !== "all",
+    categoryFilter !== "all",
+    phaseFilter !== "all",
+    supplierFilter !== "all",
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setPhaseFilter("all");
+    setSupplierFilter("all");
+  };
+
   return (
     <div className="project-supplies-workspace">
       <Card
-        title="Supplies Workspace"
+        title="Supplies"
         actions={
-          showCategoryInput ? (
-            <div className="project-supplies-workspace__category-maker">
-              <input
-                autoFocus
-                value={newCategoryName}
-                onChange={(event) => setNewCategoryName(event.currentTarget.value)}
-                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleCreateCategory(); } if (event.key === "Escape") { setShowCategoryInput(false); setNewCategoryName(""); } }}
-                placeholder="Category name"
-              />
-              <button type="button" className="button button--ghost button--sm" onClick={handleCreateCategory}>Add</button>
-              <button type="button" className="button button--ghost button--sm" onClick={() => { setShowCategoryInput(false); setNewCategoryName(""); }}>Cancel</button>
-            </div>
-          ) : (
-            <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Create Category</button>
-          )
+          <div className="supply-toolbar">
+            {showCategoryInput ? (
+              <div className="supply-toolbar__inline-input">
+                <input
+                  autoFocus
+                  value={newCategoryName}
+                  onChange={(event) => setNewCategoryName(event.currentTarget.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleCreateCategory(); } if (event.key === "Escape") { setShowCategoryInput(false); setNewCategoryName(""); } }}
+                  placeholder="Category name"
+                />
+                <button type="button" className="button button--ghost button--xs" onClick={handleCreateCategory}>Add</button>
+                <button type="button" className="button button--ghost button--xs" onClick={() => { setShowCategoryInput(false); setNewCategoryName(""); }}>Cancel</button>
+              </div>
+            ) : (
+              <>
+                <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Category</button>
+                <button type="button" className="button button--sm" onClick={() => setShowCreateForm((v) => !v)}>
+                  {showCreateForm ? "Close form" : "+ Add Supply"}
+                </button>
+              </>
+            )}
+          </div>
         }
       >
-        <div className="project-supplies-workspace__summary">
-          <div>
-            <span>Supplies</span>
-            <strong>{visibleSupplies.length}</strong>
+        <div className="supply-stat-bar">
+          <div className="supply-stat">
+            <span>{visibleSupplies.length}</span>
+            <label>Total</label>
           </div>
-          <div>
-            <span>Outstanding</span>
-            <strong>{outstandingCount}</strong>
+          <div className="supply-stat supply-stat--warning">
+            <span>{outstandingCount}</span>
+            <label>Outstanding</label>
           </div>
-          <div>
-            <span>Purchased</span>
-            <strong>{purchasedCount}</strong>
+          <div className="supply-stat supply-stat--success">
+            <span>{purchasedCount}</span>
+            <label>Purchased</label>
           </div>
-          <div>
-            <span>Estimated remaining</span>
-            <strong>{formatCurrency(totalEstimatedRemaining, "$0.00")}</strong>
+          <div className="supply-stat">
+            <span>{formatCurrency(totalEstimatedRemaining, "$0.00")}</span>
+            <label>Est. remaining</label>
           </div>
         </div>
 
-        <div className="supply-filters">
+        <div className="supply-search-bar">
           <input
             type="search"
-            className="supply-filters__search"
-            placeholder="Search supplies…"
+            className="supply-search-bar__input"
+            placeholder="Search supplies..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
           />
-          <select
-            className="supply-filters__select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "purchased" | "outstanding")}
+          <button
+            type="button"
+            className={`button button--ghost button--sm${showFilters ? " button--active" : ""}`}
+            onClick={() => setShowFilters((v) => !v)}
           >
-            <option value="all">All statuses</option>
-            <option value="outstanding">Outstanding</option>
-            <option value="purchased">Purchased</option>
-          </select>
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          </button>
           <select
-            className="supply-filters__select"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.currentTarget.value)}
+            className="supply-search-bar__sort"
+            value={`${sortField}-${sortDir}`}
+            onChange={(e) => {
+              const [f, d] = e.currentTarget.value.split("-") as [SortField, SortDirection];
+              setSortField(f);
+              setSortDir(d);
+            }}
           >
-            <option value="all">All categories</option>
-            <option value="uncategorized">Uncategorized</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
+            <option value="status-asc">Sort: Status</option>
+            <option value="name-asc">Sort: Name A-Z</option>
+            <option value="name-desc">Sort: Name Z-A</option>
+            <option value="cost-desc">Sort: Cost High-Low</option>
+            <option value="cost-asc">Sort: Cost Low-High</option>
+            <option value="remaining-desc">Sort: Remaining High-Low</option>
+            <option value="remaining-asc">Sort: Remaining Low-High</option>
           </select>
         </div>
 
-        <form action={createProjectPhaseSupplyAction} className="project-supplies-create">
-          <input type="hidden" name="householdId" value={householdId} />
-          <input type="hidden" name="projectId" value={projectId} />
-          <div className="project-supplies-create__grid">
-            <label className="field">
-              <span>Phase</span>
-              <select name="phaseId" required defaultValue={phases[0]?.id ?? ""}>
+        {showFilters ? (
+          <div className="supply-advanced-filters">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "purchased" | "outstanding")}
+            >
+              <option value="all">All statuses</option>
+              <option value="outstanding">Outstanding</option>
+              <option value="purchased">Purchased</option>
+            </select>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.currentTarget.value)}
+            >
+              <option value="all">All categories</option>
+              <option value="uncategorized">Uncategorized</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {phases.length > 1 ? (
+              <select
+                value={phaseFilter}
+                onChange={(e) => setPhaseFilter(e.currentTarget.value)}
+              >
+                <option value="all">All phases</option>
                 {phases.map((phase) => (
                   <option key={phase.id} value={phase.id}>{phase.name}</option>
                 ))}
               </select>
-            </label>
-            <label className="field field--full">
-              <span>Supply Name</span>
-              <input name="name" placeholder="Joint compound, screws, vapor barrier" required />
-            </label>
-            <label className="field">
-              <span>Category</span>
-              <>
-                <input name="category" list="project-supplies-categories" placeholder="Materials, hardware, finishes" />
-                <datalist id="project-supplies-categories">
-                  {categorySuggestions.map((category) => (
-                    <option key={category} value={category} />
-                  ))}
-                </datalist>
-              </>
-            </label>
-            <label className="field">
-              <span>Quantity Needed</span>
-              <input name="quantityNeeded" type="number" min="0" step="1" defaultValue="1" required />
-            </label>
-            <label className="field">
-              <span>Unit</span>
-              <input name="unit" defaultValue="each" />
-            </label>
-            <label className="field">
-              <span>Estimated Unit Cost</span>
-              <input name="estimatedUnitCost" type="number" min="0" step="0.01" />
-            </label>
-            <label className="field">
-              <span>Supplier</span>
-              <input name="supplier" />
-            </label>
-            <label className="field">
-              <span>Linked Inventory Item</span>
-              <select name="inventoryItemId" defaultValue="">
-                <option value="">None</option>
-                {inventoryItems.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name} Â· {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
+            ) : null}
+            {uniqueSuppliers.length > 0 ? (
+              <select
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.currentTarget.value)}
+              >
+                <option value="all">All suppliers</option>
+                <option value="none">No supplier</option>
+                {uniqueSuppliers.map((sup) => (
+                  <option key={sup} value={sup}>{sup}</option>
                 ))}
               </select>
-            </label>
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <button type="button" className="button button--ghost button--xs" onClick={clearFilters}>Clear all</button>
+            ) : null}
           </div>
-          <div className="inline-actions" style={{ marginTop: 16 }}>
-            <button type="submit" className="button">Add Supply</button>
-          </div>
-        </form>
+        ) : null}
+
+        {showCreateForm ? (
+          <form action={createProjectPhaseSupplyAction} className="supply-create-form">
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={projectId} />
+            <div className="supply-create-form__grid">
+              <label className="field">
+                <span>Phase</span>
+                <select name="phaseId" required defaultValue={phases[0]?.id ?? ""}>
+                  {phases.map((phase) => (
+                    <option key={phase.id} value={phase.id}>{phase.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field field--span-2">
+                <span>Supply Name</span>
+                <input name="name" placeholder="Joint compound, screws, vapor barrier" required />
+              </label>
+              <label className="field">
+                <span>Category</span>
+                <>
+                  <input name="category" list="project-supplies-categories" placeholder="Materials, hardware" />
+                  <datalist id="project-supplies-categories">
+                    {categorySuggestions.map((category) => (
+                      <option key={category} value={category} />
+                    ))}
+                  </datalist>
+                </>
+              </label>
+              <label className="field">
+                <span>Qty Needed</span>
+                <input name="quantityNeeded" type="number" min="0" step="1" defaultValue="1" required />
+              </label>
+              <label className="field">
+                <span>Unit</span>
+                <input name="unit" defaultValue="each" />
+              </label>
+              <label className="field">
+                <span>Est. Unit Cost</span>
+                <input name="estimatedUnitCost" type="number" min="0" step="0.01" />
+              </label>
+              <label className="field">
+                <span>Supplier</span>
+                <input name="supplier" />
+              </label>
+              <label className="field">
+                <span>Linked Inventory</span>
+                <select name="inventoryItemId" defaultValue="">
+                  <option value="">None</option>
+                  {inventoryItems.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name} · {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="inline-actions" style={{ marginTop: 12 }}>
+              <button type="submit" className="button button--sm">Add Supply</button>
+              <button type="button" className="button button--ghost button--sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
+            </div>
+          </form>
+        ) : null}
       </Card>
+
+      {filteredSupplies.length === 0 && visibleSupplies.length > 0 ? (
+        <p className="supply-sections__empty">
+          No supplies match your filters.
+          {activeFilterCount > 0 ? <button type="button" className="button--link" onClick={clearFilters} style={{ marginLeft: 8 }}>Clear filters</button> : null}
+        </p>
+      ) : null}
 
       {visibleSupplies.length === 0 ? (
         <p className="supply-sections__empty">
@@ -292,9 +420,18 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         </p>
       ) : null}
 
+      {sectionOrder.length > 1 ? (
+        <div className="supply-section-controls">
+          <button type="button" className="button button--ghost button--xs" onClick={expandAll}>Expand all</button>
+          <button type="button" className="button button--ghost button--xs" onClick={collapseAll}>Collapse all</button>
+          <span className="supply-section-controls__count">{filteredSupplies.length} item{filteredSupplies.length !== 1 ? "s" : ""}</span>
+        </div>
+      ) : null}
+
       {sectionOrder.map((category) => {
         const key = category ?? "__uncategorized";
         const sectionSupplies = suppliesByCategory.get(category) ?? [];
+        if (sectionSupplies.length === 0) return null;
         const isCollapsed = collapsedSections.has(key);
         const purchasedInSection = sectionSupplies.filter((s) => s.isProcured).length;
 
@@ -308,18 +445,14 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
             >
               <span className="supply-section__chevron">{isCollapsed ? "\u25B8" : "\u25BE"}</span>
               <h3 className="supply-section__title">{category ?? "Uncategorized"}</h3>
-              <span className="pill pill--muted">{sectionSupplies.length}</span>
-              {sectionSupplies.length > 0 ? (
-                <span className="supply-section__meta">
-                  {purchasedInSection} purchased &middot; {sectionSupplies.length - purchasedInSection} outstanding
-                </span>
-              ) : null}
+              <span className="pill pill--sm pill--muted">{sectionSupplies.length}</span>
+              <span className="supply-section__meta">
+                {purchasedInSection > 0 ? <span className="supply-section__tag supply-section__tag--success">{purchasedInSection} purchased</span> : null}
+                {sectionSupplies.length - purchasedInSection > 0 ? <span className="supply-section__tag supply-section__tag--warning">{sectionSupplies.length - purchasedInSection} outstanding</span> : null}
+              </span>
             </button>
             {!isCollapsed ? (
               <div className="supply-section__body">
-                {sectionSupplies.length === 0 ? (
-                  <p className="supply-section__empty">No supplies in this category.</p>
-                ) : null}
                 {sectionSupplies.map((supply) => (
                   <ProjectSupplyCard
                     key={supply.id}
