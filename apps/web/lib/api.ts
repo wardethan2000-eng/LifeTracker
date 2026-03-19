@@ -105,6 +105,7 @@ import {
   projectSchema,
   cloneProjectSchema,
   reorderProjectPhasesSchema,
+  reorderProjectPhaseSuppliesSchema,
   instantiateProjectTemplateSchema,
   projectSummarySchema,
   projectTaskSchema,
@@ -266,6 +267,7 @@ import {
   type InstantiateProjectTemplateInput,
   type PublicAssetReport,
   type ReorderProjectPhasesInput,
+  type ReorderProjectPhaseSuppliesInput,
   type ShareLink,
   type ServiceProvider,
   type ServiceProviderSpend,
@@ -3149,6 +3151,20 @@ export const updateProjectPhaseSupply = async (
   method: "PATCH",
   body: input,
   schema: projectPhaseSupplySchema
+});
+
+export const reorderProjectPhaseSupplies = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  supplyIds: ReorderProjectPhaseSuppliesInput["supplyIds"]
+): Promise<ReorderProjectPhaseSuppliesInput> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies/reorder`,
+  method: "PATCH",
+  body: { supplyIds },
+  schema: {
+    parse: (value: unknown) => reorderProjectPhaseSuppliesSchema.parse(value)
+  }
 });
 
 export const deleteProjectPhaseSupply = async (

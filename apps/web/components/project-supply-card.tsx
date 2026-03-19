@@ -1,16 +1,17 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import type { DragEventHandler, JSX } from "react";
-import { useState } from "react";
+import type { JSX } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { InventoryItemSummary, ProjectPhaseSupply } from "@lifekeeper/types";
 import {
   allocateSupplyFromInventoryAction,
-  createProjectPurchaseRequestsAction,
   deleteProjectPhaseSupplyAction,
+  updateProjectPhaseSupplyCategoryAction,
   updateProjectPhaseSupplyAction
 } from "../app/actions";
 import { formatCurrency, formatQuantity, formatQuantityValue } from "../lib/formatters";
+import { ConfirmActionForm } from "./confirm-action-form";
 
 type ProjectSupplyCardProps = {
   householdId: string;
@@ -21,10 +22,9 @@ type ProjectSupplyCardProps = {
   linkedInventoryItem?: InventoryItemSummary;
   phaseName?: string;
   openPhaseHref?: string;
-  categorySuggestions?: string[];
-  draggable?: boolean;
-  onDragStart?: DragEventHandler<HTMLDivElement>;
-  onDragEnd?: DragEventHandler<HTMLDivElement>;
+  categories?: string[];
+  onCategoryChange?: (supplyId: string, category: string | null) => void;
+  onCategoryCreated?: (name: string) => void;
 };
 
 const getQuantityRemaining = (supply: ProjectPhaseSupply): number => Math.max(0, Number((supply.quantityNeeded - supply.quantityOnHand).toFixed(2)));
@@ -47,36 +47,6 @@ const getSupplyStateLabel = (supply: ProjectPhaseSupply): string => {
   return "Needs Purchase";
 };
 
-function SupplyToggleForm({
-  householdId,
-  projectId,
-  phaseId,
-  supply,
-  fieldName,
-  nextValue,
-  label,
-}: {
-  householdId: string;
-  projectId: string;
-  phaseId: string;
-  supply: ProjectPhaseSupply;
-  fieldName: "isProcured" | "isStaged";
-  nextValue: boolean;
-  label: string;
-}): JSX.Element {
-  return (
-    <form action={updateProjectPhaseSupplyAction}>
-      <input type="hidden" name="householdId" value={householdId} />
-      <input type="hidden" name="projectId" value={projectId} />
-      <input type="hidden" name="phaseId" value={phaseId} />
-      <input type="hidden" name="supplyId" value={supply.id} />
-      <input type="hidden" name="name" value={supply.name} />
-      <input type="hidden" name={fieldName} value={nextValue ? "true" : "false"} />
-      <button type="submit" className="button button--ghost button--sm">{label}</button>
-    </form>
-  );
-}
-
 export function ProjectSupplyCard({
   householdId,
   projectId,
@@ -86,12 +56,16 @@ export function ProjectSupplyCard({
   linkedInventoryItem,
   phaseName,
   openPhaseHref,
-  categorySuggestions = [],
-  draggable = false,
-  onDragStart,
-  onDragEnd,
+  categories = [],
+  onCategoryChange,
+  onCategoryCreated,
 }: ProjectSupplyCardProps): JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [, startTransition] = useTransition();
+  const menuRef = useRef<HTMLDivElement>(null);
   const quantityRemaining = getQuantityRemaining(supply);
   const allocatableQuantity = linkedInventoryItem
     ? Math.max(0, Math.min(quantityRemaining, linkedInventoryItem.quantityOnHand))
@@ -99,33 +73,121 @@ export function ProjectSupplyCard({
   const estimatedRemainingCost = supply.estimatedUnitCost != null
     ? supply.estimatedUnitCost * quantityRemaining
     : null;
-  const categoryListId = `project-supply-card-category-${supply.id}`;
-  const categoryLabel = supply.category?.trim() || "Uncategorized";
+
+  useEffect(() => {
+    if (!showCategoryMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowCategoryMenu(false);
+        setIsCreatingCategory(false);
+        setNewCatName("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showCategoryMenu]);
+
+  const handleCategorySelect = (category: string | null) => {
+    const current = supply.category?.trim() || null;
+    if (current === category) {
+      setShowCategoryMenu(false);
+      return;
+    }
+    onCategoryChange?.(supply.id, category);
+    setShowCategoryMenu(false);
+    startTransition(() => {
+      void (async () => {
+        const fd = new FormData();
+        fd.set("householdId", householdId);
+        fd.set("projectId", projectId);
+        fd.set("phaseId", phaseId);
+        fd.set("supplyId", supply.id);
+        fd.set("category", category ?? "");
+        await updateProjectPhaseSupplyCategoryAction(fd);
+      })();
+    });
+  };
+
+  const handleCreateAndAssign = () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    onCategoryCreated?.(trimmed);
+    handleCategorySelect(trimmed);
+    setNewCatName("");
+    setIsCreatingCategory(false);
+  };
 
   return (
-    <div
-      className="project-supply-card"
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-    >
+    <div className="project-supply-card">
       <div className="project-supply-card__header">
         <div className="project-supply-card__identity">
           <div className="project-supply-card__title-row">
             <h4>{supply.name}</h4>
-            <span className="pill pill--muted">{categoryLabel}</span>
             <span className={`pill ${supply.isProcured ? "pill--success" : "pill--warning"}`}>{getSupplyStateLabel(supply)}</span>
-            <span className={`pill ${supply.isStaged ? "pill--info" : "pill--muted"}`}>{supply.isStaged ? "Staged" : "Not staged"}</span>
-            {supply.activePurchaseRequest ? <span className="pill pill--info">Request {supply.activePurchaseRequest.purchaseStatus}</span> : null}
           </div>
           <div className="project-supply-card__meta">
             {phaseName ? (openPhaseHref ? <Link href={openPhaseHref} className="text-link">{phaseName}</Link> : <span>{phaseName}</span>) : null}
-            {linkedInventoryItem ? <span>Linked inventory: {linkedInventoryItem.name}</span> : null}
-            {supply.supplier ? <span>Supplier: {supply.supplier}</span> : null}
+            {linkedInventoryItem
+              ? <span className="project-supply-card__inventory-link">ðŸ“¦ {linkedInventoryItem.name} Â· {formatQuantity(linkedInventoryItem.quantityOnHand, linkedInventoryItem.unit)} available</span>
+              : null}
+            {supply.supplier ? <span>{supply.supplier}</span> : null}
           </div>
         </div>
         <div className="project-supply-card__actions">
-          {openPhaseHref ? <Link href={openPhaseHref} className="button button--ghost button--sm">Open Phase</Link> : null}
+          <div className="supply-category-dropdown" ref={menuRef}>
+            <button
+              type="button"
+              className="button button--ghost button--sm"
+              onClick={() => setShowCategoryMenu((v) => !v)}
+            >
+              {supply.category ?? "Category"}
+            </button>
+            {showCategoryMenu ? (
+              <div className="supply-category-dropdown__menu">
+                <button
+                  type="button"
+                  className={`supply-category-dropdown__item${!supply.category ? " supply-category-dropdown__item--active" : ""}`}
+                  onClick={() => handleCategorySelect(null)}
+                >
+                  Uncategorized
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`supply-category-dropdown__item${supply.category === cat ? " supply-category-dropdown__item--active" : ""}`}
+                    onClick={() => handleCategorySelect(cat)}
+                  >
+                    {cat}
+                  </button>
+                ))}
+                <div className="supply-category-dropdown__divider" />
+                {isCreatingCategory ? (
+                  <div className="supply-category-dropdown__create">
+                    <input
+                      autoFocus
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); handleCreateAndAssign(); }
+                        if (e.key === "Escape") { setIsCreatingCategory(false); setNewCatName(""); }
+                      }}
+                      placeholder="Category name"
+                    />
+                    <button type="button" className="button button--ghost button--sm" onClick={handleCreateAndAssign}>Add</button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="supply-category-dropdown__item supply-category-dropdown__item--create"
+                    onClick={() => setIsCreatingCategory(true)}
+                  >
+                    + Create Category
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
           {allocatableQuantity > 0 ? (
             <form action={allocateSupplyFromInventoryAction}>
               <input type="hidden" name="householdId" value={householdId} />
@@ -133,38 +195,39 @@ export function ProjectSupplyCard({
               <input type="hidden" name="phaseId" value={phaseId} />
               <input type="hidden" name="supplyId" value={supply.id} />
               <input type="hidden" name="quantity" value={String(allocatableQuantity)} />
-              <button type="submit" className="button button--ghost button--sm">Use Stock</button>
+              <button type="submit" className="button button--ghost button--sm" title={`Use ${formatQuantityValue(allocatableQuantity)} ${supply.unit} from inventory`}>Use Stock</button>
             </form>
           ) : null}
-          {!supply.activePurchaseRequest && quantityRemaining > 0 ? (
-            <form action={createProjectPurchaseRequestsAction}>
-              <input type="hidden" name="householdId" value={householdId} />
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name="supplyIdsJson" value={JSON.stringify([supply.id])} />
-              <button type="submit" className="button button--ghost button--sm">Request Purchase</button>
-            </form>
-          ) : null}
-          <SupplyToggleForm
-            householdId={householdId}
-            projectId={projectId}
-            phaseId={phaseId}
-            supply={supply}
-            fieldName="isProcured"
-            nextValue={!supply.isProcured}
-            label={supply.isProcured ? "Mark Unpurchased" : "Mark Purchased"}
-          />
-          <SupplyToggleForm
-            householdId={householdId}
-            projectId={projectId}
-            phaseId={phaseId}
-            supply={supply}
-            fieldName="isStaged"
-            nextValue={!supply.isStaged}
-            label={supply.isStaged ? "Mark Unstaged" : "Mark Staged"}
-          />
-          <button type="button" className="button button--secondary button--sm" onClick={() => setIsEditing((current) => !current)}>
-            {isEditing ? "Close Editor" : "Edit"}
+          <form action={updateProjectPhaseSupplyAction}>
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="phaseId" value={phaseId} />
+            <input type="hidden" name="supplyId" value={supply.id} />
+            <input type="hidden" name="name" value={supply.name} />
+            <input type="hidden" name="isProcured" value={supply.isProcured ? "false" : "true"} />
+            <button type="submit" className="button button--ghost button--sm">
+              {supply.isProcured ? "Mark Unpurchased" : "Mark Purchased"}
+            </button>
+          </form>
+          <button type="button" className="button button--ghost button--sm" onClick={() => setIsEditing((current) => !current)}>
+            {isEditing ? "Close" : "Edit"}
           </button>
+          <ConfirmActionForm
+            action={deleteProjectPhaseSupplyAction}
+            hiddenFields={[
+              { name: "householdId", value: householdId },
+              { name: "projectId", value: projectId },
+              { name: "phaseId", value: phaseId },
+              { name: "supplyId", value: supply.id }
+            ]}
+            prompt="Delete this supply?"
+            triggerLabel="Delete"
+            confirmLabel="Yes, delete"
+            className="inline-actions"
+            triggerClassName="button button--danger button--sm"
+            confirmClassName="button button--danger button--sm"
+            cancelClassName="button button--ghost button--sm"
+          />
         </div>
       </div>
 
@@ -205,11 +268,11 @@ export function ProjectSupplyCard({
               <label className="field">
                 <span>Category</span>
                 <>
-                  <input name="category" list={categoryListId} defaultValue={supply.category ?? ""} placeholder="Materials, decor, logistics" />
-                  {categorySuggestions.length > 0 ? (
-                    <datalist id={categoryListId}>
-                      {categorySuggestions.map((category) => (
-                        <option key={category} value={category} />
+                  <input name="category" list={`supply-cat-${supply.id}`} defaultValue={supply.category ?? ""} placeholder="Materials, hardware, finishes" />
+                  {categories.length > 0 ? (
+                    <datalist id={`supply-cat-${supply.id}`}>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat} />
                       ))}
                     </datalist>
                   ) : null}
@@ -248,27 +311,9 @@ export function ProjectSupplyCard({
                 <select name="inventoryItemId" defaultValue={supply.inventoryItemId ?? ""}>
                   <option value="">None</option>
                   {inventoryItems.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name} · {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
+                    <option key={item.id} value={item.id}>{item.name} Â· {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
                   ))}
                 </select>
-              </label>
-              <label className="field">
-                <span>Purchased</span>
-                <select name="isProcured" defaultValue={supply.isProcured ? "true" : "false"}>
-                  <option value="false">Not purchased</option>
-                  <option value="true">Purchased</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>Staged</span>
-                <select name="isStaged" defaultValue={supply.isStaged ? "true" : "false"}>
-                  <option value="false">Not staged</option>
-                  <option value="true">Staged</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>Sort Order</span>
-                <input name="sortOrder" type="number" step="1" defaultValue={supply.sortOrder ?? ""} />
               </label>
               <label className="field field--full">
                 <span>Description</span>
@@ -280,20 +325,28 @@ export function ProjectSupplyCard({
               </label>
             </div>
             <div className="inline-actions" style={{ marginTop: 16 }}>
-              <button type="submit" className="button">Save Supply</button>
-              <button type="button" className="button button--ghost" onClick={() => setIsEditing(false)}>Close</button>
+              <button type="submit" className="button">Save</button>
+              <button type="button" className="button button--ghost" onClick={() => setIsEditing(false)}>Cancel</button>
             </div>
           </form>
 
-          <form action={deleteProjectPhaseSupplyAction} className="inline-actions inline-actions--end" style={{ marginTop: 12 }}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <input type="hidden" name="phaseId" value={phaseId} />
-            <input type="hidden" name="supplyId" value={supply.id} />
-            <button type="submit" className="button button--danger">Delete Supply</button>
-          </form>
+          {supply.inventoryItemId ? (
+            <div className="project-supply-card__inventory-note">
+              <span>Linked to inventory Â· </span>
+              <form action={updateProjectPhaseSupplyAction} style={{ display: "inline" }}>
+                <input type="hidden" name="householdId" value={householdId} />
+                <input type="hidden" name="projectId" value={projectId} />
+                <input type="hidden" name="phaseId" value={phaseId} />
+                <input type="hidden" name="supplyId" value={supply.id} />
+                <input type="hidden" name="name" value={supply.name} />
+                <input type="hidden" name="inventoryItemId" value="" />
+                <button type="submit" className="button--link">Unlink</button>
+              </form>
+            </div>
+          ) : null}
         </div>
       ) : null}
+
     </div>
   );
 }

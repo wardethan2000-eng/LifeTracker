@@ -696,7 +696,7 @@ function PhaseSuppliesSubtab({
           phaseId={phaseId}
           supply={supply}
           inventoryItems={inventoryItems}
-          categorySuggestions={Array.from(new Set(supplies.map((item) => item.category?.trim()).filter((category): category is string => Boolean(category))))}
+          categories={Array.from(new Set(supplies.map((item) => item.category?.trim()).filter((category): category is string => Boolean(category))))}
           {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
             ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
             : {})}

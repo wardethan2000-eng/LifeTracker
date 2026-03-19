@@ -56,18 +56,7 @@ export function ProjectSupplyRollupActions({
           <input type="hidden" name="name" value={supply.name} />
           <input type="hidden" name="isProcured" value={supply.isProcured ? "false" : "true"} />
           <button type="submit" className="button button--ghost button--sm">
-            {supply.isProcured ? "Undo Procured" : "Mark Procured"}
-          </button>
-        </form>
-        <form action={updateProjectPhaseSupplyAction}>
-          <input type="hidden" name="householdId" value={householdId} />
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="phaseId" value={phaseId} />
-          <input type="hidden" name="supplyId" value={supply.id} />
-          <input type="hidden" name="name" value={supply.name} />
-          <input type="hidden" name="isStaged" value={supply.isStaged ? "false" : "true"} />
-          <button type="submit" className="button button--ghost button--sm">
-            {supply.isStaged ? "Unstage" : "Stage"}
+            {supply.isProcured ? "Mark Unpurchased" : "Mark Purchased"}
           </button>
         </form>
         {allocatableQuantity > 0 ? (
@@ -77,7 +66,7 @@ export function ProjectSupplyRollupActions({
             <input type="hidden" name="phaseId" value={phaseId} />
             <input type="hidden" name="supplyId" value={supply.id} />
             <input type="hidden" name="quantity" value={String(allocatableQuantity)} />
-            <button type="submit" className="button button--ghost button--sm" title={`Allocate ${allocatableQuantity} ${supply.unit} from inventory`}>
+            <button type="submit" className="button button--ghost button--sm" title={`Use ${allocatableQuantity} ${supply.unit} from inventory`}>
               Use Stock
             </button>
           </form>

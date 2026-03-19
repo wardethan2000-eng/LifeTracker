@@ -20,25 +20,23 @@ const SuppliesWorkspaceSkeleton = (): JSX.Element => (
     </div>
     <div className="card__body">
       <div className="project-supplies-workspace__summary">
-        {[1, 2, 3, 4, 5].map((row) => (
+        {[1, 2, 3, 4].map((row) => (
           <div key={row}>
             <span><div className="skeleton-bar" style={{ width: 90, height: 10 }} /></span>
             <strong><div className="skeleton-bar" style={{ width: 48, height: 16, marginTop: 8 }} /></strong>
           </div>
         ))}
       </div>
-      <div className="project-supplies-board" style={{ marginTop: 20 }}>
-        {[1, 2, 3].map((column) => (
-          <div key={column} className="project-supplies-column">
-            <div className="project-supplies-column__header">
-              <div>
-                <div className="skeleton-bar" style={{ width: 120, height: 16 }} />
-                <div className="skeleton-bar" style={{ width: 180, height: 12, marginTop: 8 }} />
-              </div>
+      <div style={{ marginTop: 20, display: "grid", gap: 12 }}>
+        {[1, 2, 3].map((section) => (
+          <div key={section} className="supply-section">
+            <div className="supply-section__header" style={{ pointerEvents: "none" }}>
+              <div className="skeleton-bar" style={{ width: 120, height: 16 }} />
+              <div className="skeleton-bar" style={{ width: 40, height: 20 }} />
             </div>
-            <div className="project-supplies-column__body">
+            <div className="supply-section__body">
               <div className="skeleton-bar" style={{ width: "100%", height: 110 }} />
-              <div className="skeleton-bar" style={{ width: "100%", height: 110, marginTop: 12 }} />
+              <div className="skeleton-bar" style={{ width: "100%", height: 110 }} />
             </div>
           </div>
         ))}

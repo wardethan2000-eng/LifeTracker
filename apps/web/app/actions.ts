@@ -175,6 +175,7 @@ import {
   recordConditionAssessment,
   removeProjectAsset,
   reorderProjectPhases,
+  reorderProjectPhaseSupplies,
   revokeInvitation,
   restoreAsset,
   restoreSpace as restoreSpaceRequest,
@@ -949,8 +950,7 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
   revalidatePath("/projects");
 
   if (projectId) {
-    revalidatePath(`/projects/${projectId}?householdId=${householdId}`);
-    revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/projects/${projectId}`, "layout");
   }
 };
 
@@ -3175,6 +3175,21 @@ export async function deleteProjectPhaseSupplyAction(formData: FormData): Promis
   const supplyId = getRequiredString(formData, "supplyId");
 
   await deleteProjectPhaseSupply(householdId, projectId, phaseId, supplyId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function reorderProjectPhaseSuppliesAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const supplyIdsJson = getRequiredString(formData, "supplyIds");
+  const parsed = JSON.parse(supplyIdsJson) as unknown;
+
+  if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
+    throw new Error("supplyIds must be a JSON array of supply ID strings.");
+  }
+
+  await reorderProjectPhaseSupplies(householdId, projectId, phaseId, parsed);
   revalidateProjectPaths(householdId, projectId);
 }
 

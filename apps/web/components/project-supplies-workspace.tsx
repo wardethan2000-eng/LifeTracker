@@ -1,13 +1,9 @@
-"use client";
+﻿"use client";
 
 import type { InventoryItemSummary, ProjectPhaseSupply } from "@lifekeeper/types";
-import type { DragEvent, JSX } from "react";
-import { useMemo, useState, useTransition } from "react";
-import {
-  createProjectPhaseSupplyAction,
-  createProjectPurchaseRequestsAction,
-  updateProjectPhaseSupplyCategoryAction
-} from "../app/actions";
+import type { JSX } from "react";
+import { useMemo, useState } from "react";
+import { createProjectPhaseSupplyAction } from "../app/actions";
 import { formatCurrency, formatQuantity } from "../lib/formatters";
 import { Card } from "./card";
 import { ProjectSupplyCard } from "./project-supply-card";
@@ -55,11 +51,13 @@ const sortSupplies = (supplies: WorkspaceSupply[]): WorkspaceSupply[] => [...sup
 
 export function ProjectSuppliesWorkspace({ householdId, projectId, phases, supplies, inventoryItems }: ProjectSuppliesWorkspaceProps): JSX.Element {
   const [customCategories, setCustomCategories] = useState<string[]>(() => Array.from(new Set(supplies.map((supply) => normalizeCategory(supply.category)).filter((category): category is string => category !== null))));
+  const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [draggedSupplyId, setDraggedSupplyId] = useState<string | null>(null);
-  const [hoveredCategory, setHoveredCategory] = useState<string | null | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "purchased" | "outstanding">("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
-  const [isMovePending, startMoveTransition] = useTransition();
 
   const categorySuggestions = useMemo(() => Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories])).sort((left, right) => left.localeCompare(right)), [customCategories]);
 
@@ -82,89 +80,80 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
     const remaining = Math.max(0, supply.quantityNeeded - supply.quantityOnHand);
     return sum + ((supply.estimatedUnitCost ?? 0) * remaining);
   }, 0);
-  const requestedCount = visibleSupplies.filter((supply) => supply.activePurchaseRequest !== null).length;
   const purchasedCount = visibleSupplies.filter((supply) => supply.isProcured).length;
   const outstandingCount = visibleSupplies.length - purchasedCount;
 
-  const suppliesByCategory = new Map<string | null, WorkspaceSupply[]>();
+  const filteredSupplies = useMemo(() => sortSupplies(visibleSupplies).filter((supply) => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const fields = [supply.name, supply.category, supply.supplier, supply.description, supply.notes].filter(Boolean) as string[];
+      if (!fields.some((f) => f.toLowerCase().includes(q))) return false;
+    }
+    if (statusFilter === "purchased" && !supply.isProcured) return false;
+    if (statusFilter === "outstanding" && supply.isProcured) return false;
+    if (categoryFilter !== "all") {
+      const cat = normalizeCategory(supply.category);
+      if (categoryFilter === "uncategorized" && cat !== null) return false;
+      if (categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
+    }
+    return true;
+  }), [visibleSupplies, searchQuery, statusFilter, categoryFilter]);
 
-  for (const category of [null, ...categories]) {
-    suppliesByCategory.set(category, []);
-  }
+  const suppliesByCategory = useMemo(() => {
+    const map = new Map<string | null, WorkspaceSupply[]>();
+    for (const supply of filteredSupplies) {
+      const cat = normalizeCategory(supply.category);
+      const bucket = map.get(cat) ?? [];
+      bucket.push(supply);
+      map.set(cat, bucket);
+    }
+    return map;
+  }, [filteredSupplies]);
 
-  for (const supply of sortSupplies(visibleSupplies)) {
-    const category = normalizeCategory(supply.category);
-    const bucket = suppliesByCategory.get(category) ?? [];
-    bucket.push(supply);
-    suppliesByCategory.set(category, bucket);
-  }
+  const sectionOrder = useMemo((): (string | null)[] => {
+    const result: (string | null)[] = [null];
+    for (const cat of categories) {
+      result.push(cat);
+    }
+    return result;
+  }, [categories]);
 
   const handleCreateCategory = () => {
     const normalized = normalizeCategory(newCategoryName);
 
     if (!normalized || customCategories.includes(normalized)) {
       setNewCategoryName("");
+      setShowCategoryInput(false);
       return;
     }
 
     setCustomCategories((current) => [...current, normalized].sort((left, right) => left.localeCompare(right)));
     setNewCategoryName("");
+    setShowCategoryInput(false);
   };
 
-  const handleDrop = (targetCategory: string | null) => {
-    if (!draggedSupplyId) {
-      return;
-    }
-
-    const supply = visibleSupplies.find((item) => item.id === draggedSupplyId);
-
-    if (!supply) {
-      return;
-    }
-
-    const previousCategory = normalizeCategory(supply.category);
-    const normalizedTargetCategory = normalizeCategory(targetCategory);
-
-    if (previousCategory === normalizedTargetCategory) {
-      setDraggedSupplyId(null);
-      setHoveredCategory(undefined);
-      return;
-    }
-
-    setOptimisticCategories((current) => ({
-      ...current,
-      [supply.id]: normalizedTargetCategory
-    }));
-
-    if (normalizedTargetCategory) {
-      setCustomCategories((current) => current.includes(normalizedTargetCategory)
-        ? current
-        : [...current, normalizedTargetCategory].sort((left, right) => left.localeCompare(right)));
-    }
-
-    setDraggedSupplyId(null);
-    setHoveredCategory(undefined);
-
-    startMoveTransition(() => {
-      void (async () => {
-        const formData = new FormData();
-        formData.set("householdId", householdId);
-        formData.set("projectId", projectId);
-        formData.set("phaseId", supply.phaseId);
-        formData.set("supplyId", supply.id);
-        formData.set("category", normalizedTargetCategory ?? "");
-
-        try {
-          await updateProjectPhaseSupplyCategoryAction(formData);
-        } catch (error) {
-          setOptimisticCategories((current) => ({
-            ...current,
-            [supply.id]: previousCategory
-          }));
-          throw error;
-        }
-      })();
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
+  };
+
+  const handleCategoryChange = (supplyId: string, category: string | null) => {
+    setOptimisticCategories((prev) => ({ ...prev, [supplyId]: category }));
+    if (category) {
+      setCustomCategories((prev) =>
+        prev.includes(category) ? prev : [...prev, category].sort((a, b) => a.localeCompare(b))
+      );
+    }
+  };
+
+  const handleCategoryCreated = (name: string) => {
+    setCustomCategories((prev) =>
+      prev.includes(name) ? prev : [...prev, name].sort((a, b) => a.localeCompare(b))
+    );
   };
 
   return (
@@ -172,11 +161,21 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
       <Card
         title="Supplies Workspace"
         actions={
-          <form action={createProjectPurchaseRequestsAction}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <button type="submit" className="button button--sm">Create Draft Purchases</button>
-          </form>
+          showCategoryInput ? (
+            <div className="project-supplies-workspace__category-maker">
+              <input
+                autoFocus
+                value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.currentTarget.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleCreateCategory(); } if (event.key === "Escape") { setShowCategoryInput(false); setNewCategoryName(""); } }}
+                placeholder="Category name"
+              />
+              <button type="button" className="button button--ghost button--sm" onClick={handleCreateCategory}>Add</button>
+              <button type="button" className="button button--ghost button--sm" onClick={() => { setShowCategoryInput(false); setNewCategoryName(""); }}>Cancel</button>
+            </div>
+          ) : (
+            <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Create Category</button>
+          )
         }
       >
         <div className="project-supplies-workspace__summary">
@@ -193,27 +192,39 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
             <strong>{purchasedCount}</strong>
           </div>
           <div>
-            <span>Requested</span>
-            <strong>{requestedCount}</strong>
-          </div>
-          <div>
             <span>Estimated remaining</span>
             <strong>{formatCurrency(totalEstimatedRemaining, "$0.00")}</strong>
           </div>
         </div>
 
-        <div className="project-supplies-workspace__bar">
-          <div className="project-supplies-workspace__hint">
-            Drag any supply card into a category lane to reorganize the plan. Purchased state, staging, stock allocation, and editing stay on the card.
-          </div>
-          <div className="project-supplies-workspace__category-maker">
-            <input
-              value={newCategoryName}
-              onChange={(event) => setNewCategoryName(event.currentTarget.value)}
-              placeholder="Create category"
-            />
-            <button type="button" className="button button--ghost button--sm" onClick={handleCreateCategory}>Add Category</button>
-          </div>
+        <div className="supply-filters">
+          <input
+            type="search"
+            className="supply-filters__search"
+            placeholder="Search supplies…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.currentTarget.value)}
+          />
+          <select
+            className="supply-filters__select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "purchased" | "outstanding")}
+          >
+            <option value="all">All statuses</option>
+            <option value="outstanding">Outstanding</option>
+            <option value="purchased">Purchased</option>
+          </select>
+          <select
+            className="supply-filters__select"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.currentTarget.value)}
+          >
+            <option value="all">All categories</option>
+            <option value="uncategorized">Uncategorized</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
         </div>
 
         <form action={createProjectPhaseSupplyAction} className="project-supplies-create">
@@ -235,7 +246,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
             <label className="field">
               <span>Category</span>
               <>
-                <input name="category" list="project-supplies-categories" placeholder="Materials, decor, logistics" />
+                <input name="category" list="project-supplies-categories" placeholder="Materials, hardware, finishes" />
                 <datalist id="project-supplies-categories">
                   {categorySuggestions.map((category) => (
                     <option key={category} value={category} />
@@ -264,7 +275,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
               <select name="inventoryItemId" defaultValue="">
                 <option value="">None</option>
                 {inventoryItems.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name} · {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
+                  <option key={item.id} value={item.id}>{item.name} Â· {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
                 ))}
               </select>
             </label>
@@ -275,131 +286,61 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         </form>
       </Card>
 
-      <div className="project-supplies-board" aria-busy={isMovePending}>
-        <CategoryColumn
-          title="Uncategorized"
-          description="Catch-all lane for anything that still needs a home."
-          supplies={suppliesByCategory.get(null) ?? []}
-          isActiveDropTarget={hoveredCategory === null}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setHoveredCategory(null);
-          }}
-          onDragLeave={() => setHoveredCategory(undefined)}
-          onDrop={(event) => {
-            event.preventDefault();
-            handleDrop(null);
-          }}
-        >
-          {(suppliesByCategory.get(null) ?? []).map((supply) => (
-            <ProjectSupplyCard
-              key={supply.id}
-              householdId={householdId}
-              projectId={projectId}
-              phaseId={supply.phaseId}
-              phaseName={supply.phaseName}
-              openPhaseHref={supply.openPhaseHref}
-              supply={supply}
-              inventoryItems={inventoryItems}
-              {...(supply.linkedInventoryItem ? { linkedInventoryItem: supply.linkedInventoryItem } : {})}
-              categorySuggestions={categorySuggestions}
-              draggable
-              onDragStart={() => setDraggedSupplyId(supply.id)}
-              onDragEnd={() => {
-                setDraggedSupplyId(null);
-                setHoveredCategory(undefined);
-              }}
-            />
-          ))}
-        </CategoryColumn>
+      {visibleSupplies.length === 0 ? (
+        <p className="supply-sections__empty">
+          No supplies yet. Add your first supply above.
+        </p>
+      ) : null}
 
-        {categories.map((category) => {
-          const laneSupplies = suppliesByCategory.get(category) ?? [];
-          const purchasedInLane = laneSupplies.filter((supply) => supply.isProcured).length;
-          const outstandingInLane = laneSupplies.length - purchasedInLane;
+      {sectionOrder.map((category) => {
+        const key = category ?? "__uncategorized";
+        const sectionSupplies = suppliesByCategory.get(category) ?? [];
+        const isCollapsed = collapsedSections.has(key);
+        const purchasedInSection = sectionSupplies.filter((s) => s.isProcured).length;
 
-          return (
-            <CategoryColumn
-              key={category}
-              title={category}
-              description={`${outstandingInLane} outstanding · ${purchasedInLane} purchased`}
-              supplies={laneSupplies}
-              isActiveDropTarget={hoveredCategory === category}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setHoveredCategory(category);
-              }}
-              onDragLeave={() => setHoveredCategory(undefined)}
-              onDrop={(event) => {
-                event.preventDefault();
-                handleDrop(category);
-              }}
+        return (
+          <section key={key} className="supply-section">
+            <button
+              type="button"
+              className="supply-section__header"
+              onClick={() => toggleSection(key)}
+              aria-expanded={!isCollapsed}
             >
-              {laneSupplies.map((supply) => (
-                <ProjectSupplyCard
-                  key={supply.id}
-                  householdId={householdId}
-                  projectId={projectId}
-                  phaseId={supply.phaseId}
-                  phaseName={supply.phaseName}
-                  openPhaseHref={supply.openPhaseHref}
-                  supply={supply}
-                  inventoryItems={inventoryItems}
-                  {...(supply.linkedInventoryItem ? { linkedInventoryItem: supply.linkedInventoryItem } : {})}
-                  categorySuggestions={categorySuggestions}
-                  draggable
-                  onDragStart={() => setDraggedSupplyId(supply.id)}
-                  onDragEnd={() => {
-                    setDraggedSupplyId(null);
-                    setHoveredCategory(undefined);
-                  }}
-                />
-              ))}
-            </CategoryColumn>
-          );
-        })}
-      </div>
+              <span className="supply-section__chevron">{isCollapsed ? "\u25B8" : "\u25BE"}</span>
+              <h3 className="supply-section__title">{category ?? "Uncategorized"}</h3>
+              <span className="pill pill--muted">{sectionSupplies.length}</span>
+              {sectionSupplies.length > 0 ? (
+                <span className="supply-section__meta">
+                  {purchasedInSection} purchased &middot; {sectionSupplies.length - purchasedInSection} outstanding
+                </span>
+              ) : null}
+            </button>
+            {!isCollapsed ? (
+              <div className="supply-section__body">
+                {sectionSupplies.length === 0 ? (
+                  <p className="supply-section__empty">No supplies in this category.</p>
+                ) : null}
+                {sectionSupplies.map((supply) => (
+                  <ProjectSupplyCard
+                    key={supply.id}
+                    householdId={householdId}
+                    projectId={projectId}
+                    phaseId={supply.phaseId}
+                    phaseName={supply.phaseName}
+                    openPhaseHref={supply.openPhaseHref}
+                    supply={supply}
+                    inventoryItems={inventoryItems}
+                    {...(supply.linkedInventoryItem ? { linkedInventoryItem: supply.linkedInventoryItem } : {})}
+                    categories={categorySuggestions}
+                    onCategoryChange={handleCategoryChange}
+                    onCategoryCreated={handleCategoryCreated}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </section>
+        );
+      })}
     </div>
-  );
-}
-
-function CategoryColumn({
-  title,
-  description,
-  supplies,
-  isActiveDropTarget,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  children,
-}: {
-  title: string;
-  description: string;
-  supplies: WorkspaceSupply[];
-  isActiveDropTarget: boolean;
-  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDragLeave: () => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
-  children: JSX.Element[];
-}): JSX.Element {
-  return (
-    <section
-      className={`project-supplies-column${isActiveDropTarget ? " project-supplies-column--active" : ""}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
-      <div className="project-supplies-column__header">
-        <div>
-          <h3>{title}</h3>
-          <p>{description}</p>
-        </div>
-        <span className="pill pill--muted">{supplies.length}</span>
-      </div>
-      <div className="project-supplies-column__body">
-        {children}
-        {supplies.length === 0 ? <p className="project-supplies-column__empty">Drop supplies here.</p> : null}
-      </div>
-    </section>
   );
 }

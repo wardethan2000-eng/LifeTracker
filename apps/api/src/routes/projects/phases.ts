@@ -6,6 +6,7 @@ import {
   createProjectPhaseSchema,
   createProjectPhaseSupplySchema,
   createProjectTaskChecklistItemSchema,
+  reorderProjectPhaseSuppliesSchema,
   reorderProjectPhasesSchema,
   updateProjectBudgetCategorySchema,
   updateProjectPhaseChecklistItemSchema,
@@ -1089,6 +1090,41 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     refreshProjectArtifacts(params.householdId, params.projectId);
 
     return toProjectPhaseSupplyResponse(updated);
+  });
+
+  app.patch("/v1/households/:householdId/projects/:projectId/phases/:phaseId/supplies/reorder", async (request, reply) => {
+    const params = phaseParamsSchema.parse(request.params);
+    const input = reorderProjectPhaseSuppliesSchema.parse(request.body);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const phase = await getPhase(app, params.projectId, params.phaseId);
+
+    if (!phase) {
+      return reply.code(404).send({ message: "Project phase not found." });
+    }
+
+    const existing = await app.prisma.projectPhaseSupply.findMany({
+      where: { phaseId: phase.id, deletedAt: null },
+      select: { id: true }
+    });
+
+    const existingIds = new Set(existing.map((s) => s.id));
+
+    if (input.supplyIds.some((id) => !existingIds.has(id))) {
+      return reply.code(400).send({ message: "supplyIds contains unknown or deleted supply IDs." });
+    }
+
+    await app.prisma.$transaction(input.supplyIds.map((supplyId, index) => app.prisma.projectPhaseSupply.update({
+      where: { id: supplyId },
+      data: { sortOrder: index }
+    })));
+
+    refreshProjectArtifacts(params.householdId, params.projectId);
+
+    return { supplyIds: input.supplyIds };
   });
 
   app.delete("/v1/households/:householdId/projects/:projectId/phases/:phaseId/supplies/:supplyId", async (request, reply) => {
