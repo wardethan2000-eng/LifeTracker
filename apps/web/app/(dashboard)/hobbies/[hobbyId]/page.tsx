@@ -433,7 +433,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         entityId={hobbyId}
         title="Hobby Entries"
         quickAddLabel="Entry"
-        entryHrefTemplate={`/hobbies/${hobbyId}?tab=entries#entry-{entryId}`}
+        entryHrefTemplate={`/hobbies/${hobbyId}/entries#entry-{entryId}`}
       />
     );
 
@@ -596,7 +596,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         <EntryTipsSurface
           householdId={household.id}
           queries={[{ entityType: "hobby", entityId: hobbyId }]}
-          entryHrefTemplate={`/hobbies/${hobbyId}?tab=entries#entry-{entryId}`}
+          entryHrefTemplate={`/hobbies/${hobbyId}/entries#entry-{entryId}`}
         />
 
         <TabNav
@@ -604,7 +604,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
           items={tabs.map((item) => ({
             id: item.id,
             label: item.label,
-            href: `/hobbies/${hobbyId}?tab=${item.id}`,
+            href: item.id === "overview" ? `/hobbies/${hobbyId}` : `/hobbies/${hobbyId}/${item.id}`,
             active: tab === item.id,
           }))}
         />
