@@ -75,7 +75,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   const [sortField, setSortField] = useState<SortField>("status");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [showFilters, setShowFilters] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set(["__uncategorized", ...DEFAULT_CATEGORIES, ...supplies.map((s) => normalizeCategory(s.category)).filter((c): c is string => c !== null)]));
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -205,6 +205,8 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
     phaseFilter !== "all",
     supplierFilter !== "all",
   ].filter(Boolean).length;
+
+  const hasActiveFilter = searchQuery.length > 0 || activeFilterCount > 0;
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -435,15 +437,17 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         const isCollapsed = collapsedSections.has(key);
         const purchasedInSection = sectionSupplies.filter((s) => s.isProcured).length;
 
+        const sectionExpanded = hasActiveFilter || !isCollapsed;
+
         return (
           <section key={key} className="supply-section">
             <button
               type="button"
               className="supply-section__header"
               onClick={() => toggleSection(key)}
-              aria-expanded={!isCollapsed}
+              aria-expanded={sectionExpanded}
             >
-              <span className="supply-section__chevron">{isCollapsed ? "\u25B8" : "\u25BE"}</span>
+              <span className="supply-section__chevron">{sectionExpanded ? "\u25BE" : "\u25B8"}</span>
               <h3 className="supply-section__title">{category ?? "Uncategorized"}</h3>
               <span className="pill pill--sm pill--muted">{sectionSupplies.length}</span>
               <span className="supply-section__meta">
@@ -451,7 +455,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
                 {sectionSupplies.length - purchasedInSection > 0 ? <span className="supply-section__tag supply-section__tag--warning">{sectionSupplies.length - purchasedInSection} outstanding</span> : null}
               </span>
             </button>
-            {!isCollapsed ? (
+            {sectionExpanded ? (
               <div className="supply-section__body">
                 {sectionSupplies.map((supply) => (
                   <ProjectSupplyCard
@@ -460,7 +464,6 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
                     projectId={projectId}
                     phaseId={supply.phaseId}
                     phaseName={supply.phaseName}
-                    openPhaseHref={supply.openPhaseHref}
                     supply={supply}
                     inventoryItems={inventoryItems}
                     {...(supply.linkedInventoryItem ? { linkedInventoryItem: supply.linkedInventoryItem } : {})}

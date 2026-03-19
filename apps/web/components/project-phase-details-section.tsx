@@ -3,7 +3,6 @@ import type {
   ProjectBudgetAnalysis,
   ProjectDetail,
   ProjectPhaseSummary,
-  ProjectPhaseSupply,
   ServiceProvider,
   HouseholdMember
 } from "@lifekeeper/types";
@@ -19,9 +18,9 @@ import { AttachmentSection } from "./attachment-section";
 import { CompactBudgetPreview } from "./compact-budget-preview";
 import { CompactSupplyPreview } from "./compact-supply-preview";
 import { ExpandableCard } from "./expandable-card";
+import { PlanningSuppliesTable } from "./planning-supplies-table";
 import { ProjectBudgetBreakdown } from "./project-budget-breakdown";
 import { ProjectPhaseTimeline } from "./project-phase-timeline";
-import { ProjectSupplyRollupActions } from "./project-supply-rollup-actions";
 import { getProjectPhaseDetails } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/formatters";
 
@@ -36,10 +35,6 @@ type ProjectPhaseDetailsSectionProps = {
 };
 
 const toDateInputValue = (value: string | null | undefined): string => value ? value.slice(0, 10) : "";
-
-function getPhaseFocusHref(householdId: string, projectId: string, phaseId: string): string {
-  return `/projects/${projectId}?householdId=${householdId}&focusPhaseId=${phaseId}#phase-${phaseId}`;
-}
 
 function ProjectSupplyQuickAddForm({
   householdId,
@@ -103,31 +98,6 @@ function ProjectSupplyQuickAddForm({
   );
 }
 
-function ProjectSupplyActions({
-  householdId,
-  projectId,
-  phaseId,
-  supply,
-  inventoryItems
-}: {
-  householdId: string;
-  projectId: string;
-  phaseId: string;
-  supply: ProjectPhaseSupply;
-  inventoryItems: InventoryItemSummary[];
-}): JSX.Element {
-  return (
-    <ProjectSupplyRollupActions
-      householdId={householdId}
-      projectId={projectId}
-      phaseId={phaseId}
-      supply={supply}
-      inventoryItems={inventoryItems}
-      openPhaseHref={getPhaseFocusHref(householdId, projectId, phaseId)}
-    />
-  );
-}
-
 export async function ProjectPhaseDetailsSection({
   householdId,
   project,
@@ -142,6 +112,7 @@ export async function ProjectPhaseDetailsSection({
   const budgetCategoryLookup = new Map(project.budgetCategories.map((category) => [category.id, category.name]));
   const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const allSupplies = phaseDetails.flatMap((phase) => phase.supplies);
+  const allSuppliesWithPhase = allSupplies.map((s) => ({ ...s, phaseName: phaseNameLookup.get(s.phaseId) ?? "—" }));
   const estimatedProcurementCost = allSupplies.reduce((sum, supply) => sum + ((supply.estimatedUnitCost ?? 0) * supply.quantityNeeded), 0);
   const remainingProcurementCost = allSupplies.reduce((sum, supply) => {
     const quantityRemaining = Math.max(supply.quantityNeeded - supply.quantityOnHand, 0);
@@ -407,61 +378,13 @@ export async function ProjectPhaseDetailsSection({
               inventoryItems={inventoryItems}
             />
           ) : null}
-          {allSupplies.length === 0 ? (
-            <p className="panel__empty">No supplies added yet. Expand a phase in the Phase Timeline to add supplies per phase.</p>
-          ) : (
-            <table className="workbench-table">
-              <thead>
-                <tr>
-                  <th>Supply</th>
-                  <th>Phase</th>
-                  <th>Qty</th>
-                  <th>Est. Cost</th>
-                  <th>Procured</th>
-                  <th>Staged</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allSupplies.map((supply) => {
-                  const phaseName = phaseNameLookup.get(supply.phaseId) ?? "—";
-
-                  return (
-                    <tr key={supply.id}>
-                      <td>
-                        <div className="data-table__primary">{supply.name}</div>
-                        {supply.supplier ? <div className="data-table__secondary">{supply.supplier}</div> : null}
-                      </td>
-                      <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{phaseName}</td>
-                      <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>{supply.quantityOnHand}/{supply.quantityNeeded} {supply.unit}</td>
-                      <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>
-                        {supply.estimatedUnitCost != null ? formatCurrency(supply.estimatedUnitCost * supply.quantityNeeded, "$0.00") : "—"}
-                      </td>
-                      <td>
-                        {supply.isProcured
-                          ? <span className="status-chip status-chip--upcoming">Yes</span>
-                          : <span className="status-chip status-chip--overdue">No</span>}
-                      </td>
-                      <td>
-                        {supply.isStaged
-                          ? <span className="status-chip status-chip--upcoming">Yes</span>
-                          : <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem" }}>No</span>}
-                      </td>
-                      <td>
-                        <ProjectSupplyActions
-                          householdId={householdId}
-                          projectId={project.id}
-                          phaseId={supply.phaseId}
-                          supply={supply}
-                          inventoryItems={inventoryItems}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+          <PlanningSuppliesTable
+            householdId={householdId}
+            projectId={project.id}
+            supplies={allSuppliesWithPhase}
+            phases={project.phases.map((p) => ({ id: p.id, name: p.name }))}
+            inventoryItems={inventoryItems}
+          />
         </div>
       </ExpandableCard>
     </>

@@ -668,6 +668,8 @@ function TaskCompactRow({
 
 /* ─── Supplies subtab ─── */
 
+const DEFAULT_SUPPLY_CATEGORIES = ["Materials", "Hardware", "Finishes", "Fixtures", "Logistics"];
+
 function PhaseSuppliesSubtab({
   householdId,
   projectId,
@@ -683,31 +685,188 @@ function PhaseSuppliesSubtab({
   inventoryItems: InventoryItemSummary[];
   inventoryLookup: Map<string, InventoryItemSummary>;
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "purchased" | "outstanding">("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
+  const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
+
+  const allCategories = (() => {
+    const fromSupplies = supplies
+      .map((s) => {
+        const override = Object.prototype.hasOwnProperty.call(optimisticCategories, s.id)
+          ? optimisticCategories[s.id]
+          : s.category;
+        return override?.trim() || null;
+      })
+      .filter((c): c is string => c !== null);
+    return Array.from(new Set([...DEFAULT_SUPPLY_CATEGORIES, ...fromSupplies])).sort();
+  })();
+
+  const filtered = supplies.filter((s) => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const fields = [s.name, s.category, s.supplier, s.description, s.notes].filter(Boolean) as string[];
+      if (!fields.some((f) => f.toLowerCase().includes(q))) return false;
+    }
+    if (statusFilter === "purchased" && !s.isProcured) return false;
+    if (statusFilter === "outstanding" && s.isProcured) return false;
+    if (categoryFilter !== "all") {
+      const cat = Object.prototype.hasOwnProperty.call(optimisticCategories, s.id)
+        ? (optimisticCategories[s.id]?.trim() || null)
+        : (s.category?.trim() || null);
+      if (categoryFilter === "uncategorized" && cat !== null) return false;
+      if (categoryFilter !== "uncategorized" && cat !== categoryFilter) return false;
+    }
+    return true;
+  });
+
+  // Group by category
+  const groupedByCategory = new Map<string | null, typeof filtered>();
+  for (const s of filtered) {
+    const cat = Object.prototype.hasOwnProperty.call(optimisticCategories, s.id)
+      ? (optimisticCategories[s.id]?.trim() || null)
+      : (s.category?.trim() || null);
+    const bucket = groupedByCategory.get(cat) ?? [];
+    bucket.push(s);
+    groupedByCategory.set(cat, bucket);
+  }
+
+  const sectionOrder: (string | null)[] = [];
+  if (groupedByCategory.has(null)) sectionOrder.push(null);
+  for (const cat of allCategories) {
+    if (groupedByCategory.has(cat)) sectionOrder.push(cat);
+  }
+
+  const hasActiveFilter = searchQuery.length > 0 || statusFilter !== "all" || categoryFilter !== "all";
+  const hasManyCategories = sectionOrder.length > 1;
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleCategoryChange = (supplyId: string, category: string | null) => {
+    setOptimisticCategories((prev) => ({ ...prev, [supplyId]: category }));
+  };
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      {/* Search + filters */}
+      <div className="supply-search-bar">
+        <input
+          type="search"
+          className="supply-search-bar__input"
+          placeholder="Search supplies..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.currentTarget.value)}
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "purchased" | "outstanding")}
+          style={{ fontSize: "0.86rem" }}
+        >
+          <option value="all">All statuses</option>
+          <option value="outstanding">Outstanding</option>
+          <option value="purchased">Purchased</option>
+        </select>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.currentTarget.value)}
+          style={{ fontSize: "0.86rem" }}
+        >
+          <option value="all">All categories</option>
+          <option value="uncategorized">Uncategorized</option>
+          {allCategories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        {hasActiveFilter && (
+          <button
+            type="button"
+            className="button button--ghost button--xs"
+            onClick={() => { setSearchQuery(""); setStatusFilter("all"); setCategoryFilter("all"); }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 && supplies.length > 0 && (
+        <p style={{ padding: "8px 0", color: "var(--ink-muted)", fontSize: "0.88rem" }}>No supplies match your filters.</p>
+      )}
+
       {supplies.length === 0 && (
         <p style={{ padding: "16px 0", color: "var(--ink-muted)", fontSize: "0.88rem" }}>No supplies for this phase.</p>
       )}
-      {supplies.map((supply) => (
-        <ProjectSupplyCard
-          key={supply.id}
-          householdId={householdId}
-          projectId={projectId}
-          phaseId={phaseId}
-          supply={supply}
-          inventoryItems={inventoryItems}
-          categories={Array.from(new Set(supplies.map((item) => item.category?.trim()).filter((category): category is string => Boolean(category))))}
-          {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
-            ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
-            : {})}
-        />
-      ))}
+
+      {/* Expand/Collapse controls when multiple categories exist */}
+      {hasManyCategories && filtered.length > 0 && (
+        <div className="supply-section-controls">
+          <button type="button" className="button button--ghost button--xs" onClick={() => setCollapsedSections(new Set())}>Expand all</button>
+          <button type="button" className="button button--ghost button--xs" onClick={() => setCollapsedSections(new Set(sectionOrder.map((c) => c ?? "__uncategorized")))}>Collapse all</button>
+          <span className="supply-section-controls__count">{filtered.length} item{filtered.length !== 1 ? "s" : ""}</span>
+        </div>
+      )}
+
+      {/* Category accordion sections */}
+      {sectionOrder.map((category) => {
+        const key = category ?? "__uncategorized";
+        const items = groupedByCategory.get(category) ?? [];
+        if (items.length === 0) return null;
+        const isCollapsed = collapsedSections.has(key) && !hasActiveFilter;
+        const purchasedCount = items.filter((s) => s.isProcured).length;
+        const outstandingCount = items.length - purchasedCount;
+
+        return (
+          <section key={key} className="supply-section">
+            <button
+              type="button"
+              className="supply-section__header"
+              onClick={() => toggleSection(key)}
+              aria-expanded={!isCollapsed}
+            >
+              <span className="supply-section__chevron">{isCollapsed ? "\u25B8" : "\u25BE"}</span>
+              <h3 className="supply-section__title">{category ?? "Uncategorized"}</h3>
+              <span className="pill pill--sm pill--muted">{items.length}</span>
+              <span className="supply-section__meta">
+                {purchasedCount > 0 && <span className="supply-section__tag supply-section__tag--success">{purchasedCount} purchased</span>}
+                {outstandingCount > 0 && <span className="supply-section__tag supply-section__tag--warning">{outstandingCount} outstanding</span>}
+              </span>
+            </button>
+            {!isCollapsed && (
+              <div className="supply-section__body">
+                {items.map((supply) => (
+                  <ProjectSupplyCard
+                    key={supply.id}
+                    householdId={householdId}
+                    projectId={projectId}
+                    phaseId={phaseId}
+                    supply={supply}
+                    inventoryItems={inventoryItems}
+                    categories={allCategories}
+                    onCategoryChange={handleCategoryChange}
+                    {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
+                      ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
+                      : {})}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
       <ProjectSupplyCreateForm
         householdId={householdId}
         projectId={projectId}
         phaseId={phaseId}
         inventoryItems={inventoryItems}
-        categorySuggestions={Array.from(new Set(supplies.map((supply) => supply.category?.trim()).filter((category): category is string => Boolean(category))))}
+        categorySuggestions={allCategories}
       />
     </div>
   );

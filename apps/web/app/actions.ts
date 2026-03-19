@@ -951,6 +951,9 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
 
   if (projectId) {
     revalidatePath(`/projects/${projectId}`, "layout");
+    revalidatePath(`/projects/${projectId}/phases`);
+    revalidatePath(`/projects/${projectId}/supplies`);
+    revalidatePath(`/projects/${projectId}/tasks`);
   }
 };
 
@@ -3175,6 +3178,19 @@ export async function deleteProjectPhaseSupplyAction(formData: FormData): Promis
   const supplyId = getRequiredString(formData, "supplyId");
 
   await deleteProjectPhaseSupply(householdId, projectId, phaseId, supplyId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function toggleProjectPhaseSupplyPurchasedAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const supplyId = getRequiredString(formData, "supplyId");
+
+  await updateProjectPhaseSupply(householdId, projectId, phaseId, supplyId, {
+    isProcured: getOptionalBoolean(formData, "isProcured")
+  });
+
   revalidateProjectPaths(householdId, projectId);
 }
 
