@@ -87,6 +87,11 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  getProjectBlueprintByKey,
+  isSeededProjectBlueprint,
+  type SeededProjectBlueprint
+} from "../lib/project-blueprints";
+import {
   broadcastRealtimeEvent,
   createRealtimeEvent,
   type RealtimeEventType
@@ -601,6 +606,115 @@ const toNullableIsoString = (value: string | null): string | null => {
   }
 
   return new Date(value).toISOString();
+};
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const toRelativeTargetDate = (
+  targetEndDate: string | undefined,
+  daysBeforeTarget: number | undefined
+): string | undefined => {
+  if (targetEndDate === undefined || daysBeforeTarget === undefined) {
+    return undefined;
+  }
+
+  const anchor = new Date(targetEndDate);
+  return new Date(anchor.getTime() - (daysBeforeTarget * MS_PER_DAY)).toISOString();
+};
+
+const seedProjectFromBlueprint = async (
+  householdId: string,
+  projectId: string,
+  blueprint: SeededProjectBlueprint,
+  targetEndDate?: string
+): Promise<void> => {
+  const phaseIdByKey = new Map<string, string>();
+  const taskIdByKey = new Map<string, string>();
+
+  for (const [index, phase] of blueprint.seed.phases.entries()) {
+    const createdPhase = await createProjectPhase(householdId, projectId, {
+      name: phase.name,
+      description: phase.description,
+      status: "pending",
+      sortOrder: index,
+      startDate: toRelativeTargetDate(targetEndDate, phase.startDaysBeforeTarget),
+      targetEndDate: toRelativeTargetDate(targetEndDate, phase.targetDaysBeforeTarget),
+      notes: phase.notes
+    });
+
+    phaseIdByKey.set(phase.key, createdPhase.id);
+
+    for (const [checklistIndex, title] of (phase.checklist ?? []).entries()) {
+      await createPhaseChecklistItem(householdId, projectId, createdPhase.id, {
+        title,
+        sortOrder: checklistIndex
+      });
+    }
+  }
+
+  for (const category of blueprint.seed.budgetCategories) {
+    await createProjectBudgetCategory(householdId, projectId, category);
+  }
+
+  for (const note of blueprint.seed.notes) {
+    await createProjectNote(householdId, projectId, {
+      ...note,
+      isPinned: note.isPinned ?? false
+    });
+  }
+
+  for (const [index, task] of blueprint.seed.tasks.entries()) {
+    const predecessorTaskIds = (task.predecessorKeys ?? [])
+      .map((key) => taskIdByKey.get(key))
+      .filter((value): value is string => value !== undefined);
+
+    const createdTask = await createProjectTask(householdId, projectId, {
+      title: task.title,
+      description: task.description,
+      status: task.status ?? "pending",
+      taskType: task.taskType ?? "full",
+      phaseId: task.phaseKey ? phaseIdByKey.get(task.phaseKey) : undefined,
+      dueDate: toRelativeTargetDate(targetEndDate, task.dueDaysBeforeTarget),
+      estimatedHours: task.estimatedHours,
+      estimatedCost: task.estimatedCost,
+      sortOrder: index,
+      predecessorTaskIds: predecessorTaskIds.length > 0 ? predecessorTaskIds : undefined
+    });
+
+    taskIdByKey.set(task.key, createdTask.id);
+
+    for (const [checklistIndex, title] of (task.checklist ?? []).entries()) {
+      await createTaskChecklistItem(householdId, projectId, createdTask.id, {
+        title,
+        sortOrder: checklistIndex
+      });
+    }
+  }
+
+  for (const [index, supply] of blueprint.seed.supplies.entries()) {
+    const phaseId = phaseIdByKey.get(supply.phaseKey);
+
+    if (!phaseId) {
+      continue;
+    }
+
+    await createProjectPhaseSupply(householdId, projectId, phaseId, {
+      name: supply.name,
+      description: supply.description,
+      quantityNeeded: supply.quantityNeeded,
+      quantityOnHand: supply.quantityOnHand,
+      unit: supply.unit,
+      estimatedUnitCost: supply.estimatedUnitCost,
+      actualUnitCost: supply.actualUnitCost,
+      supplier: supply.supplier,
+      supplierUrl: supply.supplierUrl,
+      isProcured: supply.isProcured ?? false,
+      isStaged: supply.isStaged ?? false,
+      inventoryItemId: supply.inventoryItemId,
+      notes: supply.notes,
+      sortOrder: supply.sortOrder ?? index
+    });
+  }
 };
 
 const buildStructuredAssetInput = (formData: FormData): Partial<CreateAssetInput> => {
@@ -2188,6 +2302,7 @@ export async function acceptInvitationAction(formData: FormData): Promise<void> 
 
 export async function createProjectAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
+  const blueprint = getProjectBlueprintByKey(getOptionalString(formData, "templateKey"));
   const input: CreateProjectInput = {
     name: getRequiredString(formData, "name"),
     status: (getOptionalString(formData, "status") as ProjectStatus | undefined) ?? "planning"
@@ -2225,6 +2340,12 @@ export async function createProjectAction(formData: FormData): Promise<void> {
   }
 
   const project = await createProject(householdId, input);
+
+  if (isSeededProjectBlueprint(blueprint)) {
+    await seedProjectFromBlueprint(householdId, project.id, blueprint, input.targetEndDate);
+    revalidateProjectPaths(householdId, project.id);
+    redirect(`/projects/${project.id}?householdId=${householdId}`);
+  }
 
   const rawSuggestedPhases = getOptionalString(formData, "suggestedPhasesJson");
   if (rawSuggestedPhases) {

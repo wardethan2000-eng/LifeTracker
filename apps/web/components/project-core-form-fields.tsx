@@ -7,6 +7,11 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import {
+  isSeededProjectBlueprint,
+  projectBlueprints,
+  summarizeProjectBlueprint
+} from "../lib/project-blueprints";
+import {
   projectFormSchema,
   type ProjectFormValues,
   type ProjectResolvedValues
@@ -29,70 +34,6 @@ const projectStatusOptions = [
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" }
 ] as const;
-
-type ProjectTemplate = {
-  key: string;
-  label: string;
-  description: string;
-  status: ProjectStatus;
-  scopeSummary: string;
-  executionNotes: string;
-  checklist: string[];
-  suggestedPhases: string[];
-};
-
-export const projectTemplates: ProjectTemplate[] = [
-  {
-    key: "renovation",
-    label: "Renovation / Improvement",
-    description: "For upgrades, remodels, replacements, or larger multi-step improvements tied to a room, building, or system.",
-    status: "planning",
-    scopeSummary: "Define the area being improved, the target outcome, and any structural, finish, or contractor dependencies.",
-    executionNotes: "Capture bid comparisons, permit constraints, lead-time items, finish selections, and any sequencing dependencies across trades.",
-    checklist: ["Link affected assets or spaces", "Add procurement-driven inventory lines", "Track outside vendor quotes"],
-    suggestedPhases: ["Planning & Permitting", "Demolition & Prep", "Rough-In Work", "Finish Work", "Punch List & Closeout"]
-  },
-  {
-    key: "seasonal-maintenance",
-    label: "Seasonal Maintenance Push",
-    description: "For household-wide preventive maintenance campaigns that happen on a schedule or before a season change.",
-    status: "planning",
-    scopeSummary: "Bundle the recurring work to prepare equipment, property systems, or vehicles for the next operating season.",
-    executionNotes: "Call out consumables, inspection checkpoints, weather windows, and the list of systems that must be closed out before completion.",
-    checklist: ["Break work into repeatable tasks", "Reserve common consumables", "Use due dates to pace completion"],
-    suggestedPhases: ["Inspection & Assessment", "Parts & Supplies Procurement", "Execution", "Verification & Storage"]
-  },
-  {
-    key: "repair-response",
-    label: "Repair / Recovery",
-    description: "For corrective work responding to a breakdown, failure, inspection finding, or urgent issue.",
-    status: "active",
-    scopeSummary: "Describe the fault, the impact, and the definition of done needed to return the asset or system to service.",
-    executionNotes: "Track diagnostic findings, temporary mitigations, parts on order, and any safety or downtime considerations until the repair is closed.",
-    checklist: ["Document the failure clearly", "Track spent vs estimate closely", "Flag missing parts immediately"],
-    suggestedPhases: ["Diagnosis & Scoping", "Parts Procurement", "Repair Execution", "Testing & Verification"]
-  },
-  {
-    key: "equipment-upgrade",
-    label: "Equipment Upgrade",
-    description: "For modernization work where hardware, tools, or systems are being replaced or expanded.",
-    status: "planning",
-    scopeSummary: "Outline what is being upgraded, what capability is changing, and what installation or commissioning steps are required.",
-    executionNotes: "Include compatibility checks, retirement or transfer plans for old equipment, and the validation steps needed before cutover.",
-    checklist: ["Link old and new assets", "Stage install materials", "Plan testing or commissioning"],
-    suggestedPhases: ["Research & Selection", "Procurement & Delivery", "Installation & Configuration", "Commissioning & Validation"]
-  },
-  {
-    key: "vendor-coordination",
-    label: "Vendor / Service Coordination",
-    description: "For projects centered on outside providers, quotes, scheduling windows, and tracked service spend.",
-    status: "planning",
-    scopeSummary: "Summarize the contracted scope, the service window, and the external deliverables expected from the provider.",
-    executionNotes: "Store provider notes, approval checkpoints, warranty follow-up, and any household prep needed before the vendor arrives.",
-    checklist: ["Assign the primary provider", "Track quoted and actual costs", "Capture follow-up and warranty notes"],
-    suggestedPhases: ["Scope Definition & Quotes", "Vendor Selection & Scheduling", "Execution & Supervision", "Inspection & Acceptance"]
-  }
-];
 
 type ProjectDraft = {
   name: string;
@@ -141,7 +82,15 @@ export function ProjectCoreFormFields({
   const [phaseDrafts, setPhaseDrafts] = useState<string[]>([]);
 
   const selectedTemplateKey = watch("templateKey") ?? "";
-  const selectedTemplate = projectTemplates.find((template) => template.key === selectedTemplateKey);
+  const selectedTemplate = projectBlueprints.find((template) => template.key === selectedTemplateKey);
+  const selectedTemplateSummary = selectedTemplate ? summarizeProjectBlueprint(selectedTemplate) : null;
+  const isSeededTemplate = isSeededProjectBlueprint(selectedTemplate);
+  const blueprintsByFamily = projectBlueprints.reduce<Record<string, typeof projectBlueprints>>((groups, blueprint) => {
+    const current = groups[blueprint.family] ?? [];
+    current.push(blueprint);
+    groups[blueprint.family] = current;
+    return groups;
+  }, {});
   const name = watch("name") ?? "";
   const description = watch("description") ?? "";
   const status = watch("status") ?? "planning";
@@ -223,37 +172,66 @@ export function ProjectCoreFormFields({
               onChange={(event) => {
                 const key = event.target.value;
                 setValue("templateKey", key, { shouldDirty: true, shouldValidate: true });
-                const tpl = projectTemplates.find((t) => t.key === key);
+                const tpl = projectBlueprints.find((t) => t.key === key);
                 if (tpl) {
                   setValue("status", tpl.status, { shouldDirty: true, shouldValidate: true });
                   setValue("description", tpl.scopeSummary, { shouldDirty: true, shouldValidate: true });
                   setValue("notes", tpl.executionNotes, { shouldDirty: true, shouldValidate: true });
                   if (isCreateMode) {
-                    setPhaseDrafts([...tpl.suggestedPhases]);
+                    setPhaseDrafts(tpl.kind === "manual" ? [...tpl.suggestedPhases] : []);
                   }
+                } else if (isCreateMode) {
+                  setPhaseDrafts([]);
                 }
               }}
             >
               <option value="">None (blank project)</option>
-              {projectTemplates.map((template) => (
-                <option key={template.key} value={template.key}>{template.label}</option>
+              {Object.entries(blueprintsByFamily).map(([family, templates]) => (
+                <optgroup key={family} label={family}>
+                  {templates.map((template) => (
+                    <option key={template.key} value={template.key}>{template.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
           {selectedTemplate && (
             <div className="project-template-summary">
-              <span>About this template</span>
+              <span>{selectedTemplate.family}</span>
+              <strong>{selectedTemplate.label}</strong>
               <p>{selectedTemplate.description}</p>
+              <div className="project-template-summary__stats">
+                <span>{selectedTemplateSummary?.phaseCount ?? 0} phases</span>
+                <span>{selectedTemplateSummary?.taskCount ?? 0} tasks</span>
+                <span>{selectedTemplateSummary?.budgetCategoryCount ?? 0} budget buckets</span>
+                <span>{selectedTemplateSummary?.supplyCount ?? 0} supply lines</span>
+              </div>
+              <p>{selectedTemplate.scopeSummary}</p>
+              <div className="project-template-summary__chips">
+                {selectedTemplate.featuredTools.map((tool) => <span key={tool}>{tool}</span>)}
+              </div>
               <details>
                 <summary>Suggested phases ({selectedTemplate.suggestedPhases.length})</summary>
                 <ol>
                   {selectedTemplate.suggestedPhases.map((phase) => <li key={phase}>{phase}</li>)}
                 </ol>
               </details>
+              <details>
+                <summary>Venue and experience focus</summary>
+                <ul>
+                  {selectedTemplate.venueFocus.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </details>
+              <details>
+                <summary>Ideas and inspiration prompts</summary>
+                <ul>
+                  {selectedTemplate.inspirationPrompts.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </details>
             </div>
           )}
         </div>
-        {isCreateMode && (
+        {isCreateMode && !isSeededTemplate && (
           <div className="project-phase-drafts">
             <div className="workbench-section__head">
               <h3>Initial Phases</h3>
@@ -289,6 +267,23 @@ export function ProjectCoreFormFields({
                 No phases added yet. Start blank or add the first phase now.
               </div>
             )}
+          </div>
+        )}
+        {isCreateMode && isSeededTemplate && selectedTemplateSummary && (
+          <div className="project-seeded-summary">
+            <div className="workbench-section__head">
+              <h3>Seeded Project Structure</h3>
+            </div>
+            <p className="project-phase-drafts__hint">
+              This blueprint creates the project structure automatically when you save it, including phases, tasks, budget buckets, notes, and supply lists.
+            </p>
+            <div className="project-seeded-summary__grid">
+              <div><strong>{selectedTemplateSummary.phaseCount}</strong><span>Phases</span></div>
+              <div><strong>{selectedTemplateSummary.taskCount}</strong><span>Tasks</span></div>
+              <div><strong>{selectedTemplateSummary.noteCount}</strong><span>Planning notes</span></div>
+              <div><strong>{selectedTemplateSummary.supplyCount}</strong><span>Supply lines</span></div>
+              <div><strong>{selectedTemplateSummary.budgetCategoryCount}</strong><span>Budget buckets</span></div>
+            </div>
           </div>
         )}
       </section>

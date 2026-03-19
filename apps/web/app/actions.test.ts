@@ -6,6 +6,14 @@ const nextMocks = vi.hoisted(() => ({
 }));
 
 const apiMocks = vi.hoisted(() => ({
+  createProject: vi.fn(),
+  createProjectPhase: vi.fn(),
+  createPhaseChecklistItem: vi.fn(),
+  createProjectBudgetCategory: vi.fn(),
+  createProjectNote: vi.fn(),
+  createProjectTask: vi.fn(),
+  createTaskChecklistItem: vi.fn(),
+  createProjectPhaseSupply: vi.fn(),
   createInventoryItem: vi.fn(),
   completeSchedule: vi.fn(),
   createMaintenanceLog: vi.fn(),
@@ -34,6 +42,14 @@ vi.mock("../lib/api", async (importOriginal) => {
 
   return {
     ...actual,
+    createProject: apiMocks.createProject,
+    createProjectPhase: apiMocks.createProjectPhase,
+    createPhaseChecklistItem: apiMocks.createPhaseChecklistItem,
+    createProjectBudgetCategory: apiMocks.createProjectBudgetCategory,
+    createProjectNote: apiMocks.createProjectNote,
+    createProjectTask: apiMocks.createProjectTask,
+    createTaskChecklistItem: apiMocks.createTaskChecklistItem,
+    createProjectPhaseSupply: apiMocks.createProjectPhaseSupply,
     createInventoryItem: apiMocks.createInventoryItem,
     completeSchedule: apiMocks.completeSchedule,
     createMaintenanceLog: apiMocks.createMaintenanceLog,
@@ -43,6 +59,7 @@ vi.mock("../lib/api", async (importOriginal) => {
 
 import {
   completeScheduleAction,
+  createProjectAction,
   createInventoryItemAction,
   createLogAction,
   createScheduleAction
@@ -50,6 +67,14 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  apiMocks.createInventoryItem.mockResolvedValue({ id: "clinventoryitem0000000001" });
+  apiMocks.createProject.mockResolvedValue({ id: "clproject000000000000000001" });
+  apiMocks.createProjectPhase.mockImplementation(async (_householdId: string, _projectId: string, input: { name: string }) => ({
+    id: `phase-${input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+  }));
+  apiMocks.createProjectTask.mockImplementation(async (_householdId: string, _projectId: string, input: { title: string }) => ({
+    id: `task-${input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+  }));
 });
 
 describe("server actions", () => {
@@ -173,5 +198,61 @@ describe("server actions", () => {
     });
     expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/assets/clkeeperasset0000000000001");
     expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/maintenance");
+  });
+
+  it("seeds wedding blueprint projects with structured planning data", async () => {
+    const formData = new FormData();
+    formData.set("householdId", "clkeeperhouse000000000001");
+    formData.set("name", "Autumn Wedding");
+    formData.set("status", "planning");
+    formData.set("templateKey", "event-planning-wedding");
+    formData.set("targetEndDate", "2026-10-10");
+
+    await createProjectAction(formData);
+
+    expect(apiMocks.createProject).toHaveBeenCalledWith("clkeeperhouse000000000001", expect.objectContaining({
+      name: "Autumn Wedding",
+      targetEndDate: new Date("2026-10-10").toISOString()
+    }));
+    expect(apiMocks.createProjectPhase).toHaveBeenCalledTimes(9);
+    expect(apiMocks.createPhaseChecklistItem).toHaveBeenCalled();
+    expect(apiMocks.createProjectBudgetCategory).toHaveBeenCalledTimes(10);
+    expect(apiMocks.createProjectNote).toHaveBeenCalledTimes(5);
+    expect(apiMocks.createProjectTask).toHaveBeenCalledTimes(16);
+    expect(apiMocks.createTaskChecklistItem).toHaveBeenCalled();
+    expect(apiMocks.createProjectPhaseSupply).toHaveBeenCalledTimes(8);
+    expect(apiMocks.createProjectPhase).toHaveBeenCalledWith(
+      "clkeeperhouse000000000001",
+      "clproject000000000000000001",
+      expect.objectContaining({
+        name: "Vision, Budget & Headcount"
+      })
+    );
+    expect(apiMocks.createProjectTask).toHaveBeenCalledWith(
+      "clkeeperhouse000000000001",
+      "clproject000000000000000001",
+      expect.objectContaining({
+        title: "Write the wedding operating brief"
+      })
+    );
+    expect(nextMocks.redirect).toHaveBeenCalledWith("/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001");
+  });
+
+  it("keeps manual blueprints on the lightweight phase-draft path", async () => {
+    const formData = new FormData();
+    formData.set("householdId", "clkeeperhouse000000000001");
+    formData.set("name", "Kitchen Refresh");
+    formData.set("status", "planning");
+    formData.set("templateKey", "renovation");
+    formData.set("suggestedPhasesJson", JSON.stringify(["Planning & Permitting", "Finish Work"]));
+
+    await createProjectAction(formData);
+
+    expect(apiMocks.createProjectPhase).toHaveBeenCalledTimes(2);
+    expect(apiMocks.createProjectBudgetCategory).not.toHaveBeenCalled();
+    expect(apiMocks.createProjectNote).not.toHaveBeenCalled();
+    expect(apiMocks.createProjectTask).not.toHaveBeenCalled();
+    expect(apiMocks.createProjectPhaseSupply).not.toHaveBeenCalled();
+    expect(nextMocks.redirect).toHaveBeenCalledWith("/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001");
   });
 });
