@@ -144,7 +144,7 @@ export function ProjectPhaseDetail({
               ]}
               prompt="Delete this phase and everything attached to it?"
               triggerLabel="Delete Phase"
-              confirmLabel="Yes, delete"
+              confirmLabel="Confirm"
               triggerClassName="button button--danger"
               confirmClassName="button button--danger"
               cancelClassName="button button--ghost"
@@ -529,7 +529,7 @@ function TaskCard({
           ]}
           prompt="Delete this task?"
           triggerLabel="Delete Task"
-          confirmLabel="Yes, delete"
+          confirmLabel="Confirm"
           triggerClassName="button button--danger"
           confirmClassName="button button--danger"
           cancelClassName="button button--ghost"
@@ -625,7 +625,7 @@ function ExpenseCard({
           ]}
           prompt="Delete this expense record?"
           triggerLabel="Delete Expense"
-          confirmLabel="Yes, delete"
+          confirmLabel="Confirm"
           triggerClassName="button button--danger"
           confirmClassName="button button--danger"
           cancelClassName="button button--ghost"

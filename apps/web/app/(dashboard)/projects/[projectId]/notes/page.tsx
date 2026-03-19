@@ -272,7 +272,7 @@ async function ProjectNotesPanelAsync({
                   <input type="hidden" name="noteId" value={note.id} />
                   <input type="hidden" name="sourceSystem" value={note.sourceSystem} />
                   <input type="hidden" name="isPinned" value={note.isPinned ? "false" : "true"} />
-                  <button type="submit" className="button button--ghost button--small">
+                  <button type="submit" className="button button--ghost button--sm">
                     {note.isPinned ? "Unpin" : "Pin"}
                   </button>
                 </form>
@@ -281,7 +281,7 @@ async function ProjectNotesPanelAsync({
                   <input type="hidden" name="projectId" value={project.id} />
                   <input type="hidden" name="noteId" value={note.id} />
                   <input type="hidden" name="sourceSystem" value={note.sourceSystem} />
-                  <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                  <button type="submit" className="button button--danger button--sm">Delete</button>
                 </form>
               </div>
               {note.canManageAttachments ? (

@@ -430,7 +430,7 @@ function PhaseDetailPanel({
           ]}
           prompt="Delete this phase and everything attached to it?"
           triggerLabel="Delete Phase"
-          confirmLabel="Yes, delete"
+          confirmLabel="Confirm"
           triggerClassName="button button--danger button--sm"
           confirmClassName="button button--danger button--sm"
           cancelClassName="button button--ghost button--sm"
@@ -654,7 +654,7 @@ function TaskCompactRow({
               ]}
               prompt="Delete this task?"
               triggerLabel="Delete Task"
-              confirmLabel="Yes, delete"
+              confirmLabel="Confirm"
               triggerClassName="button button--danger button--sm"
               confirmClassName="button button--danger button--sm"
               cancelClassName="button button--ghost button--sm"

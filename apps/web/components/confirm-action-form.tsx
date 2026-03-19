@@ -47,7 +47,6 @@ export function ConfirmActionForm({
       {hiddenFields.map((field) => (
         <input key={field.name} type="hidden" name={field.name} value={field.value} />
       ))}
-      <span>{prompt}</span>
       <button type="submit" className={confirmClassName}>
         {confirmLabel}
       </button>

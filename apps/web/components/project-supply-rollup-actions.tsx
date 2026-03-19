@@ -10,7 +10,6 @@ import {
   updateProjectPhaseSupplyAction
 } from "../app/actions";
 import { ExpandableCard } from "./expandable-card";
-import { ConfirmActionForm } from "./confirm-action-form";
 
 type ProjectSupplyRollupActionsProps = {
   householdId: string;
@@ -30,6 +29,7 @@ export function ProjectSupplyRollupActions({
   openPhaseHref
 }: ProjectSupplyRollupActionsProps): JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const linkedInventoryItem = supply.inventoryItemId
     ? inventoryItems.find((item) => item.id === supply.inventoryItemId)
     : undefined;
@@ -71,22 +71,20 @@ export function ProjectSupplyRollupActions({
             </button>
           </form>
         ) : null}
-        <ConfirmActionForm
-          action={deleteProjectPhaseSupplyAction}
-          hiddenFields={[
-            { name: "householdId", value: householdId },
-            { name: "projectId", value: projectId },
-            { name: "phaseId", value: phaseId },
-            { name: "supplyId", value: supply.id }
-          ]}
-          prompt="Delete this supply line?"
-          triggerLabel="Delete"
-          confirmLabel="Yes, delete"
-          className="inline-actions"
-          triggerClassName="button button--danger button--sm"
-          confirmClassName="button button--danger button--sm"
-          cancelClassName="button button--ghost button--sm"
-        />
+        {isDeleting ? (
+          <>
+            <form action={deleteProjectPhaseSupplyAction}>
+              <input type="hidden" name="householdId" value={householdId} />
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="phaseId" value={phaseId} />
+              <input type="hidden" name="supplyId" value={supply.id} />
+              <button type="submit" className="button button--danger button--sm">Confirm</button>
+            </form>
+            <button type="button" className="button button--ghost button--sm" onClick={() => setIsDeleting(false)}>Cancel</button>
+          </>
+        ) : (
+          <button type="button" className="button button--danger button--sm" onClick={() => setIsDeleting(true)}>Delete</button>
+        )}
       </div>
 
       {isEditing ? (
