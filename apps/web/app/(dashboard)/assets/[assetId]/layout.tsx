@@ -50,11 +50,6 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
             <div className="detail-hero__info">
               <p className="eyebrow">{formatCategoryLabel(detail.asset.category)}</p>
               <h1>{detail.asset.name}</h1>
-              <p>
-                {[detail.asset.manufacturer, detail.asset.model].filter(Boolean).join(" ")
-                  || detail.asset.description
-                  || "No description."}
-              </p>
             </div>
             <dl className="detail-hero__meta">
               <div className="detail-hero__meta-item"><dt>Visibility</dt><dd>{formatVisibilityLabel(detail.asset.visibility)}</dd></div>

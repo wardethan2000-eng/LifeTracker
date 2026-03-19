@@ -90,20 +90,8 @@ export function PhaseSplitPanel({
   const selectedPhase = phaseDetails.find((p) => p.id === selectedPhaseId);
   const selectedPhaseSummary = phases.find((p) => p.id === selectedPhaseId);
 
-  const totalTasks = phases.reduce((s, p) => s + p.taskCount, 0) + unphasedTasks.length;
-  const totalBudget = phases.reduce((s, p) => s + (p.budgetAmount ?? 0), 0);
-  const totalSpent = phases.reduce((s, p) => s + p.expenseTotal, 0);
-
   return (
     <div>
-      {/* Summary bar */}
-      <div className="workspace-summary-bar" style={{ marginBottom: 16 }}>
-        <span><strong>{phases.length}</strong> phases</span>
-        <span><strong>{totalTasks}</strong> tasks</span>
-        {totalBudget > 0 && <span><strong>{formatCurrency(totalBudget)}</strong> budget</span>}
-        {totalSpent > 0 && <span><strong>{formatCurrency(totalSpent)}</strong> spent</span>}
-      </div>
-
       <div className="phase-split">
         {/* ── Left: Phase list ── */}
         <div className="phase-split__list">

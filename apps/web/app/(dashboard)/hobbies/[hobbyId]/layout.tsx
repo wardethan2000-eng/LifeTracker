@@ -69,7 +69,6 @@ export default async function HobbyLayout({ params, children }: HobbyLayoutProps
     <WorkspaceLayout
       entityType="hobby"
       title={hobby.name}
-      {...(hobby.description ? { description: hobby.description } : {})}
       status={hobbyStatusLabels[hobby.status] ?? hobby.status}
       {...(variant ? { statusVariant: variant } : {})}
       backHref="/hobbies"

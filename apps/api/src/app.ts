@@ -69,6 +69,7 @@ import { ideaCanvasRoutes } from "./routes/canvases/index.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
+import { layoutPreferenceRoutes } from "./routes/layout-preferences.js";
 
 const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPluginAsync[]) => {
   for (const plugin of plugins) {
@@ -88,7 +89,8 @@ const accountRoutePlugins: FastifyPluginAsync[] = [
   dashboardRoutes,
   searchRoutes,
   barcodeRoutes,
-  scanDetailRoutes
+  scanDetailRoutes,
+  layoutPreferenceRoutes
 ];
 
 const householdRoutePlugins: FastifyPluginAsync[] = [

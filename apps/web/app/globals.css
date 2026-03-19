@@ -6312,7 +6312,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 .tab-nav--pill .tab-nav__list {
   display: flex;
   gap: 10px;
-  margin: 0 0 18px;
+  margin: 0 0 12px;
 }
 
 .tab-nav--pill .tab-nav__control {
@@ -9260,7 +9260,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
   top: 0;
   z-index: 50;
   background: var(--surface);
-  padding: 0 var(--density-page-pad);
+  padding: 16px 28px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -13094,6 +13094,223 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 @media (max-width: 768px) {
   .note-editor__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── React Grid Layout (base) ─── */
+
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item img {
+  pointer-events: none;
+  user-select: none;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 1;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+}
+
+.react-grid-item.dropping {
+  visibility: hidden;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--accent);
+  opacity: 0.12;
+  transition-duration: 100ms;
+  z-index: 2;
+  user-select: none;
+  border-radius: 12px;
+}
+
+.react-grid-item.react-grid-placeholder.placeholder-resizing {
+  transition: none;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border-right: 2px solid var(--ink-muted);
+  border-bottom: 2px solid var(--ink-muted);
+}
+
+.react-resizable-hide > .react-resizable-handle {
+  display: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+
+/* ─── Dashboard Grid ─── */
+
+.dashboard-grid {
+  min-height: 200px;
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100%;
+}
+
+.dashboard-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.dashboard-card__header:active {
+  cursor: grabbing;
+}
+
+.dashboard-card__title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.dashboard-card__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  font-size: 0.88rem;
+}
+
+.dashboard-card__kv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.dashboard-card__kv dt {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.dashboard-card__kv dd {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 2px 0 0;
+}
+
+.dashboard-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-card__list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-light, var(--border));
+}
+
+.dashboard-card__list-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-card__empty {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.dashboard-card__footer-link {
+  display: block;
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--accent);
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.dashboard-card__footer-link:hover {
+  background: var(--surface-raised);
+}
+
+/* Notepad card overrides */
+.dashboard-notepad textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  resize: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--ink);
+  padding: 0;
+}
+
+.dashboard-notepad textarea:focus {
+  outline: none;
+}
+
+.dashboard-notepad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  .dashboard-card__kv {
     grid-template-columns: 1fr;
   }
 }

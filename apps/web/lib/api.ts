@@ -482,6 +482,9 @@ import {
   type BatchUpdateCanvasNodesInput,
   type CreateCanvasEdgeInput,
   type UpdateCanvasEdgeInput,
+  layoutPreferenceSchema,
+  type LayoutPreference,
+  type SaveLayoutPreferenceInput,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -5344,3 +5347,27 @@ export const deleteCanvasEdge = async (
     method: "DELETE",
   });
 };
+
+// ─── Layout Preferences ───
+
+export const getLayoutPreference = async (
+  entityType: string,
+  entityId?: string
+): Promise<LayoutPreference | null> => {
+  const params = new URLSearchParams({ entityType });
+  if (entityId) params.set("entityId", entityId);
+  return apiRequest({
+    path: `/v1/layout-preferences?${params.toString()}`,
+    method: "GET",
+    schema: layoutPreferenceSchema.nullable(),
+  });
+};
+
+export const saveLayoutPreference = async (
+  input: SaveLayoutPreferenceInput
+): Promise<LayoutPreference> => apiRequest({
+  path: "/v1/layout-preferences",
+  method: "PUT",
+  body: input,
+  schema: layoutPreferenceSchema,
+});

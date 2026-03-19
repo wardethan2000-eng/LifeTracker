@@ -5529,3 +5529,35 @@ export const updateCanvasEdgeSchema = z.object({
 });
 export type UpdateCanvasEdgeInput = z.infer<typeof updateCanvasEdgeSchema>;
 
+// ─── Layout Preferences ───
+
+export const layoutItemSchema = z.object({
+  i: z.string(),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  minW: z.number().optional(),
+  minH: z.number().optional(),
+  maxW: z.number().optional(),
+  maxH: z.number().optional(),
+});
+export type LayoutItem = z.infer<typeof layoutItemSchema>;
+
+export const saveLayoutPreferenceSchema = z.object({
+  entityType: z.string().max(50),
+  entityId: z.string().max(50).optional().nullable(),
+  layoutJson: z.array(layoutItemSchema),
+});
+export type SaveLayoutPreferenceInput = z.infer<typeof saveLayoutPreferenceSchema>;
+
+export const layoutPreferenceSchema = z.object({
+  id: z.string(),
+  entityType: z.string(),
+  entityId: z.string().nullable(),
+  layoutJson: z.array(layoutItemSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type LayoutPreference = z.infer<typeof layoutPreferenceSchema>;
+

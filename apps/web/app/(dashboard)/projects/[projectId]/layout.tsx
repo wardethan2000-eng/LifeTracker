@@ -68,7 +68,6 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
     <WorkspaceLayout
       entityType="project"
       title={project.name}
-      {...(project.description ? { description: project.description } : {})}
       status={projectStatusLabels[project.status] ?? project.status}
       {...(variant ? { statusVariant: variant } : {})}
       {...(breadcrumbs ? { breadcrumbs } : {})}

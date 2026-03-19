@@ -21,7 +21,6 @@ type BreadcrumbItem = {
 type WorkspaceLayoutProps = {
   entityType: "project" | "hobby" | "plan";
   title: string;
-  description?: string;
   status?: string;
   statusVariant?: "success" | "warning" | "muted" | "info" | "accent" | "danger";
   breadcrumbs?: BreadcrumbItem[];
@@ -35,7 +34,6 @@ type WorkspaceLayoutProps = {
 
 export function WorkspaceLayout({
   title,
-  description,
   status,
   statusVariant,
   breadcrumbs,
@@ -70,7 +68,6 @@ export function WorkspaceLayout({
             <Link href={backHref} className="text-link" style={{ fontSize: "0.85rem" }}>← {backLabel}</Link>
           )}
           <h1 style={{ marginTop: 4 }}>{title}</h1>
-          {description ? <p className="workspace-description">{description}</p> : null}
           {headerMeta ? <div className="workspace-header-meta">{headerMeta}</div> : null}
         </div>
         <div className="page-header__actions">
