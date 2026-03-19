@@ -3001,7 +3001,8 @@ export const entryListQuerySchema = z.object({
   sortBy: entrySortBySchema.default("entryDate"),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().cuid().optional(),
-  includeArchived: z.coerce.boolean().default(false)
+  includeArchived: z.coerce.boolean().default(false),
+  folderId: z.string().cuid().optional()
 }).superRefine((value, context) => {
   if ((value.entityType && !value.entityId) || (!value.entityType && value.entityId)) {
     context.addIssue({

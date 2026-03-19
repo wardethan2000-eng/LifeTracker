@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  Entry,
   HouseholdMember,
   InventoryItemSummary,
   ProjectBudgetCategorySummary,
@@ -37,6 +38,7 @@ import { ProjectSupplyCreateForm } from "./project-supply-create-form";
 import { AttachmentSection } from "./attachment-section";
 import { SegmentedControl } from "./segmented-control";
 import { CategoryAccordionList } from "./category-accordion-list";
+import { createEntry, getEntries, updateEntry } from "../lib/api";
 import { RichEditor } from "./rich-editor";
 
 const statusOptions = [
@@ -252,13 +254,15 @@ function PhaseDetailPanel({
   const inventoryLookup = new Map(inventoryItems.map((item) => [item.id, item]));
   const dependencyCandidates = allTasks.filter((task) => task.taskType !== "quick");
 
+  const [phaseHasNotes, setPhaseHasNotes] = useState(Boolean(phase.notes));
+
   const subTabs: { id: PhaseSubTab; label: string; count?: number }[] = [
     { id: "tasks", label: "Tasks", count: phase.tasks.length },
     { id: "checklist", label: "Checklist", count: phase.checklistItemCount },
     { id: "supplies", label: "Supplies", count: phase.supplies.length },
     { id: "expenses", label: "Expenses", count: phase.expenses.length },
     { id: "photos", label: "Photos" },
-    { id: "notes", label: "Notes" },
+    { id: "notes", label: "Notes", count: phaseHasNotes ? 1 : undefined },
   ];
 
   return (
@@ -406,6 +410,7 @@ function PhaseDetailPanel({
           householdId={householdId}
           projectId={projectId}
           phase={phase}
+          onNotesLoaded={setPhaseHasNotes}
         />
       )}
 
@@ -910,36 +915,87 @@ function PhaseExpensesSubtab({
 
 function PhaseNotesEditor({
   householdId,
-  projectId,
   phase,
+  onNotesLoaded,
 }: {
   householdId: string;
   projectId: string;
   phase: ProjectPhaseDetail;
+  onNotesLoaded?: (hasNotes: boolean) => void;
 }) {
+  const [entryId, setEntryId] = useState<string | null>(null);
+  const [content, setContent] = useState<string>("");
+  const [ready, setReady] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingEntryIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    getEntries(householdId, {
+      entityType: "project_phase",
+      entityId: phase.id,
+      limit: 1,
+    }).then((result) => {
+      const entry: Entry | undefined = result.items[0];
+      if (entry) {
+        setEntryId(entry.id);
+        pendingEntryIdRef.current = entry.id;
+        setContent(entry.body ?? "");
+        onNotesLoaded?.(true);
+      } else if (phase.notes) {
+        // Migrate legacy plain-text notes field: convert to HTML paragraphs
+        const html = phase.notes
+          .split(/\n\n+/)
+          .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
+          .join("");
+        setContent(html);
+        onNotesLoaded?.(true);
+      } else {
+        onNotesLoaded?.(false);
+      }
+      setReady(true);
+    });
+  }, [householdId, phase.id, phase.notes, onNotesLoaded]);
 
   const handleChange = useCallback(
     (html: string) => {
+      setContent(html);
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        const form = new FormData();
-        form.set("householdId", householdId);
-        form.set("projectId", projectId);
-        form.set("phaseId", phase.id);
-        form.set("name", phase.name);
-        form.set("status", phase.status);
-        form.set("notes", html);
-        updateProjectPhaseAction(form);
+      saveTimeoutRef.current = setTimeout(async () => {
+        const currentEntryId = pendingEntryIdRef.current;
+        if (currentEntryId) {
+          await updateEntry(householdId, currentEntryId, {
+            body: html,
+            bodyFormat: "rich_text",
+          });
+        } else {
+          const created = await createEntry(householdId, {
+            body: html,
+            bodyFormat: "rich_text",
+            entryDate: new Date().toISOString(),
+            entityType: "project_phase",
+            entityId: phase.id,
+            entryType: "note",
+            flags: [],
+            tags: [],
+            measurements: [],
+          });
+          pendingEntryIdRef.current = created.id;
+          setEntryId(created.id);
+          onNotesLoaded?.(true);
+        }
       }, 800);
     },
-    [householdId, projectId, phase.id, phase.name, phase.status]
+    [householdId, phase.id, onNotesLoaded]
   );
+
+  if (!ready) {
+    return <div className="phase-notes-editor--loading" />;
+  }
 
   return (
     <div style={{ padding: "8px 0" }}>
       <RichEditor
-        content={phase.notes ?? ""}
+        content={content}
         onChange={handleChange}
         placeholder="Phase notes — anything relevant to planning or execution..."
       />

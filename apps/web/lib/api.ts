@@ -917,6 +917,10 @@ export const getEntries = async (
     params.set("includeArchived", String(query.includeArchived));
   }
 
+  if (query?.folderId) {
+    params.set("folderId", query.folderId);
+  }
+
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
 
   return apiRequest({

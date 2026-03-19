@@ -189,6 +189,10 @@ const buildEntryFilterClauses = (
     `);
   }
 
+  if (query.folderId !== undefined) {
+    conditions.push(Prisma.sql`e."folderId" = ${query.folderId}`);
+  }
+
   const archivedExplicitlyIncluded = query.flags?.includes("archived") ?? false;
   if (!query.includeArchived && !archivedExplicitlyIncluded) {
     conditions.push(Prisma.sql`

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Entry, IdeaCanvasSummary, NoteFolder, NoteTemplate } from "@lifekeeper/types";
+import type { IdeaCanvasSummary, NoteFolder, NoteTemplate, Entry } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
@@ -45,22 +45,12 @@ export function NotesHub({ householdId, initialFolders, initialEntries, template
   const refreshEntries = useCallback(async (folderId: string | null) => {
     setLoading(true);
     try {
-      const query: Record<string, string> = {
-        entityType: "notebook",
-        entityId: householdId,
-      };
-      if (folderId) {
-        query.folderId = folderId;
-      }
       const result = await getEntries(householdId, {
         entityType: "notebook",
         entityId: householdId,
+        ...(folderId !== null ? { folderId } : {}),
       });
-      // Client-side folder filtering since the API doesn't have folderId query param
-      const filtered = folderId
-        ? result.items.filter((e) => (e as Entry & { folderId?: string | null }).folderId === folderId)
-        : result.items;
-      setEntries(filtered);
+      setEntries(result.items);
     } finally {
       setLoading(false);
     }
@@ -91,8 +81,8 @@ export function NotesHub({ householdId, initialFolders, initialEntries, template
 
   const handleQuickCapture = useCallback(async (body: string) => {
     await createEntry(householdId, {
-      body,
-      bodyFormat: "plain_text",
+      body: `<p>${body}</p>`,
+      bodyFormat: "rich_text",
       entryDate: new Date().toISOString(),
       entityType: "notebook",
       entityId: householdId,

@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { ApiError, getCanvas, getEntries, getMe } from "../../../../lib/api";
-import { CanvasRenderer } from "../../../../components/canvas-renderer";
+import { CanvasPageClient } from "./canvas-page-client";
 import Link from "next/link";
 
 type CanvasPageProps = {
@@ -20,7 +20,7 @@ export default async function CanvasPage({ params, searchParams }: CanvasPagePro
 
     const [canvas, notesResponse] = await Promise.all([
       getCanvas(household.id, canvasId),
-      getEntries(household.id, { entityType: "notebook", entityId: "notebook", limit: 200 }),
+      getEntries(household.id, { entityType: "notebook", entityId: household.id, limit: 200 }),
     ]);
 
     return (
@@ -30,13 +30,10 @@ export default async function CanvasPage({ params, searchParams }: CanvasPagePro
             ← Back to Notes
           </Link>
         </div>
-        <CanvasRenderer
+        <CanvasPageClient
           householdId={household.id}
           canvas={canvas}
           entries={notesResponse.items}
-          onNavigateToNote={(_entryId: string) => {
-            // Client-side navigation handled in component
-          }}
         />
       </div>
     );
