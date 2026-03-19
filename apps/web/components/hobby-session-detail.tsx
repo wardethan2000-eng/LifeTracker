@@ -31,9 +31,9 @@ import {
 } from "../lib/api";
 import { Card } from "./card";
 import { EntryTipsSurface } from "./entry-system";
+import { HobbySessionStageManager } from "./hobby-session-stage-manager";
 import { InlineError } from "./inline-error";
 import { SessionActivityLogSection } from "./session-activity-log-section";
-import { SessionPhaseManager } from "./session-phase-manager";
 import { SessionRatingForm } from "./session-rating-form";
 import { SessionStepList } from "./session-step-list";
 
@@ -43,7 +43,6 @@ type HobbySessionDetailProps = {
   hobby: HobbyDetail;
   session: HobbySessionDetail;
   series: HobbySeriesDetail | null;
-  advanceHobbySessionAction: (formData: FormData) => Promise<void>;
   deleteHobbySessionAction: (formData: FormData) => Promise<void>;
 };
 
@@ -205,7 +204,6 @@ export function HobbySessionDetail({
   hobby,
   session,
   series,
-  advanceHobbySessionAction,
   deleteHobbySessionAction,
 }: HobbySessionDetailProps): JSX.Element {
   const [sessionState, setSessionState] = useState(session);
@@ -329,30 +327,6 @@ export function HobbySessionDetail({
     }
 
     return hobby.inventoryLinks.find((link) => link.inventoryItemId === inventoryItemId)?.inventoryItem ?? null;
-  };
-
-  const advanceSession = async (formData: FormData) => {
-    if (!currentPipelineStep || currentPipelineStep.isFinal) {
-      return;
-    }
-
-    const nextStep = pipelineSteps[currentPipelineIndex + 1];
-    if (!nextStep) {
-      return;
-    }
-
-    await advanceHobbySessionAction(formData);
-    setSessionState((previous) => ({
-      ...previous,
-      status: nextStep.label,
-      pipelineStepId: nextStep.id,
-      completedDate: nextStep.isFinal ? new Date().toISOString() : previous.completedDate,
-    }));
-  };
-
-  const updateBinaryStatus = async (status: "active" | "completed") => {
-    const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, { status });
-    updateSessionSummary(updated);
   };
 
   const handleDelete = (event: FormEvent<HTMLFormElement>) => {
@@ -595,18 +569,12 @@ export function HobbySessionDetail({
       <div className="resource-layout__primary session-detail-stack">
         <InlineError message={errorMessage} />
 
-        <SessionPhaseManager
+        <HobbySessionStageManager
           householdId={householdId}
           hobbyId={hobbyId}
-          sessionId={sessionState.id}
-          lifecycleMode={hobby.lifecycleMode}
-          pipelineSteps={pipelineSteps}
-          currentPipelineIndex={currentPipelineIndex}
-          currentPipelineStep={currentPipelineStep}
-          sessionStatus={sessionState.status}
-          completedDate={sessionState.completedDate}
-          onAdvance={advanceSession}
-          onStatusChange={updateBinaryStatus}
+          hobby={hobby}
+          session={sessionState}
+          onSessionChange={updateSessionSummary}
           onError={setErrorMessage}
         />
 

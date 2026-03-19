@@ -234,8 +234,18 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
     const completedPhaseCount = project.phases.filter((phase) => phase.status === "completed").length;
     const phaseCount = project.phases.length;
     const totalTaskCount = project.tasks.length;
+    const remainingTaskCount = totalTaskCount - completedTaskCount;
     const percentComplete = totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
     const activePhase = project.phases.find((phase) => phase.status === "in_progress");
+    const workspacePhase = activePhase ?? project.phases[0] ?? null;
+    const workspaceHref = workspacePhase
+      ? getPhaseFocusHref(household.id, project.id, workspacePhase.id)
+      : `/projects/${project.id}?householdId=${household.id}#project-phases`;
+    const workspaceActionLabel = activePhase
+      ? `Continue ${activePhase.name}`
+      : workspacePhase
+        ? `Open ${workspacePhase.name}`
+        : "Set up first phase";
     const phaseProgress: ProjectPhaseProgress[] = project.phases.map((phase) => ({
       name: phase.name,
       status: phase.status,
@@ -314,49 +324,77 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             />
           ) : (
           <>
-          {project.treeStats && (
-            <div className="note" style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", marginBottom: "12px" }}>
-              <span><strong>Tree totals:</strong></span>
-              <span>{project.treeStats.descendantProjectCount} sub-project{project.treeStats.descendantProjectCount === 1 ? "" : "s"}</span>
-              <span>Budget: {formatCurrency(project.treeStats.treeBudgetTotal, "No budget")}</span>
-              <span>Spent: {formatCurrency(project.treeStats.treeSpentTotal, "$0.00")}</span>
-              <span>Tasks: {project.treeStats.treeCompletedTaskCount}/{project.treeStats.treeTaskCount} ({project.treeStats.treePercentComplete}%)</span>
+          <section className="panel panel--studio project-workspace">
+            <div className="panel__header mode-workspace__header">
+              <div>
+                <h2>Workspace</h2>
+                <p className="mode-workspace__subcopy">
+                  {workspacePhase
+                    ? `Drive execution from ${workspacePhase.name}, then branch into tasks, supplies, and field updates without bouncing through a summary page.`
+                    : "This project does not have a phase yet. Start by creating one so work can move into a concrete execution lane."}
+                </p>
+              </div>
+              <div className="mode-workspace__header-meta">
+                <span className="pill pill--info">{projectStatusLabels[project.status] ?? project.status}</span>
+                <span className="pill">{percentComplete}% complete</span>
+                {workspacePhase ? <span className="pill pill--muted">Phase: {workspacePhase.name}</span> : null}
+              </div>
             </div>
-          )}
+            <div className="panel__body--padded project-workspace__body">
+              <div className="project-workspace__summary mode-stack">
+                <div className="mode-kv-grid">
+                  <div>
+                    <span>Task backlog</span>
+                    <strong>{remainingTaskCount} remaining</strong>
+                  </div>
+                  <div>
+                    <span>Phase progress</span>
+                    <strong>{completedPhaseCount} of {phaseCount} complete</strong>
+                  </div>
+                  <div>
+                    <span>Budget</span>
+                    <strong>{project.budgetAmount ? formatCurrency(project.budgetAmount, "$0.00") : "Not set"}</strong>
+                  </div>
+                  <div>
+                    <span>Spent</span>
+                    <strong>{formatCurrency(totalSpent, "$0.00")}</strong>
+                  </div>
+                  <div>
+                    <span>Labor left</span>
+                    <strong>{remainingEstimatedHours.toFixed(1)}h</strong>
+                  </div>
+                  <div>
+                    <span>Execution flags</span>
+                    <strong>{blockedTasks.length} blocked / {criticalPathTasks.length} critical</strong>
+                  </div>
+                  {project.treeStats ? (
+                    <div>
+                      <span>Project tree</span>
+                      <strong>{project.treeStats.descendantProjectCount} sub-project{project.treeStats.descendantProjectCount === 1 ? "" : "s"}</strong>
+                    </div>
+                  ) : null}
+                </div>
+                <ProjectProgressBar
+                  phases={phaseProgress}
+                  totalTaskCount={totalTaskCount}
+                  completedTaskCount={completedTaskCount}
+                />
+                <div className="stats-row project-workspace__supply">
+                  <Suspense fallback={<ProjectSupplyStatCardsSkeleton />}>
+                    <ProjectSupplyStatCards householdId={household.id} projectId={project.id} />
+                  </Suspense>
+                </div>
+              </div>
 
-          {(blockedTasks.length > 0 || criticalPathTasks.length > 0 || totalEstimatedHours > 0 || totalActualHours > 0) && (
-            <div className="note" style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.85rem", marginBottom: "12px" }}>
-              <span><strong>Execution signals:</strong></span>
-              <span>Estimated labor: {totalEstimatedHours.toFixed(1)}h</span>
-              <span>Actual labor: {totalActualHours.toFixed(1)}h</span>
-              <span>Labor left: {remainingEstimatedHours.toFixed(1)}h</span>
-              {blockedTasks.length > 0 ? <span>{blockedTasks.length} blocked task{blockedTasks.length === 1 ? "" : "s"}</span> : null}
-              {criticalPathTasks.length > 0 ? <span>{criticalPathTasks.length} critical-path task{criticalPathTasks.length === 1 ? "" : "s"}</span> : null}
+              <div className="project-workspace__actions">
+                <Link href={workspaceHref} className="button button--primary">{workspaceActionLabel}</Link>
+                <Link href={`#project-tasks`} className="button button--ghost">Open tasks</Link>
+                <Link href={`#quick-todos`} className="button button--ghost">Quick to-dos</Link>
+                <Link href={`/projects/${project.id}?householdId=${household.id}&view=entries`} className="button button--ghost">Capture entry</Link>
+                <Link href={`#project-shopping`} className="button button--ghost">Shopping list</Link>
+                <Link href={`#project-settings`} className="button button--ghost">Project settings</Link>
+              </div>
             </div>
-          )}
-
-          <section className="stats-row">
-            <div className="stat-card stat-card--accent">
-              <span className="stat-card__label">Status</span>
-              <strong className="stat-card__value">{projectStatusLabels[project.status] ?? project.status}</strong>
-              <span className="stat-card__sub">Start {formatDate(project.startDate, "not set")}</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__label">Task Progress</span>
-              <ProjectProgressBar
-                phases={phaseProgress}
-                totalTaskCount={totalTaskCount}
-                completedTaskCount={completedTaskCount}
-              />
-            </div>
-            <div className="stat-card stat-card--warning">
-              <span className="stat-card__label">Phases</span>
-              <strong className="stat-card__value">{completedPhaseCount} / {phaseCount}</strong>
-              <span className="stat-card__sub">{activePhase ? `Active: ${activePhase.name}` : "No active phase."}</span>
-            </div>
-            <Suspense fallback={<ProjectSupplyStatCardsSkeleton />}>
-              <ProjectSupplyStatCards householdId={household.id} projectId={project.id} />
-            </Suspense>
           </section>
 
           {project.childProjects && project.childProjects.length > 0 && (
@@ -401,217 +439,227 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
           <div className="resource-layout">
             <div className="resource-layout__primary">
-              <Suspense fallback={<PhaseDetailsSkeleton />}>
-                <ProjectPhaseDetailsPanel
-                  householdId={household.id}
-                  project={project}
-                  {...(focusedPhaseId ? { focusedPhaseId } : {})}
-                />
-              </Suspense>
-
-              <ExpandableCard
-                title="Project Settings"
-                modalTitle="Project Settings"
-                previewContent={
-                  <div className="compact-preview">
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      <span className="compact-preview__pill">{projectStatusLabels[project.status] ?? project.status}</span>
-                      {project.startDate ? <span className="compact-preview__pill">Starts {formatDate(project.startDate, "—")}</span> : null}
-                      {project.targetEndDate ? <span className="compact-preview__pill">Target {formatDate(project.targetEndDate, "—")}</span> : null}
-                      {project.budgetAmount ? <span className="compact-preview__pill">{formatCurrency(project.budgetAmount, "$0")} budget</span> : null}
-                    </div>
-                  </div>
-                }
-              >
-                <div>
-                  <ProjectCoreFormFields
-                    action={updateProjectAction}
+              <section id="project-phases">
+                <Suspense fallback={<PhaseDetailsSkeleton />}>
+                  <ProjectPhaseDetailsPanel
                     householdId={household.id}
                     project={project}
-                    submitLabel="Save Project"
+                    {...(focusedPhaseId ? { focusedPhaseId } : {})}
                   />
-                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)", display: "grid", gap: 16 }}>
-                    <form action={saveProjectAsTemplateAction} className="workbench-grid">
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <label className="field">
-                        <span>Save as Template</span>
-                        <input name="templateName" defaultValue={`${project.name} Template`} required />
-                      </label>
-                      <label className="field field--full">
-                        <span>Template Description</span>
-                        <input name="templateDescription" defaultValue={project.description ?? ""} />
-                      </label>
-                      <label className="field field--full">
-                        <span>Template Notes</span>
-                        <textarea name="templateNotes" rows={2} defaultValue={project.notes ?? ""} />
-                      </label>
-                      <div className="inline-actions" style={{ marginTop: 8 }}>
-                        <button type="submit" className="button button--ghost">Save Template</button>
-                      </div>
-                    </form>
+                </Suspense>
+              </section>
 
-                    <form action={cloneProjectAction} className="workbench-grid">
-                      <input type="hidden" name="householdId" value={household.id} />
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <label className="field">
-                        <span>Clone Project</span>
-                        <input name="name" defaultValue={`${project.name} Copy`} required />
-                      </label>
-                      <label className="field">
-                        <span>Clone Start Date</span>
-                        <input name="startDate" type="date" />
-                      </label>
-                      <label className="field">
-                        <span>Clone Target End</span>
-                        <input name="targetEndDate" type="date" />
-                      </label>
-                      <div className="inline-actions" style={{ marginTop: 8 }}>
-                        <button type="submit" className="button button--ghost">Create Clone</button>
+              <div id="project-settings">
+                <ExpandableCard
+                  title="Project Settings"
+                  modalTitle="Project Settings"
+                  previewContent={
+                    <div className="compact-preview">
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        <span className="compact-preview__pill">{projectStatusLabels[project.status] ?? project.status}</span>
+                        {project.startDate ? <span className="compact-preview__pill">Starts {formatDate(project.startDate, "—")}</span> : null}
+                        {project.targetEndDate ? <span className="compact-preview__pill">Target {formatDate(project.targetEndDate, "—")}</span> : null}
+                        {project.budgetAmount ? <span className="compact-preview__pill">{formatCurrency(project.budgetAmount, "$0")} budget</span> : null}
                       </div>
-                    </form>
-                  </div>
-                  <div style={{ marginTop: 12 }}>
-                    <ProjectDangerActions householdId={household.id} projectId={project.id} />
-                  </div>
-                </div>
-              </ExpandableCard>
-
-              <ExpandableCard
-                title={`Quick To-dos (${quickTodos.length})`}
-                modalTitle="Quick To-dos"
-                previewContent={
-                  <span className="data-table__secondary">
-                    {completedQuickTodoCount} of {quickTodos.length} done
-                  </span>
-                }
-              >
-                <div>
-                  <form action={createQuickTodoAction} className="quick-todo-form">
-                    <input type="hidden" name="householdId" value={household.id} />
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <input
-                      name="title"
-                      placeholder="Add a to-do…"
-                      required
-                      className="quick-todo-form__title"
+                    </div>
+                  }
+                >
+                  <div>
+                    <ProjectCoreFormFields
+                      action={updateProjectAction}
+                      householdId={household.id}
+                      project={project}
+                      submitLabel="Save Project"
                     />
-                    {project.phases.length > 0 && (
-                      <select name="phaseId" defaultValue="" className="quick-todo-form__phase">
-                        <option value="">No phase</option>
-                        {project.phases.map((phase) => (
-                          <option key={phase.id} value={phase.id}>{phase.name}</option>
-                        ))}
-                      </select>
-                    )}
-                    <button type="submit" className="button button--sm">Add</button>
-                  </form>
-                  {quickTodos.length === 0 ? (
-                    <p className="panel__empty">No quick to-dos yet. Use the field above to add lightweight checkbox items.</p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {quickTodos.map((todo) => (
-                        <div
-                          key={todo.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            padding: "8px 0",
-                            borderBottom: "1px solid var(--border)",
-                            minHeight: "36px"
-                          }}
-                        >
-                          <form action={toggleQuickTodoAction} style={{ display: "contents" }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="taskId" value={todo.id} />
-                            <input type="hidden" name="isCompleted" value={todo.isCompleted ? "false" : "true"} />
-                            <button
-                              type="submit"
-                              style={{
-                                width: "18px",
-                                height: "18px",
-                                flexShrink: 0,
-                                border: "2px solid var(--border)",
-                                borderRadius: "3px",
-                                background: todo.isCompleted ? "var(--accent)" : "var(--surface)",
-                                cursor: "pointer",
-                                padding: 0,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                fontSize: "11px",
-                                lineHeight: 1
-                              }}
-                              title={todo.isCompleted ? "Mark incomplete" : "Mark complete"}
-                            >
-                              {todo.isCompleted ? "✓" : ""}
-                            </button>
-                          </form>
-                          <span
+                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)", display: "grid", gap: 16 }}>
+                      <form action={saveProjectAsTemplateAction} className="workbench-grid">
+                        <input type="hidden" name="householdId" value={household.id} />
+                        <input type="hidden" name="projectId" value={project.id} />
+                        <label className="field">
+                          <span>Save as Template</span>
+                          <input name="templateName" defaultValue={`${project.name} Template`} required />
+                        </label>
+                        <label className="field field--full">
+                          <span>Template Description</span>
+                          <input name="templateDescription" defaultValue={project.description ?? ""} />
+                        </label>
+                        <label className="field field--full">
+                          <span>Template Notes</span>
+                          <textarea name="templateNotes" rows={2} defaultValue={project.notes ?? ""} />
+                        </label>
+                        <div className="inline-actions" style={{ marginTop: 8 }}>
+                          <button type="submit" className="button button--ghost">Save Template</button>
+                        </div>
+                      </form>
+
+                      <form action={cloneProjectAction} className="workbench-grid">
+                        <input type="hidden" name="householdId" value={household.id} />
+                        <input type="hidden" name="projectId" value={project.id} />
+                        <label className="field">
+                          <span>Clone Project</span>
+                          <input name="name" defaultValue={`${project.name} Copy`} required />
+                        </label>
+                        <label className="field">
+                          <span>Clone Start Date</span>
+                          <input name="startDate" type="date" />
+                        </label>
+                        <label className="field">
+                          <span>Clone Target End</span>
+                          <input name="targetEndDate" type="date" />
+                        </label>
+                        <div className="inline-actions" style={{ marginTop: 8 }}>
+                          <button type="submit" className="button button--ghost">Create Clone</button>
+                        </div>
+                      </form>
+                    </div>
+                    <div style={{ marginTop: 12 }}>
+                      <ProjectDangerActions householdId={household.id} projectId={project.id} />
+                    </div>
+                  </div>
+                </ExpandableCard>
+              </div>
+
+              <div id="quick-todos">
+                <ExpandableCard
+                  title={`Quick To-dos (${quickTodos.length})`}
+                  modalTitle="Quick To-dos"
+                  previewContent={
+                    <span className="data-table__secondary">
+                      {completedQuickTodoCount} of {quickTodos.length} done
+                    </span>
+                  }
+                >
+                  <div>
+                    <form action={createQuickTodoAction} className="quick-todo-form">
+                      <input type="hidden" name="householdId" value={household.id} />
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <input
+                        name="title"
+                        placeholder="Add a to-do…"
+                        required
+                        className="quick-todo-form__title"
+                      />
+                      {project.phases.length > 0 && (
+                        <select name="phaseId" defaultValue="" className="quick-todo-form__phase">
+                          <option value="">No phase</option>
+                          {project.phases.map((phase) => (
+                            <option key={phase.id} value={phase.id}>{phase.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <button type="submit" className="button button--sm">Add</button>
+                    </form>
+                    {quickTodos.length === 0 ? (
+                      <p className="panel__empty">No quick to-dos yet. Use the field above to add lightweight checkbox items.</p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {quickTodos.map((todo) => (
+                          <div
+                            key={todo.id}
                             style={{
-                              flex: 1,
-                              fontSize: "0.875rem",
-                              color: todo.isCompleted ? "var(--ink-muted)" : "var(--ink)",
-                              textDecoration: todo.isCompleted ? "line-through" : "none"
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              padding: "8px 0",
+                              borderBottom: "1px solid var(--border)",
+                              minHeight: "36px"
                             }}
                           >
-                            {todo.title}
-                          </span>
-                          {todo.phaseId ? (
-                            <span className="pill pill--muted" style={{ fontSize: "0.75rem" }}>
-                              {phaseNameLookup.get(todo.phaseId) ?? ""}
+                            <form action={toggleQuickTodoAction} style={{ display: "contents" }}>
+                              <input type="hidden" name="householdId" value={household.id} />
+                              <input type="hidden" name="projectId" value={project.id} />
+                              <input type="hidden" name="taskId" value={todo.id} />
+                              <input type="hidden" name="isCompleted" value={todo.isCompleted ? "false" : "true"} />
+                              <button
+                                type="submit"
+                                style={{
+                                  width: "18px",
+                                  height: "18px",
+                                  flexShrink: 0,
+                                  border: "2px solid var(--border)",
+                                  borderRadius: "3px",
+                                  background: todo.isCompleted ? "var(--accent)" : "var(--surface)",
+                                  cursor: "pointer",
+                                  padding: 0,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "white",
+                                  fontSize: "11px",
+                                  lineHeight: 1
+                                }}
+                                title={todo.isCompleted ? "Mark incomplete" : "Mark complete"}
+                              >
+                                {todo.isCompleted ? "✓" : ""}
+                              </button>
+                            </form>
+                            <span
+                              style={{
+                                flex: 1,
+                                fontSize: "0.875rem",
+                                color: todo.isCompleted ? "var(--ink-muted)" : "var(--ink)",
+                                textDecoration: todo.isCompleted ? "line-through" : "none"
+                              }}
+                            >
+                              {todo.title}
                             </span>
-                          ) : null}
-                          <form action={promoteTaskAction} style={{ display: "inline" }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="taskId" value={todo.id} />
-                            <button type="submit" className="button button--ghost button--small" title="Promote to full task">→ Full task</button>
-                          </form>
-                          <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
-                            <input type="hidden" name="householdId" value={household.id} />
-                            <input type="hidden" name="projectId" value={project.id} />
-                            <input type="hidden" name="taskId" value={todo.id} />
-                            <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </ExpandableCard>
+                            {todo.phaseId ? (
+                              <span className="pill pill--muted" style={{ fontSize: "0.75rem" }}>
+                                {phaseNameLookup.get(todo.phaseId) ?? ""}
+                              </span>
+                            ) : null}
+                            <form action={promoteTaskAction} style={{ display: "inline" }}>
+                              <input type="hidden" name="householdId" value={household.id} />
+                              <input type="hidden" name="projectId" value={project.id} />
+                              <input type="hidden" name="taskId" value={todo.id} />
+                              <button type="submit" className="button button--ghost button--small" title="Promote to full task">→ Full task</button>
+                            </form>
+                            <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
+                              <input type="hidden" name="householdId" value={household.id} />
+                              <input type="hidden" name="projectId" value={project.id} />
+                              <input type="hidden" name="taskId" value={todo.id} />
+                              <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                            </form>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </ExpandableCard>
+              </div>
 
-              <Suspense fallback={<TasksSkeleton fullTasks={fullTasks} />}>
-                <ProjectTasksPanel householdId={household.id} project={project} />
-              </Suspense>
+              <div id="project-tasks">
+                <Suspense fallback={<TasksSkeleton fullTasks={fullTasks} />}>
+                  <ProjectTasksPanel householdId={household.id} project={project} />
+                </Suspense>
+              </div>
 
               <Suspense fallback={<ProjectNotesSkeleton />}>
                 <ProjectNotesPanel householdId={household.id} project={project} />
               </Suspense>
 
-              <Suspense fallback={<ShoppingListSkeleton />}>
-                <ProjectShoppingListSection householdId={household.id} projectId={project.id} />
-              </Suspense>
+              <div id="project-shopping">
+                <Suspense fallback={<ShoppingListSkeleton />}>
+                  <ProjectShoppingListSection householdId={household.id} projectId={project.id} />
+                </Suspense>
+              </div>
             </div>
 
             <div className="resource-layout__aside">
-              <Card title="Project Status">
+              <Card title="Workspace Snapshot">
                 <dl className="schedule-meta">
                   <div><dt>Status</dt><dd><span className="pill">{projectStatusLabels[project.status] ?? project.status}</span></dd></div>
                   <div><dt>Task progress</dt><dd>{percentComplete}% — {completedTaskCount}/{totalTaskCount} tasks</dd></div>
-                  <div><dt>Phases</dt><dd>{completedPhaseCount} of {phaseCount} complete</dd></div>
-                  {activePhase ? <div><dt>Active phase</dt><dd>{activePhase.name}</dd></div> : null}
-                  <div><dt>Start date</dt><dd>{formatDate(project.startDate, "Not set")}</dd></div>
-                  {project.targetEndDate ? <div><dt>Target end</dt><dd>{formatDate(project.targetEndDate, "—")}</dd></div> : null}
+                  <div><dt>Next focus</dt><dd>{workspacePhase ? workspacePhase.name : "Create first phase"}</dd></div>
                   <div><dt>Budget</dt><dd>{project.budgetAmount ? formatCurrency(project.budgetAmount, "$0.00") : "Not set"}</dd></div>
                   <div><dt>Spent</dt><dd>{formatCurrency(totalSpent, "$0.00")}</dd></div>
-                  <div><dt>Labor</dt><dd>{totalActualHours.toFixed(1)}h actual / {totalEstimatedHours.toFixed(1)}h estimated</dd></div>
-                  <div><dt>Blocked tasks</dt><dd>{blockedTasks.length}</dd></div>
-                  <div><dt>Critical path</dt><dd>{criticalPathTasks.length} task{criticalPathTasks.length === 1 ? "" : "s"}</dd></div>
+                  <div><dt>Labor left</dt><dd>{remainingEstimatedHours.toFixed(1)}h remaining</dd></div>
+                  <div><dt>Flags</dt><dd>{blockedTasks.length} blocked / {criticalPathTasks.length} critical</dd></div>
                 </dl>
+                <div className="project-aside-actions">
+                  <Link href={workspaceHref} className="button button--primary button--sm">{workspaceActionLabel}</Link>
+                  <Link href={projectEntriesHref} className="button button--ghost button--sm">Entries</Link>
+                </div>
               </Card>
 
               <Suspense fallback={<LinkedAssetsSkeleton linkedAssetCount={project.assets.length} />}>

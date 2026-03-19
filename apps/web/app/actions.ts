@@ -81,6 +81,7 @@ import {
   assetFieldDefinitionsSchema,
   createHobbyRecipeIngredientInputSchema,
   createHobbyRecipeStepInputSchema,
+  hobbyPresetPipelineStepSchema,
   presetScheduleTemplateSchema,
   presetUsageMetricTemplateSchema
 } from "@lifekeeper/types";
@@ -167,6 +168,7 @@ import {
   deleteServiceProvider,
   deleteSchedule,
   generateInventoryShoppingList,
+  getProjectDetail,
   getSpaceContents as getSpaceContentsRequest,
   markNotificationRead,
   markNotificationUnread,
@@ -622,14 +624,40 @@ const toRelativeTargetDate = (
   return new Date(anchor.getTime() - (daysBeforeTarget * MS_PER_DAY)).toISOString();
 };
 
+const buildProjectWorkspaceHref = (
+  householdId: string,
+  projectId: string,
+  focusPhaseId?: string
+): string => focusPhaseId
+  ? `/projects/${projectId}?householdId=${householdId}&focusPhaseId=${focusPhaseId}#phase-${focusPhaseId}`
+  : `/projects/${projectId}?householdId=${householdId}`;
+
+const resolveProjectWorkspaceHref = async (
+  householdId: string,
+  projectId: string,
+  focusPhaseId?: string
+): Promise<string> => {
+  if (focusPhaseId) {
+    return buildProjectWorkspaceHref(householdId, projectId, focusPhaseId);
+  }
+
+  try {
+    const project = await getProjectDetail(householdId, projectId);
+    return buildProjectWorkspaceHref(householdId, projectId, project.phases[0]?.id);
+  } catch {
+    return buildProjectWorkspaceHref(householdId, projectId);
+  }
+};
+
 const seedProjectFromBlueprint = async (
   householdId: string,
   projectId: string,
   blueprint: SeededProjectBlueprint,
   targetEndDate?: string
-): Promise<void> => {
+): Promise<string | undefined> => {
   const phaseIdByKey = new Map<string, string>();
   const taskIdByKey = new Map<string, string>();
+  let firstPhaseId: string | undefined;
 
   for (const [index, phase] of blueprint.seed.phases.entries()) {
     const createdPhase = await createProjectPhase(householdId, projectId, {
@@ -641,6 +669,10 @@ const seedProjectFromBlueprint = async (
       targetEndDate: toRelativeTargetDate(targetEndDate, phase.targetDaysBeforeTarget),
       notes: phase.notes
     });
+
+    if (firstPhaseId === undefined) {
+      firstPhaseId = createdPhase.id;
+    }
 
     phaseIdByKey.set(phase.key, createdPhase.id);
 
@@ -715,6 +747,8 @@ const seedProjectFromBlueprint = async (
       sortOrder: supply.sortOrder ?? index
     });
   }
+
+  return firstPhaseId;
 };
 
 const buildStructuredAssetInput = (formData: FormData): Partial<CreateAssetInput> => {
@@ -2342,12 +2376,13 @@ export async function createProjectAction(formData: FormData): Promise<void> {
   const project = await createProject(householdId, input);
 
   if (isSeededProjectBlueprint(blueprint)) {
-    await seedProjectFromBlueprint(householdId, project.id, blueprint, input.targetEndDate);
+    const firstPhaseId = await seedProjectFromBlueprint(householdId, project.id, blueprint, input.targetEndDate);
     revalidateProjectPaths(householdId, project.id);
-    redirect(`/projects/${project.id}?householdId=${householdId}`);
+    redirect(buildProjectWorkspaceHref(householdId, project.id, firstPhaseId));
   }
 
   const rawSuggestedPhases = getOptionalString(formData, "suggestedPhasesJson");
+  let firstPhaseId: string | undefined;
   if (rawSuggestedPhases) {
     let suggestedPhases: string[] = [];
 
@@ -2364,16 +2399,20 @@ export async function createProjectAction(formData: FormData): Promise<void> {
     }
 
     for (const [index, phaseName] of suggestedPhases.entries()) {
-      await createProjectPhase(householdId, project.id, {
+      const createdPhase = await createProjectPhase(householdId, project.id, {
         name: phaseName,
         status: "pending",
         sortOrder: index
       });
+
+      if (firstPhaseId === undefined) {
+        firstPhaseId = createdPhase.id;
+      }
     }
   }
 
   revalidateProjectPaths(householdId, project.id);
-  redirect(`/projects/${project.id}?householdId=${householdId}`);
+  redirect(buildProjectWorkspaceHref(householdId, project.id, firstPhaseId));
 }
 
 export async function createProjectFromTemplateAction(formData: FormData): Promise<void> {
@@ -2401,7 +2440,7 @@ export async function createProjectFromTemplateAction(formData: FormData): Promi
 
   const project = await instantiateProjectTemplate(householdId, templateId, input);
   revalidateProjectPaths(householdId, project.id);
-  redirect(`/projects/${project.id}?householdId=${householdId}`);
+  redirect(await resolveProjectWorkspaceHref(householdId, project.id));
 }
 
 export async function updateProjectAction(formData: FormData): Promise<void> {
@@ -2470,7 +2509,7 @@ export async function cloneProjectAction(formData: FormData): Promise<void> {
 
   const project = await cloneProject(householdId, projectId, input);
   revalidateProjectPaths(householdId, project.id);
-  redirect(`/projects/${project.id}?householdId=${householdId}`);
+  redirect(await resolveProjectWorkspaceHref(householdId, project.id));
 }
 
 export async function updateProjectStatusAction(formData: FormData): Promise<void> {
@@ -3273,8 +3312,10 @@ export async function revalidateAttachmentsAction(formData: FormData): Promise<v
 
 export async function createHobbyAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
+  const statusPipeline = parseJsonField(formData, "statusPipelineJson", hobbyPresetPipelineStepSchema.array(), []);
   const input: CreateHobbyInput = {
     name: getRequiredString(formData, "name"),
+    statusPipeline,
   };
 
   const description = getOptionalString(formData, "description");
@@ -3297,7 +3338,9 @@ export async function createHobbyAction(formData: FormData): Promise<void> {
 export async function updateHobbyAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const hobbyId = getRequiredString(formData, "hobbyId");
-  const input: UpdateHobbyInput = {};
+  const input: UpdateHobbyInput = {
+    statusPipeline: parseJsonField(formData, "statusPipelineJson", hobbyPresetPipelineStepSchema.array(), []),
+  };
 
   const name = getOptionalString(formData, "name");
   const status = getOptionalString(formData, "status") as HobbyStatus | undefined;

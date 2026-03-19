@@ -11,13 +11,30 @@ const hobbyMetric = (
   input: Omit<HobbyPresetMetricTemplate, "metricType"> & Partial<Pick<HobbyPresetMetricTemplate, "metricType">>
 ): HobbyPresetMetricTemplate => ({ metricType: "numeric", ...input });
 
+type PipelineStepOptions = {
+  description?: HobbyPresetPipelineStep["description"];
+  instructions?: HobbyPresetPipelineStep["instructions"];
+  futureNotes?: HobbyPresetPipelineStep["futureNotes"];
+  fieldDefinitions?: HobbyPresetPipelineStep["fieldDefinitions"];
+  checklistTemplates?: HobbyPresetPipelineStep["checklistTemplates"];
+  supplyTemplates?: HobbyPresetPipelineStep["supplyTemplates"];
+  color?: HobbyPresetPipelineStep["color"];
+  isFinal?: HobbyPresetPipelineStep["isFinal"];
+};
+
 const pipelineStep = (
   label: string,
   sortOrder: number,
-  options?: { color?: string; isFinal?: boolean }
+  options?: PipelineStepOptions
 ): HobbyPresetPipelineStep => ({
   label,
   sortOrder,
+  description: options?.description,
+  instructions: options?.instructions,
+  futureNotes: options?.futureNotes,
+  fieldDefinitions: options?.fieldDefinitions ?? [],
+  checklistTemplates: options?.checklistTemplates ?? [],
+  supplyTemplates: options?.supplyTemplates ?? [],
   ...(options?.color ? { color: options.color } : {}),
   isFinal: options?.isFinal ?? false,
 });
@@ -92,15 +109,214 @@ export const hobbyPresetLibrary: HobbyPreset[] = [
     ],
 
     pipelineSteps: [
-      pipelineStep("Planned", 0, { color: "gray" }),
-      pipelineStep("Brew Day", 1, { color: "blue" }),
-      pipelineStep("Primary Fermentation", 2, { color: "amber" }),
-      pipelineStep("Secondary / Dry Hop", 3, { color: "amber" }),
-      pipelineStep("Cold Crash / Clarification", 4, { color: "cyan" }),
-      pipelineStep("Packaging", 5, { color: "green" }),
-      pipelineStep("Conditioning / Carbonating", 6, { color: "green" }),
-      pipelineStep("Ready / Aging", 7, { color: "teal" }),
-      pipelineStep("Completed", 8, { color: "green", isFinal: true }),
+      pipelineStep("Planned", 0, {
+        color: "gray",
+        description: "Lock the recipe, confirm equipment, and make sure ingredients are actually on hand before brew day starts.",
+        instructions: "Use this stage to validate the recipe, brewing calendar, ingredient sourcing, water plan, and fermentation path so brew day is not spent improvising.",
+        futureNotes: "Capture anything to prep earlier next time: milling grain in advance, prebuilding water salts, replacing tubing, or ordering fresh yeast sooner.",
+        checklistTemplates: [
+          { title: "Choose or finalize recipe", sortOrder: 0 },
+          { title: "Confirm ingredient inventory and shortages", sortOrder: 1 },
+          { title: "Check brewing equipment readiness", sortOrder: 2 },
+          { title: "Plan water profile and volume targets", sortOrder: 3 },
+          { title: "Confirm fermentation temperature plan", sortOrder: 4 },
+        ],
+        supplyTemplates: [
+          { name: "Base malt and specialty grains", quantityNeeded: 1, unit: "recipe set", isRequired: true, sortOrder: 0 },
+          { name: "Hop schedule ingredients", quantityNeeded: 1, unit: "recipe set", isRequired: true, sortOrder: 1 },
+          { name: "Healthy yeast", quantityNeeded: 1, unit: "pitch", isRequired: true, sortOrder: 2 },
+          { name: "Sanitizer and cleaning chemicals", quantityNeeded: 1, unit: "brew day set", isRequired: true, sortOrder: 3 },
+        ],
+        fieldDefinitions: [
+          { key: "targetBrewDate", label: "Target Brew Date", type: "date", required: false, options: [], wide: false, order: 0 },
+          { key: "grainPrepared", label: "Grain Prepared", type: "boolean", required: false, options: [], wide: false, order: 1 },
+          { key: "starterPrepared", label: "Starter or Yeast Prep Complete", type: "boolean", required: false, options: [], wide: false, order: 2 },
+          { key: "brewPrepNotes", label: "Prep Notes", type: "textarea", required: false, options: [], wide: true, order: 3 },
+        ],
+      }),
+      pipelineStep("Brew Day", 1, {
+        color: "blue",
+        description: "Track the active production run: mash, boil, chilling, transfer, and pitch quality.",
+        instructions: "Record the brew day as it happens. Note temperature misses, gravity deltas, delayed additions, substitutions, and anything that would explain the final beer later.",
+        futureNotes: "Future notes here should improve the next brew day: timing adjustments, equipment changes, boil-off corrections, and process friction.",
+        checklistTemplates: [
+          { title: "Sanitize fermenter and cold-side equipment", sortOrder: 0 },
+          { title: "Stage salts, finings, hops, and yeast", sortOrder: 1 },
+          { title: "Hit mash target and hold steady", sortOrder: 2 },
+          { title: "Confirm pre-boil gravity and volume", sortOrder: 3 },
+          { title: "Chill wort to pitch range", sortOrder: 4 },
+          { title: "Transfer cleanly and pitch yeast", sortOrder: 5 },
+        ],
+        supplyTemplates: [
+          { name: "Brewing water", quantityNeeded: 1, unit: "full batch", isRequired: true, sortOrder: 0 },
+          { name: "Sanitizer", quantityNeeded: 1, unit: "brew day batch", isRequired: true, sortOrder: 1 },
+          { name: "Yeast nutrient", quantityNeeded: 1, unit: "dose", isRequired: false, sortOrder: 2 },
+          { name: "Whirlfloc or Irish moss", quantityNeeded: 1, unit: "dose", isRequired: false, sortOrder: 3 },
+        ],
+        fieldDefinitions: [
+          { key: "batchVolumeTargetGallons", label: "Target Batch Volume (gal)", type: "number", required: false, options: [], wide: false, order: 0 },
+          { key: "strikeTempActualF", label: "Actual Strike Temp (F)", type: "number", required: false, options: [], wide: false, order: 1 },
+          { key: "mashTempActualF", label: "Actual Mash Temp (F)", type: "number", required: false, options: [], wide: false, order: 2 },
+          { key: "preBoilGravityActual", label: "Actual Pre-Boil Gravity", type: "number", required: false, options: [], wide: false, order: 3 },
+          { key: "originalGravityActual", label: "Original Gravity", type: "number", required: false, options: [], wide: false, order: 4 },
+          { key: "pitchTempF", label: "Pitch Temp (F)", type: "number", required: false, options: [], wide: false, order: 5 },
+          { key: "brewDayIssues", label: "Brew Day Issues or Deviations", type: "textarea", required: false, options: [], wide: true, order: 6 },
+        ],
+      }),
+      pipelineStep("Primary Fermentation", 2, {
+        color: "amber",
+        description: "Monitor yeast health, fermentation temperature, gravity movement, and early quality signals.",
+        instructions: "Use this stage to capture how fermentation actually behaved, not just whether it started. Record lag time, temperature drift, blowoff activity, and the first stable readings.",
+        futureNotes: "Document strain behavior, temp-control lessons, and whether pitch rate, oxygenation, or nutrient use should change next time.",
+        checklistTemplates: [
+          { title: "Confirm visible fermentation activity", sortOrder: 0 },
+          { title: "Set and verify fermentation temperature control", sortOrder: 1 },
+          { title: "Take first gravity reading when appropriate", sortOrder: 2 },
+          { title: "Log aroma or off-flavor warnings", sortOrder: 3 },
+        ],
+        supplyTemplates: [
+          { name: "Blowoff tube or airlock", quantityNeeded: 1, unit: "setup", isRequired: true, sortOrder: 0 },
+          { name: "Temperature control setup", quantityNeeded: 1, unit: "setup", isRequired: false, sortOrder: 1 },
+        ],
+        fieldDefinitions: [
+          { key: "lagTimeHours", label: "Lag Time (hours)", type: "number", required: false, options: [], wide: false, order: 0 },
+          { key: "fermentationTempLowF", label: "Low Temp (F)", type: "number", required: false, options: [], wide: false, order: 1 },
+          { key: "fermentationTempHighF", label: "High Temp (F)", type: "number", required: false, options: [], wide: false, order: 2 },
+          { key: "krausenStatus", label: "Krausen / Activity", type: "select", required: false, options: ["Quiet", "Moderate", "Vigorous", "Finished"], wide: false, order: 3 },
+          { key: "firstGravityReading", label: "First Gravity Reading", type: "number", required: false, options: [], wide: false, order: 4 },
+          { key: "fermentationObservations", label: "Fermentation Observations", type: "textarea", required: false, options: [], wide: true, order: 5 },
+        ],
+      }),
+      pipelineStep("Secondary / Dry Hop", 3, {
+        color: "amber",
+        description: "Handle transfers, dry hopping, adjunct additions, or extended fermentation work without losing traceability.",
+        instructions: "Only use this stage when the batch actually needs it. Capture timing, contact duration, oxygen exposure risk, and any ingredient additions or transfers.",
+        futureNotes: "Future notes should help tune aroma intensity, hop timing, transfer cleanliness, or whether this stage should be skipped entirely next run.",
+        checklistTemplates: [
+          { title: "Verify gravity is ready for transfer or dry hop", sortOrder: 0 },
+          { title: "Prepare sanitized vessel or addition tools", sortOrder: 1 },
+          { title: "Add dry hops, fruit, or other adjuncts", sortOrder: 2 },
+          { title: "Record contact time plan", sortOrder: 3 },
+        ],
+        supplyTemplates: [
+          { name: "Dry hop charge or adjunct addition", quantityNeeded: 1, unit: "addition", isRequired: false, sortOrder: 0 },
+          { name: "Secondary vessel", quantityNeeded: 1, unit: "vessel", isRequired: false, sortOrder: 1 },
+        ],
+        fieldDefinitions: [
+          { key: "dryHopAddedDate", label: "Dry Hop / Addition Date", type: "date", required: false, options: [], wide: false, order: 0 },
+          { key: "dryHopDurationDays", label: "Dry Hop Duration (days)", type: "number", required: false, options: [], wide: false, order: 1 },
+          { key: "additionType", label: "Addition Type", type: "multiselect", required: false, options: ["Dry hops", "Fruit", "Oak", "Spices", "Transfer only"], wide: true, order: 2 },
+          { key: "oxygenExposureRisk", label: "Oxygen Exposure Risk", type: "select", required: false, options: ["Low", "Moderate", "High"], wide: false, order: 3 },
+          { key: "secondaryStageNotes", label: "Secondary / Dry Hop Notes", type: "textarea", required: false, options: [], wide: true, order: 4 },
+        ],
+      }),
+      pipelineStep("Cold Crash / Clarification", 4, {
+        color: "cyan",
+        description: "Stabilize the beer for packaging by recording cold crash timing, clarity progress, and any fining additions.",
+        instructions: "Note when the beer was dropped cold, how long it remained there, whether finings were used, and whether the result improved packaging readiness.",
+        futureNotes: "Capture whether this step was worthwhile for the style, how much sediment remained, and what timing works best on your setup.",
+        checklistTemplates: [
+          { title: "Confirm terminal gravity before crashing", sortOrder: 0 },
+          { title: "Drop temperature and protect from oxygen suck-back", sortOrder: 1 },
+          { title: "Add finings if used", sortOrder: 2 },
+          { title: "Check clarity before packaging", sortOrder: 3 },
+        ],
+        supplyTemplates: [
+          { name: "Cold storage or temperature control", quantityNeeded: 1, unit: "setup", isRequired: false, sortOrder: 0 },
+          { name: "Clarifying agent", quantityNeeded: 1, unit: "dose", isRequired: false, sortOrder: 1 },
+        ],
+        fieldDefinitions: [
+          { key: "coldCrashStartDate", label: "Cold Crash Start", type: "date", required: false, options: [], wide: false, order: 0 },
+          { key: "coldCrashDurationDays", label: "Cold Crash Duration (days)", type: "number", required: false, options: [], wide: false, order: 1 },
+          { key: "clarityRating", label: "Clarity", type: "select", required: false, options: ["Hazy", "Slightly hazy", "Bright", "Crystal clear"], wide: false, order: 2 },
+          { key: "clarificationNotes", label: "Clarification Notes", type: "textarea", required: false, options: [], wide: true, order: 3 },
+        ],
+      }),
+      pipelineStep("Packaging", 5, {
+        color: "green",
+        description: "Capture how the batch left the fermenter and what was needed to package cleanly and consistently.",
+        instructions: "Record packaging date, final gravity, losses, packaging format, and whether cleanup, purge, or oxygen-control steps went to plan.",
+        futureNotes: "Document packaging losses, transfer problems, priming miscalculations, or keg setup issues for the next batch.",
+        checklistTemplates: [
+          { title: "Confirm stable final gravity", sortOrder: 0 },
+          { title: "Sanitize bottles, keg, lines, and packaging tools", sortOrder: 1 },
+          { title: "Measure packaging yield and losses", sortOrder: 2 },
+          { title: "Record priming or force-carb setup", sortOrder: 3 },
+        ],
+        supplyTemplates: [
+          { name: "Bottles or keg", quantityNeeded: 1, unit: "packaging set", isRequired: true, sortOrder: 0 },
+          { name: "Priming sugar or CO2", quantityNeeded: 1, unit: "packaging dose", isRequired: true, sortOrder: 1 },
+          { name: "Caps or seals", quantityNeeded: 1, unit: "packaging set", isRequired: false, sortOrder: 2 },
+        ],
+        fieldDefinitions: [
+          { key: "packagingDate", label: "Packaging Date", type: "date", required: false, options: [], wide: false, order: 0 },
+          { key: "packagingFormat", label: "Packaging Format", type: "select", required: false, options: ["Bottle", "Keg", "Both"], wide: false, order: 1 },
+          { key: "finalGravityReading", label: "Final Gravity", type: "number", required: false, options: [], wide: false, order: 2 },
+          { key: "packagedVolumeGallons", label: "Packaged Volume (gal)", type: "number", required: false, options: [], wide: false, order: 3 },
+          { key: "packagingLossNotes", label: "Packaging Losses / Notes", type: "textarea", required: false, options: [], wide: true, order: 4 },
+        ],
+      }),
+      pipelineStep("Conditioning / Carbonating", 6, {
+        color: "green",
+        description: "Track the period where carbonation develops, flavors settle, and the beer becomes service-ready.",
+        instructions: "Record storage conditions, carbonation progress, and the first point the batch was drinkable versus genuinely ready.",
+        futureNotes: "Capture whether carbonation timing matched expectations and whether serving pressure, priming rate, or warm-conditioning duration should change.",
+        checklistTemplates: [
+          { title: "Store packaged beer at intended temperature", sortOrder: 0 },
+          { title: "Check carbonation development", sortOrder: 1 },
+          { title: "Record first acceptable tasting point", sortOrder: 2 },
+        ],
+        supplyTemplates: [
+          { name: "Cold storage space", quantityNeeded: 1, unit: "location", isRequired: false, sortOrder: 0 },
+          { name: "Serving gas", quantityNeeded: 1, unit: "setup", isRequired: false, sortOrder: 1 },
+        ],
+        fieldDefinitions: [
+          { key: "conditioningStartDate", label: "Conditioning Start", type: "date", required: false, options: [], wide: false, order: 0 },
+          { key: "carbonationStatus", label: "Carbonation Status", type: "select", required: false, options: ["Flat", "Low", "On target", "Over-carbonated"], wide: false, order: 1 },
+          { key: "conditioningTemperatureF", label: "Conditioning Temp (F)", type: "number", required: false, options: [], wide: false, order: 2 },
+          { key: "conditioningNotes", label: "Conditioning Notes", type: "textarea", required: false, options: [], wide: true, order: 3 },
+        ],
+      }),
+      pipelineStep("Ready / Aging", 7, {
+        color: "teal",
+        description: "Evaluate the finished beer in service and optionally continue aging with structured tasting notes.",
+        instructions: "Use this stage when the batch is drinkable. Record first-pour impressions, aroma and flavor notes, and whether the beer still needs time.",
+        futureNotes: "This is the most valuable place to note recipe changes, process adjustments, ingredient swaps, and whether you would brew it again unchanged.",
+        checklistTemplates: [
+          { title: "Taste the beer at serving condition", sortOrder: 0 },
+          { title: "Compare actual result to recipe targets", sortOrder: 1 },
+          { title: "Log lessons for the next batch", sortOrder: 2 },
+        ],
+        supplyTemplates: [
+          { name: "Tasting glassware", quantityNeeded: 1, unit: "set", isRequired: false, sortOrder: 0 },
+        ],
+        fieldDefinitions: [
+          { key: "firstTastingDate", label: "First Tasting Date", type: "date", required: false, options: [], wide: false, order: 0 },
+          { key: "appearanceScore", label: "Appearance Score", type: "number", required: false, options: [], wide: false, order: 1 },
+          { key: "flavorScore", label: "Flavor Score", type: "number", required: false, options: [], wide: false, order: 2 },
+          { key: "aromaScore", label: "Aroma Score", type: "number", required: false, options: [], wide: false, order: 3 },
+          { key: "wouldBrewAgain", label: "Would Brew Again", type: "boolean", required: false, options: [], wide: false, order: 4 },
+          { key: "tastingNotes", label: "Tasting Notes", type: "textarea", required: false, options: [], wide: true, order: 5 },
+        ],
+      }),
+      pipelineStep("Completed", 8, {
+        color: "green",
+        isFinal: true,
+        description: "Close out the batch with a final retrospective and durable notes that should survive into the next brew.",
+        instructions: "Use completion to summarize what happened, not just to mark it done. Record yield, quality outcome, repeatability, and what to change next time.",
+        futureNotes: "This stage should become your brew log postmortem: what worked, what failed, and what needs to be standard practice on future runs.",
+        checklistTemplates: [
+          { title: "Capture final outcome and lessons learned", sortOrder: 0 },
+          { title: "Record whether recipe should be repeated or revised", sortOrder: 1 },
+          { title: "Archive any remaining process notes", sortOrder: 2 },
+        ],
+        fieldDefinitions: [
+          { key: "finalAbvEstimate", label: "Final ABV Estimate", type: "number", required: false, options: [], wide: false, order: 0 },
+          { key: "batchOutcome", label: "Batch Outcome", type: "select", required: false, options: ["Excellent", "Good", "Usable", "Needs work", "Failed"], wide: false, order: 1 },
+          { key: "repeatIntent", label: "Repeat Intent", type: "select", required: false, options: ["Brew again unchanged", "Brew again with tweaks", "Do not repeat"], wide: false, order: 2 },
+          { key: "postmortem", label: "Final Postmortem", type: "textarea", required: false, options: [], wide: true, order: 3 },
+        ],
+      }),
     ],
 
     metricTemplates: [

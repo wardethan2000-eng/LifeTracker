@@ -5,7 +5,10 @@ import {
   createHobbySessionIngredientInputSchema,
   updateHobbySessionIngredientInputSchema,
   createHobbySessionStepInputSchema,
-  updateHobbySessionStepInputSchema
+  updateHobbySessionStepInputSchema,
+  createHobbySessionStageChecklistItemInputSchema,
+  updateHobbySessionStageChecklistItemInputSchema,
+  updateHobbySessionStageInputSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -37,6 +40,14 @@ const sessionIngredientParamsSchema = sessionParamsSchema.extend({
 
 const sessionStepParamsSchema = sessionParamsSchema.extend({
   stepId: z.string().cuid()
+});
+
+const sessionStageParamsSchema = sessionParamsSchema.extend({
+  stageId: z.string().cuid()
+});
+
+const sessionStageChecklistParamsSchema = sessionStageParamsSchema.extend({
+  checklistItemId: z.string().cuid()
 });
 
 const listSessionsQuerySchema = z.object({
@@ -192,6 +203,168 @@ const syncSessionIngredientInventory = async (
   });
 };
 
+const cloneWorkflowStagesToSession = async (
+  tx: Prisma.TransactionClient,
+  options: {
+    sessionId: string;
+    stages: Array<{
+      id: string;
+      label: string;
+      description: string | null;
+      instructions: string | null;
+      futureNotes: string | null;
+      fieldDefinitions: Prisma.JsonValue;
+      checklistTemplates: Prisma.JsonValue;
+      supplyTemplates: Prisma.JsonValue;
+      sortOrder: number;
+    }>;
+    startedAt: Date | null;
+  }
+): Promise<void> => {
+  const { sessionId, stages, startedAt } = options;
+
+  for (const [index, stage] of stages.entries()) {
+    const createdStage = await tx.hobbySessionStage.create({
+      data: {
+        sessionId,
+        stageTemplateId: stage.id,
+        name: stage.label,
+        description: stage.description,
+        instructions: stage.instructions,
+        futureNotes: stage.futureNotes,
+        fieldDefinitions: (stage.fieldDefinitions ?? []) as Prisma.InputJsonValue,
+        sortOrder: stage.sortOrder,
+        startedAt: index === 0 ? startedAt : null,
+      }
+    });
+
+    const checklistTemplates = Array.isArray(stage.checklistTemplates) ? stage.checklistTemplates as Array<{ title?: string; sortOrder?: number }> : [];
+    if (checklistTemplates.length > 0) {
+      await tx.hobbySessionStageChecklistItem.createMany({
+        data: checklistTemplates
+          .filter((item) => item.title?.trim())
+          .map((item, checklistIndex) => ({
+            sessionStageId: createdStage.id,
+            title: item.title!.trim(),
+            sortOrder: item.sortOrder ?? checklistIndex,
+          }))
+      });
+    }
+
+    const supplyTemplates = Array.isArray(stage.supplyTemplates) ? stage.supplyTemplates as Array<{
+      inventoryItemId?: string | null;
+      name?: string;
+      quantityNeeded?: number;
+      unit?: string;
+      isRequired?: boolean;
+      notes?: string | null;
+      sortOrder?: number;
+    }> : [];
+
+    if (supplyTemplates.length > 0) {
+      await tx.hobbySessionStageSupply.createMany({
+        data: supplyTemplates
+          .filter((item) => item.name?.trim() && item.quantityNeeded != null && item.unit?.trim())
+          .map((item, supplyIndex) => ({
+            sessionStageId: createdStage.id,
+            inventoryItemId: item.inventoryItemId ?? null,
+            name: item.name!.trim(),
+            quantityNeeded: item.quantityNeeded!,
+            unit: item.unit!.trim(),
+            isRequired: item.isRequired ?? true,
+            notes: item.notes?.trim() ? item.notes.trim() : null,
+            sortOrder: item.sortOrder ?? supplyIndex,
+          }))
+      });
+    }
+  }
+};
+
+const serializeSessionStages = (stages: Array<{
+  id: string;
+  sessionId: string;
+  stageTemplateId: string | null;
+  name: string;
+  description: string | null;
+  instructions: string | null;
+  futureNotes: string | null;
+  fieldDefinitions: Prisma.JsonValue;
+  sortOrder: number;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  notes: string | null;
+  customFieldValues: Prisma.JsonValue;
+  createdAt: Date;
+  updatedAt: Date;
+  checklistItems: Array<{
+    id: string;
+    sessionStageId: string;
+    title: string;
+    sortOrder: number;
+    isCompleted: boolean;
+    completedAt: Date | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  supplies: Array<{
+    id: string;
+    sessionStageId: string;
+    inventoryItemId: string | null;
+    name: string;
+    quantityNeeded: number;
+    unit: string;
+    isRequired: boolean;
+    notes: string | null;
+    sortOrder: number;
+    createdAt: Date;
+    updatedAt: Date;
+    inventoryItem: { id: string; name: string; unit: string; quantityOnHand: number } | null;
+  }>;
+}>) => stages.map((stage) => ({
+  id: stage.id,
+  sessionId: stage.sessionId,
+  stageTemplateId: stage.stageTemplateId,
+  name: stage.name,
+  description: stage.description,
+  instructions: stage.instructions,
+  futureNotes: stage.futureNotes,
+  fieldDefinitions: Array.isArray(stage.fieldDefinitions) ? stage.fieldDefinitions as unknown[] : [],
+  sortOrder: stage.sortOrder,
+  startedAt: stage.startedAt?.toISOString() ?? null,
+  completedAt: stage.completedAt?.toISOString() ?? null,
+  notes: stage.notes,
+  customFieldValues: stage.customFieldValues as Record<string, unknown>,
+  createdAt: stage.createdAt.toISOString(),
+  updatedAt: stage.updatedAt.toISOString(),
+  checklistItems: stage.checklistItems.map((item) => ({
+    id: item.id,
+    sessionStageId: item.sessionStageId,
+    title: item.title,
+    sortOrder: item.sortOrder,
+    isCompleted: item.isCompleted,
+    completedAt: item.completedAt?.toISOString() ?? null,
+    notes: item.notes,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  })),
+  supplies: stage.supplies.map((supply) => ({
+    id: supply.id,
+    sessionStageId: supply.sessionStageId,
+    inventoryItemId: supply.inventoryItemId,
+    name: supply.name,
+    quantityNeeded: supply.quantityNeeded,
+    unit: supply.unit,
+    isRequired: supply.isRequired,
+    notes: supply.notes,
+    sortOrder: supply.sortOrder,
+    createdAt: supply.createdAt.toISOString(),
+    updatedAt: supply.updatedAt.toISOString(),
+    inventoryItem: supply.inventoryItem,
+    hasSufficientInventory: supply.inventoryItem ? supply.inventoryItem.quantityOnHand >= supply.quantityNeeded : false,
+  })),
+}));
+
 export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
   const BASE = "/v1/households/:householdId/hobbies/:hobbyId/sessions";
 
@@ -302,6 +475,14 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
+      if (hobby.lifecycleMode === "pipeline" && hobby.statusPipeline.length > 0) {
+        await cloneWorkflowStagesToSession(tx, {
+          sessionId: created.id,
+          stages: hobby.statusPipeline,
+          startedAt: created.startDate ?? created.createdAt,
+        });
+      }
+
       // Clone from recipe if provided
       if (input.recipeId) {
         const recipe = await tx.hobbyRecipe.findUnique({
@@ -404,6 +585,18 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       where: { id: sessionId, hobbyId, hobby: { householdId } },
       include: {
         recipe: { select: { id: true, name: true } },
+        stages: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            checklistItems: { orderBy: { sortOrder: "asc" } },
+            supplies: {
+              orderBy: { sortOrder: "asc" },
+              include: {
+                inventoryItem: { select: { id: true, name: true, unit: true, quantityOnHand: true } }
+              }
+            }
+          }
+        },
         ingredients: {
           orderBy: { createdAt: "asc" },
           include: {
@@ -433,6 +626,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     return reply.send({
       ...toSessionResponse(session),
       recipeName: session.recipe?.name ?? null,
+      stages: serializeSessionStages(session.stages),
       ingredients: session.ingredients.map((ing) => ({
         ...toSessionIngredientResponse(ing),
         inventoryItem: ing.inventoryItem,
@@ -620,6 +814,28 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
+    const stageInstances = await app.prisma.hobbySessionStage.findMany({
+      where: { sessionId },
+      select: { id: true, stageTemplateId: true, startedAt: true, completedAt: true },
+    });
+
+    const currentStage = stageInstances.find((stage) => stage.stageTemplateId === session.pipelineStepId);
+    const nextStageInstance = stageInstances.find((stage) => stage.stageTemplateId === nextStep.id);
+
+    if (currentStage && !currentStage.completedAt) {
+      await app.prisma.hobbySessionStage.update({
+        where: { id: currentStage.id },
+        data: { completedAt: new Date() }
+      });
+    }
+
+    if (nextStageInstance && !nextStageInstance.startedAt) {
+      await app.prisma.hobbySessionStage.update({
+        where: { id: nextStageInstance.id },
+        data: { startedAt: new Date() }
+      });
+    }
+
     if (updated.seriesId) {
       await syncHobbySeriesToSearchIndex(app.prisma, updated.seriesId);
     }
@@ -634,6 +850,167 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return reply.send(toSessionResponse(updated));
+  });
+
+  // PATCH .../sessions/:sessionId/stages/:stageId
+  app.patch(`${BASE}/:sessionId/stages/:stageId`, async (request, reply) => {
+    const { householdId, hobbyId, sessionId, stageId } = sessionStageParamsSchema.parse(request.params);
+    const input = updateHobbySessionStageInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.hobbySessionStage.findFirst({
+      where: {
+        id: stageId,
+        sessionId,
+        session: { hobbyId, hobby: { householdId } },
+      }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Session stage not found" });
+    }
+
+    const updated = await app.prisma.hobbySessionStage.update({
+      where: { id: stageId },
+      data: {
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.startedAt !== undefined ? { startedAt: input.startedAt ? new Date(input.startedAt) : null } : {}),
+        ...(input.completedAt !== undefined ? { completedAt: input.completedAt ? new Date(input.completedAt) : null } : {}),
+        ...(input.customFieldValues !== undefined ? { customFieldValues: input.customFieldValues as Prisma.InputJsonValue } : {}),
+      },
+      include: {
+        checklistItems: { orderBy: { sortOrder: "asc" } },
+        supplies: {
+          orderBy: { sortOrder: "asc" },
+          include: { inventoryItem: { select: { id: true, name: true, unit: true, quantityOnHand: true } } }
+        }
+      }
+    });
+
+    return reply.send(serializeSessionStages([updated])[0]);
+  });
+
+  // POST .../sessions/:sessionId/stages/:stageId/checklists
+  app.post(`${BASE}/:sessionId/stages/:stageId/checklists`, async (request, reply) => {
+    const { householdId, hobbyId, sessionId, stageId } = sessionStageParamsSchema.parse(request.params);
+    const input = createHobbySessionStageChecklistItemInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const stage = await app.prisma.hobbySessionStage.findFirst({
+      where: { id: stageId, sessionId, session: { hobbyId, hobby: { householdId } } }
+    });
+
+    if (!stage) {
+      return reply.code(404).send({ message: "Session stage not found" });
+    }
+
+    const maxSort = await app.prisma.hobbySessionStageChecklistItem.aggregate({
+      where: { sessionStageId: stageId },
+      _max: { sortOrder: true }
+    });
+
+    const checklistItem = await app.prisma.hobbySessionStageChecklistItem.create({
+      data: {
+        sessionStageId: stageId,
+        title: input.title,
+        notes: input.notes ?? null,
+        sortOrder: input.sortOrder ?? (maxSort._max.sortOrder ?? -1) + 1,
+      }
+    });
+
+    return reply.code(201).send({
+      id: checklistItem.id,
+      sessionStageId: checklistItem.sessionStageId,
+      title: checklistItem.title,
+      sortOrder: checklistItem.sortOrder,
+      isCompleted: checklistItem.isCompleted,
+      completedAt: checklistItem.completedAt?.toISOString() ?? null,
+      notes: checklistItem.notes,
+      createdAt: checklistItem.createdAt.toISOString(),
+      updatedAt: checklistItem.updatedAt.toISOString(),
+    });
+  });
+
+  // PATCH .../sessions/:sessionId/stages/:stageId/checklists/:checklistItemId
+  app.patch(`${BASE}/:sessionId/stages/:stageId/checklists/:checklistItemId`, async (request, reply) => {
+    const { householdId, hobbyId, sessionId, stageId, checklistItemId } = sessionStageChecklistParamsSchema.parse(request.params);
+    const input = updateHobbySessionStageChecklistItemInputSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.hobbySessionStageChecklistItem.findFirst({
+      where: {
+        id: checklistItemId,
+        sessionStageId: stageId,
+        sessionStage: { sessionId, session: { hobbyId, hobby: { householdId } } }
+      }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Stage checklist item not found" });
+    }
+
+    const updated = await app.prisma.hobbySessionStageChecklistItem.update({
+      where: { id: checklistItemId },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        ...(input.isCompleted !== undefined ? {
+          isCompleted: input.isCompleted,
+          completedAt: input.isCompleted ? (input.completedAt ? new Date(input.completedAt) : new Date()) : null,
+        } : {}),
+        ...(input.completedAt !== undefined && input.isCompleted === undefined ? { completedAt: input.completedAt ? new Date(input.completedAt) : null } : {}),
+      }
+    });
+
+    return reply.send({
+      id: updated.id,
+      sessionStageId: updated.sessionStageId,
+      title: updated.title,
+      sortOrder: updated.sortOrder,
+      isCompleted: updated.isCompleted,
+      completedAt: updated.completedAt?.toISOString() ?? null,
+      notes: updated.notes,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    });
+  });
+
+  // DELETE .../sessions/:sessionId/stages/:stageId/checklists/:checklistItemId
+  app.delete(`${BASE}/:sessionId/stages/:stageId/checklists/:checklistItemId`, async (request, reply) => {
+    const { householdId, hobbyId, sessionId, stageId, checklistItemId } = sessionStageChecklistParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.hobbySessionStageChecklistItem.findFirst({
+      where: {
+        id: checklistItemId,
+        sessionStageId: stageId,
+        sessionStage: { sessionId, session: { hobbyId, hobby: { householdId } } }
+      }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Stage checklist item not found" });
+    }
+
+    await app.prisma.hobbySessionStageChecklistItem.delete({ where: { id: checklistItemId } });
+    return reply.code(204).send();
   });
 
   // DELETE .../sessions/:sessionId

@@ -3,7 +3,8 @@ import {
   createHobbyInputSchema,
   hobbyActivityModeSchema,
   updateHobbyInputSchema,
-  hobbyStatusSchema
+  hobbyStatusSchema,
+  type HobbyStatusPipelineStepInput
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -28,6 +29,157 @@ const listHobbiesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().optional()
 });
+
+const normalizeStatusPipeline = (
+  pipeline: HobbyStatusPipelineStepInput[]
+): Array<{
+  id?: string;
+  label: string;
+  description: string | null;
+  instructions: string | null;
+  futureNotes: string | null;
+  fieldDefinitions: Prisma.InputJsonValue;
+  checklistTemplates: Prisma.InputJsonValue;
+  supplyTemplates: Prisma.InputJsonValue;
+  sortOrder: number;
+  color: string | null;
+  isFinal: boolean;
+}> => {
+  const normalized = pipeline
+    .map((step, index) => ({
+      ...(step.id ? { id: step.id } : {}),
+      label: step.label.trim(),
+      description: step.description?.trim() ? step.description.trim() : null,
+      instructions: step.instructions?.trim() ? step.instructions.trim() : null,
+      futureNotes: step.futureNotes?.trim() ? step.futureNotes.trim() : null,
+      fieldDefinitions: (step.fieldDefinitions ?? []).map((field, fieldIndex) => ({
+        ...field,
+        order: field.order ?? fieldIndex,
+      })) as Prisma.InputJsonValue,
+      checklistTemplates: (step.checklistTemplates ?? [])
+        .map((item, itemIndex) => ({
+          ...item,
+          title: item.title.trim(),
+          sortOrder: item.sortOrder ?? itemIndex,
+        }))
+        .filter((item) => item.title.length > 0) as Prisma.InputJsonValue,
+      supplyTemplates: (step.supplyTemplates ?? [])
+        .map((item, itemIndex) => ({
+          ...item,
+          inventoryItemId: item.inventoryItemId ?? null,
+          name: item.name.trim(),
+          notes: item.notes?.trim() ? item.notes.trim() : null,
+          sortOrder: item.sortOrder ?? itemIndex,
+          isRequired: item.isRequired ?? true,
+        }))
+        .filter((item) => item.name.length > 0) as Prisma.InputJsonValue,
+      sortOrder: step.sortOrder ?? index,
+      color: step.color?.trim() ? step.color.trim() : null,
+      isFinal: step.isFinal ?? false,
+    }))
+    .filter((step) => step.label.length > 0)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((step, index) => ({
+      ...step,
+      sortOrder: index,
+    }));
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  let finalIndex = -1;
+  normalized.forEach((step, index) => {
+    if (step.isFinal) {
+      finalIndex = index;
+    }
+  });
+
+  if (finalIndex === -1) {
+    finalIndex = normalized.length - 1;
+  }
+
+  return normalized.map((step, index) => ({
+    ...step,
+    isFinal: index === finalIndex,
+  }));
+};
+
+const syncHobbyStatusPipeline = async (
+  prisma: Prisma.TransactionClient,
+  hobbyId: string,
+  pipeline: HobbyStatusPipelineStepInput[]
+): Promise<void> => {
+  const normalized = normalizeStatusPipeline(pipeline);
+  const existingSteps = await prisma.hobbySessionStatusStep.findMany({
+    where: { hobbyId },
+    select: { id: true },
+  });
+  const existingIds = new Set(existingSteps.map((step) => step.id));
+  const retainedIds = new Set<string>();
+
+  for (const step of normalized) {
+    if (step.id && existingIds.has(step.id)) {
+      retainedIds.add(step.id);
+      await prisma.hobbySessionStatusStep.update({
+        where: { id: step.id },
+        data: {
+          label: step.label,
+          description: step.description,
+          instructions: step.instructions,
+          futureNotes: step.futureNotes,
+          fieldDefinitions: step.fieldDefinitions,
+          checklistTemplates: step.checklistTemplates,
+          supplyTemplates: step.supplyTemplates,
+          sortOrder: step.sortOrder,
+          color: step.color,
+          isFinal: step.isFinal,
+        }
+      });
+    }
+  }
+
+  const removedIds = existingSteps
+    .filter((step) => !retainedIds.has(step.id))
+    .map((step) => step.id);
+
+  if (removedIds.length > 0) {
+    await prisma.hobbySession.updateMany({
+      where: {
+        hobbyId,
+        pipelineStepId: { in: removedIds },
+      },
+      data: { pipelineStepId: null },
+    });
+
+    await prisma.hobbySessionStatusStep.deleteMany({
+      where: {
+        hobbyId,
+        id: { in: removedIds },
+      }
+    });
+  }
+
+  const newSteps = normalized.filter((step) => !step.id || !existingIds.has(step.id));
+
+  if (newSteps.length > 0) {
+    await prisma.hobbySessionStatusStep.createMany({
+      data: newSteps.map((step) => ({
+        hobbyId,
+        label: step.label,
+        description: step.description,
+        instructions: step.instructions,
+        futureNotes: step.futureNotes,
+        fieldDefinitions: step.fieldDefinitions,
+        checklistTemplates: step.checklistTemplates,
+        supplyTemplates: step.supplyTemplates,
+        sortOrder: step.sortOrder,
+        color: step.color,
+        isFinal: step.isFinal,
+      }))
+    });
+  }
+};
 
 export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/hobbies
@@ -89,29 +241,61 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
-    const hobby = await app.prisma.hobby.create({
-      data: {
-        householdId,
-        createdById: userId,
-        name: input.name,
-        description: input.description ?? null,
-        status: input.status ?? "active",
-        activityMode: input.activityMode ?? "session",
-        hobbyType: input.hobbyType ?? null,
-        lifecycleMode: input.lifecycleMode ?? "binary",
-        customFields: (input.customFields ?? {}) as Prisma.InputJsonValue,
-        fieldDefinitions: (input.fieldDefinitions ?? []) as Prisma.InputJsonValue,
-        notes: input.notes ?? null,
-      }
-    });
+    const hobby = await app.prisma.$transaction(async (prisma) => {
+      const createdHobby = await prisma.hobby.create({
+        data: {
+          householdId,
+          createdById: userId,
+          name: input.name,
+          description: input.description ?? null,
+          status: input.status ?? "active",
+          activityMode: input.activityMode ?? "session",
+          hobbyType: input.hobbyType ?? null,
+          lifecycleMode: input.lifecycleMode ?? "binary",
+          customFields: (input.customFields ?? {}) as Prisma.InputJsonValue,
+          fieldDefinitions: (input.fieldDefinitions ?? []) as Prisma.InputJsonValue,
+          notes: input.notes ?? null,
+        }
+      });
 
-    if (input.presetKey) {
-      const preset = findHobbyPreset(input.presetKey);
-      if (preset) {
-        const definition = hobbyPresetToDefinition(preset);
-        await applyHobbyPreset(app.prisma, hobby.id, definition);
+      if (input.presetKey) {
+        const preset = findHobbyPreset(input.presetKey);
+        if (preset) {
+          const definition = hobbyPresetToDefinition(preset);
+          if (input.statusPipeline !== undefined) {
+            definition.pipeline = normalizeStatusPipeline(input.statusPipeline).map((step) => ({
+              ...(step.id ? { id: step.id } : {}),
+              label: step.label,
+              ...(step.description ? { description: step.description } : {}),
+              ...(step.instructions ? { instructions: step.instructions } : {}),
+              ...(step.futureNotes ? { futureNotes: step.futureNotes } : {}),
+              fieldDefinitions: step.fieldDefinitions as unknown[],
+              checklistTemplates: (step.checklistTemplates as Array<{ title: string; sortOrder?: number }>).map((item) => ({
+                title: item.title,
+                ...(item.sortOrder != null ? { sortOrder: item.sortOrder } : {}),
+              })),
+              supplyTemplates: (step.supplyTemplates as Array<{ inventoryItemId?: string | null; name: string; quantityNeeded: number; unit: string; isRequired?: boolean; notes?: string | null; sortOrder?: number }>).map((item) => ({
+                name: item.name,
+                quantityNeeded: item.quantityNeeded,
+                unit: item.unit,
+                ...(item.inventoryItemId != null ? { inventoryItemId: item.inventoryItemId } : {}),
+                ...(item.isRequired != null ? { isRequired: item.isRequired } : {}),
+                ...(item.notes != null ? { notes: item.notes } : {}),
+                ...(item.sortOrder != null ? { sortOrder: item.sortOrder } : {}),
+              })),
+              sortOrder: step.sortOrder,
+              ...(step.color ? { color: step.color } : {}),
+              isFinal: step.isFinal,
+            }));
+          }
+          await applyHobbyPreset(prisma, createdHobby.id, definition);
+        }
+      } else if (input.statusPipeline !== undefined && input.statusPipeline.length > 0) {
+        await syncHobbyStatusPipeline(prisma, createdHobby.id, input.statusPipeline);
       }
-    }
+
+      return createdHobby;
+    });
 
     await logActivity(app.prisma, {
       householdId,
@@ -223,6 +407,12 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
         id: s.id,
         hobbyId: s.hobbyId,
         label: s.label,
+        description: s.description,
+        instructions: s.instructions,
+        futureNotes: s.futureNotes,
+        fieldDefinitions: s.fieldDefinitions as unknown[],
+        checklistTemplates: s.checklistTemplates as Array<{ id?: string; title: string; sortOrder?: number }>,
+        supplyTemplates: s.supplyTemplates as Array<{ id?: string; inventoryItemId?: string | null; name: string; quantityNeeded: number; unit: string; isRequired?: boolean; notes?: string | null; sortOrder?: number }>,
         sortOrder: s.sortOrder,
         color: s.color,
         isFinal: s.isFinal,
@@ -262,26 +452,39 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const existing = await app.prisma.hobby.findFirst({
-      where: { id: hobbyId, householdId }
+      where: { id: hobbyId, householdId },
+      include: {
+        statusPipeline: {
+          select: { id: true },
+        }
+      }
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Hobby not found" });
     }
 
-    const hobby = await app.prisma.hobby.update({
-      where: { id: hobbyId },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.activityMode !== undefined ? { activityMode: input.activityMode } : {}),
-        ...(input.hobbyType !== undefined ? { hobbyType: input.hobbyType } : {}),
-        ...(input.lifecycleMode !== undefined ? { lifecycleMode: input.lifecycleMode } : {}),
-        ...(input.customFields !== undefined ? { customFields: input.customFields as Prisma.InputJsonValue } : {}),
-        ...(input.fieldDefinitions !== undefined ? { fieldDefinitions: input.fieldDefinitions as Prisma.InputJsonValue } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+    const hobby = await app.prisma.$transaction(async (prisma) => {
+      const updatedHobby = await prisma.hobby.update({
+        where: { id: hobbyId },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.activityMode !== undefined ? { activityMode: input.activityMode } : {}),
+          ...(input.hobbyType !== undefined ? { hobbyType: input.hobbyType } : {}),
+          ...(input.lifecycleMode !== undefined ? { lifecycleMode: input.lifecycleMode } : {}),
+          ...(input.customFields !== undefined ? { customFields: input.customFields as Prisma.InputJsonValue } : {}),
+          ...(input.fieldDefinitions !== undefined ? { fieldDefinitions: input.fieldDefinitions as Prisma.InputJsonValue } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        }
+      });
+
+      if (input.statusPipeline !== undefined) {
+        await syncHobbyStatusPipeline(prisma, hobbyId, input.statusPipeline);
       }
+
+      return updatedHobby;
     });
 
     await logActivity(app.prisma, {

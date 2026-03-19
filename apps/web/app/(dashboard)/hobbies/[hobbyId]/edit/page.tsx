@@ -26,6 +26,17 @@ export default async function EditHobbyPage({ params }: EditHobbyPageProps): Pro
     }
 
     const hobby = await getHobbyDetail(household.id, hobbyId);
+    const initialHobby = {
+      id: hobby.id,
+      name: hobby.name,
+      description: hobby.description,
+      status: hobby.status,
+      lifecycleMode: hobby.lifecycleMode,
+      hobbyType: hobby.hobbyType,
+      notes: hobby.notes,
+      statusPipeline: hobby.statusPipeline,
+      inventoryLinks: hobby.inventoryLinks,
+    };
 
     return (
       <>
@@ -44,7 +55,7 @@ export default async function EditHobbyPage({ params }: EditHobbyPageProps): Pro
             action={updateHobbyAction}
             householdId={household.id}
             presets={hobbyPresetLibrary}
-            initialHobby={hobby}
+            initialHobby={initialHobby}
           />
         </div>
       </>

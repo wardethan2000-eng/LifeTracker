@@ -901,6 +901,7 @@ model InventoryItem {
   hobbyProjectLinks   HobbyProjectInventoryItem[]
   hobbyRecipeIngredients HobbyRecipeIngredient[]
   hobbySessionIngredients HobbySessionIngredient[]
+  hobbySessionStageSupplies HobbySessionStageSupply[]
   revisions          InventoryItemRevision[]
   comments           Comment[]
   spaceItemHistory   SpaceItemHistory[]
@@ -1919,12 +1920,19 @@ model HobbySessionStatusStep {
   id        String   @id @default(cuid())
   hobbyId   String
   label     String
+  description String? @db.VarChar(2000)
+  instructions String? @db.VarChar(5000)
+  futureNotes String? @db.VarChar(5000)
+  fieldDefinitions Json @default("[]")
+  checklistTemplates Json @default("[]")
+  supplyTemplates Json @default("[]")
   sortOrder Int
   color     String?
   isFinal   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   hobby     Hobby    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
+  sessionStages HobbySessionStage[] @relation("HobbyStageTemplateInstances")
 
   @@index([hobbyId, sortOrder])
 }
@@ -2046,6 +2054,7 @@ model HobbySession {
   bestOfSeries    HobbySeries[] @relation("HobbySeriesBestBatchSession")
   ingredients     HobbySessionIngredient[]
   steps           HobbySessionStep[]
+  stages          HobbySessionStage[]
   metricReadings  HobbyMetricReading[]
   logs            HobbyLog[]
 
@@ -2055,6 +2064,68 @@ model HobbySession {
   @@index([seriesId, batchNumber])
   @@index([routineId])
   @@index([collectionItemId])
+}
+
+// A concrete stage instance inside a HobbySession, cloned from the hobby workflow definition.
+model HobbySessionStage {
+  id               String                   @id @default(cuid())
+  sessionId        String
+  stageTemplateId  String?
+  name             String
+  description      String?                  @db.VarChar(2000)
+  instructions     String?                  @db.VarChar(5000)
+  futureNotes      String?                  @db.VarChar(5000)
+  fieldDefinitions Json                     @default("[]")
+  sortOrder        Int
+  startedAt        DateTime?
+  completedAt      DateTime?
+  notes            String?
+  customFieldValues Json                    @default("{}")
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  session          HobbySession             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  stageTemplate    HobbySessionStatusStep?  @relation("HobbyStageTemplateInstances", fields: [stageTemplateId], references: [id], onDelete: SetNull)
+  checklistItems   HobbySessionStageChecklistItem[]
+  supplies         HobbySessionStageSupply[]
+
+  @@index([sessionId, sortOrder])
+  @@index([stageTemplateId])
+}
+
+// A lightweight checklist/todo item attached to a session stage.
+model HobbySessionStageChecklistItem {
+  id             String            @id @default(cuid())
+  sessionStageId String
+  title          String
+  sortOrder      Int               @default(0)
+  isCompleted    Boolean           @default(false)
+  completedAt    DateTime?
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  sessionStage   HobbySessionStage @relation(fields: [sessionStageId], references: [id], onDelete: Cascade)
+
+  @@index([sessionStageId, sortOrder])
+}
+
+// A needed supply or inventory line for a specific session stage.
+model HobbySessionStageSupply {
+  id              String            @id @default(cuid())
+  sessionStageId  String
+  inventoryItemId String?
+  name            String
+  quantityNeeded  Float
+  unit            String
+  isRequired      Boolean           @default(true)
+  notes           String?
+  sortOrder       Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  sessionStage    HobbySessionStage @relation(fields: [sessionStageId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem?    @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([sessionStageId, sortOrder])
+  @@index([inventoryItemId])
 }
 
 // A material actually consumed during a HobbySession, optionally traced to recipe and inventory rows.

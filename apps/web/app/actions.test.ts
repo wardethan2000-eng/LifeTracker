@@ -14,6 +14,9 @@ const apiMocks = vi.hoisted(() => ({
   createProjectTask: vi.fn(),
   createTaskChecklistItem: vi.fn(),
   createProjectPhaseSupply: vi.fn(),
+  instantiateProjectTemplate: vi.fn(),
+  cloneProject: vi.fn(),
+  getProjectDetail: vi.fn(),
   createInventoryItem: vi.fn(),
   completeSchedule: vi.fn(),
   createMaintenanceLog: vi.fn(),
@@ -50,6 +53,9 @@ vi.mock("../lib/api", async (importOriginal) => {
     createProjectTask: apiMocks.createProjectTask,
     createTaskChecklistItem: apiMocks.createTaskChecklistItem,
     createProjectPhaseSupply: apiMocks.createProjectPhaseSupply,
+    instantiateProjectTemplate: apiMocks.instantiateProjectTemplate,
+    cloneProject: apiMocks.cloneProject,
+    getProjectDetail: apiMocks.getProjectDetail,
     createInventoryItem: apiMocks.createInventoryItem,
     completeSchedule: apiMocks.completeSchedule,
     createMaintenanceLog: apiMocks.createMaintenanceLog,
@@ -60,6 +66,8 @@ vi.mock("../lib/api", async (importOriginal) => {
 import {
   completeScheduleAction,
   createProjectAction,
+  createProjectFromTemplateAction,
+  cloneProjectAction,
   createInventoryItemAction,
   createLogAction,
   createScheduleAction
@@ -75,6 +83,9 @@ beforeEach(() => {
   apiMocks.createProjectTask.mockImplementation(async (_householdId: string, _projectId: string, input: { title: string }) => ({
     id: `task-${input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
   }));
+  apiMocks.instantiateProjectTemplate.mockResolvedValue({ id: "clprojecttemplate000000001" });
+  apiMocks.cloneProject.mockResolvedValue({ id: "clprojectclone000000000001" });
+  apiMocks.getProjectDetail.mockResolvedValue({ phases: [{ id: "phase-loaded-from-project" }] });
 });
 
 describe("server actions", () => {
@@ -235,7 +246,9 @@ describe("server actions", () => {
         title: "Write the wedding operating brief"
       })
     );
-    expect(nextMocks.redirect).toHaveBeenCalledWith("/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001");
+    expect(nextMocks.redirect).toHaveBeenCalledWith(
+      "/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-vision-budget-headcount#phase-phase-vision-budget-headcount"
+    );
   });
 
   it("keeps manual blueprints on the lightweight phase-draft path", async () => {
@@ -253,6 +266,42 @@ describe("server actions", () => {
     expect(apiMocks.createProjectNote).not.toHaveBeenCalled();
     expect(apiMocks.createProjectTask).not.toHaveBeenCalled();
     expect(apiMocks.createProjectPhaseSupply).not.toHaveBeenCalled();
-    expect(nextMocks.redirect).toHaveBeenCalledWith("/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001");
+    expect(nextMocks.redirect).toHaveBeenCalledWith(
+      "/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-planning-permitting#phase-phase-planning-permitting"
+    );
+  });
+
+  it("redirects template-instantiated projects into the first phase workspace", async () => {
+    const formData = new FormData();
+    formData.set("householdId", "clkeeperhouse000000000001");
+    formData.set("templateId", "cltemplate000000000001");
+    formData.set("name", "Boathouse Refresh");
+
+    await createProjectFromTemplateAction(formData);
+
+    expect(apiMocks.instantiateProjectTemplate).toHaveBeenCalledWith("clkeeperhouse000000000001", "cltemplate000000000001", {
+      name: "Boathouse Refresh"
+    });
+    expect(apiMocks.getProjectDetail).toHaveBeenCalledWith("clkeeperhouse000000000001", "clprojecttemplate000000001");
+    expect(nextMocks.redirect).toHaveBeenCalledWith(
+      "/projects/clprojecttemplate000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
+    );
+  });
+
+  it("redirects cloned projects into the first phase workspace", async () => {
+    const formData = new FormData();
+    formData.set("householdId", "clkeeperhouse000000000001");
+    formData.set("projectId", "clprojectsource000000001");
+    formData.set("name", "Workshop Copy");
+
+    await cloneProjectAction(formData);
+
+    expect(apiMocks.cloneProject).toHaveBeenCalledWith("clkeeperhouse000000000001", "clprojectsource000000001", {
+      name: "Workshop Copy"
+    });
+    expect(apiMocks.getProjectDetail).toHaveBeenCalledWith("clkeeperhouse000000000001", "clprojectclone000000000001");
+    expect(nextMocks.redirect).toHaveBeenCalledWith(
+      "/projects/clprojectclone000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
+    );
   });
 });

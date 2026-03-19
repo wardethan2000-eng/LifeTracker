@@ -1,10 +1,7 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import { HobbySessionDetail } from "../../../../../../components/hobby-session-detail";
-import {
-  advanceHobbySessionAction,
-  deleteHobbySessionAction,
-} from "../../../../../actions";
+import { deleteHobbySessionAction } from "../../../../../actions";
 import {
   ApiError,
   getHobbyDetail,
@@ -73,7 +70,6 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
           hobby={hobby}
           session={session}
           series={series}
-          advanceHobbySessionAction={advanceHobbySessionAction}
           deleteHobbySessionAction={deleteHobbySessionAction}
         />
       </>

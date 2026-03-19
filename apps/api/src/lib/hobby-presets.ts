@@ -15,6 +15,23 @@ export type HobbyPresetDefinition = {
   }>;
   pipeline?: Array<{
     label: string;
+    description?: string;
+    instructions?: string;
+    futureNotes?: string;
+    fieldDefinitions?: unknown[];
+    checklistTemplates?: Array<{
+      title: string;
+      sortOrder?: number;
+    }>;
+    supplyTemplates?: Array<{
+      inventoryItemId?: string | null;
+      name: string;
+      quantityNeeded: number;
+      unit: string;
+      isRequired?: boolean;
+      notes?: string | null;
+      sortOrder?: number;
+    }>;
     sortOrder: number;
     color?: string;
     isFinal?: boolean;
@@ -81,6 +98,12 @@ export const applyHobbyPreset = async (
       data: preset.pipeline.map((s) => ({
         hobbyId,
         label: s.label,
+        description: s.description ?? null,
+        instructions: s.instructions ?? null,
+        futureNotes: s.futureNotes ?? null,
+        fieldDefinitions: (s.fieldDefinitions ?? []) as Prisma.InputJsonValue,
+        checklistTemplates: (s.checklistTemplates ?? []) as Prisma.InputJsonValue,
+        supplyTemplates: (s.supplyTemplates ?? []) as Prisma.InputJsonValue,
         sortOrder: s.sortOrder,
         color: s.color ?? null,
         isFinal: s.isFinal ?? false,
@@ -161,6 +184,27 @@ export const hobbyPresetToDefinition = (preset: HobbyPreset): HobbyPresetDefinit
   })),
   pipeline: preset.pipelineSteps.map((s) => ({
     label: s.label,
+    ...(s.description != null ? { description: s.description } : {}),
+    ...(s.instructions != null ? { instructions: s.instructions } : {}),
+    ...(s.futureNotes != null ? { futureNotes: s.futureNotes } : {}),
+    ...(s.fieldDefinitions.length > 0 ? { fieldDefinitions: s.fieldDefinitions } : {}),
+    ...(s.checklistTemplates.length > 0 ? {
+      checklistTemplates: s.checklistTemplates.map((item) => ({
+        title: item.title,
+        ...(item.sortOrder != null ? { sortOrder: item.sortOrder } : {}),
+      })),
+    } : {}),
+    ...(s.supplyTemplates.length > 0 ? {
+      supplyTemplates: s.supplyTemplates.map((item) => ({
+        name: item.name,
+        quantityNeeded: item.quantityNeeded,
+        unit: item.unit,
+        ...(item.inventoryItemId != null ? { inventoryItemId: item.inventoryItemId } : {}),
+        ...(item.isRequired != null ? { isRequired: item.isRequired } : {}),
+        ...(item.notes != null ? { notes: item.notes } : {}),
+        ...(item.sortOrder != null ? { sortOrder: item.sortOrder } : {}),
+      })),
+    } : {}),
     sortOrder: s.sortOrder,
     isFinal: s.isFinal,
     ...(s.color != null ? { color: s.color } : {}),

@@ -93,6 +93,134 @@ beforeEach(() => {
 });
 
 describe("hobby session routes", () => {
+  it("clones workflow stages into a new pipeline session", async () => {
+    const tx = {
+      hobbySession: {
+        create: vi.fn(async () => ({
+          ...sessionRecord,
+          pipelineStepId: "clkeeperstep000000000001",
+        })),
+        update: vi.fn(async () => sessionRecord),
+        findUniqueOrThrow: vi.fn(async () => sessionRecord),
+      },
+      hobbyRecipe: {
+        findUnique: vi.fn(async () => null),
+      },
+      hobbySessionIngredient: {
+        createMany: vi.fn(async () => ({ count: 0 })),
+      },
+      hobbySessionStep: {
+        createMany: vi.fn(async () => ({ count: 0 })),
+      },
+      hobbySessionStage: {
+        create: vi
+          .fn()
+          .mockResolvedValueOnce({ id: "clkeeperstage000000000001" })
+          .mockResolvedValueOnce({ id: "clkeeperstage000000000002" }),
+      },
+      hobbySessionStageChecklistItem: {
+        createMany: vi.fn(async () => ({ count: 2 })),
+      },
+      hobbySessionStageSupply: {
+        createMany: vi.fn(async () => ({ count: 1 })),
+      },
+    };
+
+    const app = await createApp({
+      householdMember: {
+        findUnique: async () => ({ householdId, userId, role: "owner" })
+      },
+      hobby: {
+        findFirst: async () => ({
+          id: hobbyId,
+          householdId,
+          lifecycleMode: "pipeline",
+          statusPipeline: [
+            {
+              id: "clkeeperstep000000000001",
+              label: "Brew Day",
+              description: "Run the batch.",
+              instructions: "Track temperatures and gravity.",
+              futureNotes: "Adjust strike water next time.",
+              fieldDefinitions: [{ key: "og", label: "OG", type: "number", options: [], required: false, wide: false, order: 0 }],
+              checklistTemplates: [
+                { title: "Sanitize fermenter", sortOrder: 0 },
+                { title: "Record original gravity", sortOrder: 1 },
+              ],
+              supplyTemplates: [
+                { name: "Sanitizer", quantityNeeded: 1, unit: "batch", isRequired: true, sortOrder: 0, inventoryItemId: null, notes: null },
+              ],
+              sortOrder: 0,
+            },
+            {
+              id: "clkeeperstep000000000002",
+              label: "Fermentation",
+              description: null,
+              instructions: null,
+              futureNotes: null,
+              fieldDefinitions: [],
+              checklistTemplates: [],
+              supplyTemplates: [],
+              sortOrder: 1,
+            },
+          ],
+        })
+      },
+      $transaction: async <T>(callback: (prismaTx: typeof tx) => Promise<T>) => callback(tx)
+    });
+
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions`,
+        payload: {
+          name: "Pipeline Brew",
+          startDate: "2026-03-17T00:00:00.000Z"
+        }
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(tx.hobbySessionStage.create).toHaveBeenNthCalledWith(1, {
+        data: expect.objectContaining({
+          sessionId,
+          stageTemplateId: "clkeeperstep000000000001",
+          name: "Brew Day",
+          startedAt: new Date("2026-03-17T00:00:00.000Z"),
+        })
+      });
+      expect(tx.hobbySessionStage.create).toHaveBeenNthCalledWith(2, {
+        data: expect.objectContaining({
+          sessionId,
+          stageTemplateId: "clkeeperstep000000000002",
+          name: "Fermentation",
+          startedAt: null,
+        })
+      });
+      expect(tx.hobbySessionStageChecklistItem.createMany).toHaveBeenCalledWith({
+        data: [
+          { sessionStageId: "clkeeperstage000000000001", title: "Sanitize fermenter", sortOrder: 0 },
+          { sessionStageId: "clkeeperstage000000000001", title: "Record original gravity", sortOrder: 1 },
+        ]
+      });
+      expect(tx.hobbySessionStageSupply.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            sessionStageId: "clkeeperstage000000000001",
+            inventoryItemId: null,
+            name: "Sanitizer",
+            quantityNeeded: 1,
+            unit: "batch",
+            isRequired: true,
+            notes: null,
+            sortOrder: 0,
+          },
+        ]
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
   it("creates inventory transactions for recipe ingredients when creating a session", async () => {
     const tx = {
       hobbySession: {

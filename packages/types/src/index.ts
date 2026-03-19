@@ -3787,6 +3787,40 @@ export type MilestoneStatus = z.infer<typeof milestoneStatusSchema>;
 export const hobbySessionLifecycleModeSchema = z.enum(["binary", "pipeline"]);
 export type HobbySessionLifecycleMode = z.infer<typeof hobbySessionLifecycleModeSchema>;
 
+export const hobbyWorkflowChecklistTemplateSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(1).max(200),
+  sortOrder: z.number().int().min(0).optional(),
+});
+export type HobbyWorkflowChecklistTemplate = z.infer<typeof hobbyWorkflowChecklistTemplateSchema>;
+
+export const hobbyWorkflowSupplyTemplateSchema = z.object({
+  id: z.string().optional(),
+  inventoryItemId: z.string().cuid().nullable().optional(),
+  name: z.string().min(1).max(200),
+  quantityNeeded: z.number().positive(),
+  unit: z.string().min(1).max(50),
+  isRequired: z.boolean().default(true),
+  notes: z.string().max(2000).nullable().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+export type HobbyWorkflowSupplyTemplate = z.infer<typeof hobbyWorkflowSupplyTemplateSchema>;
+
+export const hobbyWorkflowStageConfigSchema = z.object({
+  id: z.string().cuid().optional(),
+  label: z.string().min(1).max(120),
+  description: z.string().max(2000).nullable().optional(),
+  instructions: z.string().max(5000).nullable().optional(),
+  futureNotes: z.string().max(5000).nullable().optional(),
+  fieldDefinitions: z.array(presetCustomFieldTemplateSchema).default([]),
+  checklistTemplates: z.array(hobbyWorkflowChecklistTemplateSchema).default([]),
+  supplyTemplates: z.array(hobbyWorkflowSupplyTemplateSchema).default([]),
+  sortOrder: z.number().int().min(0),
+  color: z.string().max(20).nullable().optional(),
+  isFinal: z.boolean().default(false),
+});
+export type HobbyWorkflowStageConfig = z.infer<typeof hobbyWorkflowStageConfigSchema>;
+
 export const seriesStatusSchema = z.enum(["active", "completed", "archived"]);
 export type SeriesStatus = z.infer<typeof seriesStatusSchema>;
 
@@ -3822,6 +3856,7 @@ export const createHobbyInputSchema = z.object({
   activityMode: hobbyActivityModeSchema.optional(),
   hobbyType: z.string().max(100).optional(),
   lifecycleMode: hobbySessionLifecycleModeSchema.optional(),
+  statusPipeline: z.array(hobbyWorkflowStageConfigSchema).optional(),
   customFields: z.record(z.unknown()).optional(),
   fieldDefinitions: z.array(z.unknown()).optional(),
   notes: z.string().max(5000).optional(),
@@ -3835,6 +3870,7 @@ export const updateHobbyInputSchema = createHobbyInputSchema.partial().extend({
 
 export type CreateHobbyInput = z.infer<typeof createHobbyInputSchema>;
 export type UpdateHobbyInput = z.infer<typeof updateHobbyInputSchema>;
+export type HobbyStatusPipelineStepInput = HobbyWorkflowStageConfig;
 
 // Hobby summary (list view)
 export const hobbySummarySchema = hobbySchema.extend({
@@ -3922,6 +3958,12 @@ export const hobbyDetailSchema = hobbySchema.extend({
     id: z.string().cuid(),
     hobbyId: z.string().cuid(),
     label: z.string(),
+    description: z.string().nullable(),
+    instructions: z.string().nullable(),
+    futureNotes: z.string().nullable(),
+    fieldDefinitions: z.array(presetCustomFieldTemplateSchema),
+    checklistTemplates: z.array(hobbyWorkflowChecklistTemplateSchema),
+    supplyTemplates: z.array(hobbyWorkflowSupplyTemplateSchema),
     sortOrder: z.number(),
     color: z.string().nullable(),
     isFinal: z.boolean(),
@@ -4531,6 +4573,12 @@ export const hobbySessionStatusStepSchema = z.object({
   id: z.string().cuid(),
   hobbyId: z.string().cuid(),
   label: z.string(),
+  description: z.string().nullable(),
+  instructions: z.string().nullable(),
+  futureNotes: z.string().nullable(),
+  fieldDefinitions: z.array(presetCustomFieldTemplateSchema),
+  checklistTemplates: z.array(hobbyWorkflowChecklistTemplateSchema),
+  supplyTemplates: z.array(hobbyWorkflowSupplyTemplateSchema),
   sortOrder: z.number(),
   color: z.string().nullable(),
   isFinal: z.boolean(),
@@ -4541,8 +4589,14 @@ export type HobbySessionStatusStep = z.infer<typeof hobbySessionStatusStepSchema
 
 export const createHobbySessionStatusStepInputSchema = z.object({
   label: z.string().min(1).max(100),
+  description: z.string().max(2000).nullable().optional(),
+  instructions: z.string().max(5000).nullable().optional(),
+  futureNotes: z.string().max(5000).nullable().optional(),
+  fieldDefinitions: z.array(presetCustomFieldTemplateSchema).optional(),
+  checklistTemplates: z.array(hobbyWorkflowChecklistTemplateSchema).optional(),
+  supplyTemplates: z.array(hobbyWorkflowSupplyTemplateSchema).optional(),
   sortOrder: z.number().int(),
-  color: z.string().max(50).optional(),
+  color: z.string().max(50).nullable().optional(),
   isFinal: z.boolean().optional(),
 });
 export const updateHobbySessionStatusStepInputSchema = createHobbySessionStatusStepInputSchema.partial();
@@ -4710,6 +4764,88 @@ export const updateHobbySessionInputSchema = createHobbySessionInputSchema.parti
 
 export type CreateHobbySessionInput = z.infer<typeof createHobbySessionInputSchema>;
 export type UpdateHobbySessionInput = z.infer<typeof updateHobbySessionInputSchema>;
+
+export const hobbySessionStageChecklistItemSchema = z.object({
+  id: z.string().cuid(),
+  sessionStageId: z.string().cuid(),
+  title: z.string(),
+  sortOrder: z.number(),
+  isCompleted: z.boolean(),
+  completedAt: z.string().datetime().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbySessionStageChecklistItem = z.infer<typeof hobbySessionStageChecklistItemSchema>;
+
+export const createHobbySessionStageChecklistItemInputSchema = z.object({
+  title: z.string().min(1).max(200),
+  sortOrder: z.number().int().min(0).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateHobbySessionStageChecklistItemInputSchema = createHobbySessionStageChecklistItemInputSchema.partial().extend({
+  title: z.string().min(1).max(200).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  isCompleted: z.boolean().optional(),
+  completedAt: z.string().datetime().nullable().optional(),
+});
+export type CreateHobbySessionStageChecklistItemInput = z.infer<typeof createHobbySessionStageChecklistItemInputSchema>;
+export type UpdateHobbySessionStageChecklistItemInput = z.infer<typeof updateHobbySessionStageChecklistItemInputSchema>;
+
+export const hobbySessionStageSupplySchema = z.object({
+  id: z.string().cuid(),
+  sessionStageId: z.string().cuid(),
+  inventoryItemId: z.string().cuid().nullable(),
+  name: z.string(),
+  quantityNeeded: z.number(),
+  unit: z.string(),
+  isRequired: z.boolean(),
+  notes: z.string().nullable(),
+  sortOrder: z.number(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbySessionStageSupply = z.infer<typeof hobbySessionStageSupplySchema>;
+
+export const hobbySessionStageDetailSupplySchema = hobbySessionStageSupplySchema.extend({
+  inventoryItem: z.object({ id: z.string(), name: z.string(), unit: z.string(), quantityOnHand: z.number() }).nullable(),
+  hasSufficientInventory: z.boolean(),
+});
+export type HobbySessionStageDetailSupply = z.infer<typeof hobbySessionStageDetailSupplySchema>;
+
+export const hobbySessionStageSchema = z.object({
+  id: z.string().cuid(),
+  sessionId: z.string().cuid(),
+  stageTemplateId: z.string().cuid().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  instructions: z.string().nullable(),
+  futureNotes: z.string().nullable(),
+  fieldDefinitions: z.array(presetCustomFieldTemplateSchema),
+  sortOrder: z.number(),
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+  notes: z.string().nullable(),
+  customFieldValues: z.record(z.unknown()),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type HobbySessionStage = z.infer<typeof hobbySessionStageSchema>;
+
+export const hobbySessionStageDetailSchema = hobbySessionStageSchema.extend({
+  checklistItems: z.array(hobbySessionStageChecklistItemSchema),
+  supplies: z.array(hobbySessionStageDetailSupplySchema),
+});
+export type HobbySessionStageDetail = z.infer<typeof hobbySessionStageDetailSchema>;
+
+export const updateHobbySessionStageInputSchema = z.object({
+  notes: z.string().max(5000).nullable().optional(),
+  startedAt: z.string().datetime().nullable().optional(),
+  completedAt: z.string().datetime().nullable().optional(),
+  customFieldValues: z.record(z.unknown()).optional(),
+});
+export type UpdateHobbySessionStageInput = z.infer<typeof updateHobbySessionStageInputSchema>;
 
 // HobbySession summary (list view)
 export const hobbySessionSummarySchema = hobbySessionSchema.extend({
@@ -5069,6 +5205,7 @@ export const hobbySessionDetailSchema = hobbySessionSchema.extend({
   recipeName: z.string().nullable(),
   ingredients: z.array(hobbySessionDetailIngredientSchema),
   steps: z.array(hobbySessionStepSchema),
+  stages: z.array(hobbySessionStageDetailSchema),
   metricReadings: z.array(hobbySessionDetailMetricReadingSchema),
   logs: z.array(hobbyLogSchema),
 });
@@ -5087,6 +5224,12 @@ export type HobbyPresetMetricTemplate = z.infer<typeof hobbyPresetMetricTemplate
 
 export const hobbyPresetPipelineStepSchema = z.object({
   label: z.string().min(1).max(80),
+  description: z.string().max(2000).optional(),
+  instructions: z.string().max(5000).optional(),
+  futureNotes: z.string().max(5000).optional(),
+  fieldDefinitions: z.array(presetCustomFieldTemplateSchema).default([]),
+  checklistTemplates: z.array(hobbyWorkflowChecklistTemplateSchema).default([]),
+  supplyTemplates: z.array(hobbyWorkflowSupplyTemplateSchema).default([]),
   sortOrder: z.number().int().min(0),
   color: z.string().max(20).optional(),
   isFinal: z.boolean().default(false),

@@ -1,14 +1,20 @@
 "use client";
-import type { Hobby, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
+import type { HobbyDetail, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
 import { useRouter } from "next/navigation";
 import { useState, type JSX, type FormEvent } from "react";
+import {
+  defaultWorkflowStages,
+  HobbyWorkflowStageEditor,
+  toWorkflowStageDrafts,
+  type WorkflowStageDraft,
+} from "./hobby-workflow-stage-editor";
 
 type HobbyWorkbenchProps = {
   mode: "create" | "edit";
   action: (formData: FormData) => Promise<void>;
   householdId: string;
   presets: HobbyPreset[];
-  initialHobby?: Pick<Hobby, "id" | "name" | "description" | "status" | "lifecycleMode" | "hobbyType" | "notes"> | null;
+  initialHobby?: Pick<HobbyDetail, "id" | "name" | "description" | "status" | "lifecycleMode" | "hobbyType" | "notes" | "statusPipeline" | "inventoryLinks"> | null;
 };
 
 const hobbyStatusOptions: { value: HobbyStatus; label: string }[] = [
@@ -31,6 +37,7 @@ export function HobbyWorkbench({
   const [lifecycleMode, setLifecycleMode] = useState<HobbySessionLifecycleMode>(initialHobby?.lifecycleMode ?? "binary");
   const [hobbyType, setHobbyType] = useState(initialHobby?.hobbyType ?? "");
   const [notes, setNotes] = useState(initialHobby?.notes ?? "");
+  const [pipelineSteps, setPipelineSteps] = useState<WorkflowStageDraft[]>(toWorkflowStageDrafts(initialHobby?.statusPipeline));
   const [selectedPresetKey, setSelectedPresetKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +53,14 @@ export function HobbyWorkbench({
       }
       setLifecycleMode(preset.lifecycleMode);
       setHobbyType(preset.label);
+      setPipelineSteps(toWorkflowStageDrafts(preset.pipelineSteps));
+    }
+  };
+
+  const handleLifecycleModeChange = (nextMode: HobbySessionLifecycleMode) => {
+    setLifecycleMode(nextMode);
+    if (nextMode === "pipeline" && pipelineSteps.length === 0) {
+      setPipelineSteps(defaultWorkflowStages());
     }
   };
 
@@ -66,6 +81,40 @@ export function HobbyWorkbench({
       formData.set("lifecycleMode", lifecycleMode);
       formData.set("hobbyType", hobbyType);
       formData.set("notes", notes);
+      formData.set("statusPipelineJson", JSON.stringify(pipelineSteps.map((step, index) => ({
+        ...(step.id ? { id: step.id } : {}),
+        label: step.label.trim() || `Step ${index + 1}`,
+        description: step.description.trim() || null,
+        instructions: step.instructions.trim() || null,
+        futureNotes: step.futureNotes.trim() || null,
+        fieldDefinitions: step.fieldDefinitions.map((field, fieldIndex) => ({
+          ...field,
+          key: field.key.trim(),
+          label: field.label.trim(),
+          helpText: field.helpText?.trim() || undefined,
+          unit: field.unit?.trim() || undefined,
+          group: field.group?.trim() || undefined,
+          placeholder: field.placeholder?.trim() || undefined,
+          order: field.order ?? fieldIndex,
+          options: field.options.map((option) => option.trim()).filter(Boolean),
+        })).filter((field) => field.key && field.label),
+        checklistTemplates: step.checklistTemplates.map((item, itemIndex) => ({
+          title: item.title.trim(),
+          sortOrder: item.sortOrder ?? itemIndex,
+        })).filter((item) => item.title),
+        supplyTemplates: step.supplyTemplates.map((item, itemIndex) => ({
+          inventoryItemId: item.inventoryItemId ?? null,
+          name: item.name.trim(),
+          quantityNeeded: item.quantityNeeded,
+          unit: item.unit.trim(),
+          isRequired: item.isRequired ?? true,
+          notes: item.notes?.trim() || null,
+          sortOrder: item.sortOrder ?? itemIndex,
+        })).filter((item) => item.name && item.unit && item.quantityNeeded > 0),
+        sortOrder: index,
+        color: step.color.trim() || null,
+        isFinal: step.isFinal,
+      }))));
       if (selectedPresetKey) {
         formData.set("presetKey", selectedPresetKey);
       }
@@ -156,7 +205,7 @@ export function HobbyWorkbench({
                   name="lifecycleMode"
                   value="binary"
                   checked={lifecycleMode === "binary"}
-                  onChange={() => setLifecycleMode("binary")}
+                  onChange={() => handleLifecycleModeChange("binary")}
                 />
                 <span>Simple (Active / Completed)</span>
               </label>
@@ -166,7 +215,7 @@ export function HobbyWorkbench({
                   name="lifecycleMode"
                   value="pipeline"
                   checked={lifecycleMode === "pipeline"}
-                  onChange={() => setLifecycleMode("pipeline")}
+                  onChange={() => handleLifecycleModeChange("pipeline")}
                 />
                 <span>Pipeline (Multi-step workflow)</span>
               </label>
@@ -186,6 +235,14 @@ export function HobbyWorkbench({
         </div>
       </section>
 
+      {lifecycleMode === "pipeline" ? (
+        <HobbyWorkflowStageEditor
+          stages={pipelineSteps}
+          inventoryLinks={initialHobby?.inventoryLinks ?? []}
+          onChange={setPipelineSteps}
+        />
+      ) : null}
+
       {mode === "create" && selectedPreset && (
         <section className="workbench-section">
           <div className="workbench-section__head">
@@ -197,8 +254,12 @@ export function HobbyWorkbench({
               <span className="kv-grid__value">{selectedPreset.lifecycleMode === "pipeline" ? "Pipeline" : "Simple"}</span>
               {selectedPreset.pipelineSteps.length > 0 && (
                 <>
-                  <span className="kv-grid__label">Pipeline Steps</span>
+                  <span className="kv-grid__label">Workflow Stages</span>
                   <span className="kv-grid__value">{selectedPreset.pipelineSteps.map((s) => s.label).join(" → ")}</span>
+                  <span className="kv-grid__label">Stage Tools</span>
+                  <span className="kv-grid__value">
+                    {selectedPreset.pipelineSteps.reduce((count, stage) => count + stage.checklistTemplates.length + stage.supplyTemplates.length + stage.fieldDefinitions.length, 0)} stage assets across checklists, supply needs, and logging fields
+                  </span>
                 </>
               )}
               <span className="kv-grid__label">Metrics</span>

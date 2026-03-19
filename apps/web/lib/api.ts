@@ -396,6 +396,8 @@ import {
   type HobbySession,
   type HobbySessionSummary,
   type HobbySessionIngredient,
+  type HobbySessionStage,
+  type HobbySessionStageChecklistItem,
   type HobbySessionStep,
   type HobbyMetricDefinition,
   type HobbyMetricReading,
@@ -411,7 +413,10 @@ import {
   type CreateHobbySeriesInput,
   type CreateHobbySessionInput,
   type UpdateHobbySessionInput,
+  type UpdateHobbySessionStageInput,
   type CreateHobbySessionIngredientInput,
+  type CreateHobbySessionStageChecklistItemInput,
+  type UpdateHobbySessionStageChecklistItemInput,
   type UpdateHobbySessionIngredientInput,
   type CreateHobbySessionStepInput,
   type UpdateHobbySessionStepInput,
@@ -448,6 +453,8 @@ import {
   type HobbyStatus,
   hobbyDetailSchema,
   hobbySessionDetailSchema,
+  hobbySessionStageSchema,
+  hobbySessionStageChecklistItemSchema,
   type HobbyDetail,
   type HobbySessionDetail,
 } from "@lifekeeper/types";
@@ -4146,6 +4153,59 @@ export const advanceHobbySession = async (
   body: {},
   schema: hobbySessionSchema,
 });
+
+export const updateHobbySessionStage = async (
+  householdId: string,
+  hobbyId: string,
+  sessionId: string,
+  stageId: string,
+  input: UpdateHobbySessionStageInput
+): Promise<HobbySessionStage> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/stages/${stageId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbySessionStageSchema,
+});
+
+export const createHobbySessionStageChecklistItem = async (
+  householdId: string,
+  hobbyId: string,
+  sessionId: string,
+  stageId: string,
+  input: CreateHobbySessionStageChecklistItemInput
+): Promise<HobbySessionStageChecklistItem> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/stages/${stageId}/checklists`,
+  method: "POST",
+  body: input,
+  schema: hobbySessionStageChecklistItemSchema,
+});
+
+export const updateHobbySessionStageChecklistItem = async (
+  householdId: string,
+  hobbyId: string,
+  sessionId: string,
+  stageId: string,
+  checklistItemId: string,
+  input: UpdateHobbySessionStageChecklistItemInput
+): Promise<HobbySessionStageChecklistItem> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/stages/${stageId}/checklists/${checklistItemId}`,
+  method: "PATCH",
+  body: input,
+  schema: hobbySessionStageChecklistItemSchema,
+});
+
+export const deleteHobbySessionStageChecklistItem = async (
+  householdId: string,
+  hobbyId: string,
+  sessionId: string,
+  stageId: string,
+  checklistItemId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/stages/${stageId}/checklists/${checklistItemId}`,
+    method: "DELETE",
+  });
+};
 
 export const deleteHobbySession = async (
   householdId: string,
