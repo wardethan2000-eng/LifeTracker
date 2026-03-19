@@ -23,6 +23,7 @@ import {
   deleteHobbyProjectInventoryItem,
 } from "../lib/api";
 import { EntryTimeline, EntryTipsSurface } from "./entry-system";
+import { CategoryAccordionList } from "./category-accordion-list";
 
 type HobbyProjectDetailProps = {
   householdId: string;
@@ -126,6 +127,7 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
   }, [logs]);
 
   const availableMaterialOptions = useMemo(() => availableInventoryItems.filter((item) => !materials.some((material) => material.inventoryItemId === item.id)), [availableInventoryItems, materials]);
+  const inventoryCategoryLookup = useMemo(() => new Map(availableInventoryItems.map((item) => [item.id, item.category ?? null])), [availableInventoryItems]);
 
   const refreshMaterials = async (): Promise<void> => {
     const nextMaterials = await listHobbyProjectInventoryItems(householdId, hobbyId, projectState.id);
@@ -570,60 +572,87 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
       <section className="panel panel--studio">
         <div className="panel__header"><h2>Materials</h2></div>
         <div className="panel__body--padded mode-stack">
-          <form className="mode-inline-form mode-inline-form--grid" onSubmit={handleMaterialCreate}>
-            <select value={materialDraft.inventoryItemId} onChange={(event) => setMaterialDraft((current) => ({ ...current, inventoryItemId: event.target.value }))} required>
-              <option value="">Select inventory item</option>
-              {availableMaterialOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-            <input value={materialDraft.quantityNeeded} onChange={(event) => setMaterialDraft((current) => ({ ...current, quantityNeeded: event.target.value }))} placeholder="Needed" />
-            <input value={materialDraft.quantityUsed} onChange={(event) => setMaterialDraft((current) => ({ ...current, quantityUsed: event.target.value }))} placeholder="Used now" />
-            <input value={materialDraft.notes} onChange={(event) => setMaterialDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" />
-            <button type="submit" className="button button--secondary button--sm" disabled={busyKey === "material:new"}>Add material</button>
-          </form>
-
-          {materials.length === 0 ? <p className="panel__empty">No materials linked to this project yet.</p> : (
-            <div className="table-shell">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Needed</th>
-                    <th>Used</th>
-                    <th>Remaining</th>
-                    <th>Consume</th>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {materials.map((material) => (
-                    <tr key={material.id}>
-                      <td><Link href={`/inventory/${material.inventoryItemId}`} className="data-table__link">{material.inventoryItem.name}</Link></td>
-                      <td>{material.quantityNeeded}</td>
-                      <td>{material.quantityUsed}</td>
-                      <td>{material.quantityRemaining}</td>
-                      <td>
-                        <div className="mode-inline-actions">
-                          <input
-                            value={consumptionDrafts[material.inventoryItemId] ?? ""}
-                            onChange={(event) => setConsumptionDrafts((current) => ({ ...current, [material.inventoryItemId]: event.target.value }))}
-                            placeholder="Qty"
-                          />
-                          <button type="button" className="button button--ghost button--sm" onClick={() => void handleConsumeMaterial(material)} disabled={busyKey === `material:${material.inventoryItemId}`}>
-                            Record
-                          </button>
-                        </div>
-                      </td>
-                      <td>
-                        <button type="button" className="button button--ghost button--sm" onClick={() => void handleMaterialDelete(material)} disabled={busyKey === `material:delete:${material.inventoryItemId}`}>
-                          Remove
-                        </button>
-                      </td>
+          <CategoryAccordionList
+            items={materials}
+            getSearchText={(material) =>
+              [material.inventoryItem.name, inventoryCategoryLookup.get(material.inventoryItemId) ?? "", material.notes ?? ""].join(" ")
+            }
+            getCategory={(material) => inventoryCategoryLookup.get(material.inventoryItemId)?.trim() || null}
+            searchPlaceholder="Filter materials by name or category"
+            emptyMessage="No materials linked to this project yet."
+            noMatchMessage="No materials match your filters."
+            statusFilter={{
+              options: [
+                { value: "outstanding", label: "Outstanding" },
+                { value: "consumed", label: "Fully consumed" },
+              ],
+              getMatch: (material, v) =>
+                v === "consumed" ? material.quantityRemaining <= 0 : material.quantityRemaining > 0,
+            }}
+            getSectionTags={(items) => {
+              const consumed = items.filter((m) => m.quantityRemaining <= 0).length;
+              const outstanding = items.length - consumed;
+              const tags: { label: string; variant: "success" | "warning" | "muted" }[] = [];
+              if (consumed > 0) tags.push({ label: `${consumed} consumed`, variant: "success" });
+              if (outstanding > 0) tags.push({ label: `${outstanding} outstanding`, variant: "warning" });
+              return tags;
+            }}
+            renderItems={(sectionItems) => (
+              <div className="table-shell">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Needed</th>
+                      <th>Used</th>
+                      <th>Remaining</th>
+                      <th>Consume</th>
+                      <th aria-label="Actions" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {sectionItems.map((material) => (
+                      <tr key={material.id}>
+                        <td><Link href={`/inventory/${material.inventoryItemId}`} className="data-table__link">{material.inventoryItem.name}</Link></td>
+                        <td>{material.quantityNeeded}</td>
+                        <td>{material.quantityUsed}</td>
+                        <td>{material.quantityRemaining}</td>
+                        <td>
+                          <div className="mode-inline-actions">
+                            <input
+                              value={consumptionDrafts[material.inventoryItemId] ?? ""}
+                              onChange={(event) => setConsumptionDrafts((current) => ({ ...current, [material.inventoryItemId]: event.target.value }))}
+                              placeholder="Qty"
+                            />
+                            <button type="button" className="button button--ghost button--sm" onClick={() => void handleConsumeMaterial(material)} disabled={busyKey === `material:${material.inventoryItemId}`}>
+                              Record
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <button type="button" className="button button--ghost button--sm" onClick={() => void handleMaterialDelete(material)} disabled={busyKey === `material:delete:${material.inventoryItemId}`}>
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            header={
+              <form className="mode-inline-form mode-inline-form--grid" onSubmit={handleMaterialCreate}>
+                <select value={materialDraft.inventoryItemId} onChange={(event) => setMaterialDraft((current) => ({ ...current, inventoryItemId: event.target.value }))} required>
+                  <option value="">Select inventory item</option>
+                  {availableMaterialOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+                <input value={materialDraft.quantityNeeded} onChange={(event) => setMaterialDraft((current) => ({ ...current, quantityNeeded: event.target.value }))} placeholder="Needed" />
+                <input value={materialDraft.quantityUsed} onChange={(event) => setMaterialDraft((current) => ({ ...current, quantityUsed: event.target.value }))} placeholder="Used now" />
+                <input value={materialDraft.notes} onChange={(event) => setMaterialDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" />
+                <button type="submit" className="button button--secondary button--sm" disabled={busyKey === "material:new"}>Add material</button>
+              </form>
+            }
+          />
         </div>
       </section>
 

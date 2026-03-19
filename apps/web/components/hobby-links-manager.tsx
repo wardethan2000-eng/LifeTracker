@@ -23,6 +23,7 @@ import {
   SectionFilterProvider,
   SectionFilterToggle
 } from "./section-filter";
+import { CategoryAccordionList } from "./category-accordion-list";
 
 type AssetOption = {
   id: string;
@@ -342,76 +343,66 @@ export function HobbyLinksManager({
         </section>
       </SectionFilterProvider>
 
-      <SectionFilterProvider
-        items={inventoryLinks.map((link) => ({
-          ...link,
-          itemName: link.inventoryItem.name,
-          categoryName: inventoryCategoryLookup.get(link.inventoryItemId) ?? ""
-        }))}
-        keys={["itemName", "categoryName"]}
-        placeholder="Filter supplies by item or category"
-      >
-        <section className="panel">
+      <section className="panel">
           <div className="panel__header">
             <h2>Linked Supplies</h2>
-            <div className="panel__header-actions">
-              <span className="pill">{inventoryLinks.length}</span>
-              <SectionFilterToggle />
-            </div>
+            <span className="pill">{inventoryLinks.length}</span>
           </div>
-          <SectionFilterBar />
           <div className="panel__body--padded hobby-manager-stack">
-            <SectionFilterChildren<Array<HobbyDetailInventoryLink & { itemName: string; categoryName: string }>[number]>>
-              {(filteredInventoryLinks) => (
-                <>
-                  {inventoryLinks.length === 0 ? <p className="panel__empty">No inventory items linked yet.</p> : null}
-                  {inventoryLinks.length > 0 && filteredInventoryLinks.length === 0 ? <p className="panel__empty">No linked supplies match this filter.</p> : null}
-                  {filteredInventoryLinks.length > 0 ? (
-                    <div className="hobby-link-list">
-                      {filteredInventoryLinks.map((link) => (
-                        <div key={link.id} className="hobby-link-item">
-                          <div className="hobby-link-meta">
-                            <strong>{link.inventoryItem.name}</strong>
-                            <span>
-                              {link.categoryName ? `${link.categoryName} · ` : ""}
-                              {link.inventoryItem.quantityOnHand} {link.inventoryItem.unit} on hand
-                            </span>
-                            {link.notes ? <span>{link.notes}</span> : null}
-                          </div>
-                          <button type="button" className="button button--ghost button--sm" onClick={() => void handleInventoryRemove(link.id)} disabled={pendingKey !== null}>
-                            Remove
-                          </button>
-                        </div>
-                      ))}
+            <CategoryAccordionList
+              items={inventoryLinks}
+              getSearchText={(link) =>
+                [link.inventoryItem.name, inventoryCategoryLookup.get(link.inventoryItemId) ?? "", link.notes ?? ""].join(" ")
+              }
+              getCategory={(link) => inventoryCategoryLookup.get(link.inventoryItemId)?.trim() || null}
+              defaultCategories={sortedCategories.map((c) => c.categoryName)}
+              searchPlaceholder="Filter supplies by item or category"
+              emptyMessage="No inventory items linked yet."
+              noMatchMessage="No linked supplies match this filter."
+              renderItems={(items) => (
+                <div className="hobby-link-list">
+                  {items.map((link) => (
+                    <div key={link.id} className="hobby-link-item">
+                      <div className="hobby-link-meta">
+                        <strong>{link.inventoryItem.name}</strong>
+                        <span>
+                          {inventoryCategoryLookup.get(link.inventoryItemId) ? `${inventoryCategoryLookup.get(link.inventoryItemId)} · ` : ""}
+                          {link.inventoryItem.quantityOnHand} {link.inventoryItem.unit} on hand
+                        </span>
+                        {link.notes ? <span>{link.notes}</span> : null}
+                      </div>
+                      <button type="button" className="button button--ghost button--sm" onClick={() => void handleInventoryRemove(link.id)} disabled={pendingKey !== null}>
+                        Remove
+                      </button>
                     </div>
-                  ) : null}
-                </>
+                  ))}
+                </div>
               )}
-            </SectionFilterChildren>
-
-            <form className="form-grid" onSubmit={handleInventorySubmit}>
-            <label className="field">
-              <span>Inventory Item</span>
-              <select value={inventoryItemId} onChange={(event) => setInventoryItemId(event.target.value)} disabled={pendingKey !== null || availableInventoryOptions.length === 0}>
-                <option value="">{availableInventoryOptions.length === 0 ? "All visible inventory items are already linked" : "Select an inventory item"}</option>
-                {availableInventoryOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name} ({item.quantityOnHand} {item.unit})</option>
-                ))}
-              </select>
-            </label>
-            <label className="field field--full">
-              <span>Notes</span>
-              <textarea value={inventoryNotes} onChange={(event) => setInventoryNotes(event.target.value)} rows={2} placeholder="Store preferred usage, reorder thresholds, or category hints" disabled={pendingKey !== null} />
-            </label>
-            <div className="inline-actions inline-actions--end field--full">
-              <button type="submit" className="button button--primary button--sm" disabled={pendingKey !== null || !inventoryItemId}>
-                {pendingKey === "inventory-add" ? "Linking…" : "Link Supply"}
-              </button>
-            </div>
-            </form>
+              footer={
+                <form className="form-grid" onSubmit={handleInventorySubmit}>
+                  <label className="field">
+                    <span>Inventory Item</span>
+                    <select value={inventoryItemId} onChange={(event) => setInventoryItemId(event.target.value)} disabled={pendingKey !== null || availableInventoryOptions.length === 0}>
+                      <option value="">{availableInventoryOptions.length === 0 ? "All visible inventory items are already linked" : "Select an inventory item"}</option>
+                      {availableInventoryOptions.map((item) => (
+                        <option key={item.id} value={item.id}>{item.name} ({item.quantityOnHand} {item.unit})</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field field--full">
+                    <span>Notes</span>
+                    <textarea value={inventoryNotes} onChange={(event) => setInventoryNotes(event.target.value)} rows={2} placeholder="Store preferred usage, reorder thresholds, or category hints" disabled={pendingKey !== null} />
+                  </label>
+                  <div className="inline-actions inline-actions--end field--full">
+                    <button type="submit" className="button button--primary button--sm" disabled={pendingKey !== null || !inventoryItemId}>
+                      {pendingKey === "inventory-add" ? "Linking…" : "Link Supply"}
+                    </button>
+                  </div>
+                </form>
+              }
+            />
           </div>
-        </section>
-      </SectionFilterProvider>
+      </section>
 
       <section className="panel">
         <div className="panel__header">
