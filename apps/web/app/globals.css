@@ -1958,6 +1958,26 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
 }
 
+.status-chip--danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.status-chip--warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.status-chip--accent {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-chip--default {
+  background: var(--surface-alt);
+  color: var(--ink-muted);
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -4038,6 +4058,22 @@ textarea { resize: vertical; }
   box-shadow: inset 3px 0 0 var(--success);
 }
 
+.row--danger td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.row--warning td:first-child {
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+
+.row--accent td:first-child {
+  box-shadow: inset 3px 0 0 var(--success);
+}
+
+.row--default td:first-child {
+  box-shadow: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 39. Form Layout Variants
    ═══════════════════════════════════════════════════════════════════ */
@@ -5304,6 +5340,10 @@ textarea { resize: vertical; }
 
 .project-portfolio-card--accent {
   border-color: rgba(13, 148, 136, 0.2);
+}
+
+.project-portfolio-card--neutral {
+  border-color: var(--border);
 }
 
 .project-portfolio-card__topline,
