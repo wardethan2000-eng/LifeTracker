@@ -74,8 +74,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [sortField, setSortField] = useState<SortField>("status");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
-  const [showFilters, setShowFilters] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set(["__uncategorized", ...DEFAULT_CATEGORIES, ...supplies.map((s) => normalizeCategory(s.category)).filter((c): c is string => c !== null)]));
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -100,7 +99,6 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
     const fromSupplies = visibleSupplies
       .map((supply) => normalizeCategory(supply.category))
       .filter((category): category is string => category !== null);
-
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories, ...fromSupplies])).sort((left, right) => left.localeCompare(right));
   }, [customCategories, visibleSupplies]);
 
@@ -157,13 +155,11 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
 
   const handleCreateCategory = () => {
     const normalized = normalizeCategory(newCategoryName);
-
     if (!normalized || customCategories.includes(normalized)) {
       setNewCategoryName("");
       setShowCategoryInput(false);
       return;
     }
-
     setCustomCategories((current) => [...current, normalized].sort((left, right) => left.localeCompare(right)));
     setNewCategoryName("");
     setShowCategoryInput(false);
@@ -216,6 +212,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
 
   return (
     <div className="project-supplies-workspace">
+      {/* ── Header card with stats + add form ── */}
       <Card
         title="Supplies"
         actions={
@@ -236,7 +233,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
               <>
                 <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Category</button>
                 <button type="button" className="button button--sm" onClick={() => setShowCreateForm((v) => !v)}>
-                  {showCreateForm ? "Close form" : "+ Add Supply"}
+                  {showCreateForm ? "Close" : "+ Add Supply"}
                 </button>
               </>
             )}
@@ -261,89 +258,6 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
             <label>Est. remaining</label>
           </div>
         </div>
-
-        <div className="supply-search-bar">
-          <input
-            type="search"
-            className="supply-search-bar__input"
-            placeholder="Search supplies..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-          />
-          <button
-            type="button"
-            className={`button button--ghost button--sm${showFilters ? " button--active" : ""}`}
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-          </button>
-          <select
-            className="supply-search-bar__sort"
-            value={`${sortField}-${sortDir}`}
-            onChange={(e) => {
-              const [f, d] = e.currentTarget.value.split("-") as [SortField, SortDirection];
-              setSortField(f);
-              setSortDir(d);
-            }}
-          >
-            <option value="status-asc">Sort: Status</option>
-            <option value="name-asc">Sort: Name A-Z</option>
-            <option value="name-desc">Sort: Name Z-A</option>
-            <option value="cost-desc">Sort: Cost High-Low</option>
-            <option value="cost-asc">Sort: Cost Low-High</option>
-            <option value="remaining-desc">Sort: Remaining High-Low</option>
-            <option value="remaining-asc">Sort: Remaining Low-High</option>
-          </select>
-        </div>
-
-        {showFilters ? (
-          <div className="supply-advanced-filters">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "purchased" | "outstanding")}
-            >
-              <option value="all">All statuses</option>
-              <option value="outstanding">Outstanding</option>
-              <option value="purchased">Purchased</option>
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.currentTarget.value)}
-            >
-              <option value="all">All categories</option>
-              <option value="uncategorized">Uncategorized</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-            {phases.length > 1 ? (
-              <select
-                value={phaseFilter}
-                onChange={(e) => setPhaseFilter(e.currentTarget.value)}
-              >
-                <option value="all">All phases</option>
-                {phases.map((phase) => (
-                  <option key={phase.id} value={phase.id}>{phase.name}</option>
-                ))}
-              </select>
-            ) : null}
-            {uniqueSuppliers.length > 0 ? (
-              <select
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.currentTarget.value)}
-              >
-                <option value="all">All suppliers</option>
-                <option value="none">No supplier</option>
-                {uniqueSuppliers.map((sup) => (
-                  <option key={sup} value={sup}>{sup}</option>
-                ))}
-              </select>
-            ) : null}
-            {activeFilterCount > 0 ? (
-              <button type="button" className="button button--ghost button--xs" onClick={clearFilters}>Clear all</button>
-            ) : null}
-          </div>
-        ) : null}
 
         {showCreateForm ? (
           <form action={createProjectPhaseSupplyAction} className="supply-create-form">
@@ -407,6 +321,83 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         ) : null}
       </Card>
 
+      {/* ── Search & Filters — always visible, outside the card ── */}
+      <div className="supply-filter-bar">
+        <input
+          type="search"
+          className="supply-filter-bar__search"
+          placeholder="Search supplies by name, category, supplier, notes..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.currentTarget.value)}
+        />
+        <select
+          className="supply-filter-bar__select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "purchased" | "outstanding")}
+        >
+          <option value="all">All statuses</option>
+          <option value="outstanding">Outstanding</option>
+          <option value="purchased">Purchased</option>
+        </select>
+        <select
+          className="supply-filter-bar__select"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.currentTarget.value)}
+        >
+          <option value="all">All categories</option>
+          <option value="uncategorized">Uncategorized</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        {phases.length > 1 ? (
+          <select
+            className="supply-filter-bar__select"
+            value={phaseFilter}
+            onChange={(e) => setPhaseFilter(e.currentTarget.value)}
+          >
+            <option value="all">All phases</option>
+            {phases.map((phase) => (
+              <option key={phase.id} value={phase.id}>{phase.name}</option>
+            ))}
+          </select>
+        ) : null}
+        {uniqueSuppliers.length > 0 ? (
+          <select
+            className="supply-filter-bar__select"
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.currentTarget.value)}
+          >
+            <option value="all">All suppliers</option>
+            <option value="none">No supplier</option>
+            {uniqueSuppliers.map((sup) => (
+              <option key={sup} value={sup}>{sup}</option>
+            ))}
+          </select>
+        ) : null}
+        <select
+          className="supply-filter-bar__select"
+          value={`${sortField}-${sortDir}`}
+          onChange={(e) => {
+            const [f, d] = e.currentTarget.value.split("-") as [SortField, SortDirection];
+            setSortField(f);
+            setSortDir(d);
+          }}
+        >
+          <option value="status-asc">Sort: Status</option>
+          <option value="name-asc">Sort: Name A-Z</option>
+          <option value="name-desc">Sort: Name Z-A</option>
+          <option value="cost-desc">Sort: Cost High-Low</option>
+          <option value="cost-asc">Sort: Cost Low-High</option>
+          <option value="remaining-desc">Sort: Most Remaining</option>
+          <option value="remaining-asc">Sort: Least Remaining</option>
+        </select>
+        {activeFilterCount > 0 ? (
+          <button type="button" className="button button--ghost button--sm" onClick={clearFilters}>Clear filters ({activeFilterCount})</button>
+        ) : null}
+      </div>
+
+      {/* ── Empty states ── */}
       {filteredSupplies.length === 0 && visibleSupplies.length > 0 ? (
         <p className="supply-sections__empty">
           No supplies match your filters.
@@ -420,20 +411,23 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         </p>
       ) : null}
 
-      {sectionOrder.length > 1 ? (
+      {/* ── Expand/Collapse controls ── */}
+      {sectionOrder.length > 0 ? (
         <div className="supply-section-controls">
           <button type="button" className="button button--ghost button--xs" onClick={expandAll}>Expand all</button>
           <button type="button" className="button button--ghost button--xs" onClick={collapseAll}>Collapse all</button>
-          <span className="supply-section-controls__count">{filteredSupplies.length} item{filteredSupplies.length !== 1 ? "s" : ""}</span>
+          <span className="supply-section-controls__count">{filteredSupplies.length} supply item{filteredSupplies.length !== 1 ? "s" : ""}</span>
         </div>
       ) : null}
 
+      {/* ── Category accordion sections ── */}
       {sectionOrder.map((category) => {
         const key = category ?? "__uncategorized";
         const sectionSupplies = suppliesByCategory.get(category) ?? [];
         if (sectionSupplies.length === 0) return null;
         const isCollapsed = collapsedSections.has(key);
         const purchasedInSection = sectionSupplies.filter((s) => s.isProcured).length;
+        const outstandingInSection = sectionSupplies.length - purchasedInSection;
 
         return (
           <section key={key} className="supply-section">
@@ -448,7 +442,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
               <span className="pill pill--sm pill--muted">{sectionSupplies.length}</span>
               <span className="supply-section__meta">
                 {purchasedInSection > 0 ? <span className="supply-section__tag supply-section__tag--success">{purchasedInSection} purchased</span> : null}
-                {sectionSupplies.length - purchasedInSection > 0 ? <span className="supply-section__tag supply-section__tag--warning">{sectionSupplies.length - purchasedInSection} outstanding</span> : null}
+                {outstandingInSection > 0 ? <span className="supply-section__tag supply-section__tag--warning">{outstandingInSection} outstanding</span> : null}
               </span>
             </button>
             {!isCollapsed ? (
