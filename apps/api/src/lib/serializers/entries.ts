@@ -35,6 +35,8 @@ export const toEntryResponse = (entry: EntryResponseRecord, resolvedEntity: Entr
   attachmentName: entry.attachmentName ?? null,
   sourceType: entry.sourceType ?? null,
   sourceId: entry.sourceId ?? null,
+  folderId: entry.folderId ?? null,
+  bodyFormat: entry.bodyFormat,
   flags: entry.flags.map((flag) => flag.flag),
   createdBy: toShallowUserResponse(entry.createdBy),
   resolvedEntity,

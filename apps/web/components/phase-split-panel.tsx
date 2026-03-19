@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   HouseholdMember,
   InventoryItemSummary,
@@ -37,6 +37,7 @@ import { ProjectSupplyCreateForm } from "./project-supply-create-form";
 import { AttachmentSection } from "./attachment-section";
 import { SegmentedControl } from "./segmented-control";
 import { CategoryAccordionList } from "./category-accordion-list";
+import { RichEditor } from "./rich-editor";
 
 const statusOptions = [
   { value: "pending" as const, label: "Pending" },
@@ -401,23 +402,11 @@ function PhaseDetailPanel({
       )}
 
       {subTab === "notes" && (
-        <div style={{ padding: "8px 0" }}>
-          <form action={updateProjectPhaseAction}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <input type="hidden" name="phaseId" value={phase.id} />
-            <input type="hidden" name="name" value={phase.name} />
-            <input type="hidden" name="status" value={phase.status} />
-            <textarea
-              name="notes"
-              defaultValue={phase.notes ?? ""}
-              placeholder="Phase notes — anything relevant to planning or execution..."
-              rows={8}
-              style={{ width: "100%", fontSize: "0.9rem", lineHeight: 1.6, border: "1px solid var(--border)", borderRadius: 8, padding: "12px", fontFamily: "inherit", resize: "vertical", color: "var(--ink)" }}
-              onBlur={(e) => e.currentTarget.form?.requestSubmit()}
-            />
-          </form>
-        </div>
+        <PhaseNotesEditor
+          householdId={householdId}
+          projectId={projectId}
+          phase={phase}
+        />
       )}
 
       {/* ── Danger zone ── */}
@@ -913,6 +902,47 @@ function PhaseExpensesSubtab({
           <button type="submit" className="button button--sm">Add Expense</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/* ─── Phase Notes Editor ─── */
+
+function PhaseNotesEditor({
+  householdId,
+  projectId,
+  phase,
+}: {
+  householdId: string;
+  projectId: string;
+  phase: ProjectPhaseDetail;
+}) {
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleChange = useCallback(
+    (html: string) => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        const form = new FormData();
+        form.set("householdId", householdId);
+        form.set("projectId", projectId);
+        form.set("phaseId", phase.id);
+        form.set("name", phase.name);
+        form.set("status", phase.status);
+        form.set("notes", html);
+        updateProjectPhaseAction(form);
+      }, 800);
+    },
+    [householdId, projectId, phase.id, phase.name, phase.status]
+  );
+
+  return (
+    <div style={{ padding: "8px 0" }}>
+      <RichEditor
+        content={phase.notes ?? ""}
+        onChange={handleChange}
+        placeholder="Phase notes — anything relevant to planning or execution..."
+      />
     </div>
   );
 }

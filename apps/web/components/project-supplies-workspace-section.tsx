@@ -10,7 +10,7 @@ type ProjectSuppliesWorkspaceSectionProps = {
 export async function ProjectSuppliesWorkspaceSection({ householdId, projectId }: ProjectSuppliesWorkspaceSectionProps): Promise<JSX.Element> {
   const [phaseDetails, inventory] = await Promise.all([
     getProjectPhaseDetails(householdId, projectId),
-    getHouseholdInventory(householdId, { limit: 250 })
+    getHouseholdInventory(householdId, { limit: 100 })
   ]);
 
   const inventoryLookup = new Map(inventory.items.map((item) => [item.id, item]));

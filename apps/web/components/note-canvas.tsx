@@ -9,6 +9,7 @@ import {
   updateProjectNoteAction,
 } from "../app/actions";
 import { ConfirmActionForm } from "./confirm-action-form";
+import { RichEditor } from "./rich-editor";
 
 type NoteCanvasProps = {
   householdId: string;
@@ -123,12 +124,14 @@ function NoteCard({
         form.set("householdId", householdId);
         form.set("projectId", projectId);
         form.set("noteId", note.id);
+        form.set("sourceSystem", sourceSystem);
         form.set("title", newTitle);
         form.set("body", newBody);
+        form.set("category", note.category);
         updateProjectNoteAction(form);
       }, 800);
     },
-    [householdId, projectId, note.id]
+    [householdId, projectId, note.id, sourceSystem, note.category]
   );
 
   const handleTitleChange = useCallback(
@@ -141,13 +144,9 @@ function NoteCard({
   );
 
   const handleBodyChange = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      const newBody = e.target.value;
-      setBody(newBody);
-      debouncedSave(title, newBody);
-      // Auto-resize
-      e.target.style.height = "auto";
-      e.target.style.height = e.target.scrollHeight + "px";
+    (html: string) => {
+      setBody(html);
+      debouncedSave(title, html);
     },
     [title, debouncedSave]
   );
@@ -166,17 +165,10 @@ function NoteCard({
         onChange={handleTitleChange}
         placeholder="Note title"
       />
-      <textarea
-        className="note-card__body-input"
-        value={body}
+      <RichEditor
+        content={body}
         onChange={handleBodyChange}
-        placeholder="Start writing — markdown supported..."
-        rows={3}
-        style={{ overflow: "hidden" }}
-        onFocus={(e) => {
-          e.target.style.height = "auto";
-          e.target.style.height = e.target.scrollHeight + "px";
-        }}
+        placeholder="Start writing…"
       />
 
       {note.url && (

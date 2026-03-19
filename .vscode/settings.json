@@ -1,5 +1,9 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "Get-CimInstance": true
+        "Get-CimInstance": true,
+        "/^npx --yes prisma migrate dev --name add_note_folders_and_notebook --schema apps/api/prisma/schema\\.prisma$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

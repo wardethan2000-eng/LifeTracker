@@ -23,6 +23,7 @@ import {
 } from "../../lib/entries.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
+import { sanitizeRichTextBody } from "../../lib/sanitize-html.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 import {
   entryResponseInclude,
@@ -443,7 +444,8 @@ const buildEntryCreateData = (
   household: { connect: { id: householdId } },
   createdBy: { connect: { id: userId } },
   title: input.title ?? null,
-  body: input.body,
+  body: (input.bodyFormat ?? "plain_text") === "rich_text" ? sanitizeRichTextBody(input.body) : input.body,
+  bodyFormat: input.bodyFormat ?? "plain_text",
   entryDate: new Date(input.entryDate),
   entityType: target.entityType,
   entityId: target.entityId,
@@ -454,6 +456,7 @@ const buildEntryCreateData = (
   attachmentName: input.attachmentName ?? null,
   sourceType: input.sourceType ?? null,
   sourceId: input.sourceId ?? null,
+  ...(input.folderId ? { folder: { connect: { id: input.folderId } } } : {}),
   ...(input.flags.length > 0
     ? {
         flags: {
@@ -463,17 +466,24 @@ const buildEntryCreateData = (
     : {})
 });
 
-const buildEntryUpdateData = (input: z.infer<typeof updateEntrySchema>): Prisma.EntryUpdateInput => {
+const buildEntryUpdateData = (input: z.infer<typeof updateEntrySchema>, existingBodyFormat: string): Prisma.EntryUpdateInput => {
   const data: Prisma.EntryUpdateInput = {};
 
   if (input.title !== undefined) data.title = input.title ?? null;
-  if (input.body !== undefined) data.body = input.body;
+  const effectiveFormat = input.bodyFormat ?? existingBodyFormat;
+  if (input.body !== undefined) {
+    data.body = effectiveFormat === "rich_text" ? sanitizeRichTextBody(input.body) : input.body;
+  }
+  if (input.bodyFormat !== undefined) data.bodyFormat = input.bodyFormat;
   if (input.entryDate !== undefined) data.entryDate = new Date(input.entryDate);
   if (input.entryType !== undefined) data.entryType = input.entryType;
   if (input.measurements !== undefined) data.measurements = toInputJsonValue(input.measurements);
   if (input.tags !== undefined) data.tags = toInputJsonValue(input.tags);
   if (input.attachmentUrl !== undefined) data.attachmentUrl = input.attachmentUrl ?? null;
   if (input.attachmentName !== undefined) data.attachmentName = input.attachmentName ?? null;
+  if (input.folderId !== undefined) {
+    data.folder = input.folderId ? { connect: { id: input.folderId } } : { disconnect: true };
+  }
 
   return data;
 };
@@ -773,7 +783,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
       const entry = await tx.entry.update({
         where: { id: existing.id },
-        data: buildEntryUpdateData(input),
+        data: buildEntryUpdateData(input, existing.bodyFormat),
         include: entryResponseInclude
       });
 

@@ -382,6 +382,27 @@ export const validateEntryTarget = async (
           }
         : { status: "missing" };
     }
+    case "notebook": {
+      const household = await prisma.household.findFirst({
+        where: { id: entityId },
+        select: { id: true, name: true }
+      });
+
+      if (!household || household.id !== householdId) return { status: "missing" };
+
+      return {
+        status: "ok",
+        context: buildContext({
+          entityType,
+          entityId: household.id,
+          label: "Notebook",
+          parentEntityType: null,
+          parentEntityId: null,
+          parentLabel: null,
+          entityUrl: `/notes?householdId=${householdId}`
+        })
+      };
+    }
     default:
       return { status: "unsupported", message: unsupportedEntryTargetMessage(entityType) };
   }
@@ -646,6 +667,23 @@ export const resolveEntryEntityContexts = async (
         parentLabel: null,
         entityUrl: `/inventory?householdId=${householdId}&highlight=${item.id}`
       }));
+    }
+  }
+
+  const notebookIds = Array.from(byType.get("notebook") ?? []);
+  if (notebookIds.length > 0) {
+    for (const id of notebookIds) {
+      if (id === householdId) {
+        resolved.set(createEntryEntityKey("notebook", id), buildContext({
+          entityType: "notebook",
+          entityId: id,
+          label: "Notebook",
+          parentEntityType: null,
+          parentEntityId: null,
+          parentLabel: null,
+          entityUrl: `/notes?householdId=${householdId}`
+        }));
+      }
     }
   }
 

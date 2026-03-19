@@ -75,6 +75,7 @@ import {
   lowStockInventoryItemSchema,
   meResponseSchema,
   notificationSchema,
+  noteFolderSchema,
   onTimeRatePayloadSchema,
   overdueTrendPayloadSchema,
   partCommonalitySchema,
@@ -229,6 +230,9 @@ import {
   type MemberContributionPayload,
   type MeResponse,
   type Notification,
+  type NoteFolder,
+  type CreateNoteFolderInput,
+  type UpdateNoteFolderInput,
   type HouseholdNotificationList,
   type OnTimeRatePayload,
   type OverdueTrendPayload,
@@ -772,7 +776,7 @@ export const apiRequest = async <T>({
     response = await fetch(getFetchTarget(path), {
       method,
       ...resolvedCacheOptions,
-      headers: getRequestHeaders(),
+      headers: getRequestHeaders(body === undefined ? null : "application/json"),
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     });
   } catch (error) {
@@ -5107,3 +5111,46 @@ export const getHobbyRecipeShoppingList = async (
   path: `/v1/households/${householdId}/hobbies/${hobbyId}/recipes/${recipeId}/shopping-list`,
   schema: hobbyRecipeShoppingListSchema,
 });
+
+// ── Note Folders ─────────────────────────────────────────────────────
+
+export const getNoteFolders = async (
+  householdId: string
+): Promise<(NoteFolder & { entryCount: number; childCount: number })[]> => apiRequest({
+  path: `/v1/households/${householdId}/note-folders`,
+  schema: z.array(noteFolderSchema.extend({
+    entryCount: z.number(),
+    childCount: z.number()
+  })),
+});
+
+export const createNoteFolder = async (
+  householdId: string,
+  input: CreateNoteFolderInput
+): Promise<NoteFolder> => apiRequest({
+  path: `/v1/households/${householdId}/note-folders`,
+  method: "POST",
+  body: input,
+  schema: noteFolderSchema,
+});
+
+export const updateNoteFolder = async (
+  householdId: string,
+  folderId: string,
+  input: UpdateNoteFolderInput
+): Promise<NoteFolder> => apiRequest({
+  path: `/v1/households/${householdId}/note-folders/${folderId}`,
+  method: "PATCH",
+  body: input,
+  schema: noteFolderSchema,
+});
+
+export const deleteNoteFolder = async (
+  householdId: string,
+  folderId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/note-folders/${folderId}`,
+    method: "DELETE",
+  });
+};

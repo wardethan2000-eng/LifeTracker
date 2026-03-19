@@ -10,6 +10,7 @@ import { SidebarNav, type SidebarNavItem } from "../../components/sidebar-nav";
 const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
   { href: "/ideas", label: "Ideas", translationKey: "ideas", icon: "lightbulb" },
+  { href: "/notes", label: "Notes", translationKey: "notes", icon: "file-text" },
   { href: "/assets", label: "Assets", translationKey: "assets", icon: "box" },
   { href: "/inventory", label: "Inventory", translationKey: "inventory", icon: "layers" },
   { href: "/assets/new", label: "Add Asset", translationKey: "addAsset", icon: "plus" },
@@ -25,6 +26,7 @@ const navItems: Array<SidebarNavItem & { translationKey: string }> = [
 
 const prefetchedRoutes = [
   "/ideas",
+  "/notes",
   "/assets",
   "/projects",
   "/hobbies",

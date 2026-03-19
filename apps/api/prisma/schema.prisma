@@ -136,6 +136,7 @@ enum EntryEntityType {
   schedule
   maintenance_log
   inventory_item
+  notebook
 }
 
 // High-level classification for a universal entry.
@@ -160,6 +161,12 @@ enum EntryFlag {
   tip
   warning
   archived
+}
+
+// Distinguishes plain-text entry bodies from rich (HTML) content.
+enum BodyFormat {
+  plain_text
+  rich_text
 }
 
 // Lifecycle state of a household invitation token.
@@ -364,6 +371,7 @@ model User {
   createdHobbyPracticeRoutines HobbyPracticeRoutine[] @relation("HobbyPracticeRoutineCreator")
   createdHobbyCollectionItems HobbyCollectionItem[] @relation("HobbyCollectionItemCreator")
   createdEntries          Entry[]               @relation("EntryCreator")
+  createdNoteFolders      NoteFolder[]          @relation("NoteFolderCreator")
   performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
   spaceScanLogs          SpaceScanLog[]
 }
@@ -404,6 +412,7 @@ model Household {
   hobbyCollectionItems HobbyCollectionItem[]
   comments         Comment[]
   entries          Entry[]
+  noteFolders      NoteFolder[]
   domainEvents     DomainEvent[]
   webhookEndpoints WebhookEndpoint[]
 
@@ -755,6 +764,7 @@ model Entry {
   createdById    String
   title          String?         @db.VarChar(500)
   body           String          @db.VarChar(20000)
+  bodyFormat     BodyFormat      @default(plain_text)
   entryDate      DateTime
   entityType     EntryEntityType
   entityId       String
@@ -765,16 +775,19 @@ model Entry {
   attachmentName String?
   sourceType     String?
   sourceId       String?
+  folderId       String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   household      Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
   createdBy      User            @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
   flags          EntryFlagEntry[]
+  folder         NoteFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   @@index([householdId, entityType, entityId])
   @@index([householdId, entryType])
   @@index([householdId, entryDate])
   @@index([householdId, createdById])
+  @@index([folderId])
 }
 
 // Join table that assigns behavioral flags to entries.
@@ -786,6 +799,29 @@ model EntryFlagEntry {
 
   @@id([entryId, flag])
   @@index([flag])
+}
+
+// A hierarchical folder for organizing notes across the universal entry system.
+model NoteFolder {
+  id              String       @id @default(cuid())
+  householdId     String
+  parentFolderId  String?
+  name            String       @db.VarChar(200)
+  color           String?      @db.VarChar(30)
+  icon            String?      @db.VarChar(30)
+  sortOrder       Int          @default(0)
+  createdById     String
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  household       Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  parent          NoteFolder?  @relation("NoteFolderTree", fields: [parentFolderId], references: [id], onDelete: SetNull)
+  children        NoteFolder[] @relation("NoteFolderTree")
+  createdBy       User         @relation("NoteFolderCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  entries         Entry[]
+
+  @@index([householdId])
+  @@index([parentFolderId])
 }
 
 // A generated alert for a user about asset or schedule activity within a household.

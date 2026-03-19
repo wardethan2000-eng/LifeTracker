@@ -17,7 +17,8 @@
       "notifications": "Notifications",
       "invitations": "Invitations",
       "providers": "Providers",
-      "ideas": "Ideas"
+      "ideas": "Ideas",
+      "notes": "Notes"
     },
     "actions": {
       "cancel": "Cancel",

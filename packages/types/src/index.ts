@@ -104,7 +104,8 @@ export const entryEntityTypeValues = [
   "asset",
   "schedule",
   "maintenance_log",
-  "inventory_item"
+  "inventory_item",
+  "notebook"
 ] as const;
 export const entryTypeValues = [
   "note",
@@ -119,6 +120,7 @@ export const entryTypeValues = [
 ] as const;
 export const entryFlagValues = ["important", "actionable", "resolved", "pinned", "tip", "warning", "archived"] as const;
 export const entrySortByValues = ["entryDate", "createdAt", "title"] as const;
+export const bodyFormatValues = ["plain_text", "rich_text"] as const;
 export const webhookDeliveryStatusValues = ["pending", "delivered", "failed"] as const;
 
 export const assetCategorySchema = z.enum(assetCategoryValues);
@@ -131,6 +133,7 @@ export const entryEntityTypeSchema = z.enum(entryEntityTypeValues);
 export const entryTypeSchema = z.enum(entryTypeValues);
 export const entryFlagSchema = z.enum(entryFlagValues);
 export const entrySortBySchema = z.enum(entrySortByValues);
+export const bodyFormatSchema = z.enum(bodyFormatValues);
 export const webhookDeliveryStatusSchema = z.enum(webhookDeliveryStatusValues);
 export const authSourceSchema = z.enum(authSourceValues);
 export const notificationTypeSchema = z.enum(notificationTypeValues);
@@ -2847,6 +2850,7 @@ export const entrySchema = z.object({
   createdById: z.string().cuid(),
   title: z.string().nullable().default(null),
   body: z.string(),
+  bodyFormat: bodyFormatSchema.default("plain_text"),
   entryDate: z.string().datetime(),
   entityType: entryEntityTypeSchema,
   entityId: z.string().min(1),
@@ -2857,6 +2861,7 @@ export const entrySchema = z.object({
   attachmentName: z.string().nullable().default(null),
   sourceType: z.string().nullable().default(null),
   sourceId: z.string().nullable().default(null),
+  folderId: z.string().cuid().nullable().default(null),
   flags: z.array(entryFlagSchema).default([]),
   createdBy: shallowUserSchema,
   resolvedEntity: entryResolvedEntitySchema,
@@ -2888,6 +2893,7 @@ const entryTagsInputSchema = z.array(entryTagSchema)
 export const createEntrySchema = z.object({
   title: optionalEntryTitleSchema.optional().nullable(),
   body: z.string().trim().min(1).max(20000),
+  bodyFormat: bodyFormatSchema.default("plain_text"),
   entryDate: z.string().datetime(),
   entityType: entryEntityTypeSchema,
   entityId: z.string().trim().min(1).max(191),
@@ -2898,18 +2904,21 @@ export const createEntrySchema = z.object({
   attachmentName: z.string().trim().max(500).optional().nullable(),
   sourceType: z.string().trim().max(120).optional().nullable(),
   sourceId: z.string().trim().max(191).optional().nullable(),
+  folderId: z.string().cuid().optional().nullable(),
   flags: entryFlagsInputSchema
 });
 
 export const updateEntrySchema = z.object({
   title: optionalEntryTitleSchema.optional().nullable(),
   body: z.string().trim().min(1).max(20000).optional(),
+  bodyFormat: bodyFormatSchema.optional(),
   entryDate: z.string().datetime().optional(),
   entryType: entryTypeSchema.optional(),
   measurements: z.array(entryMeasurementSchema).optional(),
   tags: entryTagsInputSchema.optional(),
   attachmentUrl: z.string().url().max(2000).optional().nullable(),
   attachmentName: z.string().trim().max(500).optional().nullable(),
+  folderId: z.string().cuid().optional().nullable(),
   flags: entryFlagsInputSchema.optional()
 });
 
@@ -3611,7 +3620,7 @@ export type EntryResolvedEntity = z.infer<typeof entryResolvedEntitySchema>;
 export type Entry = z.infer<typeof entrySchema>;
 export type EntryListResponse = z.infer<typeof entryListResponseSchema>;
 export type ActionableEntryGroup = z.infer<typeof actionableEntryGroupSchema>;
-export type CreateEntryInput = z.infer<typeof createEntrySchema>;
+export type CreateEntryInput = z.input<typeof createEntrySchema>;
 export type UpdateEntryInput = z.infer<typeof updateEntrySchema>;
 export type EntryListQuery = z.infer<typeof entryListQuerySchema>;
 export type EntrySurfaceQuery = z.infer<typeof entrySurfaceQuerySchema>;
@@ -5292,4 +5301,47 @@ export const hobbyPresetSchema = z.object({
   sessionStepTypes: z.array(z.string()).default([]),
 });
 export type HobbyPreset = z.infer<typeof hobbyPresetSchema>;
+
+// ── NoteFolder ─────────────────────────────────────────────────
+
+export const noteFolderSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  parentFolderId: z.string().cuid().nullable().default(null),
+  name: z.string().min(1).max(200),
+  color: z.string().max(30).nullable().default(null),
+  icon: z.string().max(30).nullable().default(null),
+  sortOrder: z.number().int().default(0),
+  createdById: z.string().cuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type NoteFolder = z.infer<typeof noteFolderSchema>;
+
+export const noteFolderTreeSchema: z.ZodType<NoteFolder & { children: Array<NoteFolder & { children: unknown[] }> }> = z.lazy(() =>
+  noteFolderSchema.extend({
+    children: z.array(noteFolderTreeSchema).default([])
+  })
+) as z.ZodType<NoteFolder & { children: Array<NoteFolder & { children: unknown[] }> }>;
+export type NoteFolderTree = z.infer<typeof noteFolderTreeSchema>;
+
+export const noteFolderListSchema = z.array(noteFolderTreeSchema);
+
+export const createNoteFolderSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  parentFolderId: z.string().cuid().optional().nullable(),
+  color: z.string().trim().max(30).optional().nullable(),
+  icon: z.string().trim().max(30).optional().nullable(),
+  sortOrder: z.number().int().optional()
+});
+export type CreateNoteFolderInput = z.infer<typeof createNoteFolderSchema>;
+
+export const updateNoteFolderSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  parentFolderId: z.string().cuid().optional().nullable(),
+  color: z.string().trim().max(30).optional().nullable(),
+  icon: z.string().trim().max(30).optional().nullable(),
+  sortOrder: z.number().int().optional()
+});
+export type UpdateNoteFolderInput = z.infer<typeof updateNoteFolderSchema>;
 

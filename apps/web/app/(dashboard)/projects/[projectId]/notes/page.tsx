@@ -3,12 +3,13 @@ import { isLegacyImportedEntrySourceType, parseProjectEntryPayload } from "@life
 import type { JSX } from "react";
 import { Suspense } from "react";
 import {
-  createProjectNoteAction,
   deleteProjectNoteAction,
   toggleProjectNotePinAction,
 } from "../../../../actions";
 import { ExpandableCard } from "../../../../../components/expandable-card";
 import { AttachmentSection } from "../../../../../components/attachment-section";
+import { NoteCreateForm } from "../../../../../components/note-create-form";
+import { RichEditorDisplay } from "../../../../../components/rich-editor-display";
 import {
   ApiError,
   getEntries,
@@ -96,6 +97,7 @@ async function ProjectNotesPanelAsync({
     id: string;
     title: string;
     body: string;
+    bodyFormat: "plain_text" | "rich_text";
     category: string;
     url: string | null;
     phaseName: string | null;
@@ -123,6 +125,7 @@ async function ProjectNotesPanelAsync({
         id: entry.id,
         title: entry.title ?? "Project note",
         body: parsed.body,
+        bodyFormat: (entry.bodyFormat === "rich_text" ? "rich_text" : "plain_text") as "plain_text" | "rich_text",
         category: parsed.category,
         url: parsed.url,
         phaseName: entry.entityType === "project_phase" ? entry.resolvedEntity.label : null,
@@ -147,6 +150,7 @@ async function ProjectNotesPanelAsync({
     id: note.id,
     title: note.title,
     body: note.body,
+    bodyFormat: "plain_text",
     category: note.category,
     url: note.url ?? null,
     phaseName: note.phaseName ?? null,
@@ -193,46 +197,9 @@ async function ProjectNotesPanelAsync({
         ) : null}
         <details style={{ marginBottom: 16 }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Add Note</summary>
-          <form action={createProjectNoteAction} style={{ marginTop: 12 }}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={project.id} />
-            <div className="workbench-grid" style={{ marginBottom: 12 }}>
-              <label className="field">
-                <span className="field__label">Title *</span>
-                <input type="text" name="title" required maxLength={300} placeholder="Note title" />
-              </label>
-              <label className="field">
-                <span className="field__label">Category</span>
-                <select name="category" defaultValue="general">
-                  <option value="research">Research</option>
-                  <option value="reference">Reference</option>
-                  <option value="decision">Decision</option>
-                  <option value="measurement">Measurement</option>
-                  <option value="general">General</option>
-                </select>
-              </label>
-              <label className="field">
-                <span className="field__label">Phase (optional)</span>
-                <select name="phaseId" defaultValue="">
-                  <option value="">No phase</option>
-                  {project.phases.map((phase) => (
-                    <option key={phase.id} value={phase.id}>{phase.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span className="field__label">URL (optional)</span>
-                <input type="url" name="url" placeholder="https://…" />
-              </label>
-            </div>
-            <label className="field" style={{ display: "block", marginBottom: 12 }}>
-              <span className="field__label">Body</span>
-              <textarea name="body" rows={5} placeholder="Markdown supported…" style={{ width: "100%", resize: "vertical" }} />
-            </label>
-            <div className="inline-actions">
-              <button type="submit" className="button">Save Note</button>
-            </div>
-          </form>
+          <div style={{ marginTop: 12 }}>
+            <NoteCreateForm householdId={householdId} projectId={project.id} phases={project.phases} />
+          </div>
         </details>
         {mergedNotes.length === 0 ? <p className="panel__empty">No notes yet. Add one above.</p> : null}
         <div className="schedule-stack">
@@ -252,9 +219,12 @@ async function ProjectNotesPanelAsync({
                 </div>
                 <div className="data-table__primary">{note.title}</div>
                 {note.body ? (
-                  <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: "8px 0 0", fontFamily: "inherit", fontSize: "0.875rem" }}>
-                    {note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body}
-                  </pre>
+                  <div style={{ margin: "8px 0 0", fontSize: "0.875rem" }}>
+                    <RichEditorDisplay
+                      content={note.bodyFormat === "rich_text" ? note.body : (note.body.length > 400 ? `${note.body.slice(0, 400)}…` : note.body)}
+                      bodyFormat={note.bodyFormat}
+                    />
+                  </div>
                 ) : null}
                 {note.url ? (
                   <a href={note.url} target="_blank" rel="noopener noreferrer" className="text-link" style={{ display: "block", marginTop: 6, fontSize: "0.8125rem" }}>

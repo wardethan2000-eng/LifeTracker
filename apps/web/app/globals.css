@@ -9982,6 +9982,739 @@ html[data-ui-density="compact"] .resource-layout__aside {
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
+/* ─── Rich Editor ─── */
+
+.rich-editor {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.rich-editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.rich-editor--readonly {
+  border: none;
+  background: transparent;
+}
+
+.rich-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  flex-wrap: wrap;
+}
+
+.rich-editor__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rich-editor__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.rich-editor__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.rich-editor__btn:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.rich-editor__btn--active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+}
+
+/* ── Color picker ── */
+
+.rich-editor__color-picker {
+  position: relative;
+}
+
+.rich-editor__color-indicator {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.rich-editor__color-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  gap: 4px;
+  flex-wrap: wrap;
+  width: 140px;
+}
+
+.rich-editor__color-picker:hover .rich-editor__color-dropdown,
+.rich-editor__color-picker:focus-within .rich-editor__color-dropdown {
+  display: flex;
+}
+
+.rich-editor__color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.rich-editor__color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.rich-editor__color-swatch--reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  background: var(--surface);
+}
+
+/* ── Editor content area (ProseMirror) ── */
+
+.rich-editor__content .ProseMirror {
+  padding: 12px 16px;
+  min-height: 120px;
+  outline: none;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.rich-editor__content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-muted);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.rich-editor__content .ProseMirror h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+  line-height: 1.3;
+}
+
+.rich-editor__content .ProseMirror h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0.85rem 0 0.4rem;
+  line-height: 1.35;
+}
+
+.rich-editor__content .ProseMirror h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.7rem 0 0.35rem;
+  line-height: 1.4;
+}
+
+.rich-editor__content .ProseMirror p {
+  margin: 0 0 0.5em;
+}
+
+.rich-editor__content .ProseMirror ul,
+.rich-editor__content .ProseMirror ol {
+  padding-left: 1.4em;
+  margin: 0.35em 0;
+}
+
+.rich-editor__content .ProseMirror li {
+  margin: 0.15em 0;
+}
+
+.rich-editor__content .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rich-editor__content .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rich-editor__content .ProseMirror ul[data-type="taskList"] li label {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.rich-editor__content .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.rich-editor__content .ProseMirror blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  color: var(--ink-muted);
+}
+
+.rich-editor__content .ProseMirror code {
+  background: color-mix(in srgb, var(--ink) 8%, var(--surface));
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.rich-editor__content .ProseMirror pre {
+  background: color-mix(in srgb, var(--ink) 6%, var(--surface));
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+
+.rich-editor__content .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.rich-editor__content .ProseMirror a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-editor__content .ProseMirror a:hover {
+  opacity: 0.8;
+}
+
+.rich-editor__content .ProseMirror mark {
+  background: color-mix(in srgb, var(--warning) 35%, transparent);
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.rich-editor__content .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1em 0;
+}
+
+/* ── Rich editor display ── */
+
+.rich-editor-display--plain {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+}
+
+.rich-editor-display--rich .ProseMirror {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.rich-editor-display--rich .ProseMirror h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+  line-height: 1.3;
+}
+
+.rich-editor-display--rich .ProseMirror h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0.85rem 0 0.4rem;
+  line-height: 1.35;
+}
+
+.rich-editor-display--rich .ProseMirror h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.7rem 0 0.35rem;
+  line-height: 1.4;
+}
+
+.rich-editor-display--rich .ProseMirror p {
+  margin: 0 0 0.5em;
+}
+
+.rich-editor-display--rich .ProseMirror ul,
+.rich-editor-display--rich .ProseMirror ol {
+  padding-left: 1.4em;
+  margin: 0.35em 0;
+}
+
+.rich-editor-display--rich .ProseMirror li {
+  margin: 0.15em 0;
+}
+
+.rich-editor-display--rich .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rich-editor-display--rich .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rich-editor-display--rich .ProseMirror ul[data-type="taskList"] li label {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.rich-editor-display--rich .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.rich-editor-display--rich .ProseMirror blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  color: var(--ink-muted);
+}
+
+.rich-editor-display--rich .ProseMirror code {
+  background: color-mix(in srgb, var(--ink) 8%, var(--surface));
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.rich-editor-display--rich .ProseMirror pre {
+  background: color-mix(in srgb, var(--ink) 6%, var(--surface));
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+
+.rich-editor-display--rich .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.rich-editor-display--rich .ProseMirror a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-editor-display--rich .ProseMirror mark {
+  background: color-mix(in srgb, var(--warning) 35%, transparent);
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.rich-editor-display--rich .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1em 0;
+}
+
+/* ─── Notes Hub ─── */
+
+.notes-hub {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  min-height: 500px;
+}
+
+.notes-hub__sidebar {
+  border-right: 1px solid var(--border);
+  padding-right: 16px;
+}
+
+.notes-hub__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Folder Tree ─── */
+
+.folder-tree__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.folder-tree__title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted, #888);
+}
+
+.folder-tree__add-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.folder-tree__add-btn:hover {
+  background: var(--surface-hover, #f5f5f5);
+}
+
+.folder-tree__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.folder-tree__children {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.folder-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+}
+
+.folder-tree__row:hover {
+  background: var(--surface-hover, #f5f5f5);
+}
+
+.folder-tree__row--active {
+  background: var(--accent-light, #e8f0fe);
+  font-weight: 600;
+}
+
+.folder-tree__toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.75rem;
+  width: 16px;
+  cursor: pointer;
+  color: var(--ink-muted, #888);
+  flex-shrink: 0;
+}
+
+.folder-tree__toggle-spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.folder-tree__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.folder-tree__icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.folder-tree__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tree__count {
+  font-size: 0.75rem;
+  color: var(--ink-muted, #888);
+  background: var(--surface-hover, #f0f0f0);
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.folder-tree__actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.folder-tree__action {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--ink-muted, #888);
+  border-radius: 3px;
+}
+
+.folder-tree__action:hover {
+  background: var(--surface-hover, #eee);
+  color: var(--ink);
+}
+
+.folder-tree__action--danger:hover {
+  color: var(--error, #d00);
+}
+
+.folder-tree__rename-input {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 2px 6px;
+  border: 1px solid var(--accent, #4a90d9);
+  border-radius: 4px;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-tree__create {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  align-items: center;
+}
+
+.folder-tree__create .folder-tree__rename-input {
+  flex: 1;
+}
+
+/* ─── Quick Capture ─── */
+
+.quick-capture {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.quick-capture__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 0.95rem;
+  background: transparent;
+  color: var(--ink);
+}
+
+.quick-capture__input::placeholder {
+  color: var(--ink-muted, #999);
+}
+
+.quick-capture__btn {
+  flex-shrink: 0;
+}
+
+/* ─── Note List ─── */
+
+.note-list__header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-list__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.note-list__count {
+  font-size: 0.85rem;
+  color: var(--ink-muted, #888);
+}
+
+.note-list__loading,
+.note-list__empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--ink-muted, #888);
+}
+
+.note-list__items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.note-list__item {
+  display: flex;
+  align-items: flex-start;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: box-shadow 0.15s;
+}
+
+.note-list__item:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.note-list__link {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.note-list__item-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.note-list__item-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-list__item-date {
+  font-size: 0.8rem;
+  color: var(--ink-muted, #888);
+  flex-shrink: 0;
+}
+
+.note-list__item-preview {
+  font-size: 0.9rem;
+  color: var(--ink-muted, #666);
+  line-height: 1.5;
+  max-height: 3em;
+  overflow: hidden;
+  margin: 0;
+}
+
+.note-list__rich-preview {
+  max-height: 3em;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.note-list__item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.note-list__delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--ink-muted, #aaa);
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.note-list__item:hover .note-list__delete {
+  opacity: 1;
+}
+
+.note-list__delete:hover {
+  color: var(--error, #d00);
+  background: var(--surface-hover, #f5f5f5);
+}
+
+@media (max-width: 768px) {
+  .notes-hub {
+    grid-template-columns: 1fr;
+  }
+
+  .notes-hub__sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 16px;
+  }
+}
+
 /* ─── Summary Bar ─── */
 
 .workspace-summary-bar {

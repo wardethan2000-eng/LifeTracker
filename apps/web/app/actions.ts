@@ -2825,6 +2825,7 @@ export async function createProjectNoteAction(formData: FormData): Promise<void>
   await createEntry(householdId, {
     title,
     body: entryDetails.body,
+    bodyFormat: "rich_text",
     entryDate: new Date().toISOString(),
     entityType: phaseId ? "project_phase" : "project",
     entityId: phaseId ?? projectId,
@@ -2843,15 +2844,46 @@ export async function updateProjectNoteAction(formData: FormData): Promise<void>
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
   const noteId = getRequiredString(formData, "noteId");
-  const input: UpdateProjectNoteInput = {
-    title: getRequiredString(formData, "title"),
-    body: getNullableString(formData, "body") ?? "",
-    category: getRequiredString(formData, "category") as UpdateProjectNoteInput["category"],
-    url: getNullableString(formData, "url"),
-    phaseId: getNullableString(formData, "phaseId")
-  };
+  const sourceSystem = getOptionalString(formData, "sourceSystem") ?? "legacy";
 
-  await updateProjectNote(householdId, projectId, noteId, input);
+  if (sourceSystem === "entry") {
+    const title = getRequiredString(formData, "title");
+    const body = getNullableString(formData, "body") ?? "";
+    const rawCategory = getOptionalString(formData, "category") ?? "general";
+    const category = rawCategory as CreateProjectNoteInput["category"];
+    const url = getOptionalString(formData, "url");
+    const isPinnedRaw = getOptionalString(formData, "isPinned");
+    const isPinned = isPinnedRaw === "true";
+
+    const entryDetails = buildProjectEntryDetails({
+      title,
+      body,
+      category,
+      ...(url !== undefined ? { url } : {}),
+      isPinned
+    });
+
+    await updateEntry(householdId, noteId, {
+      title,
+      body: entryDetails.body,
+      bodyFormat: "rich_text",
+      tags: entryDetails.tags,
+      flags: entryDetails.flags,
+      attachmentUrl: entryDetails.attachmentUrl,
+      attachmentName: entryDetails.attachmentName
+    });
+  } else {
+    const input: UpdateProjectNoteInput = {
+      title: getRequiredString(formData, "title"),
+      body: getNullableString(formData, "body") ?? "",
+      category: getRequiredString(formData, "category") as UpdateProjectNoteInput["category"],
+      url: getNullableString(formData, "url"),
+      phaseId: getNullableString(formData, "phaseId")
+    };
+
+    await updateProjectNote(householdId, projectId, noteId, input);
+  }
+
   revalidateProjectPaths(householdId, projectId);
 }
 

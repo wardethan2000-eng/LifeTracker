@@ -37,57 +37,55 @@ export function ProjectChecklist({
   const [, startTransition] = useTransition();
 
   return (
-    <div className="schedule-stack">
-      {items.length === 0 ? <p className="panel__empty">{emptyMessage}</p> : null}
+    <div className="checklist">
+      {items.length === 0 ? <p className="checklist__empty">{emptyMessage}</p> : null}
 
       {items.map((item) => (
-        <div key={item.id} className="schedule-card" style={{ padding: "12px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
-            <form action={toggleAction} style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-              <input type="hidden" name="householdId" value={householdId} />
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name={parentFieldName} value={parentId} />
-              <input type="hidden" name="checklistItemId" value={item.id} />
-              <input type="hidden" name="title" value={item.title} />
-              <input type="hidden" name="sortOrder" value={item.sortOrder ?? ""} />
-              <input type="hidden" name="isCompleted" value={item.isCompleted ? "false" : "true"} />
-              <input
-                type="checkbox"
-                defaultChecked={item.isCompleted}
-                onChange={(event) => {
-                  startTransition(() => {
-                    event.currentTarget.form?.requestSubmit();
-                  });
-                }}
-              />
-              <span style={{ textDecoration: item.isCompleted ? "line-through" : "none", color: item.isCompleted ? "var(--ink-muted)" : undefined }}>
-                {item.title}
-              </span>
-            </form>
+        <div key={item.id} className="checklist__row">
+          <form action={toggleAction} className="checklist__toggle">
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name={parentFieldName} value={parentId} />
+            <input type="hidden" name="checklistItemId" value={item.id} />
+            <input type="hidden" name="title" value={item.title} />
+            <input type="hidden" name="sortOrder" value={item.sortOrder ?? ""} />
+            <input type="hidden" name="isCompleted" value={item.isCompleted ? "false" : "true"} />
+            <input
+              type="checkbox"
+              className="checklist__checkbox"
+              defaultChecked={item.isCompleted}
+              onChange={(event) => {
+                startTransition(() => {
+                  event.currentTarget.form?.requestSubmit();
+                });
+              }}
+            />
+            <span className={item.isCompleted ? "checklist__label checklist__label--done" : "checklist__label"}>
+              {item.title}
+            </span>
+          </form>
 
-            <form action={deleteAction}>
-              <input type="hidden" name="householdId" value={householdId} />
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name={parentFieldName} value={parentId} />
-              <input type="hidden" name="checklistItemId" value={item.id} />
-              <button type="submit" className="button button--ghost button--sm">Delete</button>
-            </form>
-          </div>
+          <form action={deleteAction} className="checklist__delete-form">
+            <input type="hidden" name="householdId" value={householdId} />
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name={parentFieldName} value={parentId} />
+            <input type="hidden" name="checklistItemId" value={item.id} />
+            <button type="submit" className="checklist__delete" title="Delete">×</button>
+          </form>
         </div>
       ))}
 
-      <form action={addAction} className="inline-actions" style={{ marginTop: 12 }}>
+      <form action={addAction} className="checklist__add">
         <input type="hidden" name="householdId" value={householdId} />
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name={parentFieldName} value={parentId} />
         <input
           name="title"
           placeholder={addPlaceholder}
-          className="field"
-          style={{ flex: 1, minWidth: 240 }}
+          className="checklist__add-input"
           required
         />
-        <button type="submit" className="button">+</button>
+        <button type="submit" className="checklist__add-btn">+</button>
       </form>
     </div>
   );
