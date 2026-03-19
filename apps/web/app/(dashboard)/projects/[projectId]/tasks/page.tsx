@@ -151,13 +151,13 @@ export default async function ProjectTasksPage({ params, searchParams }: Project
                         <input type="hidden" name="householdId" value={household.id} />
                         <input type="hidden" name="projectId" value={project.id} />
                         <input type="hidden" name="taskId" value={todo.id} />
-                        <button type="submit" className="button button--ghost button--small" title="Promote to full task">→ Full task</button>
+                        <button type="submit" className="button button--ghost button--sm" title="Promote to full task">Promote</button>
                       </form>
                       <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
                         <input type="hidden" name="householdId" value={household.id} />
                         <input type="hidden" name="projectId" value={project.id} />
                         <input type="hidden" name="taskId" value={todo.id} />
-                        <button type="submit" className="button button--ghost button--small button--danger">Delete</button>
+                        <button type="submit" className="button button--danger button--sm">Delete</button>
                       </form>
                     </div>
                   ))}
@@ -359,14 +359,16 @@ function UnphasedTaskCard({
         </div>
         <div className="inline-actions" style={{ marginTop: 16 }}>
           <button type="submit" className="button">Save Changes</button>
-          <form action={deleteProjectTaskAction} style={{ display: "inline" }}>
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <input type="hidden" name="taskId" value={task.id} />
-            <button type="submit" className="button button--ghost button--danger">Delete Task</button>
-          </form>
         </div>
       </form>
+      <div className="inline-actions" style={{ marginTop: 8 }}>
+        <form action={deleteProjectTaskAction}>
+          <input type="hidden" name="householdId" value={householdId} />
+          <input type="hidden" name="projectId" value={projectId} />
+          <input type="hidden" name="taskId" value={task.id} />
+          <button type="submit" className="button button--danger button--sm">Delete Task</button>
+        </form>
+      </div>
       <div style={{ marginTop: 16 }}>
         <ProjectChecklist
           householdId={householdId}

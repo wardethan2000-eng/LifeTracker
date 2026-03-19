@@ -19,7 +19,7 @@ export function ProjectDangerActions({ householdId, projectId }: ProjectDangerAc
       triggerLabel="Delete Project"
       title="Delete project"
       message="Delete this project and all related records?"
-      confirmLabel="Yes, delete"
+      confirmLabel="Confirm"
       triggerClassName="button button--danger"
       confirmClassName="button button--danger"
       cancelClassName="button button--ghost"

@@ -12,37 +12,38 @@ type ProjectSuppliesPageProps = {
 };
 
 const SuppliesWorkspaceSkeleton = (): JSX.Element => (
-  <section className="card">
-    <div className="card__header">
-      <div className="card__header-left">
-        <h3>Supplies Workspace</h3>
+  <div className="project-supplies-workspace">
+    <section className="card">
+      <div className="card__header">
+        <div className="card__header-left">
+          <h3>Supplies</h3>
+        </div>
       </div>
-    </div>
-    <div className="card__body">
-      <div className="project-supplies-workspace__summary">
-        {[1, 2, 3, 4].map((row) => (
-          <div key={row}>
-            <span><div className="skeleton-bar" style={{ width: 90, height: 10 }} /></span>
-            <strong><div className="skeleton-bar" style={{ width: 48, height: 16, marginTop: 8 }} /></strong>
-          </div>
-        ))}
-      </div>
-      <div style={{ marginTop: 20, display: "grid", gap: 12 }}>
-        {[1, 2, 3].map((section) => (
-          <div key={section} className="supply-section">
-            <div className="supply-section__header" style={{ pointerEvents: "none" }}>
-              <div className="skeleton-bar" style={{ width: 120, height: 16 }} />
-              <div className="skeleton-bar" style={{ width: 40, height: 20 }} />
+      <div className="card__body">
+        <div className="supply-stat-bar">
+          {[1, 2, 3, 4].map((row) => (
+            <div key={row} className="supply-stat">
+              <div className="skeleton-bar" style={{ width: 48, height: 18, margin: "0 auto" }} />
+              <div className="skeleton-bar" style={{ width: 60, height: 10, margin: "4px auto 0" }} />
             </div>
-            <div className="supply-section__body">
-              <div className="skeleton-bar" style={{ width: "100%", height: 110 }} />
-              <div className="skeleton-bar" style={{ width: "100%", height: 110 }} />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+    </section>
+    <div className="supply-filter-bar">
+      <div className="skeleton-bar" style={{ flex: 1, height: 32, borderRadius: 6 }} />
+      <div className="skeleton-bar" style={{ width: 120, height: 32, borderRadius: 6 }} />
+      <div className="skeleton-bar" style={{ width: 120, height: 32, borderRadius: 6 }} />
     </div>
-  </section>
+    {[1, 2].map((section) => (
+      <div key={section} className="supply-section">
+        <div className="supply-section__header" style={{ pointerEvents: "none" }}>
+          <div className="skeleton-bar" style={{ width: 120, height: 16 }} />
+          <div className="skeleton-bar" style={{ width: 40, height: 20, marginLeft: "auto" }} />
+        </div>
+      </div>
+    ))}
+  </div>
 );
 
 export default async function ProjectSuppliesPage({ params, searchParams }: ProjectSuppliesPageProps): Promise<JSX.Element> {

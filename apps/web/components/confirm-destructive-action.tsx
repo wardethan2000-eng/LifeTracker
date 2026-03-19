@@ -33,7 +33,7 @@ export function ConfirmDestructiveAction({
   triggerLabel,
   title,
   message,
-  confirmLabel = "Yes, delete",
+  confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   tone = "danger",
   triggerClassName = "button button--danger button--sm",
