@@ -3096,6 +3096,7 @@ export async function createProjectPhaseSupplyAction(formData: FormData): Promis
     isStaged: false
   };
 
+  const category = getOptionalString(formData, "category");
   const description = getOptionalString(formData, "description");
   const quantityOnHand = getOptionalNumber(formData, "quantityOnHand");
   const unit = getOptionalString(formData, "unit");
@@ -3109,6 +3110,7 @@ export async function createProjectPhaseSupplyAction(formData: FormData): Promis
   const notes = getOptionalString(formData, "notes");
   const sortOrder = getOptionalNumber(formData, "sortOrder");
 
+  if (category) input.category = category;
   if (description) input.description = description;
   if (quantityOnHand !== undefined) input.quantityOnHand = quantityOnHand;
   if (unit) input.unit = unit;
@@ -3133,6 +3135,7 @@ export async function updateProjectPhaseSupplyAction(formData: FormData): Promis
   const supplyId = getRequiredString(formData, "supplyId");
   const input: UpdateProjectPhaseSupplyInput = {
     name: getRequiredString(formData, "name"),
+    category: getNullableString(formData, "category"),
     description: getNullableString(formData, "description"),
     quantityNeeded: getOptionalNumber(formData, "quantityNeeded"),
     quantityOnHand: getOptionalNumber(formData, "quantityOnHand"),
@@ -3149,6 +3152,19 @@ export async function updateProjectPhaseSupplyAction(formData: FormData): Promis
   };
 
   await updateProjectPhaseSupply(householdId, projectId, phaseId, supplyId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectPhaseSupplyCategoryAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const phaseId = getRequiredString(formData, "phaseId");
+  const supplyId = getRequiredString(formData, "supplyId");
+
+  await updateProjectPhaseSupply(householdId, projectId, phaseId, supplyId, {
+    category: getNullableString(formData, "category")
+  });
+
   revalidateProjectPaths(householdId, projectId);
 }
 

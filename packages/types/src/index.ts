@@ -2306,6 +2306,7 @@ export const projectPhaseSupplySchema = z.object({
   id: z.string().cuid(),
   phaseId: z.string().cuid(),
   name: z.string(),
+  category: z.string().nullable(),
   description: z.string().nullable(),
   quantityNeeded: z.number(),
   quantityOnHand: z.number(),
@@ -2329,6 +2330,7 @@ export const projectPhaseSupplySchema = z.object({
 
 export const createProjectPhaseSupplySchema = z.object({
   name: z.string().min(1).max(300),
+  category: z.string().max(120).optional(),
   description: z.string().max(2000).optional(),
   quantityNeeded: z.number().min(0),
   quantityOnHand: z.number().min(0).default(0),
@@ -2345,6 +2347,7 @@ export const createProjectPhaseSupplySchema = z.object({
 });
 
 export const updateProjectPhaseSupplySchema = createProjectPhaseSupplySchema.partial().extend({
+  category: z.string().max(120).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
   quantityOnHand: z.number().min(0).nullable().optional(),
   estimatedUnitCost: z.number().min(0).nullable().optional(),

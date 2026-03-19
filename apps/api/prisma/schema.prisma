@@ -1337,6 +1337,7 @@ model ProjectPhaseSupply {
   id                String         @id @default(cuid())
   phaseId           String
   name              String
+  category          String?
   description       String?
   quantityNeeded    Float
   quantityOnHand    Float          @default(0)
@@ -1360,6 +1361,7 @@ model ProjectPhaseSupply {
   purchaseLines     InventoryPurchaseLine[]
 
   @@index([phaseId, sortOrder])
+  @@index([phaseId, category, sortOrder])
   @@index([phaseId, isProcured])
   @@index([phaseId, deletedAt])
   @@index([inventoryItemId])

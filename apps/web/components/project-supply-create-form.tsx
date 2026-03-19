@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { JSX } from "react";
 import type { InventoryItemSummary } from "@lifekeeper/types";
 import { createProjectPhaseSupplyAction } from "../app/actions";
+import { formatQuantity } from "../lib/formatters";
 import { LinkPreviewDialog } from "./link-preview-dialog";
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
   projectId: string;
   phaseId: string;
   inventoryItems: InventoryItemSummary[];
+  categorySuggestions?: string[];
 };
 
 type SupplyPrefill = {
@@ -23,10 +25,11 @@ type SupplyPrefill = {
 
 const emptyPrefill: SupplyPrefill = { name: "", description: "", estimatedUnitCost: "", supplier: "", supplierUrl: "" };
 
-export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inventoryItems }: Props): JSX.Element {
+export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inventoryItems, categorySuggestions = [] }: Props): JSX.Element {
   const [prefill, setPrefill] = useState<SupplyPrefill>(emptyPrefill);
   const [prefillKey, setPrefillKey] = useState(0);
   const [showLinkPreview, setShowLinkPreview] = useState(false);
+  const categoryListId = `project-supply-category-${phaseId}`;
 
   return (
     <div className="panel__body--padded">
@@ -62,8 +65,21 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
             <textarea name="description" rows={2} placeholder="Sizing, brand preference, finish, or substitution notes" defaultValue={prefill.description ?? ""} />
           </label>
           <label className="field">
+            <span>Category</span>
+            <>
+              <input name="category" list={categoryListId} placeholder="Materials, decor, logistics" />
+              {categorySuggestions.length > 0 ? (
+                <datalist id={categoryListId}>
+                  {categorySuggestions.map((category) => (
+                    <option key={category} value={category} />
+                  ))}
+                </datalist>
+              ) : null}
+            </>
+          </label>
+          <label className="field">
             <span>Quantity Needed</span>
-            <input name="quantityNeeded" type="number" min="0" step="0.01" required />
+            <input name="quantityNeeded" type="number" min="0" step="0.01" defaultValue="1" required />
           </label>
           <label className="field">
             <span>Unit</span>
@@ -86,7 +102,7 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
             <select name="inventoryItemId" defaultValue="">
               <option value="">None</option>
               {inventoryItems.map((item) => (
-                <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit} on hand</option>
+                <option key={item.id} value={item.id}>{item.name} · {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
               ))}
             </select>
           </label>

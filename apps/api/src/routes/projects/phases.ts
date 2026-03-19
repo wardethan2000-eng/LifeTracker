@@ -892,6 +892,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         data: {
           phaseId: phase.id,
           name: input.name,
+          category: input.category ?? null,
           description: input.description ?? null,
           quantityNeeded: input.quantityNeeded,
           quantityOnHand: input.quantityOnHand ?? 0,
@@ -1004,6 +1005,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
 
     const data: Prisma.ProjectPhaseSupplyUncheckedUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
+    if (input.category !== undefined) data.category = input.category ?? null;
     if (input.description !== undefined) data.description = input.description ?? null;
     if (input.quantityNeeded !== undefined) data.quantityNeeded = input.quantityNeeded;
     if (input.quantityOnHand !== undefined) data.quantityOnHand = input.quantityOnHand ?? 0;

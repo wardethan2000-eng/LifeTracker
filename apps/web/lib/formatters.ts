@@ -26,6 +26,10 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD"
 });
 
+const quantityFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 2
+});
+
 const categoryLabels: Record<AssetCategory, string> = {
   vehicle: "Vehicle",
   home: "Home",
@@ -72,6 +76,20 @@ export const formatCurrency = (value: number | null | undefined, fallback = "No 
   }
 
   return currencyFormatter.format(value);
+};
+
+export const formatQuantityValue = (value: number): string => {
+  const rounded = Number(value.toFixed(2));
+  return quantityFormatter.format(Object.is(rounded, -0) ? 0 : rounded);
+};
+
+export const formatQuantity = (value: number | null | undefined, unit?: string, fallback = "-"): string => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  const formattedValue = formatQuantityValue(value);
+  return unit ? `${formattedValue} ${unit}` : formattedValue;
 };
 
 export const formatCategoryLabel = (value: AssetCategory): string => categoryLabels[value];

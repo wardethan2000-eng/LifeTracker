@@ -44,19 +44,7 @@ const statusOptions = [
   { value: "skipped" as const, label: "Skipped" },
 ];
 
-const statusDot: Record<string, string> = {
-  pending: "○",
-  in_progress: "●",
-  completed: "✓",
-  skipped: "—",
-};
 
-const statusDotClass: Record<string, string> = {
-  pending: "pill pill--muted",
-  in_progress: "pill pill--info",
-  completed: "pill pill--success",
-  skipped: "pill pill--warning",
-};
 
 const toDateInputValue = (v: string | null | undefined): string => v ? v.slice(0, 10) : "";
 
@@ -128,8 +116,8 @@ export function PhaseSplitPanel({
               onClick={() => { setSelectedPhaseId(phase.id); setShowUnphased(false); }}
             >
               <div className="phase-list-item__top">
+                <span className={`phase-list-item__dot phase-list-item__dot--${phase.status}`} />
                 <span className="phase-list-item__name">{index + 1}. {phase.name}</span>
-                <span className={statusDotClass[phase.status]}>{statusDot[phase.status]} {statusOptions.find((o) => o.value === phase.status)?.label}</span>
               </div>
               <span className="phase-list-item__progress">
                 {phase.completedTaskCount}/{phase.taskCount} tasks · {phase.completedChecklistItemCount}/{phase.checklistItemCount} checks
@@ -289,25 +277,27 @@ function PhaseDetailPanel({
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
           />
 
-          <SegmentedControl
-            options={statusOptions}
-            value={phase.status}
-            onChange={onStatusChange}
-            size="sm"
-          />
+          <div className="phase-detail-status-control">
+            <SegmentedControl
+              options={statusOptions}
+              value={phase.status}
+              onChange={onStatusChange}
+              size="sm"
+            />
+          </div>
 
           <div className="phase-detail-meta">
             <div className="phase-detail-meta__item">
               <span className="phase-detail-meta__label">Start</span>
-              <input type="date" name="startDate" defaultValue={toDateInputValue(phase.startDate)} style={{ fontSize: "0.85rem", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 6px" }} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
+              <input type="date" name="startDate" defaultValue={toDateInputValue(phase.startDate)} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
             </div>
             <div className="phase-detail-meta__item">
               <span className="phase-detail-meta__label">Target End</span>
-              <input type="date" name="targetEndDate" defaultValue={toDateInputValue(phase.targetEndDate)} style={{ fontSize: "0.85rem", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 6px" }} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
+              <input type="date" name="targetEndDate" defaultValue={toDateInputValue(phase.targetEndDate)} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
             </div>
             <div className="phase-detail-meta__item">
               <span className="phase-detail-meta__label">Budget</span>
-              <input type="number" name="budgetAmount" min="0" step="0.01" defaultValue={phase.budgetAmount ?? ""} placeholder="$0" style={{ fontSize: "0.85rem", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 6px", width: 100 }} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
+              <input type="number" name="budgetAmount" min="0" step="0.01" defaultValue={phase.budgetAmount ?? ""} placeholder="$0" style={{ width: 90 }} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
             </div>
             <div className="phase-detail-meta__item">
               <span className="phase-detail-meta__label">Spent</span>
@@ -319,13 +309,12 @@ function PhaseDetailPanel({
             </div>
           </div>
 
-          {/* Description - inline editable */}
           <textarea
             name="description"
+            className="phase-detail-description"
             defaultValue={phase.description ?? ""}
-            placeholder="Phase description — scope, entry criteria, exit criteria"
+            placeholder="Phase description..."
             rows={2}
-            style={{ fontSize: "0.88rem", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px", resize: "vertical", fontFamily: "inherit", color: "var(--ink)" }}
             onBlur={(e) => e.currentTarget.form?.requestSubmit()}
           />
           {/* Hidden submit for auto-save */}
@@ -431,7 +420,7 @@ function PhaseDetailPanel({
       )}
 
       {/* ── Danger zone ── */}
-      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+      <div className="phase-detail-danger">
         <ConfirmActionForm
           action={deleteProjectPhaseAction}
           hiddenFields={[
@@ -706,6 +695,8 @@ function PhaseSuppliesSubtab({
           projectId={projectId}
           phaseId={phaseId}
           supply={supply}
+          inventoryItems={inventoryItems}
+          categorySuggestions={Array.from(new Set(supplies.map((item) => item.category?.trim()).filter((category): category is string => Boolean(category))))}
           {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
             ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
             : {})}
@@ -716,6 +707,7 @@ function PhaseSuppliesSubtab({
         projectId={projectId}
         phaseId={phaseId}
         inventoryItems={inventoryItems}
+        categorySuggestions={Array.from(new Set(supplies.map((supply) => supply.category?.trim()).filter((category): category is string => Boolean(category))))}
       />
     </div>
   );

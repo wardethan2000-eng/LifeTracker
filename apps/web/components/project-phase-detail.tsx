@@ -291,6 +291,8 @@ export function ProjectPhaseDetail({
                         projectId={projectId}
                         phaseId={phase.id}
                         supply={supply}
+                        inventoryItems={inventoryItems}
+                        categorySuggestions={Array.from(new Set(phase.supplies.map((item) => item.category?.trim()).filter((category): category is string => Boolean(category))))}
                         {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
                           ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
                           : {})}

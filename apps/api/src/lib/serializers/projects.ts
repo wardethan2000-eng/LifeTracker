@@ -415,6 +415,7 @@ export const toProjectPhaseDetailResponse = (phase: {
     id: string;
     phaseId: string;
     name: string;
+    category: string | null;
     description: string | null;
     quantityNeeded: number;
     quantityOnHand: number;
@@ -524,6 +525,7 @@ export const toProjectPhaseSupplyResponse = (supply: {
   id: string;
   phaseId: string;
   name: string;
+  category?: string | null;
   description: string | null;
   quantityNeeded: number;
   quantityOnHand: number;
@@ -578,6 +580,7 @@ export const toProjectPhaseSupplyResponse = (supply: {
   id: supply.id,
   phaseId: supply.phaseId,
   name: supply.name,
+  category: supply.category ?? null,
   description: supply.description,
   quantityNeeded: supply.quantityNeeded,
   quantityOnHand: supply.quantityOnHand,
