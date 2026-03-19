@@ -505,6 +505,22 @@ const threadedCommentListSchema = threadedCommentSchema.array();
 const householdInvitationListSchema = householdInvitationSchema.array();
 const householdMemberListSchema = householdMemberSchema.array();
 const inventoryItemSummaryListSchema = inventoryItemSummarySchema.array();
+const normalizeHobbyPayload = (value: unknown): unknown => {
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    ...record,
+    activityMode: record.activityMode ?? "session"
+  };
+};
+
+const parseHobbyResponse = (value: unknown): Hobby => hobbySchema.parse(normalizeHobbyPayload(value));
+const parseHobbySummaryResponse = (value: unknown): HobbySummary => hobbySummarySchema.parse(normalizeHobbyPayload(value));
+const parseHobbyDetailResponse = (value: unknown): HobbyDetail => hobbyDetailSchema.parse(normalizeHobbyPayload(value));
+
 const householdInventoryListSchema = {
   parse: (value: unknown) => {
     if (typeof value !== "object" || value === null) {
@@ -3854,7 +3870,7 @@ export const getHouseholdHobbies = async (
     path: `/v1/households/${householdId}/hobbies${query ? `?${query}` : ""}`,
     cacheOptions: { revalidate: 30 }
   });
-  return result.items.map((item) => hobbySummarySchema.parse(item));
+  return result.items.map((item) => parseHobbySummaryResponse(item));
 };
 
 export const createHobby = async (
@@ -3870,18 +3886,24 @@ export const createHobby = async (
 export const getHobby = async (
   householdId: string,
   hobbyId: string
-): Promise<Hobby> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}`,
-  schema: hobbySchema,
-});
+): Promise<Hobby> => {
+  const result = await apiRequest<unknown>({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}`,
+  });
+
+  return parseHobbyResponse(result);
+};
 
 export const getHobbyDetail = async (
   householdId: string,
   hobbyId: string
-): Promise<HobbyDetail> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}`,
-  schema: hobbyDetailSchema,
-});
+): Promise<HobbyDetail> => {
+  const result = await apiRequest<unknown>({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}`,
+  });
+
+  return parseHobbyDetailResponse(result);
+};
 
 export const updateHobby = async (
   householdId: string,

@@ -17,7 +17,7 @@ export default async function AssetEntriesPage({ params }: AssetEntriesPageProps
       entityId={assetId}
       title="Asset Entries"
       quickAddLabel="Entry"
-      entryHrefBuilder={(entry) => `/assets/${assetId}/entries#entry-${entry.id}`}
+      entryHrefTemplate={`/assets/${assetId}/entries#entry-{entryId}`}
     />
   );
 }

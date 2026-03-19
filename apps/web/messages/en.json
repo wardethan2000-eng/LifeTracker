@@ -67,8 +67,7 @@
         "label": "Theme",
         "ariaLabel": "Theme preference",
         "light": "Light",
-        "dark": "Dark",
-        "system": "System"
+        "dark": "Dark"
       },
       "locale": {
         "label": "Language",
@@ -126,6 +125,12 @@
     "undoVisibleRead": "Undo Visible Read",
     "backgroundNote": "Recurring background jobs keep notifications, low-stock alerts, and compliance checks up to date."
   },
+    "settings": {
+      "pageTitle": "User Settings",
+      "pageSubtitle": "Personal interface preferences for this browser.",
+      "appearanceTitle": "Appearance",
+      "appearanceDescription": "Choose between light and dark mode."
+    },
   "ideas": {
     "pageTitle": "Ideas",
     "pageSubtitle": "Capture thoughts, concepts, and materials before they become plans or projects.",

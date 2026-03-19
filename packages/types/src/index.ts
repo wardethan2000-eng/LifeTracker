@@ -3803,7 +3803,7 @@ export const hobbySchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   status: hobbyStatusSchema,
-  activityMode: hobbyActivityModeSchema,
+  activityMode: hobbyActivityModeSchema.default("session"),
   hobbyType: z.string().nullable(),
   lifecycleMode: hobbySessionLifecycleModeSchema,
   customFields: z.record(z.unknown()),

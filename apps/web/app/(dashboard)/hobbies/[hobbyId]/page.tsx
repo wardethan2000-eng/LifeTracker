@@ -433,7 +433,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         entityId={hobbyId}
         title="Hobby Entries"
         quickAddLabel="Entry"
-        entryHrefBuilder={(entry) => `/hobbies/${hobbyId}?tab=entries#entry-${entry.id}`}
+        entryHrefTemplate={`/hobbies/${hobbyId}?tab=entries#entry-{entryId}`}
       />
     );
 
@@ -576,7 +576,7 @@ export default async function HobbyDetailPage({ params, searchParams }: HobbyDet
         <EntryTipsSurface
           householdId={household.id}
           queries={[{ entityType: "hobby", entityId: hobbyId }]}
-          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}?tab=entries#entry-${entry.id}`}
+          entryHrefTemplate={`/hobbies/${hobbyId}?tab=entries#entry-{entryId}`}
         />
 
         <TabNav

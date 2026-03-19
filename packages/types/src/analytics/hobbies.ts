@@ -88,7 +88,7 @@ export const hobbyAnalyticsOverviewHobbySchema = z.object({
   hobbyId: z.string().cuid(),
   hobbyName: z.string(),
   status: hobbyStatusSchema,
-  activityMode: hobbyActivityModeSchema,
+  activityMode: hobbyActivityModeSchema.default("session"),
   totalSessions: z.number().int().nonnegative(),
   totalDurationMinutes: z.number().int().nonnegative(),
   totalCost: z.number(),

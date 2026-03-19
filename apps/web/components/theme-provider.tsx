@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = "light" | "dark";
 type ResolvedTheme = "light" | "dark";
 
 type ThemeContextValue = {
@@ -16,16 +16,28 @@ type ThemeContextValue = {
 const storageKey = "lifekeeper-theme";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const getSystemTheme = (): ResolvedTheme => {
+const getStoredTheme = (): ThemePreference => {
   if (typeof window === "undefined") {
     return "light";
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const storedTheme = window.localStorage.getItem(storageKey);
+  return storedTheme === "dark" ? "dark" : "light";
 };
 
 const applyTheme = (theme: ResolvedTheme): void => {
   document.documentElement.setAttribute("data-theme", theme);
+};
+
+const disableThemeTransitionsTemporarily = (): void => {
+  const root = document.documentElement;
+  root.setAttribute("data-theme-switching", "true");
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      root.removeAttribute("data-theme-switching");
+    });
+  });
 };
 
 type ThemeProviderProps = {
@@ -33,44 +45,23 @@ type ThemeProviderProps = {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps): ReactNode {
-  const [theme, setThemeState] = useState<ThemePreference>("system");
+  const [theme, setThemeState] = useState<ThemePreference>("light");
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem(storageKey);
-    const initialTheme = storedTheme === "light" || storedTheme === "dark" || storedTheme === "system"
-      ? storedTheme
-      : "system";
-    const nextResolvedTheme = initialTheme === "system" ? getSystemTheme() : initialTheme;
+    const initialTheme = getStoredTheme();
 
     setThemeState(initialTheme);
-    setResolvedTheme(nextResolvedTheme);
-    applyTheme(nextResolvedTheme);
+    setResolvedTheme(initialTheme);
+    applyTheme(initialTheme);
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const handleChange = (): void => {
-      if (theme !== "system") {
-        return;
-      }
-
-      const nextResolvedTheme = mediaQuery.matches ? "dark" : "light";
-      setResolvedTheme(nextResolvedTheme);
-      applyTheme(nextResolvedTheme);
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [theme]);
-
   const setTheme = (nextTheme: ThemePreference): void => {
-    const nextResolvedTheme = nextTheme === "system" ? getSystemTheme() : nextTheme;
+    disableThemeTransitionsTemporarily();
 
     setThemeState(nextTheme);
-    setResolvedTheme(nextResolvedTheme);
-    applyTheme(nextResolvedTheme);
+    setResolvedTheme(nextTheme);
+    applyTheme(nextTheme);
     window.localStorage.setItem(storageKey, nextTheme);
   };
 

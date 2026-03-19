@@ -1,13 +1,11 @@
 import type { JSX, ReactNode } from "react";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getMe } from "../../lib/api";
-import { DensityToggle } from "../../components/density-toggle";
-import { LocaleSwitcher } from "../../components/locale-switcher";
 import { SearchCommandPaletteLazy } from "../../components/search-command-palette-lazy";
 import { RoutePrefetcher } from "../../components/route-prefetcher";
 import { RealtimeStatusIndicator } from "../../components/realtime-status-indicator";
 import { SidebarNav, type SidebarNavItem } from "../../components/sidebar-nav";
-import { ThemeToggle } from "../../components/theme-toggle";
 
 const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
@@ -75,6 +73,11 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
               <span>{userRole}</span>
             </div>
           </div>
+          <div className="sidebar__footer-actions">
+            <Link href="/settings" className="sidebar__settings-link">
+              User Settings
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -84,9 +87,6 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <SearchCommandPaletteLazy fallbackHouseholdId={fallbackHouseholdId} />
           <div className="shell-toolbar__controls">
             <RealtimeStatusIndicator householdId={fallbackHouseholdId} />
-            <DensityToggle />
-            <ThemeToggle />
-            <LocaleSwitcher />
           </div>
         </div>
         {children}

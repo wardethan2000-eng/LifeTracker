@@ -53,6 +53,7 @@ type EntryTimelineProps = {
   quickAddLabel?: string;
   initialComposerOpen?: boolean;
   entryHrefBuilder?: (entry: Entry) => string | null;
+  entryHrefTemplate?: string;
 };
 
 type EntryTipsSurfaceProps = {
@@ -60,6 +61,7 @@ type EntryTipsSurfaceProps = {
   queries: EntrySurfaceQuery[];
   title?: string;
   entryHrefBuilder?: (entry: Entry) => string | null;
+  entryHrefTemplate?: string;
   defaultOpen?: boolean;
 };
 
@@ -68,6 +70,7 @@ type EntryActionableListProps = {
   title?: string;
   compact?: boolean;
   entryHrefBuilder?: (entry: Entry) => string | null;
+  entryHrefStrategy?: "dashboardActionable";
 };
 
 type EntryDraft = {
@@ -186,6 +189,33 @@ const getFlagToneClass = (flag: EntryFlag): string => {
       return "entry-flag--muted";
     default:
       return "entry-flag--muted";
+  }
+};
+
+const buildTemplateHref = (template: string | undefined, entryId: string): string | null => (
+  template ? template.replaceAll("{entryId}", entryId) : null
+);
+
+const buildDashboardActionableHref = (householdId: string, entry: Entry): string | null => {
+  switch (entry.resolvedEntity.entityType) {
+    case "asset":
+      return `/assets/${entry.resolvedEntity.entityId}/entries#entry-${entry.id}`;
+    case "project":
+      return `/projects/${entry.resolvedEntity.entityId}?householdId=${householdId}&view=entries#entry-${entry.id}`;
+    case "project_phase":
+      return entry.resolvedEntity.parentEntityId
+        ? `/projects/${entry.resolvedEntity.parentEntityId}?householdId=${householdId}&view=entries#entry-${entry.id}`
+        : null;
+    case "hobby":
+      return `/hobbies/${entry.resolvedEntity.entityId}?tab=entries#entry-${entry.id}`;
+    case "hobby_session":
+      return entry.resolvedEntity.parentEntityId
+        ? `/hobbies/${entry.resolvedEntity.parentEntityId}/sessions/${entry.resolvedEntity.entityId}#entry-${entry.id}`
+        : null;
+    case "inventory_item":
+      return `/inventory/${entry.resolvedEntity.entityId}`;
+    default:
+      return null;
   }
 };
 
@@ -691,7 +721,8 @@ export function EntryTimeline({
   emptyMessage = "No entries recorded yet.",
   quickAddLabel = "New Entry",
   initialComposerOpen = false,
-  entryHrefBuilder
+  entryHrefBuilder,
+  entryHrefTemplate
 }: EntryTimelineProps): JSX.Element {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1002,7 +1033,7 @@ export function EntryTimeline({
           {filteredEntries.map((entry) => {
             const isExpanded = expandedEntryId === entry.id;
             const isEditing = editingEntryId === entry.id;
-            const entryHref = entryHrefBuilder?.(entry) ?? null;
+            const entryHref = entryHrefBuilder?.(entry) ?? buildTemplateHref(entryHrefTemplate, entry.id);
 
             return (
               <article
@@ -1145,6 +1176,7 @@ export function EntryTipsSurface({
   queries,
   title = "Tips & Warnings from past sessions",
   entryHrefBuilder,
+  entryHrefTemplate,
   defaultOpen = true
 }: EntryTipsSurfaceProps): JSX.Element {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -1217,7 +1249,7 @@ export function EntryTipsSurface({
       {open ? (
         <div className="panel__body--padded entry-surface__body">
           {entries.map((entry) => {
-            const href = entryHrefBuilder?.(entry) ?? null;
+            const href = entryHrefBuilder?.(entry) ?? buildTemplateHref(entryHrefTemplate, entry.id);
             const content = (
               <>
                 <div className="entry-surface__item-topline">
@@ -1250,7 +1282,8 @@ export function EntryActionableList({
   householdId,
   title = "Action Items",
   compact = false,
-  entryHrefBuilder
+  entryHrefBuilder,
+  entryHrefStrategy
 }: EntryActionableListProps): JSX.Element {
   const [groups, setGroups] = useState<ActionableEntryGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1347,7 +1380,8 @@ export function EntryActionableList({
 
             <div className="entry-actionable-group__items">
               {group.items.map((entry) => {
-                const href = entryHrefBuilder?.(entry) ?? null;
+                const href = entryHrefBuilder?.(entry)
+                  ?? (entryHrefStrategy === "dashboardActionable" ? buildDashboardActionableHref(householdId, entry) : null);
 
                 return (
                   <article key={entry.id} className={`entry-actionable-item${compact ? " entry-actionable-item--compact" : ""}`}>

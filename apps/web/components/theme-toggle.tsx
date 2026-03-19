@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { useTranslations } from "next-intl";
 import { useTheme, type ThemePreference } from "./theme-provider";
 
-const themeOptions: ThemePreference[] = ["light", "dark", "system"];
+const themeOptions: ThemePreference[] = ["light", "dark"];
 
 export function ThemeToggle(): JSX.Element {
   const t = useTranslations("common.toolbar.theme");
