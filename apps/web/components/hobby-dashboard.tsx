@@ -190,6 +190,7 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
           entityId={hobbyId}
         />
       ),
+      footerLink: { label: "Open journal →", href: `${base}/entries` },
     },
   ];
 

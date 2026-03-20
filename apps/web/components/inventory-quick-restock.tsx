@@ -105,6 +105,8 @@ export function InventoryQuickRestock({ householdId, items, lowStockItemIds, red
               <span>Batch Notes</span>
               <textarea name="notes" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Receipt number, store visit, or delivery notes" />
             </label>
+          </div>
+          <div className="quick-restock__filter-row">
             <label className="field field--full">
               <span>Filter Items</span>
               <input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter by name, part number, category, or supplier" />

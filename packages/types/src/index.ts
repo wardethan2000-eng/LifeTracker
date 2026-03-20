@@ -5561,3 +5561,21 @@ export const layoutPreferenceSchema = z.object({
 });
 export type LayoutPreference = z.infer<typeof layoutPreferenceSchema>;
 
+export const createDashboardPinSchema = z.object({
+  entityType: z.enum(["asset", "project", "hobby"]),
+  entityId: z.string().min(1).max(50),
+});
+export type CreateDashboardPinInput = z.infer<typeof createDashboardPinSchema>;
+
+export const dashboardPinSchema = z.object({
+  id: z.string(),
+  entityType: z.string(),
+  entityId: z.string(),
+  entityName: z.string(),
+  entityStatus: z.string().nullable(),
+  entityHref: z.string(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+});
+export type DashboardPin = z.infer<typeof dashboardPinSchema>;
+

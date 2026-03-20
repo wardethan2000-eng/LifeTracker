@@ -180,6 +180,7 @@ export function AssetDashboard(props: AssetDashboardProps) {
           entityId={assetId}
         />
       ),
+      footerLink: { label: "Open journal →", href: `${base}/entries` },
     },
   ];
 

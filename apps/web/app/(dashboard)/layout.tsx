@@ -13,14 +13,10 @@ const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/notes", label: "Notes", translationKey: "notes", icon: "file-text" },
   { href: "/assets", label: "Assets", translationKey: "assets", icon: "box" },
   { href: "/inventory", label: "Inventory", translationKey: "inventory", icon: "layers" },
-  { href: "/assets/new", label: "Add Asset", translationKey: "addAsset", icon: "plus" },
   { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
-  { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
   { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
   { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
-  { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
-  { href: "/notifications", label: "Notifications", translationKey: "notifications", icon: "bell" },
-  { href: "/invitations", label: "Invitations", translationKey: "invitations", icon: "mail" },
+  { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
   { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
 ];
 
@@ -28,12 +24,11 @@ const prefetchedRoutes = [
   "/ideas",
   "/notes",
   "/assets",
+  "/inventory",
   "/projects",
   "/hobbies",
   "/maintenance",
-  "/inventory",
-  "/notifications",
-  "/activity"
+  "/analytics",
 ];
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>): Promise<JSX.Element> {

@@ -112,11 +112,11 @@ export function DashboardGrid({
   );
 
   if (!loaded || !mounted) {
-    return <div ref={containerRef} className="dashboard-grid" style={{ minHeight: 400 }} />;
+    return <div ref={containerRef} className="dashboard-grid-wrap" style={{ minHeight: 400 }} />;
   }
 
   return (
-    <div ref={containerRef} className="dashboard-grid">
+    <div ref={containerRef} className="dashboard-grid-wrap">
       <ResponsiveGridLayout
         className="react-grid-layout"
         width={width}

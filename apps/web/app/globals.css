@@ -1868,6 +1868,86 @@ p { margin: 0; color: var(--ink-light); }
   color: var(--ink-muted);
 }
 
+/* ── Shopping List Purchase Groups ── */
+
+.purchase-group-list {
+  display: grid;
+  gap: 20px;
+}
+
+.purchase-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.purchase-group__header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.purchase-group__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.purchase-group__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.purchase-group__meta {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.purchase-group__supplier-link {
+  white-space: nowrap;
+}
+
+/* ── Purchase Line Edit Row ── */
+
+.row--editing td {
+  background: var(--surface-alt);
+}
+
+.purchase-line-edit-cell {
+  padding: 16px 20px 20px !important;
+}
+
+.purchase-line-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.purchase-line-edit-actions__submit {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Quick Restock Filter Row ── */
+
+.quick-restock__filter-row {
+  padding: 16px 0 16px;
+  border-top: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
 .inventory-transaction-meta {
   margin-top: 6px;
   color: var(--ink-muted);
@@ -13182,7 +13262,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 /* ─── Dashboard Grid ─── */
 
-.dashboard-grid {
+.dashboard-grid-wrap {
   min-height: 200px;
 }
 
@@ -13227,7 +13307,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .dashboard-card__kv {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px 16px;
 }
 
@@ -13256,6 +13336,15 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-size: 0.85rem;
   padding: 6px 0;
   border-bottom: 1px solid var(--border-light, var(--border));
+  gap: 8px;
+}
+
+.dashboard-card__list-item > :first-child {
+  min-width: 0;
+}
+
+.dashboard-card__list-item > :last-child:not(:first-child) {
+  flex-shrink: 0;
 }
 
 .dashboard-card__list-item:last-child {
@@ -13309,8 +13398,25 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex-direction: column;
 }
 
-@media (max-width: 768px) {
-  .dashboard-card__kv {
-    grid-template-columns: 1fr;
-  }
+.dashboard-notepad__status {
+  flex-shrink: 0;
+  padding: 4px 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  text-align: right;
+  transition: color 200ms;
 }
+
+.dashboard-notepad__status--saving {
+  color: var(--accent);
+}
+
+.dashboard-notepad__status--saved {
+  color: var(--success, #1a8a4a);
+}
+
+.dashboard-notepad__status--error {
+  color: var(--danger);
+}
+
+/* KV grid responsiveness handled by auto-fill minmax */

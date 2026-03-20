@@ -217,7 +217,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               },
               {
                 id: "spaces",
-                label: "Spaces",
+                label: "Organization",
                 href: buildInventoryHref(household.id, { tab: "spaces" }),
                 active: activeTab === "spaces"
               }

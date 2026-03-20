@@ -377,6 +377,7 @@ model User {
   performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
   spaceScanLogs          SpaceScanLog[]
   layoutPreferences      UserLayoutPreference[]
+  dashboardPins          DashboardPin[]
 }
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
@@ -2375,6 +2376,20 @@ model UserLayoutPreference {
   entityType String   @db.VarChar(50)
   entityId   String?  @db.VarChar(50)
   layoutJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId])
+}
+
+model DashboardPin {
+  id         String   @id @default(cuid())
+  userId     String
+  entityType String   @db.VarChar(50)
+  entityId   String   @db.VarChar(50)
+  sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)

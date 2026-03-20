@@ -201,6 +201,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
           entityId={projectId}
         />
       ),
+      footerLink: { label: "Open journal →", href: `${base}/entries${qs}` },
     },
     {
       key: "assets",

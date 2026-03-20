@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { createHouseholdAction } from "../actions";
 import { getDashboardData } from "../../components/dashboard-data";
 import { HomeDashboard } from "../../components/home-dashboard";
+import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
 import { ApiError, getApiBaseUrl, getDevUserId, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
@@ -138,6 +139,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
         </header>
 
         <div className="page-body">
+          <LaunchPad />
           <HomeDashboard
             householdId={selectedHousehold.id}
             assetCount={dashboard.stats.assetCount}

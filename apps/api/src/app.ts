@@ -70,6 +70,7 @@ import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
 import { layoutPreferenceRoutes } from "./routes/layout-preferences.js";
+import { dashboardPinRoutes } from "./routes/dashboard-pins.js";
 
 const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPluginAsync[]) => {
   for (const plugin of plugins) {
@@ -90,7 +91,8 @@ const accountRoutePlugins: FastifyPluginAsync[] = [
   searchRoutes,
   barcodeRoutes,
   scanDetailRoutes,
-  layoutPreferenceRoutes
+  layoutPreferenceRoutes,
+  dashboardPinRoutes
 ];
 
 const householdRoutePlugins: FastifyPluginAsync[] = [

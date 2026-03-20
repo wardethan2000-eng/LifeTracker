@@ -6,6 +6,14 @@ import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { EntryActionableList } from "./entry-system";
 
+/* LaunchPad actions moved back to <LaunchPad /> rendered outside the grid */
+
+const statusTones: Record<string, string> = {
+  overdue: "danger",
+  due: "warning",
+  scheduled: "info",
+};
+
 type DueWorkItem = {
   scheduleId: string;
   assetId: string;
@@ -48,20 +56,6 @@ type HomeDashboardProps = {
   nextDueAssetName: string | null;
 };
 
-const launchActions = [
-  { href: "/ideas/new", title: "Ideate", desc: "Capture ideas" },
-  { href: "/assets/new", title: "Create", desc: "New asset" },
-  { href: "/projects/new", title: "Plan", desc: "Start project" },
-  { href: "/maintenance", title: "Maintain", desc: "Due work" },
-  { href: "/hobbies/new", title: "Pursue", desc: "New hobby" },
-];
-
-const statusTones: Record<string, string> = {
-  overdue: "danger",
-  due: "warning",
-  scheduled: "info",
-};
-
 export function HomeDashboard(props: HomeDashboardProps) {
   const {
     householdId,
@@ -79,31 +73,6 @@ export function HomeDashboard(props: HomeDashboardProps) {
   } = props;
 
   const cards: DashboardCardDef[] = [
-    {
-      key: "launch",
-      title: "Quick Start",
-      content: (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-          {launchActions.map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              style={{
-                textDecoration: "none",
-                textAlign: "center",
-                padding: "12px 8px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                display: "block",
-              }}
-            >
-              <strong style={{ display: "block", fontSize: "0.88rem", color: "var(--ink)" }}>{a.title}</strong>
-              <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>{a.desc}</span>
-            </Link>
-          ))}
-        </div>
-      ),
-    },
     {
       key: "stats",
       title: "At a Glance",
@@ -233,18 +202,18 @@ export function HomeDashboard(props: HomeDashboardProps) {
           entityId="dashboard"
         />
       ),
+      footerLink: { label: "Open notes →", href: "/notes" },
     },
   ];
 
   const defaultLayout: LayoutItem[] = [
-    { i: "launch", x: 0, y: 0, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: "stats", x: 0, y: 2, w: 4, h: 2, minW: 2, minH: 2 },
-    { i: "duework", x: 0, y: 4, w: 2, h: 4, minW: 1, minH: 2 },
-    { i: "assets", x: 2, y: 4, w: 2, h: 4, minW: 1, minH: 2 },
-    { i: "quickactions", x: 0, y: 8, w: 1, h: 3, minW: 1, minH: 2 },
-    { i: "actionitems", x: 1, y: 8, w: 1, h: 3, minW: 1, minH: 2 },
-    { i: "notifications", x: 2, y: 8, w: 1, h: 3, minW: 1, minH: 2 },
-    { i: "notepad", x: 3, y: 8, w: 1, h: 4, minW: 1, minH: 2 },
+    { i: "stats", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "duework", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "assets", x: 2, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "notifications", x: 3, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "quickactions", x: 0, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "actionitems", x: 1, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "notepad", x: 2, y: 3, w: 2, h: 4, minW: 1, minH: 3 },
   ];
 
   return (
