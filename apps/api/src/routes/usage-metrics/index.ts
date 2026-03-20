@@ -58,8 +58,10 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const metric = await app.prisma.usageMetric.create({ data });
-    await recalculateAssetSchedules(app.prisma, asset.id);
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      recalculateAssetSchedules(app.prisma, asset.id),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     return reply.code(201).send(toUsageMetricResponse(metric));
   });
@@ -129,8 +131,10 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
-    await recalculateAssetSchedules(app.prisma, asset.id);
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      recalculateAssetSchedules(app.prisma, asset.id),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     return toUsageMetricResponse(metric);
   });
@@ -227,8 +231,10 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Recalculate related maintenance schedules
-    await recalculateAssetSchedules(app.prisma, asset.id);
-    await enqueueNotificationScan({ householdId: asset.householdId });
+    await Promise.all([
+      recalculateAssetSchedules(app.prisma, asset.id),
+      enqueueNotificationScan({ householdId: asset.householdId })
+    ]);
 
     return reply.code(201).send(toUsageMetricEntryResponse(entry));
   });

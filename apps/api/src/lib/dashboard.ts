@@ -74,9 +74,15 @@ export const listHouseholdDueWork = async (
     status?: "all" | "due" | "overdue";
   } = {}
 ) => {
+  const lookahead = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
   const schedules = await prisma.maintenanceSchedule.findMany({
     where: {
       isActive: true,
+      OR: [
+        { nextDueAt: { lte: lookahead } },
+        { nextDueMetricValue: { not: null } }
+      ],
       asset: {
         householdId,
         isArchived: false,
@@ -137,13 +143,8 @@ export const buildHouseholdDashboard = async (
     notificationLimit?: number;
   } = {}
 ) => {
-  const membership = await getMembership(prisma, householdId, userId);
-
-  if (!membership) {
-    throw new Error("Dashboard membership context is unavailable.");
-  }
-
-  const [household, dueWork, assets, notifications, unreadNotificationCount] = await Promise.all([
+  const [membership, household, dueWork, assets, notifications, unreadNotificationCount] = await Promise.all([
+    getMembership(prisma, householdId, userId),
     prisma.household.findUnique({
       where: { id: householdId },
       include: {
@@ -180,6 +181,7 @@ export const buildHouseholdDashboard = async (
           select: { completedAt: true }
         }
       },
+      take: 100,
       orderBy: { createdAt: "desc" }
     }),
     prisma.notification.findMany({
@@ -198,6 +200,10 @@ export const buildHouseholdDashboard = async (
       }
     })
   ]);
+
+  if (!membership) {
+    throw new Error("Dashboard membership context is unavailable.");
+  }
 
   if (!household) {
     throw new DashboardNotFoundError();

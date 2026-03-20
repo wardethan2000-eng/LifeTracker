@@ -930,6 +930,10 @@ const revalidateAssetPaths = (assetId: string): void => {
   revalidatePath(`/assets/${assetId}`);
 };
 
+const revalidateDashboardPath = (): void => {
+  revalidatePath("/");
+};
+
 const revalidateServiceProviderPaths = (householdId: string): void => {
   revalidatePath("/service-providers");
   revalidatePath(`/service-providers?householdId=${householdId}`);
@@ -1466,6 +1470,7 @@ export async function createAssetAction(formData: FormData): Promise<void> {
 
   await emitRealtimeEvent(input.householdId, "asset.updated", asset.id);
   revalidateAssetPaths(asset.id);
+  revalidateDashboardPath();
   redirect(`/assets/${asset.id}`);
 }
 
@@ -1650,6 +1655,7 @@ export async function createMetricEntryAction(formData: FormData): Promise<void>
   await createMetricEntry(assetId, metricId, input);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
 }
 
 export async function completeScheduleAction(formData: FormData): Promise<void> {
@@ -1691,6 +1697,7 @@ export async function completeScheduleAction(formData: FormData): Promise<void> 
   await emitRealtimeEvent(householdId, "maintenance.completed", scheduleId);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
 }
 
 export async function createLogAction(formData: FormData): Promise<void> {
@@ -1742,10 +1749,11 @@ export async function createLogAction(formData: FormData): Promise<void> {
     input.parts = parts;
   }
 
-  const log = await createMaintenanceLog(assetId, input);
+  await createMaintenanceLog(assetId, input);
   await emitRealtimeEvent(householdId, "maintenance.completed", assetId);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
 }
 
 export async function applyPresetToAssetAction(formData: FormData): Promise<void> {
@@ -2184,6 +2192,7 @@ export async function toggleScheduleActiveAction(formData: FormData): Promise<vo
   await updateSchedule(assetId, scheduleId, { isActive });
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
 }
 
 export async function deleteScheduleAction(formData: FormData): Promise<void> {
@@ -2193,6 +2202,7 @@ export async function deleteScheduleAction(formData: FormData): Promise<void> {
   await deleteSchedule(assetId, scheduleId);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
 }
 
 export async function archiveAssetAction(formData: FormData): Promise<void> {
@@ -2203,6 +2213,7 @@ export async function archiveAssetAction(formData: FormData): Promise<void> {
   await emitRealtimeEvent(householdId, "asset.updated", assetId);
   revalidatePath("/assets");
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
   if (redirectTo !== "none") {
     redirect(redirectTo ?? "/assets");
   }
@@ -2225,6 +2236,7 @@ export async function softDeleteAssetAction(formData: FormData): Promise<void> {
   await emitRealtimeEvent(householdId, "asset.updated", assetId);
   revalidatePath("/assets");
   revalidatePath("/maintenance");
+  revalidateDashboardPath();
   if (redirectTo !== "none") {
     redirect(redirectTo ?? "/assets");
   }
