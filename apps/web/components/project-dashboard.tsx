@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { LayoutItem } from "react-grid-layout";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
+import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
 import type { ProjectPhaseProgress } from "@lifekeeper/types";
@@ -250,11 +251,16 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
   }
 
   return (
-    <DashboardGrid
-      entityType="project"
-      entityId={projectId}
-      cards={cards}
-      defaultLayout={defaultLayout}
-    />
+    <>
+      <div className="dashboard-pin-bar">
+        <PinButton entityType="project" entityId={projectId} />
+      </div>
+      <DashboardGrid
+        entityType="project"
+        entityId={projectId}
+        cards={cards}
+        defaultLayout={defaultLayout}
+      />
+    </>
   );
 }

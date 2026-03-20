@@ -485,6 +485,10 @@ import {
   layoutPreferenceSchema,
   type LayoutPreference,
   type SaveLayoutPreferenceInput,
+  dashboardPinSchema,
+  createDashboardPinSchema,
+  type DashboardPin,
+  type CreateDashboardPinInput,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -5371,3 +5375,27 @@ export const saveLayoutPreference = async (
   body: input,
   schema: layoutPreferenceSchema,
 });
+
+export const getDashboardPins = async (): Promise<DashboardPin[]> =>
+  apiRequest({
+    path: "/v1/dashboard-pins",
+    method: "GET",
+    schema: dashboardPinSchema.array(),
+  });
+
+export const addDashboardPin = async (
+  input: CreateDashboardPinInput
+): Promise<{ id: string }> =>
+  apiRequest({
+    path: "/v1/dashboard-pins",
+    method: "POST",
+    body: input,
+    schema: z.object({ id: z.string() }),
+  });
+
+export const removeDashboardPin = async (pinId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/dashboard-pins/${encodeURIComponent(pinId)}`,
+    method: "DELETE",
+  });
+};

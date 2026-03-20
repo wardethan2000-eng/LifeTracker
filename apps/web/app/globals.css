@@ -13420,3 +13420,50 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 /* KV grid responsiveness handled by auto-fill minmax */
+
+/* ─── Dashboard Pin Button ─── */
+
+.dashboard-pin-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 10px;
+}
+
+.pin-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.pin-button:hover {
+  background: var(--surface-hover, var(--surface-raised));
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.pin-button--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.pin-button--active:hover {
+  opacity: 0.85;
+}
+
+.dashboard-card__pin-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}

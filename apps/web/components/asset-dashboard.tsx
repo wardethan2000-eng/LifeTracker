@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { LayoutItem } from "react-grid-layout";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
+import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
 
 type ScheduleSummary = {
@@ -194,11 +195,16 @@ export function AssetDashboard(props: AssetDashboardProps) {
   ];
 
   return (
-    <DashboardGrid
-      entityType="asset"
-      entityId={assetId}
-      cards={cards}
-      defaultLayout={defaultLayout}
-    />
+    <>
+      <div className="dashboard-pin-bar">
+        <PinButton entityType="asset" entityId={assetId} />
+      </div>
+      <DashboardGrid
+        entityType="asset"
+        entityId={assetId}
+        cards={cards}
+        defaultLayout={defaultLayout}
+      />
+    </>
   );
 }

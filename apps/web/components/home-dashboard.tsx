@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { LayoutItem } from "react-grid-layout";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { EntryActionableList } from "./entry-system";
+import { removeDashboardPin } from "../lib/api";
+import type { DashboardPin } from "@lifekeeper/types";
 
 /* LaunchPad actions moved back to <LaunchPad /> rendered outside the grid */
 
@@ -54,9 +57,11 @@ type HomeDashboardProps = {
   notifications: NotificationSummary[];
   nextDueAssetId: string | null;
   nextDueAssetName: string | null;
+  pins: DashboardPin[];
 };
 
 export function HomeDashboard(props: HomeDashboardProps) {
+  const router = useRouter();
   const {
     householdId,
     assetCount,
@@ -70,7 +75,13 @@ export function HomeDashboard(props: HomeDashboardProps) {
     notifications,
     nextDueAssetId,
     nextDueAssetName,
+    pins,
   } = props;
+
+  const handleUnpin = async (pinId: string) => {
+    await removeDashboardPin(pinId);
+    router.refresh();
+  };
 
   const cards: DashboardCardDef[] = [
     {
@@ -214,12 +225,48 @@ export function HomeDashboard(props: HomeDashboardProps) {
     { i: "quickactions", x: 0, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "actionitems", x: 1, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "notepad", x: 2, y: 3, w: 2, h: 4, minW: 1, minH: 3 },
+    ...pins.map((pin, i) => ({
+      i: `pin-${pin.entityType}-${pin.entityId}`,
+      x: i % 4,
+      y: 7 + Math.floor(i / 4) * 3,
+      w: 1,
+      h: 3,
+      minW: 1,
+      minH: 2,
+    })),
   ];
+
+  const pinCards: DashboardCardDef[] = pins.map((pin) => ({
+    key: `pin-${pin.entityType}-${pin.entityId}`,
+    title: pin.entityName,
+    content: (
+      <div className="dashboard-card__pin-body">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          <span className="pill">{pin.entityType}</span>
+          {pin.entityStatus ? (
+            <span className="pill">{pin.entityStatus.replace(/_/g, " ")}</span>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link href={pin.entityHref} className="button button--sm">
+            Open →
+          </Link>
+          <button
+            type="button"
+            className="button button--sm button--ghost"
+            onClick={() => handleUnpin(pin.id)}
+          >
+            Unpin
+          </button>
+        </div>
+      </div>
+    ),
+  }));
 
   return (
     <DashboardGrid
       entityType="home"
-      cards={cards}
+      cards={[...cards, ...pinCards]}
       defaultLayout={defaultLayout}
     />
   );
