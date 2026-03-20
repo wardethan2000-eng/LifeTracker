@@ -184,12 +184,12 @@ export function AssetDashboard(props: AssetDashboardProps) {
   ];
 
   const defaultLayout: LayoutItem[] = [
-    { i: "condition", x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "duework", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "maintenance", x: 8, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "timeline", x: 0, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "hobbies", x: 4, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "notepad", x: 8, y: 3, w: 4, h: 4, minW: 3, minH: 3 },
+    { i: "condition", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "duework", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "maintenance", x: 2, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "timeline", x: 3, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "hobbies", x: 0, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "notepad", x: 2, y: 3, w: 2, h: 4, minW: 1, minH: 3 },
   ];
 
   return (

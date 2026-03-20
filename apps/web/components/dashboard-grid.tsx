@@ -22,10 +22,30 @@ type DashboardGridProps = {
   defaultLayout: LayoutItem[];
 };
 
-const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
+const COLS = { lg: 4, md: 4, sm: 2, xs: 2, xxs: 1 };
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
-const ROW_HEIGHT = 80;
-const SAVE_DEBOUNCE_MS = 1200;
+const ROW_HEIGHT = 100;
+const SETTLE_MS = 400;
+
+/** Compact layout items upward to eliminate vertical gaps. */
+function compactVertical(layout: readonly LayoutItem[]): LayoutItem[] {
+  const sorted = [...layout].sort((a, b) => a.y - b.y || a.x - b.x);
+  const compacted: LayoutItem[] = [];
+  for (const item of sorted) {
+    let minY = 0;
+    for (const placed of compacted) {
+      if (item.x < placed.x + placed.w && item.x + item.w > placed.x) {
+        minY = Math.max(minY, placed.y + placed.h);
+      }
+    }
+    compacted.push({ ...item, y: minY });
+  }
+  return compacted;
+}
+
+function layoutFingerprint(layout: readonly LayoutItem[]): string {
+  return layout.map(({ i, x, y, w, h }) => `${i}:${x},${y},${w},${h}`).join("|");
+}
 
 export function DashboardGrid({
   entityType,
@@ -33,9 +53,12 @@ export function DashboardGrid({
   cards,
   defaultLayout,
 }: DashboardGridProps) {
-  const [layouts, setLayouts] = useState<ResponsiveLayouts>({ lg: defaultLayout });
+  const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => ({
+    lg: compactVertical(defaultLayout),
+  }));
   const [loaded, setLoaded] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFP = useRef(layoutFingerprint(compactVertical(defaultLayout)));
   const { width, containerRef: rawRef, mounted } = useContainerWidth({ initialWidth: 1280 });
   const containerRef = rawRef as React.RefObject<HTMLDivElement>;
 
@@ -46,7 +69,16 @@ export function DashboardGrid({
       .then((pref) => {
         if (cancelled) return;
         if (pref?.layoutJson) {
-          setLayouts({ lg: pref.layoutJson as unknown as LayoutItem[] });
+          const saved = pref.layoutJson as unknown as LayoutItem[];
+          // Discard layouts saved with a wider column grid (e.g. old 12-col)
+          const fits = saved.every((item) => item.x + item.w <= COLS.lg);
+          if (fits) {
+            const savedMap = new Map(saved.map((item) => [item.i, item]));
+            const merged = defaultLayout.map((def) => savedMap.get(def.i) ?? def);
+            const items = compactVertical(merged);
+            setLayouts({ lg: items });
+            lastFP.current = layoutFingerprint(items);
+          }
         }
         setLoaded(true);
       })
@@ -54,24 +86,27 @@ export function DashboardGrid({
         if (!cancelled) setLoaded(true);
       });
     return () => { cancelled = true; };
-  }, [entityType, entityId]);
+  }, [entityType, entityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayoutChange = useCallback(
     (currentLayout: Layout, _allLayouts: ResponsiveLayouts) => {
       if (!loaded) return;
 
-      // Debounced save
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        const items = currentLayout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }));
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settleTimer.current = setTimeout(() => {
+        const compacted = compactVertical(currentLayout as LayoutItem[]);
+        const fp = layoutFingerprint(compacted);
+        if (fp === lastFP.current) return;
+        lastFP.current = fp;
+
+        setLayouts({ lg: compacted });
+
         saveLayoutPreference({
           entityType,
           entityId: entityId ?? null,
-          layoutJson: items,
-        }).catch(() => {
-          // Silent failure — layout will still work, just not persisted
-        });
-      }, SAVE_DEBOUNCE_MS);
+          layoutJson: compacted.map(({ i, x, y, w, h }) => ({ i, x, y, w, h })),
+        }).catch(() => {});
+      }, SETTLE_MS);
     },
     [loaded, entityType, entityId]
   );

@@ -194,13 +194,13 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
   ];
 
   const defaultLayout: LayoutItem[] = [
-    { i: "stats", x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "active", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "recent", x: 8, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "recipes", x: 0, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "equipment", x: 4, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "journal", x: 8, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "notepad", x: 0, y: 6, w: 6, h: 4, minW: 3, minH: 3 },
+    { i: "stats", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "active", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "recent", x: 2, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "recipes", x: 3, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "equipment", x: 0, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "journal", x: 2, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "notepad", x: 0, y: 6, w: 2, h: 4, minW: 1, minH: 3 },
   ];
 
   return (

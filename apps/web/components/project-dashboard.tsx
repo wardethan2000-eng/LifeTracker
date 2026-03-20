@@ -234,18 +234,18 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
   }
 
   const defaultLayout: LayoutItem[] = [
-    { i: "tasks", x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "phases", x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "budget", x: 8, y: 0, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "inventory", x: 0, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "upcoming", x: 4, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "journal", x: 8, y: 3, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "notepad", x: 0, y: 6, w: 6, h: 4, minW: 3, minH: 3 },
-    { i: "assets", x: 6, y: 6, w: 6, h: 4, minW: 3, minH: 2 },
+    { i: "tasks", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "phases", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "budget", x: 2, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "inventory", x: 3, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "upcoming", x: 0, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "journal", x: 2, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "notepad", x: 0, y: 6, w: 2, h: 4, minW: 1, minH: 3 },
+    { i: "assets", x: 2, y: 6, w: 2, h: 3, minW: 1, minH: 2 },
   ];
 
   if (subProjectCount > 0) {
-    defaultLayout.push({ i: "subprojects", x: 0, y: 10, w: 4, h: 2, minW: 3, minH: 2 });
+    defaultLayout.push({ i: "subprojects", x: 0, y: 9, w: 2, h: 2, minW: 1, minH: 2 });
   }
 
   return (
