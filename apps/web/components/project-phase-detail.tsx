@@ -105,10 +105,6 @@ export function ProjectPhaseDetail({
                 </select>
               </label>
               <label className="field">
-                <span>Sort Order</span>
-                <input name="sortOrder" type="number" step="1" defaultValue={phase.sortOrder ?? ""} />
-              </label>
-              <label className="field">
                 <span>Start Date</span>
                 <input name="startDate" type="date" defaultValue={toDateInputValue(phase.startDate)} />
               </label>
@@ -470,10 +466,6 @@ function TaskCard({
           <label className="field">
             <span>Actual Hours</span>
             <input name="actualHours" type="number" min="0" step="0.25" defaultValue={task.actualHours ?? ""} />
-          </label>
-          <label className="field">
-            <span>Sort Order</span>
-            <input name="sortOrder" type="number" step="1" defaultValue={task.sortOrder ?? ""} />
           </label>
           <label className="field">
             <span>Estimated Cost</span>

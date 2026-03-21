@@ -7087,7 +7087,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .session-step {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   gap: 12px;
   align-items: flex-start;
   padding: 12px;
@@ -7879,6 +7879,8 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .milestone-card {
   overflow: hidden;
+  display: flex;
+  align-items: stretch;
 }
 
 .milestone-card__summary {
@@ -8308,6 +8310,14 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 .recipe-step-item:last-child {
+  border-bottom: none;
+}
+
+.recipe-steps-sortable .recipe-step-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.recipe-steps-sortable > div:last-child .recipe-step-item {
   border-bottom: none;
 }
 
@@ -9577,6 +9587,25 @@ html[data-ui-density="compact"] .resource-layout__aside {
   border-bottom: none;
 }
 
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--ink-muted);
+  opacity: 0.4;
+  font-size: 0.9rem;
+  line-height: 1;
+  user-select: none;
+}
+.drag-handle::before {
+  content: "⠿";
+}
+.drag-handle:hover {
+  opacity: 0.8;
+}
+
 .phase-split__detail {
   padding: 20px 24px;
   overflow-y: visible;
@@ -9743,6 +9772,15 @@ html[data-ui-density="compact"] .resource-layout__aside {
   border-bottom: none;
 }
 
+/* Inside a sortable checklist, each .checklist__row is in its own SortableItem <div>,
+   so :last-of-type always matches. Restore separators and suppress only the final one. */
+.checklist--sortable .checklist__row {
+  border-bottom: 1px solid var(--border);
+}
+.checklist--sortable > div:last-of-type .checklist__row {
+  border-bottom: none;
+}
+
 .checklist__row:hover .checklist__delete {
   opacity: 1;
 }
@@ -9857,6 +9895,19 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .task-row:last-child {
   border-bottom: none;
+}
+
+/* Inside a sortable task list, every task-row is :last-child of its wrapper div.
+   Restore the separator and only suppress the border on the actual final row. */
+.task-list-container .task-row:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.task-list-container > div:last-child > .task-row {
+  border-bottom: none;
+}
+
+.task-row--sortable {
+  grid-template-columns: 20px 24px 1fr auto auto auto;
 }
 
 .task-row:hover {

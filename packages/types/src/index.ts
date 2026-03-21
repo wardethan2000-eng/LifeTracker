@@ -2409,6 +2409,10 @@ export const reorderProjectPhaseSuppliesSchema = z.object({
   supplyIds: z.array(z.string().cuid()).min(1)
 });
 
+export const reorderByOrderedIdsSchema = z.object({
+  orderedIds: z.array(z.string().cuid()).min(1)
+});
+
 export const projectTaskSchema = z.object({
   id: z.string().cuid(),
   projectId: z.string().cuid(),
@@ -3581,6 +3585,7 @@ export type ProjectPhaseSupply = z.infer<typeof projectPhaseSupplySchema>;
 export type CreateProjectPhaseSupplyInput = z.infer<typeof createProjectPhaseSupplySchema>;
 export type UpdateProjectPhaseSupplyInput = z.infer<typeof updateProjectPhaseSupplySchema>;
 export type ReorderProjectPhaseSuppliesInput = z.infer<typeof reorderProjectPhaseSuppliesSchema>;
+export type ReorderByOrderedIdsInput = z.infer<typeof reorderByOrderedIdsSchema>;
 export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
 export type ProjectPhaseSummary = z.infer<typeof projectPhaseSummarySchema>;
 export type ProjectPhaseProgress = z.infer<typeof projectPhaseProgressSchema>;

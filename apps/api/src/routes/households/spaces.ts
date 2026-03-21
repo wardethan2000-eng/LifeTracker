@@ -6,6 +6,7 @@ import {
   importSpacesResultSchema,
   inventoryItemListResponseSchema,
   moveSpaceInputSchema,
+  reorderByOrderedIdsSchema,
   spaceOrphanCountSchema,
   spaceRecentScanListSchema,
   spaceItemHistoryListResponseSchema,
@@ -1973,5 +1974,35 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     void syncSpacesToSearchIndex(app.prisma, collectDescendantIds(householdSpaces, moved.id)).catch(console.error);
 
     return serializeSpace(moved, { breadcrumb });
+  });
+
+  // PATCH /v1/households/:householdId/spaces/reorder
+  app.patch("/v1/households/:householdId/spaces/reorder", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
+
+    if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const existing = await app.prisma.space.findMany({
+      where: { householdId: params.householdId, deletedAt: null, id: { in: orderedIds } },
+      select: { id: true }
+    });
+
+    if (existing.length !== orderedIds.length) {
+      return reply.code(400).send({ message: "One or more space IDs not found in this household." });
+    }
+
+    await app.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        app.prisma.space.update({
+          where: { id },
+          data: { sortOrder: index }
+        })
+      )
+    );
+
+    return reply.send({ orderedIds });
   });
 };

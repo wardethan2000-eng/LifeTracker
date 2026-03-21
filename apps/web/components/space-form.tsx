@@ -55,8 +55,7 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
       type: initialSpace?.type ?? "room",
       parentSpaceId: initialSpace?.parentSpaceId ?? initialParentSpaceId ?? "",
       description: initialSpace?.description ?? "",
-      notes: initialSpace?.notes ?? "",
-      sortOrder: initialSpace?.sortOrder ?? undefined
+      notes: initialSpace?.notes ?? ""
     }
   });
 
@@ -72,7 +71,6 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
           parentSpaceId: values.parentSpaceId || null,
           description: values.description ?? null,
           notes: values.notes ?? null,
-          sortOrder: values.sortOrder
         });
       } else {
         await createSpace(householdId, {
@@ -81,7 +79,6 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
           ...(values.parentSpaceId ? { parentSpaceId: values.parentSpaceId } : {}),
           ...(values.description ? { description: values.description } : {}),
           ...(values.notes ? { notes: values.notes } : {}),
-          ...(values.sortOrder !== undefined ? { sortOrder: values.sortOrder } : {})
         });
       }
 
@@ -130,11 +127,6 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
         <span>Notes</span>
         <textarea rows={4} {...register("notes")} />
         <InlineError message={errors.notes?.message} size="sm" />
-      </label>
-      <label className="field">
-        <span>Sort Order</span>
-        <input type="number" step="1" {...register("sortOrder")} />
-        <InlineError message={errors.sortOrder?.message} size="sm" />
       </label>
       <InlineError message={error} className="field field--full" size="sm" />
       <div className="inline-actions inline-actions--end field field--full">

@@ -10,7 +10,8 @@ import type {
 } from "@lifekeeper/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type DragEvent, type FormEvent, type JSX } from "react";
+import { useMemo, useState, type FormEvent, type JSX } from "react";
+import { SortableList } from "./ui/sortable-list";
 import {
   createHobbyProjectInventoryItem,
   createHobbyProjectMilestone,
@@ -101,7 +102,6 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
     targetEndDate: toDateInputValue(project.targetEndDate),
   });
   const [expandedMilestoneId, setExpandedMilestoneId] = useState<string | null>(project.milestones[0]?.id ?? null);
-  const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null);
   const [milestoneDrafts, setMilestoneDrafts] = useState<MilestoneDraft>(() => Object.fromEntries(project.milestones.map((milestone) => [milestone.id, {
     name: milestone.name,
     description: milestone.description ?? "",
@@ -222,24 +222,16 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
     }
   };
 
-  const handleMilestoneDrop = async (targetId: string) => {
-    if (!draggedMilestoneId || draggedMilestoneId === targetId) return;
-    const reordered = [...orderedMilestones];
-    const sourceIndex = reordered.findIndex((milestone) => milestone.id === draggedMilestoneId);
-    const targetIndex = reordered.findIndex((milestone) => milestone.id === targetId);
-    if (sourceIndex === -1 || targetIndex === -1) return;
-    const [moved] = reordered.splice(sourceIndex, 1);
-    if (!moved) return;
-    reordered.splice(targetIndex, 0, moved);
+  const handleMilestoneReorder = async (newIds: string[]) => {
+    const reordered = newIds.map((id) => orderedMilestones.find((m) => m.id === id)!);
     setProjectState((current) => ({
       ...current,
       milestones: reordered.map((milestone, index) => ({ ...milestone, sortOrder: index })),
     }));
-    setDraggedMilestoneId(null);
     setBusyKey("milestone:reorder");
     try {
       const nextMilestones = await reorderHobbyProjectMilestones(householdId, hobbyId, projectState.id, {
-        milestoneIds: reordered.map((milestone) => milestone.id)
+        milestoneIds: newIds,
       });
       setProjectState((current) => ({ ...current, milestones: nextMilestones }));
       setMessage("Milestones reordered.");
@@ -425,97 +417,111 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
           </form>
 
           <div className="mode-stack">
-            {orderedMilestones.map((milestone) => {
-              const draft = milestoneDrafts[milestone.id];
-              const milestoneLogs = logs.filter((log) => log.milestoneId === milestone.id);
-              const isExpanded = expandedMilestoneId === milestone.id;
-              return (
-                <div
-                  key={milestone.id}
-                  className={`milestone-card${isExpanded ? " milestone-card--expanded" : ""}`}
-                  draggable
-                  onDragStart={() => setDraggedMilestoneId(milestone.id)}
-                  onDragOver={(event: DragEvent<HTMLDivElement>) => event.preventDefault()}
-                  onDrop={() => void handleMilestoneDrop(milestone.id)}
-                >
-                  <button type="button" className="milestone-card__summary" onClick={() => setExpandedMilestoneId(isExpanded ? null : milestone.id)}>
-                    <span className="milestone-card__icon">{statusIcon(milestone.status)}</span>
-                    <div className="milestone-card__content">
-                      <strong>{milestone.name}</strong>
-                      <p>{milestone.description ?? "No description provided."}</p>
-                    </div>
-                    <div className="milestone-card__meta">
-                      <span className={statusClass(milestone.status)}>{milestone.status.replaceAll("_", " ")}</span>
-                      <span>Target {formatDate(milestone.targetDate)}</span>
-                      <span>Done {formatDate(milestone.completedDate)}</span>
-                    </div>
-                  </button>
-                  {isExpanded && draft ? (
-                    <div className="milestone-card__details">
-                      <div className="workbench-grid">
-                        <label className="workbench-field workbench-field--wide">
-                          <span className="workbench-field__label">Name</span>
-                          <input className="workbench-field__input" value={draft.name} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, name: event.target.value } }))} />
-                        </label>
-                        <label className="workbench-field workbench-field--wide">
-                          <span className="workbench-field__label">Description</span>
-                          <textarea className="workbench-field__input workbench-field__textarea" rows={2} value={draft.description} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, description: event.target.value } }))} />
-                        </label>
-                        <label className="workbench-field">
-                          <span className="workbench-field__label">Status</span>
-                          <select className="workbench-field__input" value={draft.status} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, status: event.target.value as MilestoneStatus } }))}>
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">In progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="skipped">Skipped</option>
-                          </select>
-                        </label>
-                        <label className="workbench-field">
-                          <span className="workbench-field__label">Target date</span>
-                          <input type="date" className="workbench-field__input" value={draft.targetDate} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, targetDate: event.target.value } }))} />
-                        </label>
-                        <label className="workbench-field">
-                          <span className="workbench-field__label">Completed date</span>
-                          <input type="date" className="workbench-field__input" value={draft.completedDate} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, completedDate: event.target.value } }))} />
-                        </label>
-                      </div>
-                      <div className="workbench-bar">
-                        <button type="button" className="button button--secondary button--sm" onClick={() => void handleMilestoneSave(milestone)} disabled={busyKey === `milestone:${milestone.id}`}>
-                          Save milestone
-                        </button>
-                      </div>
-
-                      <div className="mode-stack">
-                        <div className="mode-section-card">
-                          <div className="mode-section-card__head"><h3>Work logs</h3></div>
-                          {milestoneLogs.length === 0 ? <p className="panel__empty">No work logs linked to this milestone yet.</p> : (
-                            <div className="mode-stack">
-                              {milestoneLogs.map((log) => (
-                                <div key={log.id} className="mode-inline-row mode-inline-row--card">
-                                  <div>
-                                    <strong>{log.description}</strong>
-                                    <p>{formatDate(log.date)}</p>
-                                  </div>
-                                  <span className="pill pill--muted">{formatDuration(log.durationMinutes)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+            <SortableList
+              items={orderedMilestones}
+              onReorder={(newIds) => { void handleMilestoneReorder(newIds); }}
+              renderItem={(milestone, dragHandleProps) => {
+                const draft = milestoneDrafts[milestone.id];
+                const milestoneLogs = logs.filter((log) => log.milestoneId === milestone.id);
+                const isExpanded = expandedMilestoneId === milestone.id;
+                return (
+                  <div
+                    className={`milestone-card${isExpanded ? " milestone-card--expanded" : ""}`}
+                  >
+                    <span
+                      ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+                      role={dragHandleProps.role}
+                      tabIndex={dragHandleProps.tabIndex}
+                      aria-roledescription={dragHandleProps["aria-roledescription"]}
+                      aria-describedby={dragHandleProps["aria-describedby"]}
+                      aria-pressed={dragHandleProps["aria-pressed"]}
+                      aria-disabled={dragHandleProps["aria-disabled"]}
+                      onKeyDown={dragHandleProps.onKeyDown}
+                      onPointerDown={dragHandleProps.onPointerDown}
+                      className="drag-handle"
+                      style={{ alignSelf: "flex-start", paddingTop: 20, paddingLeft: 12 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <button type="button" className="milestone-card__summary" onClick={() => setExpandedMilestoneId(isExpanded ? null : milestone.id)}>
+                        <span className="milestone-card__icon">{statusIcon(milestone.status)}</span>
+                        <div className="milestone-card__content">
+                          <strong>{milestone.name}</strong>
+                          <p>{milestone.description ?? "No description provided."}</p>
                         </div>
-                        <EntryTimeline
-                          householdId={householdId}
-                          entityType="hobby_project_milestone"
-                          entityId={milestone.id}
-                          title={`Milestone entries for ${milestone.name}`}
-                          quickAddLabel="Milestone entry"
-                          entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/projects/${projectState.id}#entry-${entry.id}`}
-                        />
-                      </div>
+                        <div className="milestone-card__meta">
+                          <span className={statusClass(milestone.status)}>{milestone.status.replaceAll("_", " ")}</span>
+                          <span>Target {formatDate(milestone.targetDate)}</span>
+                          <span>Done {formatDate(milestone.completedDate)}</span>
+                        </div>
+                      </button>
+                      {isExpanded && draft ? (
+                        <div className="milestone-card__details">
+                          <div className="workbench-grid">
+                            <label className="workbench-field workbench-field--wide">
+                              <span className="workbench-field__label">Name</span>
+                              <input className="workbench-field__input" value={draft.name} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, name: event.target.value } }))} />
+                            </label>
+                            <label className="workbench-field workbench-field--wide">
+                              <span className="workbench-field__label">Description</span>
+                              <textarea className="workbench-field__input workbench-field__textarea" rows={2} value={draft.description} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, description: event.target.value } }))} />
+                            </label>
+                            <label className="workbench-field">
+                              <span className="workbench-field__label">Status</span>
+                              <select className="workbench-field__input" value={draft.status} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, status: event.target.value as MilestoneStatus } }))}>
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="skipped">Skipped</option>
+                              </select>
+                            </label>
+                            <label className="workbench-field">
+                              <span className="workbench-field__label">Target date</span>
+                              <input type="date" className="workbench-field__input" value={draft.targetDate} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, targetDate: event.target.value } }))} />
+                            </label>
+                            <label className="workbench-field">
+                              <span className="workbench-field__label">Completed date</span>
+                              <input type="date" className="workbench-field__input" value={draft.completedDate} onChange={(event) => setMilestoneDrafts((current) => ({ ...current, [milestone.id]: { ...draft, completedDate: event.target.value } }))} />
+                            </label>
+                          </div>
+                          <div className="workbench-bar">
+                            <button type="button" className="button button--secondary button--sm" onClick={() => void handleMilestoneSave(milestone)} disabled={busyKey === `milestone:${milestone.id}`}>
+                              Save milestone
+                            </button>
+                          </div>
+
+                          <div className="mode-stack">
+                            <div className="mode-section-card">
+                              <div className="mode-section-card__head"><h3>Work logs</h3></div>
+                              {milestoneLogs.length === 0 ? <p className="panel__empty">No work logs linked to this milestone yet.</p> : (
+                                <div className="mode-stack">
+                                  {milestoneLogs.map((log) => (
+                                    <div key={log.id} className="mode-inline-row mode-inline-row--card">
+                                      <div>
+                                        <strong>{log.description}</strong>
+                                        <p>{formatDate(log.date)}</p>
+                                      </div>
+                                      <span className="pill pill--muted">{formatDuration(log.durationMinutes)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <EntryTimeline
+                              householdId={householdId}
+                              entityType="hobby_project_milestone"
+                              entityId={milestone.id}
+                              title={`Milestone entries for ${milestone.name}`}
+                              quickAddLabel="Milestone entry"
+                              entryHrefBuilder={(entry) => `/hobbies/${hobbyId}/projects/${projectState.id}#entry-${entry.id}`}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              }}
+            />
           </div>
         </div>
       </section>

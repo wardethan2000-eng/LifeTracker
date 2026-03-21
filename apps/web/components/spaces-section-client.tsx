@@ -12,7 +12,7 @@ import type {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addItemToSpace } from "../app/actions";
 import {
   ApiError,
@@ -21,6 +21,7 @@ import {
   getSpaceByShortCode,
   getSpaceOrphans,
   importHouseholdSpaces,
+  reorderSpaces,
 } from "../lib/api";
 import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { formatSpaceBreadcrumb, getSpaceTypeBadge, getSpaceTypeLabel } from "../lib/spaces";
@@ -28,6 +29,7 @@ import { SpaceForm } from "./space-form";
 import { SpacePickerField } from "./space-picker-field";
 import { SpaceQuickPlace } from "./space-quick-place";
 import { SpaceTreeMap } from "./space-tree-map";
+import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 import {
   Dialog,
   DialogContent,
@@ -205,21 +207,40 @@ const SpaceTreeNode = ({
   householdId,
   space,
   selectedIds,
-  onToggleSelected
+  onToggleSelected,
+  dragHandleProps,
 }: {
   householdId: string;
   space: SpaceResponse;
   selectedIds: Set<string>;
   onToggleSelected: (spaceId: string) => void;
+  dragHandleProps?: DragHandleProps;
 }): JSX.Element => {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = (space.children?.length ?? 0) > 0;
+  const [orderedChildren, setOrderedChildren] = useState<SpaceResponse[]>(space.children ?? []);
+  useEffect(() => { setOrderedChildren(space.children ?? []); }, [space.children]);
 
   return (
-    <li style={{ display: "grid", gap: 10 }}>
+    <div style={{ display: "grid", gap: 10 }}>
       <article className="schedule-card" style={{ gap: 12 }}>
         <div className="schedule-card__summary" style={{ alignItems: "start" }}>
-          <div style={{ display: "grid", gap: 6 }}>
+          {dragHandleProps && (
+            <span
+              ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+              role={dragHandleProps.role}
+              tabIndex={dragHandleProps.tabIndex}
+              aria-roledescription={dragHandleProps["aria-roledescription"]}
+              aria-describedby={dragHandleProps["aria-describedby"]}
+              aria-pressed={dragHandleProps["aria-pressed"]}
+              aria-disabled={dragHandleProps["aria-disabled"]}
+              onKeyDown={dragHandleProps.onKeyDown}
+              onPointerDown={dragHandleProps.onPointerDown}
+              className="drag-handle"
+              style={{ marginTop: 2, flexShrink: 0 }}
+            />
+          )}
+          <div style={{ display: "grid", gap: 6, flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <label className="space-tree__check" aria-label={`Select ${space.name}`}>
                 <input
@@ -244,19 +265,27 @@ const SpaceTreeNode = ({
         </div>
       </article>
       {expanded && hasChildren ? (
-        <ul style={{ listStyle: "none", margin: 0, padding: "0 0 0 20px", display: "grid", gap: 10, borderLeft: "1px solid var(--border)" }}>
-          {space.children?.map((child) => (
-            <SpaceTreeNode
-              key={child.id}
-              householdId={householdId}
-              space={child}
-              selectedIds={selectedIds}
-              onToggleSelected={onToggleSelected}
-            />
-          ))}
-        </ul>
+        <div style={{ margin: 0, padding: "0 0 0 20px", display: "grid", gap: 10, borderLeft: "1px solid var(--border)" }}>
+          <SortableList
+            items={orderedChildren}
+            onReorder={(newIds) => {
+              const reordered = newIds.map((id) => orderedChildren.find((c) => c.id === id)!);
+              setOrderedChildren(reordered);
+              reorderSpaces(householdId, newIds);
+            }}
+            renderItem={(child, childDragHandleProps) => (
+              <SpaceTreeNode
+                householdId={householdId}
+                space={child}
+                selectedIds={selectedIds}
+                onToggleSelected={onToggleSelected}
+                dragHandleProps={childDragHandleProps}
+              />
+            )}
+          />
+        </div>
       ) : null}
-    </li>
+    </div>
   );
 };
 
@@ -295,6 +324,8 @@ export function SpacesSectionClient({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportSpacesResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [orderedSpaces, setOrderedSpaces] = useState<SpaceResponse[]>(spaces);
+  useEffect(() => { setOrderedSpaces(spaces); }, [spaces]);
   const allSpaceIds = collectSpaceIds(spaces);
   const allSpaces = flattenSpaces(spaces);
   const maxUtilization = utilization.reduce((max, entry) => Math.max(max, entry.totalItemCount), 0);
@@ -699,17 +730,25 @@ export function SpacesSectionClient({
           spaces.length === 0 ? (
             <p className="panel__empty">No spaces have been added yet.</p>
           ) : (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
-              {spaces.map((space) => (
-                <SpaceTreeNode
-                  key={space.id}
-                  householdId={householdId}
-                  space={space}
-                  selectedIds={selectedIds}
-                  onToggleSelected={handleToggleSelected}
-                />
-              ))}
-            </ul>
+            <div style={{ margin: 0, padding: 0, display: "grid", gap: 12 }}>
+              <SortableList
+                items={orderedSpaces}
+                onReorder={(newIds) => {
+                  const reordered = newIds.map((id) => orderedSpaces.find((s) => s.id === id)!);
+                  setOrderedSpaces(reordered);
+                  reorderSpaces(householdId, newIds);
+                }}
+                renderItem={(space, dragHandleProps) => (
+                  <SpaceTreeNode
+                    householdId={householdId}
+                    space={space}
+                    selectedIds={selectedIds}
+                    onToggleSelected={handleToggleSelected}
+                    dragHandleProps={dragHandleProps}
+                  />
+                )}
+              />
+            </div>
           )
         ) : null}
 

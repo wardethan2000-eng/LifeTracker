@@ -1321,5 +1321,43 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.send({ success: true });
   });
+
+  // PATCH .../sessions/:sessionId/steps/reorder
+  app.patch(`${BASE}/:sessionId/steps/reorder`, async (request, reply) => {
+    const { householdId, hobbyId, sessionId } = sessionParamsSchema.parse(request.params);
+    const { orderedIds } = z.object({ orderedIds: z.array(z.string().cuid()).min(1) }).parse(request.body);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const session = await app.prisma.hobbySession.findFirst({
+      where: { id: sessionId, hobbyId, hobby: { householdId } }
+    });
+    if (!session) {
+      return reply.code(404).send({ message: "Session not found" });
+    }
+
+    const existing = await app.prisma.hobbySessionStep.findMany({
+      where: { sessionId },
+      select: { id: true }
+    });
+
+    if (existing.length !== orderedIds.length || existing.some((s) => !orderedIds.includes(s.id))) {
+      return reply.code(400).send({ message: "orderedIds must include every step in the session exactly once." });
+    }
+
+    await app.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        app.prisma.hobbySessionStep.update({
+          where: { id },
+          data: { sortOrder: index }
+        })
+      )
+    );
+
+    return reply.send({ orderedIds });
+  });
 };
 

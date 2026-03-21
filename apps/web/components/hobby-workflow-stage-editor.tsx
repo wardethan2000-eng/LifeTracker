@@ -9,9 +9,11 @@ import type {
   PresetCustomFieldTemplate,
 } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 
 export type WorkflowStageDraft = {
   id?: string;
+  clientId: string;
   label: string;
   description: string;
   instructions: string;
@@ -41,6 +43,13 @@ const fieldTypeOptions: CustomFieldTemplateType[] = [
   "currency",
 ];
 
+const createLocalId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `local-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const buildFieldKey = (label: string, existingKeys: string[]): string => {
   const base = label
     .trim()
@@ -62,6 +71,7 @@ const buildFieldKey = (label: string, existingKeys: string[]): string => {
 
 export const defaultWorkflowStages = (): WorkflowStageDraft[] => [
   {
+    clientId: createLocalId(),
     label: "In Progress",
     description: "Primary execution stage for this hobby session.",
     instructions: "Capture the core work, mark the checklist as you go, and log the important measurements before moving on.",
@@ -73,6 +83,7 @@ export const defaultWorkflowStages = (): WorkflowStageDraft[] => [
     supplyTemplates: [],
   },
   {
+    clientId: createLocalId(),
     label: "Completed",
     description: "Closeout and wrap-up stage.",
     instructions: "Confirm the work is actually done, capture outcome notes, and record any final readings or packaging details.",
@@ -96,6 +107,7 @@ export const toWorkflowStageDrafts = (
     .sort((left, right) => left.sortOrder - right.sortOrder)
     .map((stage) => ({
       ...("id" in stage ? { id: stage.id } : {}),
+      clientId: "id" in stage ? stage.id : createLocalId(),
       label: stage.label,
       description: stage.description ?? "",
       instructions: stage.instructions ?? "",
@@ -119,27 +131,11 @@ export function HobbyWorkflowStageEditor({ stages, inventoryLinks, onChange }: H
     }));
   };
 
-  const moveStage = (index: number, direction: -1 | 1) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= stages.length) {
-      return;
-    }
-
-    const next = [...stages];
-    const stage = next[index];
-    if (!stage) {
-      return;
-    }
-
-    next.splice(index, 1);
-    next.splice(nextIndex, 0, stage);
-    onChange(next);
-  };
-
   const addStage = () => {
     const next = [
       ...stages,
       {
+        clientId: createLocalId(),
         label: `Stage ${stages.length + 1}`,
         description: "",
         instructions: "",
@@ -291,18 +287,35 @@ export function HobbyWorkflowStageEditor({ stages, inventoryLinks, onChange }: H
         </div>
       ) : null}
 
-      <div className="schedule-stack">
-        {stages.map((stage, stageIndex) => (
-          <article key={stage.id ?? `${stage.label}-${stageIndex}`} className="schedule-card hobby-stage-editor-card">
+      <SortableList
+        items={stages.map((stage) => ({ ...stage, id: stage.clientId }))}
+        onReorder={(newIds) => {
+          onChange(newIds.map((id) => stages.find((s) => s.clientId === id)!));
+        }}
+        renderItem={(stage, dragHandleProps) => {
+          const stageIndex = stages.findIndex((s) => s.clientId === stage.clientId);
+          return (
+          <article className="schedule-card hobby-stage-editor-card">
             <div className="hobby-stage-editor-card__header">
+              <span
+                ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+                role={dragHandleProps.role}
+                tabIndex={dragHandleProps.tabIndex}
+                aria-roledescription={dragHandleProps["aria-roledescription"]}
+                aria-describedby={dragHandleProps["aria-describedby"]}
+                aria-pressed={dragHandleProps["aria-pressed"]}
+                aria-disabled={dragHandleProps["aria-disabled"]}
+                onKeyDown={dragHandleProps.onKeyDown}
+                onPointerDown={dragHandleProps.onPointerDown}
+                className="drag-handle"
+                style={{ flexShrink: 0, alignSelf: "center" }}
+              />
               <div>
                 <strong>{stage.label.trim() || `Stage ${stageIndex + 1}`}</strong>
                 <p className="workbench-section__hint">Sessions enter this stage in order and use its checklist, supply template, and logging fields.</p>
               </div>
               <div className="hobby-pipeline-table__actions">
                 {stage.isFinal ? <span className="pill pill--muted">Final</span> : null}
-                <button type="button" className="button button--ghost button--sm" onClick={() => moveStage(stageIndex, -1)} disabled={stageIndex === 0}>↑</button>
-                <button type="button" className="button button--ghost button--sm" onClick={() => moveStage(stageIndex, 1)} disabled={stageIndex === stages.length - 1}>↓</button>
                 <button type="button" className="button button--ghost button--sm" onClick={() => removeStage(stageIndex)}>Remove</button>
               </div>
             </div>
@@ -418,8 +431,9 @@ export function HobbyWorkflowStageEditor({ stages, inventoryLinks, onChange }: H
               </div>
             </section>
           </article>
-        ))}
-      </div>
+          );
+        }}
+      />
     </section>
   );
 }

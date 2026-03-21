@@ -6,6 +6,7 @@ import {
   createProjectPhaseSchema,
   createProjectPhaseSupplySchema,
   createProjectTaskChecklistItemSchema,
+  reorderByOrderedIdsSchema,
   reorderProjectPhaseSuppliesSchema,
   reorderProjectPhasesSchema,
   updateProjectBudgetCategorySchema,
@@ -597,6 +598,40 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(204).send();
   });
 
+  app.patch("/v1/households/:householdId/projects/:projectId/phases/:phaseId/checklist-items/reorder", async (request, reply) => {
+    const params = phaseParamsSchema.parse(request.params);
+    const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const phase = await getPhase(app, params.projectId, params.phaseId);
+    if (!phase) {
+      return reply.code(404).send({ message: "Project phase not found." });
+    }
+
+    const existing = await app.prisma.projectPhaseChecklistItem.findMany({
+      where: { phaseId: phase.id },
+      select: { id: true }
+    });
+
+    if (existing.length !== orderedIds.length || existing.some((item) => !orderedIds.includes(item.id))) {
+      return reply.code(400).send({ message: "orderedIds must include every checklist item for this phase exactly once." });
+    }
+
+    await app.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        app.prisma.projectPhaseChecklistItem.update({
+          where: { id },
+          data: { sortOrder: index }
+        })
+      )
+    );
+
+    return reply.send({ orderedIds });
+  });
+
   app.get("/v1/households/:householdId/projects/:projectId/tasks/:taskId/checklist", async (request, reply) => {
     const params = taskParamsSchema.parse(request.params);
 
@@ -708,6 +743,42 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     await app.prisma.projectTaskChecklistItem.delete({ where: { id: item.id } });
 
     return reply.code(204).send();
+  });
+
+  app.patch("/v1/households/:householdId/projects/:projectId/tasks/:taskId/checklist-items/reorder", async (request, reply) => {
+    const params = taskParamsSchema.parse(request.params);
+    const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
+
+    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const task = await app.prisma.projectTask.findFirst({
+      where: { id: params.taskId, deletedAt: null, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
+    });
+    if (!task) {
+      return reply.code(404).send({ message: "Project task not found." });
+    }
+
+    const existing = await app.prisma.projectTaskChecklistItem.findMany({
+      where: { taskId: task.id },
+      select: { id: true }
+    });
+
+    if (existing.length !== orderedIds.length || existing.some((item) => !orderedIds.includes(item.id))) {
+      return reply.code(400).send({ message: "orderedIds must include every checklist item for this task exactly once." });
+    }
+
+    await app.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        app.prisma.projectTaskChecklistItem.update({
+          where: { id },
+          data: { sortOrder: index }
+        })
+      )
+    );
+
+    return reply.send({ orderedIds });
   });
 
   app.get("/v1/households/:householdId/projects/:projectId/budget-categories", async (request, reply) => {

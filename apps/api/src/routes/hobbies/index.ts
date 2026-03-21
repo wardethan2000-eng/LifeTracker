@@ -4,6 +4,7 @@ import {
   hobbyActivityModeSchema,
   updateHobbyInputSchema,
   hobbyStatusSchema,
+  reorderByOrderedIdsSchema,
   type HobbyStatusPipelineStepInput
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
@@ -531,6 +532,45 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     await removeSearchIndexEntry(app.prisma, "hobby", hobbyId);
 
     return reply.code(204).send();
+  });
+
+  // PATCH /v1/households/:householdId/hobbies/:hobbyId/workflow-stages/reorder
+  app.patch("/v1/households/:householdId/hobbies/:hobbyId/workflow-stages/reorder", async (request, reply) => {
+    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+    const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
+    const userId = request.auth.userId;
+
+    if (!await checkMembership(app.prisma, householdId, userId)) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const hobby = await app.prisma.hobby.findFirst({
+      where: { id: hobbyId, householdId }
+    });
+
+    if (!hobby) {
+      return reply.code(404).send({ message: "Hobby not found." });
+    }
+
+    const existing = await app.prisma.hobbySessionStatusStep.findMany({
+      where: { hobbyId },
+      select: { id: true }
+    });
+
+    if (existing.length !== orderedIds.length || existing.some((s) => !orderedIds.includes(s.id))) {
+      return reply.code(400).send({ message: "orderedIds must include every workflow stage exactly once." });
+    }
+
+    await app.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        app.prisma.hobbySessionStatusStep.update({
+          where: { id },
+          data: { sortOrder: index }
+        })
+      )
+    );
+
+    return reply.send({ orderedIds });
   });
 };
 

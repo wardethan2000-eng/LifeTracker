@@ -108,6 +108,7 @@ import {
   cloneProjectSchema,
   reorderProjectPhasesSchema,
   reorderProjectPhaseSuppliesSchema,
+  reorderByOrderedIdsSchema,
   instantiateProjectTemplateSchema,
   projectSummarySchema,
   projectTaskSchema,
@@ -276,6 +277,7 @@ import {
   type PublicAssetReport,
   type ReorderProjectPhasesInput,
   type ReorderProjectPhaseSuppliesInput,
+  type ReorderByOrderedIdsInput,
   type ShareLink,
   type ServiceProvider,
   type ServiceProviderSpend,
@@ -2676,6 +2678,16 @@ export const deleteSpace = async (householdId: string, spaceId: string): Promise
   });
 };
 
+export const reorderSpaces = async (
+  householdId: string,
+  orderedIds: ReorderByOrderedIdsInput["orderedIds"]
+): Promise<ReorderByOrderedIdsInput> => apiRequest({
+  path: `/v1/households/${householdId}/spaces/reorder`,
+  method: "PATCH",
+  body: { orderedIds },
+  schema: reorderByOrderedIdsSchema,
+});
+
 export const restoreSpace = async (householdId: string, spaceId: string): Promise<SpaceResponse> => apiRequest({
   path: `/v1/households/${householdId}/spaces/${spaceId}/restore`,
   method: "POST",
@@ -3101,6 +3113,18 @@ export const deletePhaseChecklistItem = async (
   });
 };
 
+export const reorderPhaseChecklistItems = async (
+  householdId: string,
+  projectId: string,
+  phaseId: string,
+  orderedIds: ReorderByOrderedIdsInput["orderedIds"]
+): Promise<ReorderByOrderedIdsInput> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/checklist-items/reorder`,
+  method: "PATCH",
+  body: { orderedIds },
+  schema: reorderByOrderedIdsSchema,
+});
+
 export const createTaskChecklistItem = async (
   householdId: string,
   projectId: string,
@@ -3137,6 +3161,18 @@ export const deleteTaskChecklistItem = async (
     method: "DELETE"
   });
 };
+
+export const reorderTaskChecklistItems = async (
+  householdId: string,
+  projectId: string,
+  taskId: string,
+  orderedIds: ReorderByOrderedIdsInput["orderedIds"]
+): Promise<ReorderByOrderedIdsInput> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/tasks/${taskId}/checklist-items/reorder`,
+  method: "PATCH",
+  body: { orderedIds },
+  schema: reorderByOrderedIdsSchema,
+});
 
 export const createProjectBudgetCategory = async (
   householdId: string,
@@ -3993,6 +4029,17 @@ export const deleteHobby = async (
   });
 };
 
+export const reorderHobbyWorkflowStages = async (
+  householdId: string,
+  hobbyId: string,
+  orderedIds: ReorderByOrderedIdsInput["orderedIds"]
+): Promise<ReorderByOrderedIdsInput> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/workflow-stages/reorder`,
+  method: "PATCH",
+  body: { orderedIds },
+  schema: reorderByOrderedIdsSchema,
+});
+
 // ── Hobby Recipes ────────────────────────────────────────────────────
 
 export const getHobbyRecipes = async (
@@ -4507,6 +4554,18 @@ export const reorderHobbySessionSteps = async (
     body: { stepIds },
   });
 };
+
+export const reorderHobbySessionStepsOrdered = async (
+  householdId: string,
+  hobbyId: string,
+  sessionId: string,
+  orderedIds: ReorderByOrderedIdsInput["orderedIds"]
+): Promise<ReorderByOrderedIdsInput> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/steps/reorder`,
+  method: "PATCH",
+  body: { orderedIds },
+  schema: reorderByOrderedIdsSchema,
+});
 
 // ── Hobby Metrics ────────────────────────────────────────────────────
 

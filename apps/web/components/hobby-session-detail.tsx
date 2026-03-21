@@ -26,6 +26,7 @@ import {
   createHobbySessionIngredient,
   deleteHobbyMetricReading,
   deleteHobbySessionIngredient,
+  reorderHobbySessionStepsOrdered,
   updateHobbySession,
   updateHobbySessionStep,
 } from "../lib/api";
@@ -355,6 +356,21 @@ export function HobbySessionDetail({
       ...previous,
       steps: previous.steps.map((candidate) => candidate.id === step.id ? updated : candidate),
     }));
+  };
+
+  const handleStepReorder = async (newIds: string[]) => {
+    const previousSteps = sessionState.steps;
+    const reordered = newIds.map((id) => previousSteps.find((s) => s.id === id)!);
+    setSessionState((current) => ({
+      ...current,
+      steps: reordered.map((step, index) => ({ ...step, sortOrder: index })),
+    }));
+    try {
+      await reorderHobbySessionStepsOrdered(householdId, hobbyId, sessionState.id, newIds);
+    } catch (error) {
+      setSessionState((current) => ({ ...current, steps: previousSteps }));
+      setErrorMessage(error instanceof Error ? error.message : "Failed to reorder steps.");
+    }
   };
 
   const handleIngredientSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -759,6 +775,7 @@ export function HobbySessionDetail({
           completedSteps={completedSteps}
           progressPercent={progressPercent}
           onToggleStep={toggleStep}
+          onReorder={handleStepReorder}
           onError={setErrorMessage}
           formatDateTime={formatDateTime}
           titleCase={titleCase}

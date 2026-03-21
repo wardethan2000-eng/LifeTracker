@@ -20,6 +20,7 @@ import {
 } from "../lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type JSX, type KeyboardEvent } from "react";
+import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 
 type InventoryLinkOption = {
   inventoryItemId: string;
@@ -679,8 +680,8 @@ export function HobbyRecipeWorkbench({
     }
   };
 
-  const reorderSteps = async (fromIndex: number, toIndex: number) => {
-    const reordered = moveItem(steps, fromIndex, toIndex);
+  const handleStepReorder = async (newIds: string[]) => {
+    const reordered = newIds.map((id) => steps.find((s) => s.clientId === id)!);
     setSteps(reordered);
 
     if (mode !== "edit" || !recipeId) {
@@ -1043,107 +1044,109 @@ export function HobbyRecipeWorkbench({
           {suggestedStepTypes.map((stepType) => <option key={stepType} value={stepType} />)}
         </datalist>
 
-        <div style={{ display: "grid", gap: "0" }}>
+        <div className="recipe-steps-sortable" style={{ display: "grid", gap: "0" }}>
           {steps.length === 0 ? (
             <p style={{ color: "var(--ink-muted)" }}>No steps yet.</p>
-          ) : steps.map((step, index) => {
-            const isDescriptionExpanded = Boolean(expandedDescriptions[step.clientId]);
+          ) : (
+            <SortableList
+              items={steps.map((s) => ({ ...s, id: s.clientId }))}
+              onReorder={(newIds) => { void handleStepReorder(newIds); }}
+              renderItem={(step, dragHandleProps) => {
+                const stepIndex = steps.findIndex((s) => s.clientId === step.clientId);
+                const isDescriptionExpanded = Boolean(expandedDescriptions[step.clientId]);
 
-            return (
-              <div key={step.clientId} className="recipe-step-item">
-                <div className="recipe-step-item__number">{index + 1}</div>
-                <div className="recipe-step-item__reorder">
-                  <button
-                    type="button"
-                    className="button button--ghost button--sm"
-                    onClick={() => { void reorderSteps(index, index - 1); }}
-                    disabled={index === 0}
-                  >
-                    Up
-                  </button>
-                  <button
-                    type="button"
-                    className="button button--ghost button--sm"
-                    onClick={() => { void reorderSteps(index, index + 1); }}
-                    disabled={index === steps.length - 1}
-                  >
-                    Down
-                  </button>
-                </div>
-                <div style={{ flex: 1, display: "grid", gap: "8px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto auto", gap: "8px", alignItems: "center" }}>
-                    <input
-                      type="text"
-                      value={step.title}
-                      onChange={(event) => updateStepField(step.clientId, "title", event.target.value)}
-                      onBlur={() => { void saveExistingStep(step.clientId); }}
-                      onKeyDown={handleCommitKey(() => saveExistingStep(step.clientId))}
-                      placeholder="Step title"
+                return (
+                  <div className="recipe-step-item">
+                    <span
+                      ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+                      role={dragHandleProps.role}
+                      tabIndex={dragHandleProps.tabIndex}
+                      aria-roledescription={dragHandleProps["aria-roledescription"]}
+                      aria-describedby={dragHandleProps["aria-describedby"]}
+                      aria-pressed={dragHandleProps["aria-pressed"]}
+                      aria-disabled={dragHandleProps["aria-disabled"]}
+                      onKeyDown={dragHandleProps.onKeyDown}
+                      onPointerDown={dragHandleProps.onPointerDown}
+                      className="drag-handle"
+                      style={{ alignSelf: "center" }}
                     />
-                    <input
-                      type="text"
-                      list="recipe-step-type-suggestions"
-                      className="recipe-step-type-input"
-                      value={step.stepType}
-                      onChange={(event) => updateStepField(step.clientId, "stepType", event.target.value)}
-                      onBlur={() => { void saveExistingStep(step.clientId); }}
-                      onKeyDown={handleCommitKey(() => saveExistingStep(step.clientId))}
-                      placeholder="generic"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={step.durationMinutes}
-                      onChange={(event) => updateStepField(step.clientId, "durationMinutes", event.target.value)}
-                      onBlur={() => { void saveExistingStep(step.clientId); }}
-                      onKeyDown={handleCommitKey(() => saveExistingStep(step.clientId))}
-                      placeholder="min"
-                    />
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                      {mode === "edit" && step.isNew ? (
-                        <button
-                          type="button"
-                          className="button button--secondary button--sm"
-                          onClick={() => { void saveNewStep(step.clientId); }}
-                          disabled={Boolean(savingSteps[step.clientId])}
-                        >
-                          {savingSteps[step.clientId] ? "Saving..." : "Save"}
-                        </button>
-                      ) : null}
-                      {!step.isNew && savedStepRows[step.clientId] ? <span className="recipe-field-saved">Saved</span> : null}
+                    <div className="recipe-step-item__number">{stepIndex + 1}</div>
+                    <div style={{ flex: 1, display: "grid", gap: "8px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto auto", gap: "8px", alignItems: "center" }}>
+                        <input
+                          type="text"
+                          value={step.title}
+                          onChange={(event) => updateStepField(step.clientId, "title", event.target.value)}
+                          onBlur={() => { void saveExistingStep(step.clientId); }}
+                          onKeyDown={handleCommitKey(() => saveExistingStep(step.clientId))}
+                          placeholder="Step title"
+                        />
+                        <input
+                          type="text"
+                          list="recipe-step-type-suggestions"
+                          className="recipe-step-type-input"
+                          value={step.stepType}
+                          onChange={(event) => updateStepField(step.clientId, "stepType", event.target.value)}
+                          onBlur={() => { void saveExistingStep(step.clientId); }}
+                          onKeyDown={handleCommitKey(() => saveExistingStep(step.clientId))}
+                          placeholder="generic"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={step.durationMinutes}
+                          onChange={(event) => updateStepField(step.clientId, "durationMinutes", event.target.value)}
+                          onBlur={() => { void saveExistingStep(step.clientId); }}
+                          onKeyDown={handleCommitKey(() => saveExistingStep(step.clientId))}
+                          placeholder="min"
+                        />
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                          {mode === "edit" && step.isNew ? (
+                            <button
+                              type="button"
+                              className="button button--secondary button--sm"
+                              onClick={() => { void saveNewStep(step.clientId); }}
+                              disabled={Boolean(savingSteps[step.clientId])}
+                            >
+                              {savingSteps[step.clientId] ? "Saving..." : "Save"}
+                            </button>
+                          ) : null}
+                          {!step.isNew && savedStepRows[step.clientId] ? <span className="recipe-field-saved">Saved</span> : null}
+                          <button
+                            type="button"
+                            className="button button--danger button--sm"
+                            onClick={() => { void removeStep(step.clientId); }}
+                            disabled={Boolean(savingSteps[step.clientId])}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
                       <button
                         type="button"
-                        className="button button--danger button--sm"
-                        onClick={() => { void removeStep(step.clientId); }}
-                        disabled={Boolean(savingSteps[step.clientId])}
+                        className="recipe-step-description-toggle"
+                        onClick={() => setExpandedDescriptions((current) => ({ ...current, [step.clientId]: !isDescriptionExpanded }))}
                       >
-                        Remove
+                        {isDescriptionExpanded ? "Hide description" : "Show description"}
                       </button>
+
+                      {isDescriptionExpanded ? (
+                        <textarea
+                          rows={3}
+                          value={step.description}
+                          onChange={(event) => updateStepField(step.clientId, "description", event.target.value)}
+                          onBlur={() => { void saveExistingStep(step.clientId); }}
+                          placeholder="Describe the action, cues, or targets."
+                        />
+                      ) : null}
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    className="recipe-step-description-toggle"
-                    onClick={() => setExpandedDescriptions((current) => ({ ...current, [step.clientId]: !isDescriptionExpanded }))}
-                  >
-                    {isDescriptionExpanded ? "Hide description" : "Show description"}
-                  </button>
-
-                  {isDescriptionExpanded ? (
-                    <textarea
-                      rows={3}
-                      value={step.description}
-                      onChange={(event) => updateStepField(step.clientId, "description", event.target.value)}
-                      onBlur={() => { void saveExistingStep(step.clientId); }}
-                      placeholder="Describe the action, cues, or targets."
-                    />
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
+                );
+              }}
+            />
+          )}
         </div>
       </section>
 

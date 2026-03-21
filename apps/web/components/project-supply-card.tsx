@@ -10,6 +10,7 @@ import {
   updateProjectPhaseSupplyAction
 } from "../app/actions";
 import { formatCurrency, formatQuantity } from "../lib/formatters";
+import { type DragHandleProps } from "./ui/sortable-list";
 
 type ProjectSupplyCardProps = {
   householdId: string;
@@ -23,6 +24,7 @@ type ProjectSupplyCardProps = {
   categories?: string[];
   onCategoryChange?: (supplyId: string, category: string | null) => void;
   onCategoryCreated?: (name: string) => void;
+  dragHandleProps?: DragHandleProps;
 };
 
 const getQuantityRemaining = (supply: ProjectPhaseSupply): number => Math.max(0, Number((supply.quantityNeeded - supply.quantityOnHand).toFixed(2)));
@@ -55,6 +57,7 @@ export function ProjectSupplyCard({
   phaseName,
   categories = [],
   onCategoryChange,
+  dragHandleProps,
 }: ProjectSupplyCardProps): JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -113,6 +116,20 @@ export function ProjectSupplyCard({
   return (
     <div className={`supply-row${isEditing ? " supply-row--expanded" : ""}${supply.isProcured ? " supply-row--purchased" : ""}${isPending ? " supply-row--pending" : ""}`}>
       <div className="supply-row__summary">
+        {dragHandleProps ? (
+          <span
+            ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+            role={dragHandleProps.role}
+            tabIndex={dragHandleProps.tabIndex}
+            aria-roledescription={dragHandleProps["aria-roledescription"]}
+            aria-describedby={dragHandleProps["aria-describedby"]}
+            aria-pressed={dragHandleProps["aria-pressed"]}
+            aria-disabled={dragHandleProps["aria-disabled"]}
+            onKeyDown={dragHandleProps.onKeyDown}
+            onPointerDown={dragHandleProps.onPointerDown}
+            className="drag-handle"
+          />
+        ) : null}
         <button
           type="button"
           className="button button--ghost button--xs supply-row__toggle"

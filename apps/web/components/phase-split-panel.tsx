@@ -38,7 +38,8 @@ import { ProjectSupplyCreateForm } from "./project-supply-create-form";
 import { AttachmentSection } from "./attachment-section";
 import { SegmentedControl } from "./segmented-control";
 import { CategoryAccordionList } from "./category-accordion-list";
-import { createEntry, getEntries, updateEntry } from "../lib/api";
+import { createEntry, getEntries, reorderPhaseChecklistItems, reorderProjectPhaseSupplies, reorderProjectPhases, reorderTaskChecklistItems, updateEntry, updateProjectTask } from "../lib/api";
+import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 import { RichEditor } from "./rich-editor";
 
 const statusOptions = [
@@ -86,6 +87,7 @@ export function PhaseSplitPanel({
   );
   const [showUnphased, setShowUnphased] = useState(false);
   const [subTab, setSubTab] = useState<PhaseSubTab>("tasks");
+  const [orderedPhases, setOrderedPhases] = useState<ProjectPhaseSummary[]>(phases);
 
   const selectedPhase = phaseDetails.find((p) => p.id === selectedPhaseId);
   const selectedPhaseSummary = phases.find((p) => p.id === selectedPhaseId);
@@ -100,22 +102,42 @@ export function PhaseSplitPanel({
             <AddPhaseButton householdId={householdId} projectId={projectId} />
           </div>
 
-          {phases.map((phase, index) => (
-            <button
-              key={phase.id}
-              type="button"
-              className={`phase-list-item${selectedPhaseId === phase.id && !showUnphased ? " phase-list-item--active" : ""}`}
-              onClick={() => { setSelectedPhaseId(phase.id); setShowUnphased(false); }}
-            >
-              <div className="phase-list-item__top">
-                <span className={`phase-list-item__dot phase-list-item__dot--${phase.status}`} />
-                <span className="phase-list-item__name">{index + 1}. {phase.name}</span>
-              </div>
-              <span className="phase-list-item__progress">
-                {phase.completedTaskCount}/{phase.taskCount} tasks · {phase.completedChecklistItemCount}/{phase.checklistItemCount} checks
-              </span>
-            </button>
-          ))}
+          <SortableList
+            items={orderedPhases}
+            onReorder={(newIds) => {
+              const reordered = newIds.map((id) => orderedPhases.find((p) => p.id === id)!);
+              setOrderedPhases(reordered);
+              reorderProjectPhases(householdId, projectId, newIds);
+            }}
+            renderItem={(phase, dragHandleProps) => (
+              <button
+                type="button"
+                className={`phase-list-item${selectedPhaseId === phase.id && !showUnphased ? " phase-list-item--active" : ""}`}
+                onClick={() => { setSelectedPhaseId(phase.id); setShowUnphased(false); }}
+              >
+                <div className="phase-list-item__top">
+                  <span
+                    ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+                    role={dragHandleProps.role}
+                    tabIndex={dragHandleProps.tabIndex}
+                    aria-roledescription={dragHandleProps["aria-roledescription"]}
+                    aria-describedby={dragHandleProps["aria-describedby"]}
+                    aria-pressed={dragHandleProps["aria-pressed"]}
+                    aria-disabled={dragHandleProps["aria-disabled"]}
+                    onKeyDown={dragHandleProps.onKeyDown}
+                    onPointerDown={dragHandleProps.onPointerDown}
+                    onClick={(e) => e.stopPropagation()}
+                    className="drag-handle"
+                  />
+                  <span className={`phase-list-item__dot phase-list-item__dot--${phase.status}`} />
+                  <span className="phase-list-item__name">{phase.name}</span>
+                </div>
+                <span className="phase-list-item__progress">
+                  {phase.completedTaskCount}/{phase.taskCount} tasks · {phase.completedChecklistItemCount}/{phase.checklistItemCount} checks
+                </span>
+              </button>
+            )}
+          />
 
           {unphasedTasks.length > 0 && (
             <button
@@ -356,6 +378,7 @@ function PhaseDetailPanel({
             deleteAction={deletePhaseChecklistItemAction}
             addPlaceholder="Add a readiness check"
             emptyMessage="No checklist items yet."
+            onReorder={(orderedIds) => reorderPhaseChecklistItems(householdId, projectId, phase.id, orderedIds)}
           />
         </div>
       )}
@@ -441,26 +464,40 @@ function PhaseTasksSubtab({
   dependencyCandidates: ProjectTask[];
 }) {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [orderedTasks, setOrderedTasks] = useState<ProjectTask[]>(tasks);
+  useEffect(() => {
+    setOrderedTasks(tasks);
+  }, [tasks]);
 
   return (
     <div>
       {tasks.length === 0 ? (
         <p style={{ padding: "16px 0", color: "var(--ink-muted)", fontSize: "0.88rem" }}>No tasks in this phase yet.</p>
       ) : (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-          {tasks.map((task) => (
-            <TaskCompactRow
-              key={task.id}
-              householdId={householdId}
-              projectId={projectId}
-              phaseId={phaseId}
-              task={task}
-              expanded={expandedTaskId === task.id}
-              onToggle={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-              householdMembers={householdMembers}
-              dependencyCandidates={dependencyCandidates.filter((c) => c.id !== task.id)}
-            />
-          ))}
+        <div className="task-list-container" style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          <SortableList
+            items={orderedTasks}
+            onReorder={(newIds) => {
+              const reordered = newIds.map((id) => orderedTasks.find((t) => t.id === id)!);
+              setOrderedTasks(reordered);
+              newIds.forEach((id, i) => {
+                updateProjectTask(householdId, projectId, id, { sortOrder: i });
+              });
+            }}
+            renderItem={(task, dragHandleProps) => (
+              <TaskCompactRow
+                householdId={householdId}
+                projectId={projectId}
+                phaseId={phaseId}
+                task={task}
+                expanded={expandedTaskId === task.id}
+                onToggle={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                householdMembers={householdMembers}
+                dependencyCandidates={dependencyCandidates.filter((c) => c.id !== task.id)}
+                dragHandleProps={dragHandleProps}
+              />
+            )}
+          />
         </div>
       )}
 
@@ -498,6 +535,7 @@ function TaskCompactRow({
   onToggle,
   householdMembers,
   dependencyCandidates,
+  dragHandleProps,
 }: {
   householdId: string;
   projectId: string;
@@ -507,6 +545,7 @@ function TaskCompactRow({
   onToggle: () => void;
   householdMembers: HouseholdMember[];
   dependencyCandidates: ProjectTask[];
+  dragHandleProps?: DragHandleProps;
 }) {
   const isDone = task.status === "completed";
 
@@ -523,7 +562,22 @@ function TaskCompactRow({
 
   return (
     <>
-      <div className={`task-row${expanded ? " task-row--expanded" : ""}`} onClick={onToggle}>
+      <div className={`task-row${expanded ? " task-row--expanded" : ""}${dragHandleProps ? " task-row--sortable" : ""}`} onClick={onToggle}>
+        {dragHandleProps && (
+          <span
+            ref={(el: HTMLSpanElement | null) => dragHandleProps.ref(el)}
+            role={dragHandleProps.role}
+            tabIndex={dragHandleProps.tabIndex}
+            aria-roledescription={dragHandleProps["aria-roledescription"]}
+            aria-describedby={dragHandleProps["aria-describedby"]}
+            aria-pressed={dragHandleProps["aria-pressed"]}
+            aria-disabled={dragHandleProps["aria-disabled"]}
+            onKeyDown={dragHandleProps.onKeyDown}
+            onPointerDown={dragHandleProps.onPointerDown}
+            onClick={(e) => e.stopPropagation()}
+            className="drag-handle"
+          />
+        )}
         <input
           type="checkbox"
           className="task-row__check"
@@ -620,6 +674,7 @@ function TaskCompactRow({
               deleteAction={deleteTaskChecklistItemAction}
               addPlaceholder="Add step"
               emptyMessage="No sub-steps."
+              onReorder={(orderedIds) => reorderTaskChecklistItems(householdId, projectId, task.id, orderedIds)}
             />
           </div>
 
@@ -668,7 +723,12 @@ function PhaseSuppliesSubtab({
   inventoryItems: InventoryItemSummary[];
   inventoryLookup: Map<string, InventoryItemSummary>;
 }) {
+  const [localSupplies, setLocalSupplies] = useState(supplies);
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    setLocalSupplies(supplies);
+  }, [supplies]);
 
   type SupplyItem = ProjectPhaseDetail["supplies"][number];
 
@@ -690,6 +750,24 @@ function PhaseSuppliesSubtab({
 
   const handleCategoryChange = (supplyId: string, category: string | null) => {
     setOptimisticCategories((prev) => ({ ...prev, [supplyId]: category }));
+  };
+
+  const handleSectionReorder = async (newIds: string[]) => {
+    const previousLocalSupplies = localSupplies;
+    const sectionIds = new Set(newIds);
+    const positions = previousLocalSupplies
+      .map((s, i) => (sectionIds.has(s.id) ? i : -1))
+      .filter((i) => i !== -1);
+    const next = [...previousLocalSupplies];
+    newIds.forEach((id, pos) => {
+      next[positions[pos]!] = previousLocalSupplies.find((s) => s.id === id)!;
+    });
+    setLocalSupplies(next);
+    try {
+      await reorderProjectPhaseSupplies(householdId, projectId, phaseId, next.map((s) => s.id));
+    } catch {
+      setLocalSupplies(previousLocalSupplies);
+    }
   };
 
   const supplyStatusFilter = useMemo(
@@ -716,7 +794,7 @@ function PhaseSuppliesSubtab({
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <CategoryAccordionList
-        items={supplies}
+        items={localSupplies}
         getSearchText={getSearchText}
         getCategory={getCategory}
         defaultCategories={DEFAULT_SUPPLY_CATEGORIES}
@@ -725,23 +803,27 @@ function PhaseSuppliesSubtab({
         noMatchMessage="No supplies match your filters."
         statusFilter={supplyStatusFilter}
         getSectionTags={getSectionTags}
-        renderItems={(items, allCategories) =>
-          items.map((supply) => (
-            <ProjectSupplyCard
-              key={supply.id}
-              householdId={householdId}
-              projectId={projectId}
-              phaseId={phaseId}
-              supply={supply}
-              inventoryItems={inventoryItems}
-              categories={allCategories}
-              onCategoryChange={handleCategoryChange}
-              {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
-                ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
-                : {})}
-            />
-          ))
-        }
+        renderItems={(items, allCategories) => (
+          <SortableList
+            items={items}
+            onReorder={(newIds) => { void handleSectionReorder(newIds); }}
+            renderItem={(supply, dragHandleProps) => (
+              <ProjectSupplyCard
+                householdId={householdId}
+                projectId={projectId}
+                phaseId={phaseId}
+                supply={supply}
+                inventoryItems={inventoryItems}
+                categories={allCategories}
+                onCategoryChange={handleCategoryChange}
+                dragHandleProps={dragHandleProps}
+                {...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
+                  ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
+                  : {})}
+              />
+            )}
+          />
+        )}
         footer={
           <ProjectSupplyCreateForm
             householdId={householdId}
