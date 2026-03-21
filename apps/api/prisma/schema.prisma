@@ -137,6 +137,7 @@ enum EntryEntityType {
   maintenance_log
   inventory_item
   notebook
+  idea
 }
 
 // High-level classification for a universal entry.
@@ -195,6 +196,7 @@ enum AttachmentEntityType {
   project_phase
   project_task
   inventory_item
+  idea
 }
 
 // Distinguishes stock that gets consumed from durable gear.
@@ -321,6 +323,7 @@ enum CommentEntityType {
   project
   hobby
   inventory_item
+  idea
 }
 
 enum WebhookDeliveryStatus {
@@ -374,6 +377,7 @@ model User {
   createdNoteFolders      NoteFolder[]          @relation("NoteFolderCreator")
   createdNoteTemplates    NoteTemplate[]        @relation("NoteTemplateCreator")
   createdIdeaCanvases     IdeaCanvas[]          @relation("IdeaCanvasCreator")
+  createdIdeas            Idea[]                @relation("IdeaCreator")
   performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
   spaceScanLogs          SpaceScanLog[]
   layoutPreferences      UserLayoutPreference[]
@@ -419,6 +423,7 @@ model Household {
   noteFolders      NoteFolder[]
   noteTemplates    NoteTemplate[]
   ideaCanvases     IdeaCanvas[]
+  ideas            Idea[]
   domainEvents     DomainEvent[]
   webhookEndpoints WebhookEndpoint[]
 
@@ -1743,6 +1748,51 @@ model Hobby {
   @@index([createdById])
 }
 
+// A lightweight staging area for thoughts that may eventually become projects, assets, or hobbies.
+model Idea {
+  id              String               @id @default(cuid())
+  householdId     String
+  title           String
+  description     String?
+  stage           IdeaStage            @default(spark)
+  priority        IdeaPriority         @default(medium)
+  category        IdeaCategory?
+  promotionTarget IdeaPromotionTarget?
+
+  // Structured data stored as JSON for simplicity.
+  // notes: Array of { id: string, text: string, createdAt: string }
+  // links: Array of { id: string, url: string, label: string, createdAt: string }
+  // materials: Array of { id: string, name: string, quantity: string, notes: string }
+  // steps: Array of { id: string, label: string, done: boolean }
+  notes           Json                 @default("[]")
+  links           Json                 @default("[]")
+  materials       Json                 @default("[]")
+  steps           Json                 @default("[]")
+
+  // Promotion tracking
+  promotedAt      DateTime?
+  promotedToType  IdeaPromotionTarget?
+  promotedToId    String?              // ID of the created project/asset/hobby
+
+  // Demotion tracking — when a project/asset/hobby is sent back to ideas
+  demotedFromType IdeaPromotionTarget?
+  demotedFromId   String?
+
+  // Standard fields
+  archivedAt      DateTime?
+  createdById     String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  household       Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy       User                 @relation("IdeaCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([householdId, stage])
+  @@index([householdId, category])
+  @@index([householdId, priority])
+  @@index([createdById])
+}
+
 // Join table linking a Hobby to an Asset used as tracked equipment or context.
 model HobbyAsset {
   id          String   @id @default(cuid())
@@ -2301,6 +2351,41 @@ enum CanvasEdgeStyle {
   solid
   dashed
   dotted
+}
+
+// Kanban lifecycle stage for an idea.
+enum IdeaStage {
+  spark       // Just captured — a raw thought
+  developing  // Being fleshed out with notes, links, materials
+  ready       // Mature enough to promote into a project, asset, or hobby
+}
+
+// What an idea can be promoted into.
+enum IdeaPromotionTarget {
+  project
+  asset
+  hobby
+}
+
+// Priority level for triaging ideas.
+enum IdeaPriority {
+  low
+  medium
+  high
+}
+
+// Category grouping for ideas.
+enum IdeaCategory {
+  home_improvement
+  vehicle
+  outdoor
+  technology
+  hobby_craft
+  financial
+  health
+  travel
+  learning
+  other
 }
 
 // A spatial canvas for arranging and connecting ideas visually.

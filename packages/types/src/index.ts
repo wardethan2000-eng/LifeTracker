@@ -91,7 +91,7 @@ export const assetTimelineSourceTypeValues = [
   "condition_assessment",
   "usage_reading"
 ] as const;
-export const commentEntityTypeValues = ["asset", "project", "hobby", "inventory_item"] as const;
+export const commentEntityTypeValues = ["asset", "project", "hobby", "inventory_item", "idea"] as const;
 export const entryEntityTypeValues = [
   "hobby",
   "hobby_series",
@@ -105,7 +105,8 @@ export const entryEntityTypeValues = [
   "schedule",
   "maintenance_log",
   "inventory_item",
-  "notebook"
+  "notebook",
+  "idea"
 ] as const;
 export const entryTypeValues = [
   "note",
@@ -3157,7 +3158,8 @@ export const searchEntityTypeValues = [
   "hobby",
   "hobby_series",
   "hobby_collection_item",
-  "historical_inventory_item"
+  "historical_inventory_item",
+  "idea"
 ] as const;
 
 export const searchEntityTypeSchema = z.enum(searchEntityTypeValues);
@@ -3713,6 +3715,7 @@ export const attachmentEntityTypeValues = [
   "project_phase",
   "project_task",
   "inventory_item",
+  "idea",
 ] as const;
 
 export const attachmentEntityTypeSchema = z.enum(attachmentEntityTypeValues);
@@ -5578,4 +5581,169 @@ export const dashboardPinSchema = z.object({
   createdAt: z.string(),
 });
 export type DashboardPin = z.infer<typeof dashboardPinSchema>;
+
+// ── Idea Domain ─────────────────────────────────────────────────────
+
+// Enum schemas
+export const ideaStageSchema = z.enum(["spark", "developing", "ready"]);
+export type IdeaStage = z.infer<typeof ideaStageSchema>;
+
+export const ideaPrioritySchema = z.enum(["low", "medium", "high"]);
+export type IdeaPriority = z.infer<typeof ideaPrioritySchema>;
+
+export const ideaCategorySchema = z.enum([
+  "home_improvement",
+  "vehicle",
+  "outdoor",
+  "technology",
+  "hobby_craft",
+  "financial",
+  "health",
+  "travel",
+  "learning",
+  "other",
+]);
+export type IdeaCategory = z.infer<typeof ideaCategorySchema>;
+
+export const ideaPromotionTargetSchema = z.enum(["project", "asset", "hobby"]);
+export type IdeaPromotionTarget = z.infer<typeof ideaPromotionTargetSchema>;
+
+// ── Idea JSON sub-schemas ───────────────────────────────────────────
+
+export const ideaNoteItemSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  createdAt: z.string(),
+});
+export type IdeaNoteItem = z.infer<typeof ideaNoteItemSchema>;
+
+export const ideaLinkItemSchema = z.object({
+  id: z.string(),
+  url: z.string().url(),
+  label: z.string(),
+  createdAt: z.string(),
+});
+export type IdeaLinkItem = z.infer<typeof ideaLinkItemSchema>;
+
+export const ideaMaterialItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  quantity: z.string(),
+  notes: z.string(),
+});
+export type IdeaMaterialItem = z.infer<typeof ideaMaterialItemSchema>;
+
+export const ideaStepItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  done: z.boolean(),
+});
+export type IdeaStepItem = z.infer<typeof ideaStepItemSchema>;
+
+// ── Idea response schema ────────────────────────────────────────────
+
+export const ideaSchema = z.object({
+  id: z.string(),
+  householdId: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  stage: ideaStageSchema,
+  priority: ideaPrioritySchema,
+  category: ideaCategorySchema.nullable(),
+  promotionTarget: ideaPromotionTargetSchema.nullable(),
+  notes: z.array(ideaNoteItemSchema),
+  links: z.array(ideaLinkItemSchema),
+  materials: z.array(ideaMaterialItemSchema),
+  steps: z.array(ideaStepItemSchema),
+  promotedAt: z.string().nullable(),
+  promotedToType: ideaPromotionTargetSchema.nullable(),
+  promotedToId: z.string().nullable(),
+  demotedFromType: ideaPromotionTargetSchema.nullable(),
+  demotedFromId: z.string().nullable(),
+  archivedAt: z.string().nullable(),
+  createdById: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Idea = z.infer<typeof ideaSchema>;
+
+export const ideaSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  stage: ideaStageSchema,
+  priority: ideaPrioritySchema,
+  category: ideaCategorySchema.nullable(),
+  promotionTarget: ideaPromotionTargetSchema.nullable(),
+  noteCount: z.number(),
+  linkCount: z.number(),
+  materialCount: z.number(),
+  stepCount: z.number(),
+  stepsCompleted: z.number(),
+  promotedAt: z.string().nullable(),
+  promotedToType: ideaPromotionTargetSchema.nullable(),
+  archivedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type IdeaSummary = z.infer<typeof ideaSummarySchema>;
+
+// ── Idea input schemas ──────────────────────────────────────────────
+
+export const createIdeaSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  stage: ideaStageSchema.optional(),
+  priority: ideaPrioritySchema.optional(),
+  category: ideaCategorySchema.optional(),
+  promotionTarget: ideaPromotionTargetSchema.optional(),
+  materials: z.array(z.object({
+    name: z.string().min(1),
+    quantity: z.string(),
+    notes: z.string(),
+  })).optional(),
+  steps: z.array(z.object({
+    label: z.string().min(1),
+  })).optional(),
+});
+export type CreateIdeaInput = z.infer<typeof createIdeaSchema>;
+
+export const updateIdeaSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  stage: ideaStageSchema.optional(),
+  priority: ideaPrioritySchema.optional(),
+  category: ideaCategorySchema.nullable().optional(),
+  promotionTarget: ideaPromotionTargetSchema.nullable().optional(),
+  materials: z.array(ideaMaterialItemSchema).optional(),
+  steps: z.array(ideaStepItemSchema).optional(),
+  links: z.array(ideaLinkItemSchema).optional(),
+});
+export type UpdateIdeaInput = z.infer<typeof updateIdeaSchema>;
+
+export const addIdeaNoteSchema = z.object({
+  text: z.string().min(1).max(2000),
+});
+export type AddIdeaNoteInput = z.infer<typeof addIdeaNoteSchema>;
+
+export const addIdeaLinkSchema = z.object({
+  url: z.string().url(),
+  label: z.string().min(1).max(200),
+});
+export type AddIdeaLinkInput = z.infer<typeof addIdeaLinkSchema>;
+
+export const promoteIdeaSchema = z.object({
+  target: ideaPromotionTargetSchema,
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+});
+export type PromoteIdeaInput = z.infer<typeof promoteIdeaSchema>;
+
+export const demoteToIdeaSchema = z.object({
+  sourceType: ideaPromotionTargetSchema,
+  sourceId: z.string(),
+  title: z.string().min(1).max(200).optional(),
+  stage: ideaStageSchema.optional(),
+});
+export type DemoteToIdeaInput = z.infer<typeof demoteToIdeaSchema>;
 

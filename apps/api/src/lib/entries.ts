@@ -403,6 +403,27 @@ export const validateEntryTarget = async (
         })
       };
     }
+    case "idea": {
+      const idea = await prisma.idea.findFirst({
+        where: { id: entityId, householdId },
+        select: { id: true, title: true }
+      });
+
+      return idea
+        ? {
+            status: "ok",
+            context: buildContext({
+              entityType,
+              entityId: idea.id,
+              label: idea.title,
+              parentEntityType: null,
+              parentEntityId: null,
+              parentLabel: null,
+              entityUrl: `/ideas/${idea.id}?householdId=${householdId}`
+            })
+          }
+        : { status: "missing" };
+    }
     default:
       return { status: "unsupported", message: unsupportedEntryTargetMessage(entityType) };
   }
@@ -684,6 +705,25 @@ export const resolveEntryEntityContexts = async (
           entityUrl: `/notes?householdId=${householdId}`
         }));
       }
+    }
+  }
+
+  const ideaIds = Array.from(byType.get("idea") ?? []);
+  if (ideaIds.length > 0) {
+    const ideas = await prisma.idea.findMany({
+      where: { id: { in: ideaIds }, householdId },
+      select: { id: true, title: true }
+    });
+    for (const idea of ideas) {
+      resolved.set(createEntryEntityKey("idea", idea.id), buildContext({
+        entityType: "idea",
+        entityId: idea.id,
+        label: idea.title,
+        parentEntityType: null,
+        parentEntityId: null,
+        parentLabel: null,
+        entityUrl: `/ideas/${idea.id}?householdId=${householdId}`
+      }));
     }
   }
 

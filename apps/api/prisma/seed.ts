@@ -2603,6 +2603,140 @@ async function main(): Promise<void> {
     });
   }
 
+  // ── Ideas ──────────────────────────────────────────────────────────
+  const ideaSparkId = "clkeeperidea000000000001";
+  const ideaDevelopingId = "clkeeperidea000000000002";
+  const ideaReadyId = "clkeeperidea000000000003";
+  const ideaPromotedId = "clkeeperidea000000000004";
+  const ideaTechId = "clkeeperidea000000000005";
+  const ideaTravelId = "clkeeperidea000000000006";
+
+  await prisma.idea.upsert({
+    where: { id: ideaSparkId },
+    update: {},
+    create: {
+      id: ideaSparkId,
+      householdId,
+      createdById: ownerUserId,
+      title: "Install smart thermostat",
+      stage: "spark",
+      priority: "low",
+      category: "home_improvement",
+    },
+  });
+
+  await prisma.idea.upsert({
+    where: { id: ideaDevelopingId },
+    update: {},
+    create: {
+      id: ideaDevelopingId,
+      householdId,
+      createdById: ownerUserId,
+      title: "Build raised garden beds",
+      description: "Construct 4x8 cedar raised beds for the backyard vegetable garden",
+      stage: "developing",
+      priority: "medium",
+      category: "outdoor",
+      promotionTarget: "project",
+      notes: [
+        { id: "note-001", text: "Cedar is best for longevity — avoid pressure-treated lumber near food", createdAt: "2026-02-15T10:00:00.000Z" },
+        { id: "note-002", text: "Need at least 12 inches deep for root vegetables", createdAt: "2026-02-18T14:30:00.000Z" },
+      ],
+      links: [
+        { id: "link-001", url: "https://example.com/raised-bed-plans", label: "Raised Bed Plans Guide", createdAt: "2026-02-16T09:00:00.000Z" },
+      ],
+      materials: [
+        { id: "mat-001", name: "Cedar 2x12x8 boards", quantity: "12", notes: "Check local lumber yard pricing" },
+        { id: "mat-002", name: "Deck screws (3 inch)", quantity: "1 box", notes: "Stainless steel preferred" },
+        { id: "mat-003", name: "Landscape fabric", quantity: "50 sq ft", notes: "For bottom of beds" },
+        { id: "mat-004", name: "Garden soil mix", quantity: "2 cubic yards", notes: "60/40 topsoil/compost blend" },
+      ],
+      steps: [
+        { id: "step-001", label: "Measure and mark bed locations", done: true },
+        { id: "step-002", label: "Purchase lumber and hardware", done: false },
+        { id: "step-003", label: "Cut boards to size", done: false },
+        { id: "step-004", label: "Assemble bed frames", done: false },
+        { id: "step-005", label: "Level and place beds", done: false },
+        { id: "step-006", label: "Fill with soil mix", done: false },
+      ],
+    },
+  });
+
+  await prisma.idea.upsert({
+    where: { id: ideaReadyId },
+    update: {},
+    create: {
+      id: ideaReadyId,
+      householdId,
+      createdById: memberUserId,
+      title: "Set up home NAS server",
+      description: "Network-attached storage for family photo backups and media streaming",
+      stage: "ready",
+      priority: "high",
+      category: "technology",
+      promotionTarget: "asset",
+      steps: [
+        { id: "step-010", label: "Research NAS hardware options", done: true },
+        { id: "step-011", label: "Order Synology DS923+", done: true },
+        { id: "step-012", label: "Purchase 4x 8TB NAS drives", done: true },
+        { id: "step-013", label: "Configure RAID and network shares", done: false },
+      ],
+    },
+  });
+
+  await prisma.idea.upsert({
+    where: { id: ideaPromotedId },
+    update: {},
+    create: {
+      id: ideaPromotedId,
+      householdId,
+      createdById: ownerUserId,
+      title: "Kitchen renovation project",
+      description: "Full kitchen remodel — cabinets, countertops, and backsplash",
+      stage: "ready",
+      priority: "high",
+      category: "home_improvement",
+      promotionTarget: "project",
+      promotedAt: new Date("2026-01-15T12:00:00.000Z"),
+      promotedToType: "project",
+      promotedToId: projectId,
+      archivedAt: new Date("2026-01-15T12:00:00.000Z"),
+    },
+  });
+
+  await prisma.idea.upsert({
+    where: { id: ideaTechId },
+    update: {},
+    create: {
+      id: ideaTechId,
+      householdId,
+      createdById: memberUserId,
+      title: "Learn woodworking basics",
+      description: "Pick up woodworking as a hobby — start with simple projects",
+      stage: "developing",
+      priority: "medium",
+      category: "hobby_craft",
+      promotionTarget: "hobby",
+      notes: [
+        { id: "note-010", text: "Local community college has a weekend intro course", createdAt: "2026-03-01T08:00:00.000Z" },
+      ],
+    },
+  });
+
+  await prisma.idea.upsert({
+    where: { id: ideaTravelId },
+    update: {},
+    create: {
+      id: ideaTravelId,
+      householdId,
+      createdById: ownerUserId,
+      title: "Plan summer camping trip",
+      stage: "spark",
+      priority: "low",
+      category: "travel",
+    },
+  });
+
   await rebuildSearchIndex(prisma, householdId);
 
   // ── Built-in Note Templates ──────────────────────────────────────────

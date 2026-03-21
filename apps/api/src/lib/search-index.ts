@@ -61,7 +61,8 @@ const SEARCH_GROUP_LABELS: Record<SearchEntityType, string> = {
   hobby: "Hobbies",
   hobby_series: "Hobby Series",
   hobby_collection_item: "Hobby Collection Items",
-  historical_inventory_item: "Historical"
+  historical_inventory_item: "Historical",
+  idea: "Ideas"
 };
 
 const SEARCH_GROUP_ORDER: SearchEntityType[] = [
@@ -81,7 +82,8 @@ const SEARCH_GROUP_ORDER: SearchEntityType[] = [
   "hobby",
   "hobby_series",
   "hobby_collection_item",
-  "historical_inventory_item"
+  "historical_inventory_item",
+  "idea"
 ];
 
 const normalizeText = (value: string | null | undefined): string | null => {
@@ -1654,6 +1656,41 @@ export const syncHobbyToSearchIndex = async (prisma: SearchPrisma, hobbyId: stri
   }]);
 };
 
+export const syncIdeaToSearchIndex = async (prisma: SearchPrisma, ideaId: string): Promise<void> => {
+  const idea = await prisma.idea.findUnique({
+    where: { id: ideaId },
+    select: {
+      id: true,
+      householdId: true,
+      title: true,
+      description: true,
+      stage: true,
+      priority: true,
+      category: true,
+    }
+  });
+
+  if (!idea) {
+    await deleteSearchIndexEntry(prisma, "idea", ideaId);
+    return;
+  }
+
+  await syncSearchIndexPayloads(prisma, "idea", idea.id, [{
+    householdId: idea.householdId,
+    entityType: "idea",
+    entityId: idea.id,
+    title: idea.title,
+    subtitle: idea.category ?? idea.stage,
+    body: joinText(idea.description, idea.stage, idea.priority, idea.category),
+    entityUrl: `/ideas/${idea.id}?householdId=${idea.householdId}`,
+    entityMeta: {
+      stage: idea.stage,
+      priority: idea.priority,
+      category: idea.category
+    }
+  }]);
+};
+
 export const syncHobbyProjectToSearchIndex = async (prisma: SearchPrisma, hobbyProjectId: string): Promise<void> => {
   const project = await prisma.hobbyProject.findUnique({
     where: { id: hobbyProjectId },
@@ -2036,6 +2073,15 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const item of hobbyCollectionItems) {
     await syncHobbyCollectionItemToSearchIndex(prisma, item.id);
+  }
+
+  const ideas = await prisma.idea.findMany({
+    where: { householdId, archivedAt: null },
+    select: { id: true }
+  });
+
+  for (const idea of ideas) {
+    await syncIdeaToSearchIndex(prisma, idea.id);
   }
 };
 

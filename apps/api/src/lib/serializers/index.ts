@@ -7,6 +7,7 @@ export * from "./cost-analytics.js";
 export * from "./entries.js";
 export * from "./hobby-analytics.js";
 export * from "./hobbies.js";
+export * from "./ideas.js";
 export * from "./invitations.js";
 export * from "./inventory.js";
 export * from "./maintenance-logs.js";
