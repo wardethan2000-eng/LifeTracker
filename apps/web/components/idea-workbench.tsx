@@ -2,56 +2,85 @@
 
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useTransition } from "react";
+import type { Idea, IdeaCategory, IdeaPriority, IdeaPromotionTarget, IdeaStage } from "@lifekeeper/types";
+import { createIdeaAction, updateIdeaAction } from "../app/actions";
 
-type MaterialItem = {
+type MaterialDraft = {
   name: string;
   quantity: string;
   notes: string;
 };
 
-type TaskItem = {
+type TaskDraft = {
   label: string;
 };
 
-const STORAGE_KEY = "lifekeeper_ideas";
-
-type StoredIdea = {
-  id: string;
-  title: string;
-  description: string;
-  materials: MaterialItem[];
-  tasks: TaskItem[];
-  escalateTo: string;
-  createdAt: string;
+const stageLabels: Record<IdeaStage, string> = {
+  spark: "Spark",
+  developing: "Developing",
+  ready: "Ready",
 };
 
-function saveIdea(idea: Omit<StoredIdea, "id" | "createdAt">): void {
-  const existing: StoredIdea[] = JSON.parse(
-    localStorage.getItem(STORAGE_KEY) ?? "[]",
-  );
-  existing.unshift({
-    ...idea,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-}
+const stageOrder: IdeaStage[] = ["spark", "developing", "ready"];
 
-export function IdeaWorkbench(): JSX.Element {
+const priorityLabels: Record<IdeaPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+const priorityOrder: IdeaPriority[] = ["low", "medium", "high"];
+
+const categoryLabels: Record<IdeaCategory, string> = {
+  home_improvement: "Home Improvement",
+  vehicle: "Vehicle",
+  outdoor: "Outdoor",
+  technology: "Technology",
+  hobby_craft: "Hobby / Craft",
+  financial: "Financial",
+  health: "Health",
+  travel: "Travel",
+  learning: "Learning",
+  other: "Other",
+};
+
+const categoryKeys: IdeaCategory[] = [
+  "home_improvement", "vehicle", "outdoor", "technology",
+  "hobby_craft", "financial", "health", "travel", "learning", "other",
+];
+
+type IdeaWorkbenchProps = {
+  householdId: string;
+  idea?: Idea;
+};
+
+export function IdeaWorkbench({ householdId, idea }: IdeaWorkbenchProps): JSX.Element {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [materials, setMaterials] = useState<MaterialItem[]>([]);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [escalateTo, setEscalateTo] = useState("");
+  const isEditMode = !!idea;
+  const [isPending, startTransition] = useTransition();
+
+  const [title, setTitle] = useState(idea?.title ?? "");
+  const [description, setDescription] = useState(idea?.description ?? "");
+  const [materials, setMaterials] = useState<MaterialDraft[]>(
+    idea?.materials.map((m) => ({ name: m.name, quantity: m.quantity, notes: m.notes })) ?? []
+  );
+  const [tasks, setTasks] = useState<TaskDraft[]>(
+    idea?.steps.map((s) => ({ label: s.label })) ?? []
+  );
+  const [promotionTarget, setPromotionTarget] = useState<IdeaPromotionTarget | "">(
+    idea?.promotionTarget ?? ""
+  );
+  const [priority, setPriority] = useState<IdeaPriority>(idea?.priority ?? "medium");
+  const [category, setCategory] = useState<IdeaCategory | "">(idea?.category ?? "");
+  const [stage, setStage] = useState<IdeaStage>(idea?.stage ?? "spark");
 
   const addMaterial = useCallback(() => {
     setMaterials((prev) => [...prev, { name: "", quantity: "", notes: "" }]);
   }, []);
 
   const updateMaterial = useCallback(
-    (index: number, field: keyof MaterialItem, value: string) => {
+    (index: number, field: keyof MaterialDraft, value: string) => {
       setMaterials((prev) =>
         prev.map((m, i) => (i === index ? { ...m, [field]: value } : m)),
       );
@@ -81,15 +110,50 @@ export function IdeaWorkbench(): JSX.Element {
     e.preventDefault();
     if (!title.trim()) return;
 
-    saveIdea({
-      title: title.trim(),
-      description: description.trim(),
-      materials: materials.filter((m) => m.name.trim()),
-      tasks: tasks.filter((t) => t.label.trim()),
-      escalateTo,
-    });
+    const filteredMaterials = materials.filter((m) => m.name.trim());
+    const filteredTasks = tasks.filter((t) => t.label.trim());
 
-    router.push("/ideas");
+    startTransition(async () => {
+      if (isEditMode) {
+        await updateIdeaAction(householdId, idea.id, {
+          title: title.trim(),
+          description: description.trim() || null,
+          priority,
+          category: category || null,
+          promotionTarget: promotionTarget || null,
+          materials: filteredMaterials.map((m) => ({
+            id: crypto.randomUUID(),
+            name: m.name.trim(),
+            quantity: m.quantity.trim(),
+            notes: m.notes.trim(),
+          })),
+          steps: filteredTasks.map((t) => ({
+            id: crypto.randomUUID(),
+            label: t.label.trim(),
+            done: false,
+          })),
+        });
+        router.push(`/ideas/${idea.id}`);
+      } else {
+        const newId = await createIdeaAction(householdId, {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          stage,
+          priority,
+          category: category || undefined,
+          promotionTarget: promotionTarget || undefined,
+          materials: filteredMaterials.map((m) => ({
+            name: m.name.trim(),
+            quantity: m.quantity.trim(),
+            notes: m.notes.trim(),
+          })),
+          steps: filteredTasks.map((t) => ({
+            label: t.label.trim(),
+          })),
+        });
+        router.push(`/ideas/${newId}`);
+      }
+    });
   };
 
   return (
@@ -267,7 +331,60 @@ export function IdeaWorkbench(): JSX.Element {
       <div className="workbench-layout__aside">
         <section className="card">
           <div className="card__header">
-            <h2>Escalate Later</h2>
+            <h2>Priority &amp; Category</h2>
+          </div>
+          <div className="card__body">
+            <label className="field">
+              <span>Priority</span>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as IdeaPriority)}
+              >
+                {priorityOrder.map((p) => (
+                  <option key={p} value={p}>{priorityLabels[p]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field" style={{ marginTop: 10 }}>
+              <span>Category</span>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as IdeaCategory | "")}
+              >
+                <option value="">No category</option>
+                {categoryKeys.map((c) => (
+                  <option key={c} value={c}>{categoryLabels[c]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        {!isEditMode && (
+          <section className="card">
+            <div className="card__header">
+              <h2>Initial Stage</h2>
+            </div>
+            <div className="card__body">
+              <div className="stage-selector">
+                {stageOrder.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`stage-selector__option${stage === s ? " stage-selector__option--active" : ""}`}
+                    onClick={() => setStage(s)}
+                  >
+                    {stageLabels[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="card">
+          <div className="card__header">
+            <h2>Promotion Target</h2>
           </div>
           <div className="card__body">
             <p
@@ -282,8 +399,8 @@ export function IdeaWorkbench(): JSX.Element {
             <label className="field">
               <span>Destination</span>
               <select
-                value={escalateTo}
-                onChange={(e) => setEscalateTo(e.target.value)}
+                value={promotionTarget}
+                onChange={(e) => setPromotionTarget(e.target.value as IdeaPromotionTarget | "")}
               >
                 <option value="">Undecided</option>
                 <option value="project">Project — plan with phases and budget</option>
@@ -299,14 +416,15 @@ export function IdeaWorkbench(): JSX.Element {
         <button
           type="submit"
           className="button button--primary"
-          disabled={!title.trim()}
+          disabled={!title.trim() || isPending}
         >
-          Save Idea
+          {isPending ? "Saving…" : isEditMode ? "Save Changes" : "Save Idea"}
         </button>
         <button
           type="button"
           className="button button--ghost"
-          onClick={() => router.push("/ideas")}
+          onClick={() => router.push(isEditMode ? `/ideas/${idea.id}` : "/ideas")}
+          disabled={isPending}
         >
           Cancel
         </button>

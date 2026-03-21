@@ -4,6 +4,7 @@
         "/^npx --yes prisma migrate dev --name add_note_folders_and_notebook --schema apps/api/prisma/schema\\.prisma$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "npx tsc": true
     }
 }

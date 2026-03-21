@@ -74,7 +74,11 @@ import type {
   SpaceContentsResponse,
   SpaceGeneralItemInput,
   UpdateSpaceInput,
-  UpdateUsageMetricInput
+  UpdateUsageMetricInput,
+  CreateIdeaInput,
+  UpdateIdeaInput,
+  PromoteIdeaInput,
+  DemoteToIdeaInput,
 } from "@lifekeeper/types";
 import {
   assetCustomFieldsSchema,
@@ -212,7 +216,17 @@ import {
   addGeneralItemToSpace as addGeneralItemToSpaceRequest,
   addItemToSpace as addItemToSpaceRequest,
   moveSpace as moveSpaceRequest,
-  removeItemFromSpace as removeItemFromSpaceRequest
+  removeItemFromSpace as removeItemFromSpaceRequest,
+  createIdea,
+  updateIdea,
+  deleteIdea,
+  addIdeaNote,
+  removeIdeaNote,
+  addIdeaLink,
+  removeIdeaLink,
+  updateIdeaStage,
+  promoteIdea,
+  demoteToIdea,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
@@ -3691,4 +3705,108 @@ export async function deleteHobbySessionAction(formData: FormData): Promise<void
   await deleteHobbySession(householdId, hobbyId, sessionId);
   revalidateHobbySessionPaths(hobbyId);
   redirect(`/hobbies/${hobbyId}?tab=sessions`);
+}
+
+// ── Ideas ──────────────────────────────────────────────────────────
+
+const revalidateIdeaPaths = (ideaId?: string): void => {
+  revalidatePath("/ideas");
+  if (ideaId) {
+    revalidatePath(`/ideas/${ideaId}`);
+    revalidatePath(`/ideas/${ideaId}/edit`);
+  }
+};
+
+export async function createIdeaAction(
+  householdId: string,
+  data: CreateIdeaInput
+): Promise<string> {
+  const idea = await createIdea(householdId, data);
+  revalidateIdeaPaths(idea.id);
+  return idea.id;
+}
+
+export async function updateIdeaAction(
+  householdId: string,
+  ideaId: string,
+  data: UpdateIdeaInput
+): Promise<void> {
+  await updateIdea(householdId, ideaId, data);
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function deleteIdeaAction(
+  householdId: string,
+  ideaId: string
+): Promise<void> {
+  await deleteIdea(householdId, ideaId);
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function addIdeaNoteAction(
+  householdId: string,
+  ideaId: string,
+  text: string
+): Promise<void> {
+  await addIdeaNote(householdId, ideaId, { text });
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function removeIdeaNoteAction(
+  householdId: string,
+  ideaId: string,
+  noteId: string
+): Promise<void> {
+  await removeIdeaNote(householdId, ideaId, noteId);
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function addIdeaLinkAction(
+  householdId: string,
+  ideaId: string,
+  url: string,
+  label: string
+): Promise<void> {
+  await addIdeaLink(householdId, ideaId, { url, label });
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function removeIdeaLinkAction(
+  householdId: string,
+  ideaId: string,
+  linkId: string
+): Promise<void> {
+  await removeIdeaLink(householdId, ideaId, linkId);
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function updateIdeaStageAction(
+  householdId: string,
+  ideaId: string,
+  stage: string
+): Promise<void> {
+  await updateIdeaStage(householdId, ideaId, stage);
+  revalidateIdeaPaths(ideaId);
+}
+
+export async function promoteIdeaAction(
+  householdId: string,
+  ideaId: string,
+  data: PromoteIdeaInput
+): Promise<{ type: string; id: string }> {
+  const result = await promoteIdea(householdId, ideaId, data);
+  revalidateIdeaPaths(ideaId);
+  if (result.createdEntity.type === "project") revalidatePath("/projects");
+  if (result.createdEntity.type === "asset") revalidatePath("/assets");
+  if (result.createdEntity.type === "hobby") revalidatePath("/hobbies");
+  return result.createdEntity;
+}
+
+export async function demoteToIdeaAction(
+  householdId: string,
+  data: DemoteToIdeaInput
+): Promise<{ id: string; title: string }> {
+  const idea = await demoteToIdea(householdId, data);
+  revalidateIdeaPaths();
+  return { id: idea.id, title: idea.title };
 }

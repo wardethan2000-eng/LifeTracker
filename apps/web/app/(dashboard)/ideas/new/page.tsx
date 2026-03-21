@@ -1,8 +1,25 @@
 import type { JSX } from "react";
 import Link from "next/link";
+import { getMe } from "../../../../lib/api";
 import { IdeaWorkbench } from "../../../../components/idea-workbench";
 
-export default function NewIdeaPage(): JSX.Element {
+export default async function NewIdeaPage(): Promise<JSX.Element> {
+  const me = await getMe();
+  const household = me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <header className="page-header">
+          <div><h1>Capture an Idea</h1></div>
+        </header>
+        <div className="page-body">
+          <p>No household found. <Link href="/" className="text-link">Go to Dashboard</Link>.</p>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <header className="page-header">
@@ -20,7 +37,7 @@ export default function NewIdeaPage(): JSX.Element {
       </header>
 
       <div className="page-body">
-        <IdeaWorkbench />
+        <IdeaWorkbench householdId={household.id} />
       </div>
     </>
   );

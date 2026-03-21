@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { JSX } from "react";
+import { useCallback, useRef, useState } from "react";
+import { IdeaQuickCapture } from "./idea-quick-capture";
 
 export type SidebarNavItem = {
   href: string;
@@ -12,6 +14,7 @@ export type SidebarNavItem = {
 
 type SidebarNavProps = {
   navItems: SidebarNavItem[];
+  householdId?: string | null;
 };
 
 const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
@@ -49,8 +52,14 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
   }
 };
 
-export function SidebarNav({ navItems }: SidebarNavProps): JSX.Element {
+export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Element {
   const pathname = usePathname();
+  const [showQuickCapture, setShowQuickCapture] = useState(false);
+  const quickAddRef = useRef<HTMLButtonElement>(null);
+
+  const handleCloseCapture = useCallback(() => {
+    setShowQuickCapture(false);
+  }, []);
 
   return (
     <div className="sidebar__nav">
@@ -62,6 +71,40 @@ export function SidebarNav({ navItems }: SidebarNavProps): JSX.Element {
           : item.href === "/assets"
             ? !isAssetsCreatePath && (pathname === item.href || pathname.startsWith(`${item.href}/`))
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+        const isIdeas = item.href === "/ideas";
+
+        if (isIdeas && householdId) {
+          return (
+            <div key={item.href} className="sidebar__link-row">
+              <Link
+                href={item.href}
+                prefetch={true}
+                className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+              >
+                <NavIcon icon={item.icon} />
+                {item.label}
+              </Link>
+              <button
+                ref={quickAddRef}
+                type="button"
+                className="sidebar__quick-add"
+                onClick={() => setShowQuickCapture(true)}
+                title="Quick capture idea"
+                aria-label="Quick capture idea"
+              >
+                +
+              </button>
+              {showQuickCapture && (
+                <IdeaQuickCapture
+                  householdId={householdId}
+                  triggerRef={quickAddRef}
+                  onClose={handleCloseCapture}
+                />
+              )}
+            </div>
+          );
+        }
 
         return (
           <Link

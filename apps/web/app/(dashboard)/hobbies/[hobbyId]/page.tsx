@@ -7,8 +7,10 @@ import {
   getHobbySeries,
   getEntries,
   getMe,
+  getSourceIdea,
 } from "../../../../lib/api";
 import { HobbyDashboard } from "../../../../components/hobby-dashboard";
+import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
 
 type HobbyDetailPageProps = {
   params: Promise<{ hobbyId: string }>;
@@ -25,7 +27,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       return <p>No household found.</p>;
     }
 
-    const [hobby, sessions, series, entriesResult] = await Promise.all([
+    const [hobby, sessions, series, entriesResult, sourceIdea] = await Promise.all([
       getHobbyDetail(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbySeries(household.id, hobbyId),
@@ -36,6 +38,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
         sortBy: "entryDate",
         excludeFlags: ["archived"],
       }).catch(() => ({ items: [], nextCursor: null })),
+      getSourceIdea(household.id, "hobby", hobbyId).catch(() => null),
     ]);
 
     const activeSessions = sessions.filter((s) => s.status !== "completed" && s.status !== "cancelled");
@@ -51,7 +54,11 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       }));
 
     return (
-      <HobbyDashboard
+      <>
+        {sourceIdea && (
+          <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
+        )}
+        <HobbyDashboard
         householdId={household.id}
         hobbyId={hobbyId}
         hobbyName={hobby.name}
@@ -92,6 +99,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
         }))}
         recentEntries={recentEntries}
       />
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {

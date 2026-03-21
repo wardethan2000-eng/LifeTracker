@@ -8,7 +8,9 @@ import {
   getMe,
   getProjectDetail,
   getEntries,
+  getSourceIdea,
 } from "../../../../lib/api";
+import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
 import { ProjectDashboard } from "../../../../components/project-dashboard";
 
 type ProjectDetailPageProps = {
@@ -46,7 +48,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, entriesResult] = await Promise.all([
+    const [project, entriesResult, sourceIdea] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getEntries(household.id, {
         entityType: "project",
@@ -56,6 +58,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         excludeFlags: ["archived"],
         tags: undefined,
       }).catch(() => ({ items: [], nextCursor: null })),
+      getSourceIdea(household.id, "project", routeParams.projectId).catch(() => null),
     ]);
 
     const qs = `?householdId=${household.id}`;
@@ -134,7 +137,11 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       }));
 
     return (
-      <ProjectDashboard
+      <>
+        {sourceIdea && (
+          <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
+        )}
+        <ProjectDashboard
         householdId={household.id}
         projectId={project.id}
         qs={qs}
@@ -161,6 +168,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         upcomingTasks={upcomingTasks}
         phaseProgress={phaseProgress}
       />
+      </>
     );
   } catch (error) {
     if (error instanceof ApiError) {

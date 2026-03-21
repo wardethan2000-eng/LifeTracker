@@ -12,6 +12,7 @@ import {
   updateAssetAction
 } from "../app/actions";
 import { AssetDangerActions } from "./asset-danger-actions";
+import { DemoteToIdeaButton } from "./demote-to-idea-button";
 import { AssetLabelActions } from "./asset-label-actions";
 import { AssetProfileWorkbench } from "./asset-profile-workbench";
 import {
@@ -139,6 +140,12 @@ export async function AssetSettingsTab({
           <h2>Danger Zone</h2>
         </div>
         <div className="panel__body--padded">
+          <DemoteToIdeaButton
+            householdId={detail.asset.householdId}
+            sourceType="asset"
+            sourceId={detail.asset.id}
+            sourceName={detail.asset.name}
+          />
           <AssetDangerActions
             householdId={detail.asset.householdId}
             assetId={detail.asset.id}

@@ -6,6 +6,7 @@ import {
 } from "../../../../actions";
 import { ExpandableCard } from "../../../../../components/expandable-card";
 import { ProjectCoreFormFields } from "../../../../../components/project-core-form-fields";
+import { DemoteToIdeaButton } from "../../../../../components/demote-to-idea-button";
 import { ProjectDangerActions } from "../../../../../components/project-danger-actions";
 import {
   ApiError,
@@ -106,7 +107,13 @@ export default async function ProjectSettingsPage({ params, searchParams }: Proj
                 </div>
               </form>
             </div>
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+              <DemoteToIdeaButton
+                householdId={household.id}
+                sourceType="project"
+                sourceId={project.id}
+                sourceName={project.name}
+              />
               <ProjectDangerActions householdId={household.id} projectId={project.id} />
             </div>
           </div>

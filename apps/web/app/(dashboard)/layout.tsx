@@ -60,7 +60,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <p>{t("brand.tagline")}</p>
         </div>
 
-        <SidebarNav navItems={navItems.map((item) => ({ ...item, label: t(`nav.${item.translationKey}`) }))} />
+        <SidebarNav navItems={navItems.map((item) => ({ ...item, label: t(`nav.${item.translationKey}`) }))} householdId={fallbackHouseholdId} />
 
         <div className="sidebar__footer">
           <div className="sidebar__user">

@@ -467,6 +467,16 @@ import {
   hobbySessionStageChecklistItemSchema,
   type HobbyDetail,
   type HobbySessionDetail,
+  ideaSchema,
+  ideaSummarySchema,
+  addIdeaNoteSchema,
+  addIdeaLinkSchema,
+  type Idea,
+  type IdeaSummary,
+  type CreateIdeaInput,
+  type UpdateIdeaInput,
+  type PromoteIdeaInput,
+  type DemoteToIdeaInput,
   ideaCanvasSchema,
   ideaCanvasSummarySchema,
   ideaCanvasNodeSchema,
@@ -5223,6 +5233,166 @@ export const deleteNoteTemplate = async (
     path: `/v1/households/${householdId}/note-templates/${templateId}`,
     method: "DELETE",
   });
+};
+
+// ─── Ideas ───────────────────────────────────────────────────────────────────
+
+export const getHouseholdIdeas = async (
+  householdId: string,
+  options?: {
+    stage?: string;
+    category?: string;
+    priority?: string;
+    search?: string;
+    includeArchived?: boolean;
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<IdeaSummary[]> => {
+  const params = new URLSearchParams();
+  if (options?.stage) params.set("stage", options.stage);
+  if (options?.category) params.set("category", options.category);
+  if (options?.priority) params.set("priority", options.priority);
+  if (options?.search) params.set("search", options.search);
+  if (options?.includeArchived) params.set("includeArchived", "true");
+  if (options?.limit != null) params.set("limit", String(options.limit));
+  if (options?.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  const result = await apiRequest<{ items: unknown[] }>({
+    path: `/v1/households/${householdId}/ideas${query ? `?${query}` : ""}`,
+    cacheOptions: { revalidate: 30 },
+  });
+  return result.items.map((item) => ideaSummarySchema.parse(item));
+};
+
+export const getIdea = async (
+  householdId: string,
+  ideaId: string
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}`,
+  schema: ideaSchema,
+});
+
+export const createIdea = async (
+  householdId: string,
+  input: CreateIdeaInput
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas`,
+  method: "POST",
+  body: input,
+  schema: ideaSchema,
+});
+
+export const updateIdea = async (
+  householdId: string,
+  ideaId: string,
+  input: UpdateIdeaInput
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}`,
+  method: "PATCH",
+  body: input,
+  schema: ideaSchema,
+});
+
+export const deleteIdea = async (
+  householdId: string,
+  ideaId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/ideas/${ideaId}`,
+    method: "DELETE",
+  });
+};
+
+export const addIdeaNote = async (
+  householdId: string,
+  ideaId: string,
+  data: { text: string }
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/notes`,
+  method: "POST",
+  body: data,
+  schema: ideaSchema,
+});
+
+export const removeIdeaNote = async (
+  householdId: string,
+  ideaId: string,
+  noteId: string
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/notes/${noteId}`,
+  method: "DELETE",
+  schema: ideaSchema,
+});
+
+export const addIdeaLink = async (
+  householdId: string,
+  ideaId: string,
+  data: { url: string; label: string }
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/links`,
+  method: "POST",
+  body: data,
+  schema: ideaSchema,
+});
+
+export const removeIdeaLink = async (
+  householdId: string,
+  ideaId: string,
+  linkId: string
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/links/${linkId}`,
+  method: "DELETE",
+  schema: ideaSchema,
+});
+
+export const updateIdeaStage = async (
+  householdId: string,
+  ideaId: string,
+  stage: string
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/stage`,
+  method: "PATCH",
+  body: { stage },
+  schema: ideaSchema,
+});
+
+export const promoteIdea = async (
+  householdId: string,
+  ideaId: string,
+  data: PromoteIdeaInput
+): Promise<{ idea: Idea; createdEntity: { type: string; id: string } }> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/promote`,
+  method: "POST",
+  body: data,
+  schema: z.object({
+    idea: ideaSchema,
+    createdEntity: z.object({ type: z.string(), id: z.string() }),
+  }),
+});
+
+export const demoteToIdea = async (
+  householdId: string,
+  data: DemoteToIdeaInput
+): Promise<Idea> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/demote`,
+  method: "POST",
+  body: data,
+  schema: ideaSchema,
+});
+
+export const getSourceIdea = async (
+  householdId: string,
+  entityType: string,
+  entityId: string
+): Promise<IdeaSummary | null> => {
+  const params = new URLSearchParams({ entityType, entityId });
+  const result = await apiRequest<unknown>({
+    path: `/v1/households/${householdId}/ideas/source?${params.toString()}`,
+    cacheOptions: { revalidate: 60 },
+  });
+  if (result === null) return null;
+  return ideaSummarySchema.parse(result);
 };
 
 // ─── Idea Canvas ─────────────────────────────────────────────────────────────

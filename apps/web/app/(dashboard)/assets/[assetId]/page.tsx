@@ -3,8 +3,10 @@ import {
   getAssetDetail,
   getAssetTimeline,
   getAssetTransferHistory,
+  getSourceIdea,
 } from "../../../../lib/api";
 import { AssetDashboard } from "../../../../components/asset-dashboard";
+import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
 
 type AssetOverviewPageProps = {
   params: Promise<{ assetId: string }>;
@@ -17,6 +19,8 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
     getAssetTransferHistory(assetId),
     getAssetTimeline(assetId, { limit: 5 }),
   ]);
+
+  const sourceIdea = await getSourceIdea(detail.asset.householdId, "asset", assetId).catch(() => null);
 
   const dueWork = detail.schedules
     .filter((s) => s.status === "due" || s.status === "overdue")
@@ -50,7 +54,11 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
   }));
 
   return (
-    <AssetDashboard
+    <>
+      {sourceIdea && (
+        <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
+      )}
+      <AssetDashboard
       householdId={detail.asset.householdId}
       assetId={assetId}
       conditionScore={detail.asset.conditionScore ?? null}
@@ -65,5 +73,6 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
       hobbyLinks={hobbyLinks}
       transferCount={transferHistory.items.length}
     />
+    </>
   );
 }

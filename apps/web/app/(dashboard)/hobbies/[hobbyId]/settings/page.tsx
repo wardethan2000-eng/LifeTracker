@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import Link from "next/link";
+import { DemoteToIdeaButton } from "../../../../../components/demote-to-idea-button";
 import { HobbyDangerActions } from "../../../../../components/hobby-danger-actions";
 import {
   ApiError,
@@ -160,6 +161,12 @@ export default async function HobbySettingsPage({ params }: HobbySectionPageProp
             <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginBottom: "12px" }}>
               Archive hides the hobby from active work without removing its history. Delete removes the hobby and its related records.
             </p>
+            <DemoteToIdeaButton
+              householdId={household.id}
+              sourceType="hobby"
+              sourceId={hobbyId}
+              sourceName={hobby.name}
+            />
             <HobbyDangerActions
               householdId={household.id}
               hobbyId={hobbyId}

@@ -539,6 +539,34 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  // GET /v1/households/:householdId/ideas/source?entityType=project&entityId=abc
+  app.get("/v1/households/:householdId/ideas/source", async (request, reply) => {
+    const { householdId } = householdParamsSchema.parse(request.params);
+    const query = z.object({
+      entityType: z.enum(["project", "asset", "hobby"]),
+      entityId: z.string(),
+    }).parse(request.query);
+    const userId = request.auth.userId;
+
+    if (!(await checkMembership(app.prisma, householdId, userId))) {
+      return reply.code(403).send({ message: "You do not have access to this household." });
+    }
+
+    const idea = await app.prisma.idea.findFirst({
+      where: {
+        householdId,
+        promotedToType: query.entityType,
+        promotedToId: query.entityId,
+      },
+    });
+
+    if (!idea) {
+      return reply.send(null);
+    }
+
+    return reply.send(toIdeaSummaryResponse(idea));
+  });
+
   // POST /v1/households/:householdId/ideas/demote
   app.post("/v1/households/:householdId/ideas/demote", async (request, reply) => {
     const { householdId } = householdParamsSchema.parse(request.params);

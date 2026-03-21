@@ -43,6 +43,14 @@ type NotificationSummary = {
   href: string | null;
 };
 
+type IdeaSummaryItem = {
+  id: string;
+  title: string;
+  stage: string;
+  priority: string;
+  promotionTarget: string | null;
+};
+
 type HomeDashboardProps = {
   householdId: string;
   assetCount: number;
@@ -58,6 +66,7 @@ type HomeDashboardProps = {
   nextDueAssetId: string | null;
   nextDueAssetName: string | null;
   pins: DashboardPin[];
+  ideas?: IdeaSummaryItem[];
 };
 
 export function HomeDashboard(props: HomeDashboardProps) {
@@ -76,6 +85,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
     nextDueAssetId,
     nextDueAssetName,
     pins,
+    ideas = [],
   } = props;
 
   const handleUnpin = async (pinId: string) => {
@@ -217,6 +227,57 @@ export function HomeDashboard(props: HomeDashboardProps) {
     },
   ];
 
+  if (ideas.length > 0) {
+    const sparkCount = ideas.filter((i) => i.stage === "spark").length;
+    const developingCount = ideas.filter((i) => i.stage === "developing").length;
+    const readyCount = ideas.filter((i) => i.stage === "ready").length;
+
+    const stageLabels: Record<string, string> = { spark: "Spark", developing: "Developing", ready: "Ready" };
+    const targetLabels: Record<string, string> = { project: "Project", asset: "Asset", hobby: "Hobby" };
+    const priorityLabels: Record<string, string> = { high: "High", medium: "Medium", low: "Low" };
+
+    cards.push({
+      key: "ideas",
+      title: "💡 Ideas",
+      content: (
+        <div className="dashboard-card__list">
+          <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", padding: "0 0 6px" }}>
+            {sparkCount} spark · {developingCount} developing · {readyCount} ready
+          </div>
+          {ideas.slice(0, 5).map((idea) => (
+            <div key={idea.id} className="dashboard-card__list-item">
+              <div>
+                <Link href={`/ideas/${idea.id}`} className="text-link" style={{ fontWeight: 500, fontSize: "0.85rem" }}>
+                  {idea.title}
+                </Link>
+                <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                  {stageLabels[idea.stage] ?? idea.stage}
+                  {idea.priority === "high" ? ` · ${priorityLabels[idea.priority]}` : ""}
+                  {idea.promotionTarget ? ` → ${targetLabels[idea.promotionTarget]}` : ""}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+      footerLink: { label: "View all ideas →", href: "/ideas" },
+    });
+  } else {
+    cards.push({
+      key: "ideas",
+      title: "💡 Ideas",
+      content: (
+        <div className="dashboard-card__list">
+          <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", margin: 0 }}>
+            No ideas captured yet.{" "}
+            <Link href="/ideas" className="text-link">Quick Capture</Link>
+          </p>
+        </div>
+      ),
+      footerLink: { label: "View all ideas →", href: "/ideas" },
+    });
+  }
+
   const defaultLayout: LayoutItem[] = [
     { i: "stats", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "duework", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
@@ -225,6 +286,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
     { i: "quickactions", x: 0, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "actionitems", x: 1, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "notepad", x: 2, y: 3, w: 2, h: 4, minW: 1, minH: 3 },
+    ...(ideas.length > 0 ? [{ i: "ideas", x: 0, y: 7, w: 1, h: 3, minW: 1, minH: 2 }] : []),
     ...pins.map((pin, i) => ({
       i: `pin-${pin.entityType}-${pin.entityId}`,
       x: i % 4,

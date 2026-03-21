@@ -5,7 +5,7 @@ import { getDashboardData } from "../../components/dashboard-data";
 import { HomeDashboard } from "../../components/home-dashboard";
 import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
-import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getMe } from "../../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getHouseholdIdeas, getMe } from "../../lib/api";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
 
 type HomePageProps = {
@@ -66,9 +66,10 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, pins] = await Promise.all([
+    const [dashboard, pins, recentIdeas] = await Promise.all([
       getDashboardData(selectedHousehold.id),
       getDashboardPins().catch(() => []),
+      getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
     ]);
 
     const sortedAssets = [...dashboard.assets].sort(
@@ -158,6 +159,13 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             nextDueAssetId={firstDueWork?.assetId ?? null}
             nextDueAssetName={firstDueWork?.assetName ?? null}
             pins={pins}
+            ideas={recentIdeas.map((idea) => ({
+              id: idea.id,
+              title: idea.title,
+              stage: idea.stage,
+              priority: idea.priority,
+              promotionTarget: idea.promotionTarget,
+            }))}
           />
         </div>
       </>
