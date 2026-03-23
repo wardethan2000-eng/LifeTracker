@@ -5,6 +5,9 @@ import type { JSX } from "react";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import type { IdeaCategory, IdeaPriority, IdeaStage, IdeaSummary } from "@lifekeeper/types";
 import { updateIdeaStageAction, deleteIdeaAction } from "../app/actions";
+import { useMultiSelect } from "../lib/use-multi-select";
+import { BulkActionBar } from "./bulk-action-bar";
+import { IdeaBulkActions } from "./idea-bulk-actions";
 
 type ViewMode = "board" | "table";
 
@@ -51,6 +54,8 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
   const [dragOverColumn, setDragOverColumn] = useState<IdeaStage | null>(null);
   const [stageMenu, setStageMenu] = useState<string | null>(null);
 
+  const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
+
   const filteredIdeas = useMemo(() => {
     return ideas.filter((idea) => {
       if (idea.archivedAt) return false;
@@ -68,6 +73,13 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
       return true;
     });
   }, [ideas, stageFilter, categoryFilter, priorityFilter, searchQuery]);
+
+  const allFilteredIds = useMemo(() => filteredIdeas.map((i) => i.id), [filteredIdeas]);
+  const allSelected = selectedCount > 0 && allFilteredIds.every((id) => isSelected(id));
+  const selectedItems = useMemo(
+    () => filteredIdeas.filter((i) => isSelected(i.id)),
+    [filteredIdeas, isSelected]
+  );
 
   const handleStageChange = useCallback(
     (ideaId: string, newStage: IdeaStage) => {
@@ -206,6 +218,14 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
         </div>
       </div>
 
+      <BulkActionBar selectedCount={selectedCount} onClearSelection={clearSelection}>
+        <IdeaBulkActions
+          householdId={householdId}
+          selectedItems={selectedItems}
+          onBulkComplete={clearSelection}
+        />
+      </BulkActionBar>
+
       {isPending && <div className="skeleton-bar" style={{ width: "100%", height: 2, marginBottom: 8 }} />}
 
       {viewMode === "board" ? (
@@ -241,6 +261,14 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                     onDragEnd={handleDragEnd}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <input
+                        type="checkbox"
+                        className="bulk-checkbox"
+                        checked={isSelected(idea.id)}
+                        onChange={() => toggleItem(idea.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select ${idea.title}`}
+                      />
                       <span className={`priority-dot priority-dot--${idea.priority}`} />
                       <Link href={`/ideas/${idea.id}`} className="idea-board__card-title">
                         {idea.title}
@@ -315,6 +343,16 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
             <table className="data-table idea-table">
               <thead>
                 <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      className="bulk-checkbox"
+                      checked={allSelected}
+                      onChange={() => toggleGroup(allFilteredIds, !allSelected)}
+                      aria-label="Select all ideas"
+                      disabled={filteredIdeas.length === 0}
+                    />
+                  </th>
                   <th>Idea</th>
                   <th>Stage</th>
                   <th>Priority</th>
@@ -330,6 +368,15 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
               <tbody>
                 {filteredIdeas.map((idea) => (
                   <tr key={idea.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="bulk-checkbox"
+                        checked={isSelected(idea.id)}
+                        onChange={() => toggleItem(idea.id)}
+                        aria-label={`Select ${idea.title}`}
+                      />
+                    </td>
                     <td>
                       <Link href={`/ideas/${idea.id}`} className="data-table__primary">
                         {idea.title}

@@ -3471,6 +3471,13 @@ export type BulkReassignTasksInput = z.infer<typeof bulkReassignTasksSchema>;
 export type BulkChangeProjectStatusInput = z.infer<typeof bulkChangeProjectStatusSchema>;
 export type BulkTaskOperationResult = z.infer<typeof bulkTaskOperationResultSchema>;
 export type BulkProjectOperationResult = z.infer<typeof bulkProjectOperationResultSchema>;
+export type BulkLogHobbySessionsInput = z.infer<typeof bulkLogHobbySessionsSchema>;
+export type BulkArchiveHobbySessionsInput = z.infer<typeof bulkArchiveHobbySessionsSchema>;
+export type BulkHobbySessionOperationResult = z.infer<typeof bulkHobbySessionOperationResultSchema>;
+export type BulkMoveIdeasInput = z.infer<typeof bulkMoveIdeasSchema>;
+export type BulkArchiveIdeasInput = z.infer<typeof bulkArchiveIdeasSchema>;
+export type BulkSetIdeaPriorityInput = z.infer<typeof bulkSetIdeaPrioritySchema>;
+export type BulkIdeaOperationResult = z.infer<typeof bulkIdeaOperationResultSchema>;
 export type Asset = z.infer<typeof assetSchema>;
 export type AssetPage = z.infer<typeof assetPageSchema>;
 export type AssetTransfer = z.infer<typeof assetTransferSchema>;
@@ -4988,6 +4995,33 @@ export const hobbySessionSummarySchema = hobbySessionSchema.extend({
 });
 export type HobbySessionSummary = z.infer<typeof hobbySessionSummarySchema>;
 
+export const bulkLogHobbySessionsSchema = z.object({
+  householdId: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  sessions: z.array(z.object({
+    name: z.string().min(1).max(200),
+    startDate: z.string().datetime().nullable().optional(),
+    completedDate: z.string().datetime().nullable().optional(),
+    durationMinutes: z.number().int().min(1).max(1440).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional()
+  })).min(1).max(50)
+});
+
+export const bulkArchiveHobbySessionsSchema = z.object({
+  householdId: z.string().cuid(),
+  hobbyId: z.string().cuid(),
+  sessionIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkHobbySessionOperationResultSchema = z.object({
+  succeeded: z.number(),
+  failed: z.array(z.object({
+    sessionId: z.string().optional(),
+    name: z.string().nullable(),
+    message: z.string()
+  }))
+});
+
 const hobbySeriesTagSchema = z.string().trim().min(1).max(80);
 
 export const hobbySeriesSchema = z.object({
@@ -5855,4 +5889,30 @@ export const demoteToIdeaSchema = z.object({
   stage: ideaStageSchema.optional(),
 });
 export type DemoteToIdeaInput = z.infer<typeof demoteToIdeaSchema>;
+
+export const bulkMoveIdeasSchema = z.object({
+  householdId: z.string().cuid(),
+  ideaIds: z.array(z.string().cuid()).min(1).max(100),
+  stage: ideaStageSchema
+});
+
+export const bulkArchiveIdeasSchema = z.object({
+  householdId: z.string().cuid(),
+  ideaIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkSetIdeaPrioritySchema = z.object({
+  householdId: z.string().cuid(),
+  ideaIds: z.array(z.string().cuid()).min(1).max(100),
+  priority: ideaPrioritySchema
+});
+
+export const bulkIdeaOperationResultSchema = z.object({
+  succeeded: z.number(),
+  failed: z.array(z.object({
+    ideaId: z.string(),
+    title: z.string().nullable(),
+    message: z.string()
+  }))
+});
 

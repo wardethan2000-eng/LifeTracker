@@ -58,6 +58,7 @@ import { hobbyRoutes } from "./routes/hobbies/index.js";
 import { hobbySeriesRoutes } from "./routes/hobbies/series.js";
 import { hobbyRecipeRoutes } from "./routes/hobbies/recipes.js";
 import { hobbySessionRoutes } from "./routes/hobbies/sessions.js";
+import { hobbySessionBulkRoutes } from "./routes/hobbies/sessions-bulk.js";
 import { hobbyMetricRoutes } from "./routes/hobbies/metrics.js";
 import { hobbyLinkRoutes } from "./routes/hobbies/links.js";
 import { hobbyProjectRoutes } from "./routes/hobbies/projects.js";
@@ -69,6 +70,7 @@ import { noteFolderRoutes } from "./routes/notes/index.js";
 import { noteTemplateRoutes } from "./routes/notes/templates.js";
 import { ideaCanvasRoutes } from "./routes/canvases/index.js";
 import { ideaRoutes } from "./routes/ideas/index.js";
+import { ideaBulkRoutes } from "./routes/ideas/bulk.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
@@ -125,6 +127,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   hobbySeriesRoutes,
   hobbyRecipeRoutes,
   hobbySessionRoutes,
+  hobbySessionBulkRoutes,
   hobbyMetricRoutes,
   hobbyLinkRoutes,
   hobbyProjectRoutes,
@@ -135,6 +138,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   noteFolderRoutes,
   noteTemplateRoutes,
   ideaCanvasRoutes,
+  ideaBulkRoutes,
   ideaRoutes
 ];
 

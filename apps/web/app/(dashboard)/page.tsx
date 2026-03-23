@@ -5,7 +5,8 @@ import { getDashboardData } from "../../components/dashboard-data";
 import { HomeDashboard } from "../../components/home-dashboard";
 import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
-import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getHouseholdIdeas, getMe } from "../../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdProjectStatusCounts, getLayoutPreference, getMe } from "../../lib/api";
+import { OnboardingChecklistClient } from "../../components/onboarding-checklist";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
 
 type HomePageProps = {
@@ -66,11 +67,21 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, pins, recentIdeas] = await Promise.all([
+    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, onboardingPref] = await Promise.all([
       getDashboardData(selectedHousehold.id),
       getDashboardPins().catch(() => []),
       getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
+      getHouseholdProjectStatusCounts(selectedHousehold.id).catch(() => []),
+      getHouseholdHobbies(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
+      getHouseholdInventory(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
+      getLayoutPreference("onboarding", "dismissed").catch(() => null),
     ]);
+
+    const projectCount = projectStatusCounts.reduce((sum, s) => sum + s.count, 0);
+    const hobbyCount = hobbyData.items.length;
+    const inventoryCount = inventoryData.items.length;
+    const ideaCount = recentIdeas.length;
+    const onboardingDismissed = onboardingPref !== null;
 
     const sortedAssets = [...dashboard.assets].sort(
       (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -144,6 +155,17 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
         <div className="page-body">
           <LaunchPad />
+          {!onboardingDismissed && (
+            <OnboardingChecklistClient
+              assetCount={dashboard.stats.assetCount}
+              householdId={selectedHousehold.id}
+              projectCount={projectCount}
+              hobbyCount={hobbyCount}
+              inventoryItemCount={inventoryCount}
+              ideaCount={ideaCount}
+              maintenanceScheduleCount={dashboard.stats.dueScheduleCount + dashboard.stats.overdueScheduleCount}
+            />
+          )}
           <HomeDashboard
             householdId={selectedHousehold.id}
             assetCount={dashboard.stats.assetCount}

@@ -20,7 +20,7 @@ export default async function HobbySessionsPage({ params }: HobbySectionPageProp
 
     const sessions = await getHobbySessions(household.id, hobbyId);
 
-    return <HobbySessionList hobbyId={hobbyId} sessions={sessions} />;
+    return <HobbySessionList hobbyId={hobbyId} householdId={household.id} sessions={sessions} />;
   } catch (error) {
     if (error instanceof ApiError) {
       return <div className="panel"><div className="panel__body--padded"><p>Failed to load sessions: {error.message}</p></div></div>;

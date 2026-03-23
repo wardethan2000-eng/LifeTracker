@@ -516,6 +516,10 @@ import {
   type BulkTaskOperationResult,
   bulkProjectOperationResultSchema,
   type BulkProjectOperationResult,
+  bulkHobbySessionOperationResultSchema,
+  type BulkHobbySessionOperationResult,
+  bulkIdeaOperationResultSchema,
+  type BulkIdeaOperationResult,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -4507,6 +4511,36 @@ export const deleteHobbySession = async (
   });
 };
 
+export const bulkLogHobbySessions = async (
+  householdId: string,
+  hobbyId: string,
+  sessions: Array<{
+    name: string;
+    startDate?: string | null;
+    completedDate?: string | null;
+    durationMinutes?: number | null;
+    notes?: string | null;
+  }>
+): Promise<BulkHobbySessionOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/bulk/log`,
+    method: "POST",
+    body: { sessions },
+    schema: bulkHobbySessionOperationResultSchema
+  });
+
+export const bulkArchiveHobbySessions = async (
+  householdId: string,
+  hobbyId: string,
+  sessionIds: string[]
+): Promise<BulkHobbySessionOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/bulk/archive`,
+    method: "POST",
+    body: { sessionIds },
+    schema: bulkHobbySessionOperationResultSchema
+  });
+
 // ── Hobby Series ─────────────────────────────────────────────────────
 
 export const getHobbySeries = async (
@@ -5544,6 +5578,41 @@ export const deleteIdea = async (
     method: "DELETE",
   });
 };
+
+export const bulkMoveIdeas = async (
+  householdId: string,
+  ideaIds: string[],
+  stage: string
+): Promise<BulkIdeaOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/ideas/bulk/stage`,
+    method: "POST",
+    body: { ideaIds, stage },
+    schema: bulkIdeaOperationResultSchema
+  });
+
+export const bulkArchiveIdeas = async (
+  householdId: string,
+  ideaIds: string[]
+): Promise<BulkIdeaOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/ideas/bulk/archive`,
+    method: "POST",
+    body: { ideaIds },
+    schema: bulkIdeaOperationResultSchema
+  });
+
+export const bulkSetIdeaPriority = async (
+  householdId: string,
+  ideaIds: string[],
+  priority: string
+): Promise<BulkIdeaOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/ideas/bulk/priority`,
+    method: "POST",
+    body: { ideaIds, priority },
+    schema: bulkIdeaOperationResultSchema
+  });
 
 export const addIdeaNote = async (
   householdId: string,

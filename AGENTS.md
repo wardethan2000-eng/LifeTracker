@@ -82,6 +82,25 @@ Presets live in `packages/presets/src/library.ts`. Each preset is built with hel
 5. Web client: add API methods in `apps/web/lib/api.ts`, then build UI components.
 6. Seed data: update `apps/api/prisma/seed.ts` if the feature needs demo data.
 
+## Onboarding walkthrough maintenance
+
+The onboarding checklist lives in `apps/web/components/onboarding-checklist.tsx` and is rendered conditionally on the dashboard home page at `apps/web/app/(dashboard)/page.tsx`. It is hidden once the user dismisses it or all steps are completed.
+
+**Adding a step for a new feature:**
+1. Add a new entry to the `steps` array in `OnboardingChecklist` with an `id`, `label`, `description`, `href`, and a `completed` expression (e.g. `myFeatureCount > 0`).
+2. Add a corresponding count prop to `OnboardingChecklistProps` (e.g. `myFeatureCount: number`) and destructure it in the component.
+3. In `page.tsx`, fetch the relevant count (add it to the parallel `Promise.all` block), derive the numeric count, and pass it as a prop to `<OnboardingChecklistClient />`.
+
+**If you rename or move a route** that an onboarding step links to, update the `href` field in the corresponding step in the `steps` array.
+
+**Completion detection** is automatic — each step checks whether its related entity count is greater than zero. There is no manual completion tracking.
+
+**Dismissal** is persisted via `UserLayoutPreference` with `entityType: "onboarding"` and `entityId: "dismissed"`. The server component reads this with `getLayoutPreference("onboarding", "dismissed")` and skips rendering the checklist if the preference exists. The client wrapper `OnboardingChecklistClient` writes it on dismiss and calls `router.refresh()`.
+
+**CSS styles** for the checklist are in `apps/web/app/globals.css` under the `/* Onboarding Checklist */` comment in section 56.
+
+**Keep it lightweight** — the checklist must not make its own API calls. All data is passed as props from the server component in `page.tsx`. Add new fetches there, not inside the component.
+
 ## Things to avoid
 
 - Do not break existing functionality. All changes must be additive and non-breaking.
