@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
-import { ApiError, getHouseholdAssets, getMe } from "../../../lib/api";
-import {
-  formatCategoryLabel,
-  formatDate,
-  formatVisibilityLabel
-} from "../../../lib/formatters";
+import { ApiError, getHouseholdAssetsPaginated, getMe } from "../../../lib/api";
+import { AssetListWorkspace } from "../../../components/asset-list-workspace";
+import { OffsetPaginationControls } from "../../../components/pagination-controls";
+
+const limitOptions = [25, 50, 100] as const;
 
 type AssetsPageProps = {
+  
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
@@ -17,6 +17,22 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
   const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
+  const includeArchived = params.includeArchived === "true";
+  const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
+    ? Number(params.limit)
+    : 25;
+  const offset = typeof params.offset === "string" && Number.isInteger(Number(params.offset)) && Number(params.offset) >= 0
+    ? Number(params.offset)
+    : 0;
+
+  const buildHref = (p: { offset: number; limit: number }): string => {
+    const query = new URLSearchParams();
+    if (householdId) query.set("householdId", householdId);
+    if (includeArchived) query.set("includeArchived", "true");
+    query.set("limit", String(p.limit));
+    query.set("offset", String(p.offset));
+    return `/assets?${query.toString()}`;
+  };
 
   try {
     const me = await getMe();
@@ -33,10 +49,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
       );
     }
 
-    const assets = await getHouseholdAssets(household.id);
-    const sortedAssets = [...assets].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const assetPage = await getHouseholdAssetsPaginated(household.id, { limit, offset, includeArchived });
 
     return (
       <>
@@ -50,51 +63,21 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
         <div className="page-body">
           <section className="panel">
             <div className="panel__header">
-              <h2>{t("listTitle", { count: sortedAssets.length })}</h2>
+              <h2>{t("listTitle", { count: assetPage.total })}</h2>
             </div>
             <div className="panel__body">
-              {sortedAssets.length === 0 ? (
-                <p className="panel__empty">
-                  {t("empty")} <Link href="/assets/new" className="text-link">{t("emptyLink")}</Link> {t("emptySuffix")}
-                </p>
-              ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Asset</th>
-                      <th>Category</th>
-                      <th>Visibility</th>
-                      <th>Status</th>
-                      <th>Manufacturer</th>
-                      <th>Model</th>
-                      <th>Created</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedAssets.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <div className="data-table__primary">
-                            <Link href={`/assets/${item.id}`} className="data-table__link">{item.name}</Link>
-                          </div>
-                        </td>
-                        <td><span className="pill">{formatCategoryLabel(item.category)}</span></td>
-                        <td><span className="pill">{formatVisibilityLabel(item.visibility)}</span></td>
-                        <td>{item.isArchived ? tCommon("status.archived") : tCommon("status.active")}</td>
-                        <td>{item.manufacturer ?? "—"}</td>
-                        <td>{item.model ?? "—"}</td>
-                        <td>{formatDate(item.createdAt)}</td>
-                        <td>
-                          <Link href={`/assets/${item.id}`} className="data-table__link">{tCommon("actions.open")}</Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <AssetListWorkspace householdId={household.id} assets={assetPage.items} />
             </div>
           </section>
+
+          <OffsetPaginationControls
+            total={assetPage.total}
+            limit={assetPage.limit}
+            offset={assetPage.offset}
+            hasMore={assetPage.hasMore}
+            entityLabel="assets"
+            buildHref={buildHref}
+          />
         </div>
       </>
     );

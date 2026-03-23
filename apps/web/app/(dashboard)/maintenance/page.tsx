@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
 import { ApiError, getHouseholdDueWork, getMe } from "../../../lib/api";
-import { formatCategoryLabel, formatDueLabel } from "../../../lib/formatters";
+import { formatCategoryLabel } from "../../../lib/formatters";
+import { MaintenanceListWorkspace } from "../../../components/maintenance-list-workspace";
+import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
 type MaintenancePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -10,6 +12,7 @@ type MaintenancePageProps = {
 
 const sortOptions = ["priority", "asset", "category", "schedule"] as const;
 const statusOptions = ["all", "overdue", "due"] as const;
+const limitOptions = [25, 50, 100] as const;
 
 const getSortRank = (status: string): number => {
   if (status === "overdue") {
@@ -34,6 +37,9 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
   const sort = typeof params.sort === "string" && sortOptions.includes(params.sort as (typeof sortOptions)[number])
     ? params.sort as (typeof sortOptions)[number]
     : "priority";
+  const rawLimit = typeof params.limit === "string" ? parseInt(params.limit, 10) : 25;
+  const limit = (limitOptions as readonly number[]).includes(rawLimit) ? rawLimit : 25;
+  const offset = typeof params.offset === "string" ? Math.max(0, parseInt(params.offset, 10)) : 0;
 
   try {
     const me = await getMe();
@@ -50,7 +56,7 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
       );
     }
 
-    const dueWork = await getHouseholdDueWork(household.id);
+    const dueWork = await getHouseholdDueWork(household.id, { limit: 500 });
     const overdueScheduleCount = dueWork.filter((item) => item.status === "overdue").length;
     const dueScheduleCount = dueWork.filter((item) => item.status === "due").length;
     const categoryOptions = Array.from(new Set(dueWork.map((item) => item.assetCategory))).sort();
@@ -76,6 +82,30 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
           || left.assetName.localeCompare(right.assetName)
           || left.scheduleName.localeCompare(right.scheduleName);
       });
+
+    const pagedDueWork = filteredDueWork.slice(offset, offset + limit);
+
+    const buildMaintenanceHref = (updates: Record<string, string | number | undefined>): string => {
+      const merged = {
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+        sort: sort !== "priority" ? sort : undefined,
+        limit: limit !== 25 ? limit : undefined,
+        offset: offset !== 0 ? offset : undefined,
+        ...updates
+      };
+
+      const qs = new URLSearchParams();
+
+      for (const [key, value] of Object.entries(merged)) {
+        if (value !== undefined && value !== "") {
+          qs.set(key, String(value));
+        }
+      }
+
+      const queryString = qs.toString();
+      return queryString ? `/maintenance?${queryString}` : "/maintenance";
+    };
 
     return (
       <>
@@ -147,60 +177,18 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
               <span className="pill">{filteredDueWork.length} visible</span>
             </div>
             <div className="panel__body">
-              {filteredDueWork.length === 0 ? (
-                <p className="panel__empty">{t("empty")}</p>
-              ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Asset</th>
-                      <th>Category</th>
-                      <th>Schedule</th>
-                      <th>Description</th>
-                      <th>Due Trigger</th>
-                      <th>Current Reading</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredDueWork.map((item) => (
-                      <tr key={item.scheduleId} className={`row--${item.status}`}>
-                        <td>
-                          <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
-                        </td>
-                        <td>
-                          <div className="data-table__primary">
-                            <Link href={`/assets/${item.assetId}`} className="data-table__link">{item.assetName}</Link>
-                          </div>
-                        </td>
-                        <td><span className="pill">{formatCategoryLabel(item.assetCategory)}</span></td>
-                        <td>
-                          <div className="data-table__primary">{item.scheduleName}</div>
-                        </td>
-                        <td>
-                          <div className="data-table__secondary">{item.summary}</div>
-                        </td>
-                        <td>
-                          <strong>{formatDueLabel(item.nextDueAt, item.nextDueMetricValue, item.metricUnit)}</strong>
-                          <div className="data-table__secondary">{item.nextDueAt ? "Date-based" : "Usage-based"}</div>
-                        </td>
-                        <td>
-                          {item.currentMetricValue !== null
-                            ? <strong>{item.currentMetricValue} {item.metricUnit ?? "units"}</strong>
-                            : <span style={{ color: "var(--ink-muted)" }}>N/A</span>
-                          }
-                        </td>
-                        <td>
-                          <Link href={`/assets/${item.assetId}`} className="data-table__link">Open Asset</Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <MaintenanceListWorkspace householdId={household.id} items={pagedDueWork} />
             </div>
           </section>
+
+          <OffsetPaginationControls
+            total={filteredDueWork.length}
+            limit={limit}
+            offset={offset}
+            hasMore={offset + limit < filteredDueWork.length}
+            entityLabel="work items"
+            buildHref={(updates) => buildMaintenanceHref(updates)}
+          />
         </div>
       </>
     );

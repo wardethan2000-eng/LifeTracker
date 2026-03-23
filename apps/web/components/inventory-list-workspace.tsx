@@ -3,8 +3,10 @@
 import type { InventoryItemConsumption, InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useMultiSelect } from "../lib/use-multi-select";
 import { formatCurrency } from "../lib/formatters";
+import { BulkActionBar } from "./bulk-action-bar";
 import { InventoryBulkActions } from "./inventory-bulk-actions";
 import { InventoryEditableRow } from "./inventory-editable-row";
 import { InventorySection } from "./inventory-section";
@@ -81,40 +83,10 @@ export function InventoryListWorkspace({
   highlightedAnalytics,
   spaces,
 }: InventoryListWorkspaceProps): JSX.Element {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { selectedIds, selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
 
   const allItems = useMemo(() => groupedItems.flatMap((group) => group.items), [groupedItems]);
   const selectedItems = useMemo(() => allItems.filter((item) => selectedIds.has(item.id)), [allItems, selectedIds]);
-
-  const toggleItem = (inventoryItemId: string): void => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-
-      if (next.has(inventoryItemId)) {
-        next.delete(inventoryItemId);
-      } else {
-        next.add(inventoryItemId);
-      }
-
-      return next;
-    });
-  };
-
-  const toggleGroup = (items: InventoryItemSummary[], checked: boolean): void => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-
-      for (const item of items) {
-        if (checked) {
-          next.add(item.id);
-        } else {
-          next.delete(item.id);
-        }
-      }
-
-      return next;
-    });
-  };
 
   return (
     <InventorySection
@@ -126,7 +98,7 @@ export function InventoryListWorkspace({
           householdId={householdId}
           selectedItems={selectedItems}
           spaces={spaces}
-          onBulkAssigned={() => setSelectedIds(new Set())}
+          onBulkAssigned={clearSelection}
         />
       )}
     >
@@ -134,28 +106,10 @@ export function InventoryListWorkspace({
         <p className="panel__empty">No inventory items found for this household yet.</p>
       ) : (
         <div className="inventory-groups">
-          {selectedItems.length > 0 ? (
-            <div
-              className="inventory-selection-summary"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                flexWrap: "wrap",
-                padding: "12px 16px",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                background: "var(--surface-alt)"
-              }}
-            >
-              <span>{selectedItems.length} item{selectedItems.length === 1 ? "" : "s"} selected for bulk actions.</span>
-              <button type="button" className="button button--ghost button--sm" onClick={() => setSelectedIds(new Set())}>Clear selection</button>
-            </div>
-          ) : null}
+          <BulkActionBar selectedCount={selectedCount} onClearSelection={clearSelection} />
 
           {groupedItems.map((group) => {
-            const groupSelectedCount = group.items.filter((item) => selectedIds.has(item.id)).length;
+            const groupSelectedCount = group.items.filter((item) => isSelected(item.id)).length;
             const allGroupItemsSelected = group.items.length > 0 && groupSelectedCount === group.items.length;
 
             return (
@@ -174,7 +128,7 @@ export function InventoryListWorkspace({
                           type="checkbox"
                           aria-label={`Select all ${group.label} items`}
                           checked={allGroupItemsSelected}
-                          onChange={(event) => toggleGroup(group.items, event.target.checked)}
+                          onChange={(event) => toggleGroup(group.items.map((item) => item.id), event.target.checked)}
                         />
                       </th>
                       <th>Item</th>
@@ -201,7 +155,7 @@ export function InventoryListWorkspace({
                           <input
                             type="checkbox"
                             aria-label={`Select ${item.name}`}
-                            checked={selectedIds.has(item.id)}
+                            checked={isSelected(item.id)}
                             onChange={() => toggleItem(item.id)}
                           />
                         </td>

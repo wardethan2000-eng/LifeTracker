@@ -84,9 +84,13 @@ const listProjectsQuerySchema = createOffsetPaginationQuerySchema({
   parentProjectId: z.string().optional()
 });
 
-const projectPortfolioQuerySchema = z.object({
+const projectPortfolioQuerySchema = createOffsetPaginationQuerySchema({
+  defaultLimit: 25,
+  maxLimit: 100
+}).extend({
   status: projectStatusSchema.optional(),
-  q: z.string().trim().min(1).max(200).optional()
+  q: z.string().trim().min(1).max(200).optional(),
+  depth: z.coerce.number().int().min(0).optional()
 });
 
 const projectTemplateParamsSchema = householdParamsSchema.extend({
@@ -132,7 +136,8 @@ const buildProjectPortfolioWhere = (
 ): Prisma.ProjectWhereInput => {
   const baseWhere: Prisma.ProjectWhereInput = {
     householdId,
-    deletedAt: null
+    deletedAt: null,
+    ...(filters.depth !== undefined ? { depth: filters.depth } : {})
   };
 
   if (filters.status !== undefined) {
@@ -653,62 +658,76 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
-    const projects = await app.prisma.project.findMany({
-      where: buildProjectPortfolioWhere(params.householdId, query),
-      include: {
-        expenses: { where: { deletedAt: null }, select: { amount: true } },
-        tasks: { where: { deletedAt: null }, select: projectTaskSummarySelect },
-        phases: {
-          where: { deletedAt: null },
-          select: {
-            id: true,
-            name: true,
-            status: true
-          },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    const where = buildProjectPortfolioWhere(params.householdId, query);
+    const portfolioInclude = {
+      expenses: { where: { deletedAt: null }, select: { amount: true } },
+      tasks: { where: { deletedAt: null }, select: projectTaskSummarySelect },
+      phases: {
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          status: true
         },
-        _count: { select: { tasks: true } }
+        orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }]
       },
+      _count: { select: { tasks: true } }
+    };
+
+    const buildPortfolioItems = async (projects: Awaited<ReturnType<typeof app.prisma.project.findMany<{ include: typeof portfolioInclude }>>>) => {
+      const projectIds = projects.map((project) => project.id);
+      const inventoryLinks = projectIds.length > 0
+        ? await app.prisma.projectInventoryItem.findMany({
+            where: { projectId: { in: projectIds } },
+            select: {
+              projectId: true,
+              quantityNeeded: true,
+              quantityAllocated: true,
+              budgetedUnitCost: true,
+              inventoryItem: { select: { unitCost: true } }
+            },
+            orderBy: [{ projectId: "asc" }, { createdAt: "asc" }]
+          })
+        : [];
+      const rollups = buildProjectInventoryRollups(inventoryLinks);
+
+      return projects.map((project) => {
+        const summary = toProjectSummary(project);
+        const rollup = rollups.get(project.id) ?? {
+          inventoryLineCount: 0,
+          totalInventoryNeeded: 0,
+          totalInventoryAllocated: 0,
+          totalInventoryRemaining: 0,
+          plannedInventoryCost: 0
+        };
+
+        return toProjectPortfolioItemResponse({ ...summary, ...rollup });
+      });
+    };
+
+    if (query.paginated) {
+      const [projects, total] = await Promise.all([
+        app.prisma.project.findMany({
+          where,
+          include: portfolioInclude,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          skip: query.offset,
+          take: query.limit
+        }),
+        app.prisma.project.count({ where })
+      ]);
+
+      const items = await buildPortfolioItems(projects);
+      return buildOffsetPage(items, total, query);
+    }
+
+    const projects = await app.prisma.project.findMany({
+      where,
+      include: portfolioInclude,
       orderBy: { createdAt: "desc" }
     });
 
-    const projectIds = projects.map((project) => project.id);
-    const inventoryLinks = projectIds.length > 0
-      ? await app.prisma.projectInventoryItem.findMany({
-          where: {
-            projectId: { in: projectIds }
-          },
-          select: {
-            projectId: true,
-            quantityNeeded: true,
-            quantityAllocated: true,
-            budgetedUnitCost: true,
-            inventoryItem: {
-              select: {
-                unitCost: true
-              }
-            }
-          },
-          orderBy: [{ projectId: "asc" }, { createdAt: "asc" }]
-        })
-      : [];
-    const rollups = buildProjectInventoryRollups(inventoryLinks);
-
-    return projects.map((project) => {
-      const summary = toProjectSummary(project);
-      const rollup = rollups.get(project.id) ?? {
-        inventoryLineCount: 0,
-        totalInventoryNeeded: 0,
-        totalInventoryAllocated: 0,
-        totalInventoryRemaining: 0,
-        plannedInventoryCost: 0
-      };
-
-      return toProjectPortfolioItemResponse({
-        ...summary,
-        ...rollup
-      });
-    });
+    return buildPortfolioItems(projects);
   });
 
   app.post("/v1/households/:householdId/projects", async (request, reply) => {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
 import { ApiError, getHouseholdHobbies, getMe } from "../../../lib/api";
+import { CursorPaginationControls } from "../../../components/pagination-controls";
 
 type HobbiesPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -33,6 +34,22 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
   const selectedStatus = (statusParam === "active" || statusParam === "paused" || statusParam === "archived")
     ? statusParam as HobbyStatus
     : undefined;
+  const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
+  const history = typeof params.history === "string"
+    ? params.history.split(",").map((v) => v.trim()).filter(Boolean)
+    : [];
+  const limit = typeof params.limit === "string" && [25, 50, 100].includes(Number(params.limit))
+    ? Number(params.limit)
+    : 25;
+
+  const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
+    const q = new URLSearchParams();
+    if (selectedStatus) q.set("status", selectedStatus);
+    q.set("limit", String(p.limit));
+    if (p.cursor) q.set("cursor", p.cursor);
+    if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
+    return `/hobbies?${q.toString()}`;
+  };
 
   try {
     const me = await getMe();
@@ -49,15 +66,17 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
       );
     }
 
-    const hobbies = await getHouseholdHobbies(household.id);
-    const visibleHobbies = selectedStatus
-      ? hobbies.filter((hobby) => hobby.status === selectedStatus)
-      : hobbies;
+    const hobbyPage = await getHouseholdHobbies(household.id, {
+      ...(selectedStatus ? { status: selectedStatus } : {}),
+      limit,
+      ...(cursor ? { cursor } : {})
+    });
+    const visibleHobbies = hobbyPage.items;
 
-    const totalActive = hobbies.filter((h) => h.status === "active").length;
-    const totalSessions = hobbies.reduce((sum, h) => sum + h.sessionCount, 0);
-    const activeSessions = hobbies.reduce((sum, h) => sum + h.activeSessionCount, 0);
-    const totalRecipes = hobbies.reduce((sum, h) => sum + h.recipeCount, 0);
+    const totalActive = visibleHobbies.filter((h) => h.status === "active").length;
+    const totalSessions = visibleHobbies.reduce((sum, h) => sum + h.sessionCount, 0);
+    const activeSessions = visibleHobbies.reduce((sum, h) => sum + h.activeSessionCount, 0);
+    const totalRecipes = visibleHobbies.reduce((sum, h) => sum + h.recipeCount, 0);
 
     return (
       <>
@@ -99,10 +118,8 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
               className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
             >
               <span>All</span>
-              <strong>{hobbies.length}</strong>
             </Link>
             {(Object.keys(hobbyStatusLabels) as HobbyStatus[]).map((status) => {
-              const count = hobbies.filter((h) => h.status === status).length;
               return (
                 <Link
                   key={status}
@@ -110,13 +127,20 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
                   className={`project-status-chip${selectedStatus === status ? " project-status-chip--active" : ""}`}
                 >
                   <span>{hobbyStatusLabels[status]}</span>
-                  <strong>{count}</strong>
                 </Link>
               );
             })}
           </div>
 
           {/* Hobby cards */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span className="data-table__secondary">
+              {selectedStatus ? hobbyStatusLabels[selectedStatus] : "All hobbies"}
+            </span>
+            {visibleHobbies.length > 0 && (
+              <span className="pill">Showing {visibleHobbies.length}</span>
+            )}
+          </div>
           {visibleHobbies.length === 0 ? (
             <section className="panel">
               <div className="panel__body--padded panel__empty">
@@ -160,6 +184,16 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
               ))}
             </div>
           )}
+
+          <CursorPaginationControls
+            nextCursor={hobbyPage.nextCursor}
+            currentCursor={cursor}
+            cursorHistory={history}
+            limit={limit}
+            resultCount={visibleHobbies.length}
+            entityLabel="hobbies"
+            buildHref={buildHref}
+          />
         </div>
       </>
     );

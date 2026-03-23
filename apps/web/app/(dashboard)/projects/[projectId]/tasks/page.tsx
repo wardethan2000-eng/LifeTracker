@@ -14,6 +14,7 @@ import {
 import { CompactTaskPreview } from "../../../../../components/compact-task-preview";
 import { ExpandableCard } from "../../../../../components/expandable-card";
 import { ProjectChecklist } from "../../../../../components/project-checklist";
+import { TaskListWorkspace } from "../../../../../components/task-list-workspace";
 import {
   ApiError,
   getHouseholdMembers,
@@ -210,7 +211,8 @@ async function ProjectTasksPanelAsync({
   const unphasedTasks = fullTasks.filter((task) => task.phaseId === null);
 
   return (
-    <ExpandableCard
+    <>
+      <ExpandableCard
       title="Tasks"
       modalTitle="Tasks"
       previewContent={<CompactTaskPreview tasks={fullTasks} />}
@@ -279,6 +281,21 @@ async function ProjectTasksPanelAsync({
         </div>
       </div>
     </ExpandableCard>
+
+      <section className="panel">
+        <div className="panel__header">
+          <h2>Bulk Task Operations</h2>
+        </div>
+        <div className="panel__body panel__body--padded">
+          <TaskListWorkspace
+            householdId={householdId}
+            projectId={project.id}
+            tasks={fullTasks}
+            phases={project.phases.map((p) => ({ id: p.id, name: p.name }))}
+          />
+        </div>
+      </section>
+    </>
   );
 }
 

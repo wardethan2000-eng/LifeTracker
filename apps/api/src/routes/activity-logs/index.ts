@@ -28,21 +28,28 @@ export const activityLogRoutes: FastifyPluginAsync = async (app) => {
       ...(query.cursor ? { id: { lt: query.cursor } } : {})
     };
 
-    const entries = await app.prisma.activityLog.findMany({
+    const rawEntries = await app.prisma.activityLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: query.limit
+      take: query.limit + 1
     });
 
-    return entries.map((entry) => ({
-      id: entry.id,
-      householdId: entry.householdId,
-      userId: entry.userId,
-      action: entry.action,
-      entityType: entry.entityType,
-      entityId: entry.entityId,
-      metadata: entry.metadata,
-      createdAt: entry.createdAt.toISOString()
-    }));
+    const hasMore = rawEntries.length > query.limit;
+    const entries = hasMore ? rawEntries.slice(0, query.limit) : rawEntries;
+    const nextCursor = hasMore ? entries[entries.length - 1]!.id : null;
+
+    return {
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        householdId: entry.householdId,
+        userId: entry.userId,
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        metadata: entry.metadata,
+        createdAt: entry.createdAt.toISOString()
+      })),
+      nextCursor
+    };
   });
 };

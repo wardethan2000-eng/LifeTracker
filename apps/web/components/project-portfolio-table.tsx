@@ -16,9 +16,10 @@ type ProjectPortfolioTableProps = {
   householdId: string;
   projects: ProjectPortfolioItem[];
   selectedSort: ProjectSort;
+  total: number;
 };
 
-export function ProjectPortfolioTable({ householdId, projects, selectedSort }: ProjectPortfolioTableProps): JSX.Element {
+export function ProjectPortfolioTable({ householdId, projects, selectedSort, total }: ProjectPortfolioTableProps): JSX.Element {
   const portfolioProjects = buildPortfolioProjects(projects, selectedSort);
 
   return (
@@ -26,6 +27,7 @@ export function ProjectPortfolioTable({ householdId, projects, selectedSort }: P
       <section className="panel">
         <div className="panel__header">
           <h2>Project Portfolio ({portfolioProjects.length})</h2>
+          <span className="pill">{total} total</span>
         </div>
         <div className="panel__body">
           {portfolioProjects.length === 0 ? (

@@ -27,6 +27,7 @@ import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications/index.js";
 import { presetRoutes } from "./routes/presets/index.js";
 import { scheduleRoutes } from "./routes/schedules/index.js";
+import { scheduleBulkRoutes } from "./routes/schedules/bulk.js";
 import { scheduleInventoryRoutes } from "./routes/schedules/inventory.js";
 import { serviceProviderRoutes } from "./routes/service-providers/index.js";
 import { usageMetricRoutes } from "./routes/usage-metrics/index.js";
@@ -43,6 +44,7 @@ import { exportRoutes } from "./routes/exports/index.js";
 import { projectBudgetAnalyticsRoutes } from "./routes/cost-analytics/project-budget.js";
 import { invitationRoutes } from "./routes/invitations/index.js";
 import { projectRoutes } from "./routes/projects/index.js";
+import { projectBulkRoutes } from "./routes/projects/bulk.js";
 import { projectInventoryRoutes } from "./routes/projects/inventory.js";
 import { projectNoteRoutes } from "./routes/projects/notes.js";
 import { projectPhaseRoutes } from "./routes/projects/phases.js";
@@ -145,6 +147,7 @@ const assetRoutePlugins: FastifyPluginAsync[] = [
   usageMetricRoutes,
   usageMetricAnalyticsRoutes,
   scheduleRoutes,
+  scheduleBulkRoutes,
   scheduleInventoryRoutes,
   maintenanceLogRoutes,
   maintenanceLogPartRoutes,
@@ -154,6 +157,7 @@ const assetRoutePlugins: FastifyPluginAsync[] = [
 ];
 
 const projectRoutePlugins: FastifyPluginAsync[] = [
+  projectBulkRoutes,
   projectRoutes,
   projectInventoryRoutes,
   projectPhaseRoutes,

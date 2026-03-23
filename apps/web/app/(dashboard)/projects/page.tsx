@@ -5,8 +5,9 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { ProjectPortfolioAside } from "../../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../../components/project-portfolio-stats";
-import { ProjectPortfolioTable } from "../../../components/project-portfolio-table";
-import { ApiError, getHouseholdProjectPortfolio, getHouseholdProjectStatusCounts, getMe } from "../../../lib/api";
+import { ProjectPortfolioWorkspace } from "../../../components/project-portfolio-workspace";
+import { ApiError, getHouseholdProjectPortfolioPaginated, getHouseholdProjectStatusCounts, getMe } from "../../../lib/api";
+import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
 type ProjectsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -23,6 +24,7 @@ const projectStatusLabels: Record<ProjectStatus, string> = {
 };
 
 const projectSortValues = ["risk", "target", "budget", "progress"] as const;
+const limitOptions = [25, 50, 100] as const;
 
 type ProjectSort = (typeof projectSortValues)[number];
 
@@ -31,6 +33,8 @@ type ProjectsPageHref = {
   status?: ProjectStatus | undefined;
   query?: string | undefined;
   sort?: ProjectSort | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 };
 
 const projectSortLabels: Record<ProjectSort, string> = {
@@ -53,7 +57,7 @@ const isProjectSort = (value: string | undefined): value is ProjectSort => (
   value !== undefined && projectSortValues.includes(value as ProjectSort)
 );
 
-const buildProjectsHref = ({ householdId, status, query, sort }: ProjectsPageHref): string => {
+const buildProjectsHref = ({ householdId, status, query, sort, limit, offset }: ProjectsPageHref): string => {
   const params = new URLSearchParams({ householdId });
 
   if (status) {
@@ -66,6 +70,14 @@ const buildProjectsHref = ({ householdId, status, query, sort }: ProjectsPageHre
 
   if (sort && sort !== "risk") {
     params.set("sort", sort);
+  }
+
+  if (limit && limit !== 25) {
+    params.set("limit", String(limit));
+  }
+
+  if (offset && offset > 0) {
+    params.set("offset", String(offset));
   }
 
   return `/projects?${params.toString()}`;
@@ -153,6 +165,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
   const selectedStatus = isProjectStatus(statusParam) ? statusParam : undefined;
   const selectedSort = isProjectSort(sortParam) ? sortParam : "risk";
   const searchQuery = normalizeSearchValue(rawSearchQuery);
+  const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
+    ? Number(params.limit)
+    : 25;
+  const offset = typeof params.offset === "string" && Number.isInteger(Number(params.offset)) && Number(params.offset) >= 0
+    ? Number(params.offset)
+    : 0;
 
   try {
     const me = await getMe();
@@ -173,20 +191,19 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
       household.id,
       searchQuery.length > 0 ? { q: searchQuery } : undefined
     );
-    const visiblePortfolioProjectsPromise = getHouseholdProjectPortfolio(
+    // depth=0 shows only root projects by default; when searching, include all depths
+    const visiblePortfolioProjectsPromise = getHouseholdProjectPortfolioPaginated(
       household.id,
       {
         ...(selectedStatus ? { status: selectedStatus } : {}),
-        ...(searchQuery.length > 0 ? { q: searchQuery } : {})
+        ...(searchQuery.length > 0 ? { q: searchQuery } : { depth: 0 }),
+        limit,
+        offset
       }
     );
 
-    const [projectStatusCounts, statusScopedProjects] = await Promise.all([projectStatusCountsPromise, visiblePortfolioProjectsPromise]);
-    // Show only root-level projects by default; when a search query is active, include all depths
-    const depthFilteredProjects = searchQuery.length > 0
-      ? statusScopedProjects
-      : statusScopedProjects.filter((project) => project.depth === 0);
-    const filteredProjects = depthFilteredProjects;
+    const [projectStatusCounts, projectPage] = await Promise.all([projectStatusCountsPromise, visiblePortfolioProjectsPromise]);
+    const filteredProjects = projectPage.items;
     const projectCountByStatus = new Map(projectStatusCounts.map((entry) => [entry.status, entry.count]));
     const statusCounts = projectStatusValues.map((status) => ({
       status,
@@ -305,10 +322,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
           <div className="dashboard-grid">
             <div className="dashboard-main">
               <Suspense fallback={<ProjectTableSkeleton />}>
-                <ProjectPortfolioTable
+                <ProjectPortfolioWorkspace
                   householdId={household.id}
                   projects={filteredProjects}
                   selectedSort={selectedSort}
+                  total={projectPage.total}
                 />
               </Suspense>
             </div>
@@ -323,6 +341,22 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
               </Suspense>
             </div>
           </div>
+
+          <OffsetPaginationControls
+            total={projectPage.total}
+            limit={projectPage.limit}
+            offset={projectPage.offset}
+            hasMore={projectPage.hasMore}
+            entityLabel="projects"
+            buildHref={(p) => buildProjectsHref({
+              householdId: household.id,
+              status: selectedStatus,
+              query: rawSearchQuery,
+              sort: selectedSort,
+              limit: p.limit,
+              offset: p.offset
+            })}
+          />
         </div>
       </>
     );

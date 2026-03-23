@@ -681,6 +681,90 @@ export const createAssetSchema = z.object({
 
 export const updateAssetSchema = createAssetSchema.omit({ householdId: true }).partial();
 
+export const bulkArchiveAssetsSchema = z.object({
+  householdId: z.string().cuid(),
+  assetIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkReassignCategorySchema = z.object({
+  householdId: z.string().cuid(),
+  assetIds: z.array(z.string().cuid()).min(1).max(100),
+  category: assetCategorySchema
+});
+
+export const bulkAssetOperationResultSchema = z.object({
+  succeeded: z.number(),
+  failed: z.array(z.object({
+    assetId: z.string(),
+    name: z.string().nullable(),
+    message: z.string()
+  }))
+});
+
+export const bulkCompleteSchedulesSchema = z.object({
+  householdId: z.string().cuid(),
+  scheduleIds: z.array(z.string().cuid()).min(1).max(100),
+  notes: z.string().max(2000).optional()
+});
+
+export const bulkSnoozeSchedulesSchema = z.object({
+  householdId: z.string().cuid(),
+  scheduleIds: z.array(z.string().cuid()).min(1).max(100),
+  snoozeDays: z.number().int().min(1).max(365)
+});
+
+export const bulkPauseSchedulesSchema = z.object({
+  householdId: z.string().cuid(),
+  scheduleIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkScheduleOperationResultSchema = z.object({
+  succeeded: z.number(),
+  failed: z.array(z.object({
+    scheduleId: z.string(),
+    name: z.string().nullable(),
+    message: z.string()
+  }))
+});
+
+export const bulkCompleteTasksSchema = z.object({
+  householdId: z.string().cuid(),
+  projectId: z.string().cuid(),
+  taskIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkReassignTasksSchema = z.object({
+  householdId: z.string().cuid(),
+  projectId: z.string().cuid(),
+  taskIds: z.array(z.string().cuid()).min(1).max(100),
+  phaseId: z.string().cuid().nullable().optional(),
+  assignedToId: z.string().cuid().nullable().optional()
+});
+
+export const bulkChangeProjectStatusSchema = z.object({
+  householdId: z.string().cuid(),
+  projectIds: z.array(z.string().cuid()).min(1).max(100),
+  status: projectStatusSchema
+});
+
+export const bulkTaskOperationResultSchema = z.object({
+  succeeded: z.number(),
+  failed: z.array(z.object({
+    taskId: z.string(),
+    title: z.string().nullable(),
+    message: z.string()
+  }))
+});
+
+export const bulkProjectOperationResultSchema = z.object({
+  succeeded: z.number(),
+  failed: z.array(z.object({
+    projectId: z.string(),
+    name: z.string().nullable(),
+    message: z.string()
+  }))
+});
+
 export const shallowAssetSchema = z.object({
   id: z.string().cuid(),
   name: z.string(),
@@ -2620,6 +2704,7 @@ export const projectBudgetCategoryListSchema = z.array(projectBudgetCategorySumm
 export const projectPhaseSupplyListSchema = z.array(projectPhaseSupplySchema);
 export const projectInventoryRollupListSchema = z.array(projectInventoryRollupSchema);
 export const projectPortfolioListSchema = z.array(projectPortfolioItemSchema);
+export const projectPortfolioPageSchema = createOffsetPageSchema(projectPortfolioItemSchema);
 export const projectStatusCountListSchema = z.array(projectStatusCountSchema);
 
 export const projectTemplateSchema = z.object({
@@ -2762,6 +2847,11 @@ export const activityLogQuerySchema = z.object({
   since: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().cuid().optional()
+});
+
+export const activityLogListResponseSchema = z.object({
+  entries: z.array(activityLogSchema),
+  nextCursor: z.string().cuid().nullable()
 });
 
 // ── Invitation Schemas ───────────────────────────────────────────────
@@ -3369,6 +3459,18 @@ export type UpdateUsageMetricInput = z.infer<typeof updateUsageMetricSchema>;
 export type UsageMetric = z.infer<typeof usageMetricResponseSchema>;
 export type CreateAssetInput = z.infer<typeof createAssetSchema>;
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
+export type BulkArchiveAssetsInput = z.infer<typeof bulkArchiveAssetsSchema>;
+export type BulkReassignCategoryInput = z.infer<typeof bulkReassignCategorySchema>;
+export type BulkAssetOperationResult = z.infer<typeof bulkAssetOperationResultSchema>;
+export type BulkCompleteSchedulesInput = z.infer<typeof bulkCompleteSchedulesSchema>;
+export type BulkSnoozeSchedulesInput = z.infer<typeof bulkSnoozeSchedulesSchema>;
+export type BulkPauseSchedulesInput = z.infer<typeof bulkPauseSchedulesSchema>;
+export type BulkScheduleOperationResult = z.infer<typeof bulkScheduleOperationResultSchema>;
+export type BulkCompleteTasksInput = z.infer<typeof bulkCompleteTasksSchema>;
+export type BulkReassignTasksInput = z.infer<typeof bulkReassignTasksSchema>;
+export type BulkChangeProjectStatusInput = z.infer<typeof bulkChangeProjectStatusSchema>;
+export type BulkTaskOperationResult = z.infer<typeof bulkTaskOperationResultSchema>;
+export type BulkProjectOperationResult = z.infer<typeof bulkProjectOperationResultSchema>;
 export type Asset = z.infer<typeof assetSchema>;
 export type AssetPage = z.infer<typeof assetPageSchema>;
 export type AssetTransfer = z.infer<typeof assetTransferSchema>;
@@ -3592,6 +3694,7 @@ export type ProjectPhaseProgress = z.infer<typeof projectPhaseProgressSchema>;
 export type ProjectPhaseDetail = z.infer<typeof projectPhaseDetailSchema>;
 export type ProjectInventoryRollup = z.infer<typeof projectInventoryRollupSchema>;
 export type ProjectPortfolioItem = z.infer<typeof projectPortfolioItemSchema>;
+export type ProjectPortfolioPage = z.infer<typeof projectPortfolioPageSchema>;
 export type CreateProjectPhaseInput = z.infer<typeof createProjectPhaseSchema>;
 export type UpdateProjectPhaseInput = z.infer<typeof updateProjectPhaseSchema>;
 export type ReorderProjectPhasesInput = z.infer<typeof reorderProjectPhasesSchema>;
@@ -3609,6 +3712,7 @@ export type ProjectSummaryPage = z.infer<typeof projectSummaryPageSchema>;
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
 export type ActivityLog = z.infer<typeof activityLogSchema>;
 export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;
+export type ActivityLogListResponse = z.infer<typeof activityLogListResponseSchema>;
 export type InvitationStatus = z.infer<typeof invitationStatusSchema>;
 export type HouseholdInvitation = z.infer<typeof householdInvitationSchema>;
 export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;

@@ -12,7 +12,7 @@ const assetParamsSchema = z.object({
 });
 
 const dueWorkQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(25),
+  limit: z.coerce.number().int().min(1).max(500).default(25),
   status: z.enum(["all", "due", "overdue"]).default("all")
 });
 

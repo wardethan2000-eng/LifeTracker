@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import {
+  assetCategorySchema,
   assetLabelDataSchema,
   assetLookupQuerySchema,
   assetSchema,
@@ -49,6 +50,33 @@ const assetLabelQuerySchema = z.object({
   format: z.enum(["png", "svg"]).default("png"),
   size: z.coerce.number().int().min(100).max(1000).default(300)
 });
+
+const bulkArchiveBodySchema = z.object({
+  householdId: z.string().cuid(),
+  assetIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+const bulkReassignCategoryBodySchema = z.object({
+  householdId: z.string().cuid(),
+  assetIds: z.array(z.string().cuid()).min(1).max(100),
+  category: assetCategorySchema
+});
+
+const assetExportQuerySchema = z.object({
+  householdId: z.string().cuid()
+});
+
+const csvEscape = (value: string): string => {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+};
+
+const csvCell = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined) return "";
+  return csvEscape(String(value));
+};
 
 export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets", async (request, reply) => {
@@ -109,6 +137,146 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return toAssetResponse(asset);
+  });
+
+  // ── Bulk operations ────────────────────────────────────────────────
+
+  app.post("/v1/assets/bulk/archive", async (request, reply) => {
+    const input = bulkArchiveBodySchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, input.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const accessible = await app.prisma.asset.findMany({
+      where: {
+        id: { in: input.assetIds },
+        householdId: input.householdId,
+        deletedAt: null,
+        ...personalAssetAccessWhere(request.auth.userId)
+      },
+      select: { id: true, name: true }
+    });
+
+    const accessibleIds = new Set(accessible.map((a) => a.id));
+    const failed = input.assetIds
+      .filter((id) => !accessibleIds.has(id))
+      .map((assetId) => ({ assetId, name: null, message: "Asset not found or not accessible." }));
+
+    if (accessible.length > 0) {
+      await app.prisma.$transaction(async (tx) => {
+        await tx.asset.updateMany({
+          where: { id: { in: accessible.map((a) => a.id) } },
+          data: { deletedAt: new Date() }
+        });
+      });
+
+      await logActivity(app.prisma, {
+        householdId: input.householdId,
+        userId: request.auth.userId,
+        action: "asset.bulk_archived",
+        entityType: "asset",
+        entityId: input.householdId,
+        metadata: { count: accessible.length, assetIds: accessible.map((a) => a.id) }
+      });
+
+      for (const asset of accessible) {
+        void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+      }
+    }
+
+    return reply.send({ succeeded: accessible.length, failed });
+  });
+
+  app.post("/v1/assets/bulk/category", async (request, reply) => {
+    const input = bulkReassignCategoryBodySchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, input.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const accessible = await app.prisma.asset.findMany({
+      where: {
+        id: { in: input.assetIds },
+        householdId: input.householdId,
+        deletedAt: null,
+        ...personalAssetAccessWhere(request.auth.userId)
+      },
+      select: { id: true, name: true }
+    });
+
+    const accessibleIds = new Set(accessible.map((a) => a.id));
+    const failed = input.assetIds
+      .filter((id) => !accessibleIds.has(id))
+      .map((assetId) => ({ assetId, name: null, message: "Asset not found or not accessible." }));
+
+    if (accessible.length > 0) {
+      await app.prisma.$transaction(async (tx) => {
+        await tx.asset.updateMany({
+          where: { id: { in: accessible.map((a) => a.id) } },
+          data: { category: input.category }
+        });
+      });
+
+      await logActivity(app.prisma, {
+        householdId: input.householdId,
+        userId: request.auth.userId,
+        action: "asset.bulk_category_changed",
+        entityType: "asset",
+        entityId: input.householdId,
+        metadata: { count: accessible.length, category: input.category, assetIds: accessible.map((a) => a.id) }
+      });
+
+      for (const asset of accessible) {
+        void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
+      }
+    }
+
+    return reply.send({ succeeded: accessible.length, failed });
+  });
+
+  app.get("/v1/assets/export", async (request, reply) => {
+    const query = assetExportQuerySchema.parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, query.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const assets = await app.prisma.asset.findMany({
+      where: {
+        householdId: query.householdId,
+        deletedAt: null,
+        ...personalAssetAccessWhere(request.auth.userId)
+      },
+      orderBy: [{ category: "asc" }, { name: "asc" }]
+    });
+
+    const headers = ["assetTag", "name", "category", "visibility", "purchaseDate", "purchasePrice", "warrantyExpiration", "location"];
+
+    const rows = assets.map((asset) => {
+      const purchase = (asset.purchaseDetails as Record<string, unknown> | null) ?? {};
+      const warranty = (asset.warrantyDetails as Record<string, unknown> | null) ?? {};
+      const location = (asset.locationDetails as Record<string, unknown> | null) ?? {};
+      const locationStr = [location.propertyName, location.room].filter(Boolean).join(", ");
+
+      return [
+        csvCell(asset.assetTag ?? `LK-${asset.id.slice(-8).toUpperCase()}`),
+        csvCell(asset.name),
+        csvCell(asset.category),
+        csvCell(asset.visibility),
+        csvCell(asset.purchaseDate?.toISOString().split("T")[0] ?? null),
+        csvCell(typeof purchase.price === "number" ? purchase.price : null),
+        csvCell(typeof warranty.endDate === "string" ? warranty.endDate.split("T")[0] : null),
+        csvCell(locationStr || null)
+      ].join(",");
+    });
+
+    const csvString = [headers.join(","), ...rows].join("\n");
+
+    return reply
+      .type("text/csv")
+      .header("Content-Disposition", 'attachment; filename="assets-export.csv"')
+      .send(csvString);
   });
 
   app.post("/v1/assets", async (request, reply) => {

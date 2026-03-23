@@ -2,6 +2,7 @@ import { cache } from "react";
 import { z } from "zod";
 import {
   activityLogSchema,
+  activityLogListResponseSchema,
   assetComparisonPayloadSchema,
   assetPartsConsumptionSchema,
   assetDetailResponseSchema,
@@ -99,6 +100,7 @@ import {
   projectPhaseSupplySchema,
   projectInventoryRollupListSchema,
   projectPortfolioListSchema,
+  projectPortfolioPageSchema,
   projectStatusCountListSchema,
   projectTemplateListSchema,
   projectTemplateSchema,
@@ -134,6 +136,7 @@ import {
   type AssetTimelineItem,
   type AssetTimelineQuery,
   type ActivityLog,
+  type ActivityLogListResponse,
   type AcceptInvitationInput,
   type ActionableEntryGroup,
   type CreateEntryInput,
@@ -265,6 +268,7 @@ import {
   type SearchEntityType,
   type SearchResponse,
   type ProjectPortfolioItem,
+  type ProjectPortfolioPage,
   type ProjectStatusCount,
   type ProjectSummary,
   type ProjectTask,
@@ -501,6 +505,17 @@ import {
   createDashboardPinSchema,
   type DashboardPin,
   type CreateDashboardPinInput,
+  bulkAssetOperationResultSchema,
+  type BulkAssetOperationResult,
+  type AssetCategory,
+  assetPageSchema,
+  type AssetPage,
+  bulkScheduleOperationResultSchema,
+  type BulkScheduleOperationResult,
+  bulkTaskOperationResultSchema,
+  type BulkTaskOperationResult,
+  bulkProjectOperationResultSchema,
+  type BulkProjectOperationResult,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -527,7 +542,7 @@ type RequestOptions<T> = {
 
 const libraryPresetListSchema = libraryPresetSchema.array();
 const customPresetProfileListSchema = customPresetProfileSchema.array();
-const activityLogListSchema = activityLogSchema.array();
+const activityLogListSchema = activityLogListResponseSchema;
 const assetListSchema = assetSchema.array();
 const dueWorkItemListSchema = dueWorkItemSchema.array();
 const actionableEntryGroupResponseSchema = actionableEntryGroupListSchema;
@@ -992,11 +1007,20 @@ export const getActionableEntries = async (householdId: string): Promise<Actiona
   cacheOptions: "no-store"
 });
 
-export const getHouseholdDueWork = async (householdId: string): Promise<DueWorkItem[]> => apiRequest({
-  path: `/v1/households/${householdId}/due-work?limit=100&status=all`,
-  schema: dueWorkItemListSchema,
-  cachePolicy: { next: { revalidate: 15 } }
-});
+export const getHouseholdDueWork = async (
+  householdId: string,
+  options: { limit?: number; status?: "all" | "due" | "overdue" } = {}
+): Promise<DueWorkItem[]> => {
+  const params = new URLSearchParams();
+  params.set("limit", String(options.limit ?? 100));
+  params.set("status", options.status ?? "all");
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/due-work?${params.toString()}`,
+    schema: dueWorkItemListSchema,
+    cachePolicy: { next: { revalidate: 15 } }
+  });
+};
 
 export const getAssetDetail = async (assetId: string): Promise<AssetDetailResponse> => apiRequest({
   path: `/v1/assets/${assetId}/detail`,
@@ -1124,6 +1148,17 @@ const getHouseholdAssetsCached = cache(async (householdId: string): Promise<Asse
   cacheOptions: { revalidate: 30 }
 }));
 
+const getHouseholdAssetsPaginatedCached = cache(async (
+  householdId: string,
+  limit: number,
+  offset: number,
+  includeArchived: boolean
+): Promise<AssetPage> => apiRequest({
+  path: `/v1/assets?householdId=${householdId}&paginated=true&limit=${limit}&offset=${offset}${includeArchived ? "&includeArchived=true" : ""}`,
+  schema: assetPageSchema,
+  cacheOptions: { revalidate: 30 }
+}));
+
 const getHouseholdMembersCached = cache(async (householdId: string): Promise<HouseholdMember[]> => apiRequest({
   path: `/v1/households/${householdId}/members`,
   schema: householdMemberListSchema,
@@ -1232,6 +1267,34 @@ export const getHouseholdProjectPortfolio = async (
   });
 };
 
+export const getHouseholdProjectPortfolioPaginated = async (
+  householdId: string,
+  options: { status?: ProjectStatus; q?: string; depth?: number; limit: number; offset: number }
+): Promise<ProjectPortfolioPage> => {
+  const params = new URLSearchParams();
+  params.set("paginated", "true");
+  params.set("limit", String(options.limit));
+  params.set("offset", String(options.offset));
+
+  if (options.status) {
+    params.set("status", options.status);
+  }
+
+  if (options.q && options.q.trim().length > 0) {
+    params.set("q", options.q.trim());
+  }
+
+  if (options.depth !== undefined) {
+    params.set("depth", String(options.depth));
+  }
+
+  return apiRequest({
+    path: `/v1/households/${householdId}/projects/portfolio?${params.toString()}`,
+    schema: projectPortfolioPageSchema,
+    revalidate: 15
+  });
+};
+
 export const searchHousehold = async (
   householdId: string,
   query: string,
@@ -1276,7 +1339,7 @@ export const getHouseholdActivity = async (
     cursor?: string;
     limit?: number;
   }
-): Promise<ActivityLog[]> => {
+): Promise<ActivityLogListResponse> => {
   const params = new URLSearchParams();
 
   if (options?.entityType) {
@@ -1750,6 +1813,11 @@ export const createProjectPurchaseRequests = async (
 });
 
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => getHouseholdAssetsCached(householdId);
+
+export const getHouseholdAssetsPaginated = async (
+  householdId: string,
+  options: { limit: number; offset: number; includeArchived?: boolean }
+): Promise<AssetPage> => getHouseholdAssetsPaginatedCached(householdId, options.limit, options.offset, options.includeArchived ?? false);
 
 export const getHouseholdUsageHighlights = async (
   householdId: string,
@@ -3820,6 +3888,120 @@ export const restoreAsset = async (assetId: string): Promise<Asset> => apiReques
   schema: assetSchema
 });
 
+export const bulkArchiveAssets = async (householdId: string, assetIds: string[]): Promise<BulkAssetOperationResult> =>
+  apiRequest({
+    path: "/v1/assets/bulk/archive",
+    method: "POST",
+    body: { householdId, assetIds },
+    schema: bulkAssetOperationResultSchema
+  });
+
+export const bulkReassignAssetCategory = async (householdId: string, assetIds: string[], category: AssetCategory): Promise<BulkAssetOperationResult> =>
+  apiRequest({
+    path: "/v1/assets/bulk/category",
+    method: "POST",
+    body: { householdId, assetIds, category },
+    schema: bulkAssetOperationResultSchema
+  });
+
+export const exportHouseholdAssets = async (householdId: string): Promise<string> => {
+  const path = `/v1/assets/export?householdId=${encodeURIComponent(householdId)}`;
+  let response: Response;
+
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "GET",
+      cache: "no-store",
+      headers: getRequestHeaders(null)
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
+    throw new ApiError(`Unable to reach the API at ${apiBaseUrl}.${detail}`, 503);
+  }
+
+  if (!response.ok) {
+    const payload = await parseJson(response);
+    const message = typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+      ? payload.message
+      : `Request failed with status ${response.status}.`;
+    throw new ApiError(message, response.status);
+  }
+
+  return response.text();
+};
+
+export const bulkCompleteSchedules = async (
+  householdId: string,
+  scheduleIds: string[],
+  notes?: string
+): Promise<BulkScheduleOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/schedules/bulk/complete`,
+    method: "POST",
+    body: { scheduleIds, ...(notes !== undefined ? { notes } : {}) },
+    schema: bulkScheduleOperationResultSchema
+  });
+
+export const bulkSnoozeSchedules = async (
+  householdId: string,
+  scheduleIds: string[],
+  snoozeDays: number
+): Promise<BulkScheduleOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/schedules/bulk/snooze`,
+    method: "POST",
+    body: { scheduleIds, snoozeDays },
+    schema: bulkScheduleOperationResultSchema
+  });
+
+export const bulkPauseSchedules = async (
+  householdId: string,
+  scheduleIds: string[]
+): Promise<BulkScheduleOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/schedules/bulk/pause`,
+    method: "POST",
+    body: { scheduleIds },
+    schema: bulkScheduleOperationResultSchema
+  });
+
+export const bulkCompleteTasks = async (
+  householdId: string,
+  projectId: string,
+  taskIds: string[]
+): Promise<BulkTaskOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/tasks/bulk/complete`,
+    method: "POST",
+    body: { taskIds },
+    schema: bulkTaskOperationResultSchema
+  });
+
+export const bulkReassignTasks = async (
+  householdId: string,
+  projectId: string,
+  taskIds: string[],
+  options: { phaseId?: string | null; assignedToId?: string | null }
+): Promise<BulkTaskOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/tasks/bulk/reassign`,
+    method: "POST",
+    body: { taskIds, ...options },
+    schema: bulkTaskOperationResultSchema
+  });
+
+export const bulkChangeProjectsStatus = async (
+  householdId: string,
+  projectIds: string[],
+  status: string
+): Promise<BulkProjectOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/projects/bulk/status`,
+    method: "POST",
+    body: { projectIds, status },
+    schema: bulkProjectOperationResultSchema
+  });
+
 export const markNotificationRead = async (notificationId: string): Promise<Notification> => apiRequest({
   path: `/v1/notifications/${notificationId}/read`,
   method: "PATCH",
@@ -3961,19 +4143,19 @@ export const deleteAttachment = async (
 
 export const getHouseholdHobbies = async (
   householdId: string,
-  options?: { status?: HobbyStatus; search?: string; limit?: number; offset?: number }
-): Promise<HobbySummary[]> => {
+  options?: { status?: HobbyStatus; search?: string; limit?: number; cursor?: string }
+): Promise<{ items: HobbySummary[]; nextCursor: string | null }> => {
   const params = new URLSearchParams();
   if (options?.status) params.set("status", options.status);
   if (options?.search) params.set("search", options.search);
   if (options?.limit != null) params.set("limit", String(options.limit));
-  if (options?.offset != null) params.set("offset", String(options.offset));
+  if (options?.cursor) params.set("cursor", options.cursor);
   const query = params.toString();
   const result = await apiRequest<{ items: HobbySummary[]; nextCursor: string | null }>({
     path: `/v1/households/${householdId}/hobbies${query ? `?${query}` : ""}`,
     cacheOptions: { revalidate: 30 }
   });
-  return result.items.map((item) => parseHobbySummaryResponse(item));
+  return { items: result.items.map((item) => parseHobbySummaryResponse(item)), nextCursor: result.nextCursor };
 };
 
 export const createHobby = async (

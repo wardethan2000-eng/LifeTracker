@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Notification } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { CursorPaginationControls } from "../../../components/pagination-controls";
 import { getTranslations } from "next-intl/server";
 import {
   markNotificationReadAction,
@@ -191,10 +192,6 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     const overdueNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "overdue");
     const dueSoonNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "dueSoon");
     const informationalNotifications = filteredNotifications.filter((notification) => getNotificationBucket(notification) === "informational");
-    const previousCursor = history.length > 0 ? history[history.length - 1] : undefined;
-    const previousHistory = history.slice(0, -1);
-    const nextHistory = cursor ? [...history, cursor] : history;
-
     return (
       <>
         <header className="page-header">
@@ -338,49 +335,17 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
             </div>
           </section>
 
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Pagination</h2>
-              <span className="pill">Showing {filteredNotifications.length} on this page</span>
-            </div>
-            <div className="panel__body--padded" style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
-              <div className="data-table__secondary">
-                Cursor-based pages keep the order stable while filters stay applied.
-              </div>
-              <div className="inline-actions">
-                {previousCursor ? (
-                  <Link
-                    href={buildNotificationsHref({
-                      status,
-                      channel,
-                      type,
-                      limit,
-                      cursor: previousCursor,
-                      history: previousHistory
-                    })}
-                    className="button button--ghost"
-                  >
-                    Previous Page
-                  </Link>
-                ) : null}
-                {notificationList.nextCursor ? (
-                  <Link
-                    href={buildNotificationsHref({
-                      status,
-                      channel,
-                      type,
-                      limit,
-                      cursor: notificationList.nextCursor,
-                      history: nextHistory
-                    })}
-                    className="button button--primary"
-                  >
-                    Next Page
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          </section>
+          <CursorPaginationControls
+            nextCursor={notificationList.nextCursor ?? null}
+            currentCursor={cursor}
+            cursorHistory={history}
+            limit={limit}
+            resultCount={filteredNotifications.length}
+            entityLabel="notifications"
+            buildHref={({ cursor: c, history: h, limit: l }) =>
+              buildNotificationsHref({ status, channel, type, limit: l, cursor: c, history: h })
+            }
+          />
         </div>
       </>
     );

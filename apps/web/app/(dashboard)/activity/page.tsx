@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { HouseholdCsvExportButton } from "../../../components/asset-export-actions";
 import { ApiError, getHouseholdActivity, getMe } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/formatters";
+import { CursorPaginationControls } from "../../../components/pagination-controls";
 
 type ActivityPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -68,6 +69,10 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
   const limit = typeof params.limit === "string" && activityLimitOptions.includes(Number(params.limit) as (typeof activityLimitOptions)[number])
     ? Number(params.limit)
     : 50;
+  const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
+  const history = typeof params.history === "string"
+    ? params.history.split(",").map((v) => v.trim()).filter(Boolean)
+    : [];
 
   try {
     const me = await getMe();
@@ -87,9 +92,22 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
     const since = windowDays === "all"
       ? undefined
       : new Date(Date.now() - Number(windowDays) * 24 * 60 * 60 * 1000).toISOString();
+
+    const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
+      const q = new URLSearchParams();
+      q.set("householdId", household.id);
+      q.set("entityType", entityType);
+      q.set("windowDays", windowDays);
+      q.set("limit", String(p.limit));
+      if (p.cursor) q.set("cursor", p.cursor);
+      if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
+      return `/activity?${q.toString()}`;
+    };
+
     const activity = await getHouseholdActivity(household.id, {
       ...(entityType !== "all" ? { entityType } : {}),
       ...(since ? { since } : {}),
+      ...(cursor ? { cursor } : {}),
       limit
     });
 
@@ -154,15 +172,15 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
 
           <section className="panel">
             <div className="panel__header">
-              <h2>Recent Activity ({activity.length})</h2>
+              <h2>Recent Activity ({activity.entries.length})</h2>
               <span className="pill">Newest first</span>
             </div>
             <div className="panel__body">
-              {activity.length === 0 ? (
+              {activity.entries.length === 0 ? (
                 <p className="panel__empty">No activity recorded yet.</p>
               ) : (
                 <div className="schedule-stack">
-                  {activity.map((entry) => (
+                  {activity.entries.map((entry) => (
                     <article key={entry.id} className="schedule-card">
                       <div className="schedule-card__summary">
                         <div>
@@ -191,6 +209,16 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
               )}
             </div>
           </section>
+
+          <CursorPaginationControls
+            nextCursor={activity.nextCursor ?? null}
+            currentCursor={cursor}
+            cursorHistory={history}
+            limit={limit}
+            resultCount={activity.entries.length}
+            entityLabel="entries"
+            buildHref={buildHref}
+          />
         </div>
       </>
     );
