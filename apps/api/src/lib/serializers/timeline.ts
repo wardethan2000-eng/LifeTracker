@@ -130,6 +130,47 @@ const buildProjectEventTitle = (activity: TimelineActivity): string => {
   }
 };
 
+export const toEntryAsTimelineEntry = (
+  entry: Pick<Entry, "id" | "entityId" | "createdById" | "title" | "body" | "entryDate" | "entryType" | "measurements" | "tags" | "attachmentName" | "createdAt" | "updatedAt">
+) => {
+  const tags = Array.isArray(entry.tags)
+    ? entry.tags.filter((t): t is string => typeof t === "string")
+    : [];
+  const measurements = Array.isArray(entry.measurements)
+    ? entry.measurements.filter(
+        (m): m is { name: string; value: number; unit: string } =>
+          m !== null && typeof m === "object" && !Array.isArray(m) &&
+          typeof (m as Record<string, unknown>).name === "string" &&
+          typeof (m as Record<string, unknown>).value === "number" &&
+          typeof (m as Record<string, unknown>).unit === "string"
+      )
+    : [];
+  const details = parseAssetEntryPayload({
+    title: entry.title,
+    body: entry.body,
+    entryType: entry.entryType,
+    tags,
+    measurements,
+    attachmentName: entry.attachmentName
+  });
+
+  return assetTimelineEntrySchema.parse({
+    id: entry.id,
+    assetId: entry.entityId,
+    createdById: entry.createdById,
+    title: entry.title ?? "",
+    description: details.description,
+    entryDate: entry.entryDate.toISOString(),
+    category: details.category,
+    cost: details.cost,
+    vendor: details.vendor,
+    tags: details.tags,
+    metadata: {},
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString()
+  });
+};
+
 export const toAssetTimelineEntryResponse = (
   entry: Pick<AssetTimelineEntry, "id" | "assetId" | "createdById" | "title" | "description" | "entryDate" | "category" | "cost" | "vendor" | "tags" | "metadata" | "createdAt" | "updatedAt">
 ) => assetTimelineEntrySchema.parse({

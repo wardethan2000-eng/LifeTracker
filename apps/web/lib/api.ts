@@ -5614,6 +5614,191 @@ export const bulkSetIdeaPriority = async (
     schema: bulkIdeaOperationResultSchema
   });
 
+// ── CSV Export / Import ──────────────────────────────────────────────────────
+
+export type ImportAssetsResult = {
+  created: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+  createdItems: Array<{ id: string; name: string; category: string }>;
+};
+
+export type ImportProjectsResult = {
+  created: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+  createdItems: Array<{ id: string; name: string; status: string }>;
+};
+
+export type ImportSchedulesResult = {
+  created: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+  createdItems: Array<{ id: string; name: string; assetId: string }>;
+};
+
+export type ImportHobbiesResult = {
+  created: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+  createdItems: Array<{ id: string; name: string; status: string }>;
+};
+
+export type ImportIdeasResult = {
+  created: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+  createdItems: Array<{ id: string; title: string; stage: string }>;
+};
+
+const parseImportResult = <T extends { id: string }>(
+  value: unknown,
+  parseCreatedItem: (entry: Record<string, unknown>) => T
+): { created: number; skipped: number; errors: Array<{ index: number; message: string }>; createdItems: T[] } => {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Invalid import response.");
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    created: typeof record.created === "number" ? record.created : 0,
+    skipped: typeof record.skipped === "number" ? record.skipped : 0,
+    errors: Array.isArray(record.errors)
+      ? record.errors.map((e) => {
+          const err = e as Record<string, unknown>;
+          return {
+            index: typeof err.index === "number" ? err.index : 0,
+            message: typeof err.message === "string" ? err.message : "Unknown error."
+          };
+        })
+      : [],
+    createdItems: Array.isArray(record.createdItems)
+      ? record.createdItems.map((item) => parseCreatedItem(item as Record<string, unknown>))
+      : []
+  };
+};
+
+const fetchCsvExport = async (path: string): Promise<string> => {
+  let response: Response;
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "GET",
+      cache: "no-store",
+      headers: getRequestHeaders(null)
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
+    throw new ApiError(`Unable to reach the API at ${apiBaseUrl}.${detail}`, 503);
+  }
+  if (!response.ok) {
+    const payload = await parseJson(response);
+    const message =
+      typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : `Request failed with status ${response.status}.`;
+    throw new ApiError(message, response.status);
+  }
+  return response.text();
+};
+
+const postCsvImport = async (path: string, items: Array<Record<string, unknown>>): Promise<unknown> => {
+  let response: Response;
+  try {
+    response = await fetch(getFetchTarget(path), {
+      method: "POST",
+      cache: "no-store",
+      headers: getRequestHeaders(),
+      body: JSON.stringify({ items })
+    });
+  } catch (error) {
+    const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
+    throw new ApiError(`Unable to reach the API at ${apiBaseUrl}.${detail}`, 503);
+  }
+  const payload = await parseJson(response);
+  if (!response.ok) {
+    const message =
+      typeof payload === "object" && payload && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : `Request failed with status ${response.status}.`;
+    throw new ApiError(message, response.status);
+  }
+  return payload;
+};
+
+export const exportHouseholdAssetsCSV = async (householdId: string): Promise<string> =>
+  fetchCsvExport(`/v1/households/${householdId}/assets/export`);
+
+export const importHouseholdAssets = async (
+  householdId: string,
+  items: Array<Record<string, unknown>>
+): Promise<ImportAssetsResult> => {
+  const payload = await postCsvImport(`/v1/households/${householdId}/assets/import`, items);
+  return parseImportResult(payload, (e) => ({
+    id: String(e.id ?? ""),
+    name: String(e.name ?? ""),
+    category: String(e.category ?? "")
+  }));
+};
+
+export const exportHouseholdProjectsCSV = async (householdId: string): Promise<string> =>
+  fetchCsvExport(`/v1/households/${householdId}/projects/export`);
+
+export const importHouseholdProjects = async (
+  householdId: string,
+  items: Array<Record<string, unknown>>
+): Promise<ImportProjectsResult> => {
+  const payload = await postCsvImport(`/v1/households/${householdId}/projects/import`, items);
+  return parseImportResult(payload, (e) => ({
+    id: String(e.id ?? ""),
+    name: String(e.name ?? ""),
+    status: String(e.status ?? "")
+  }));
+};
+
+export const exportHouseholdSchedulesCSV = async (householdId: string): Promise<string> =>
+  fetchCsvExport(`/v1/households/${householdId}/schedules/export`);
+
+export const importHouseholdSchedules = async (
+  householdId: string,
+  items: Array<Record<string, unknown>>
+): Promise<ImportSchedulesResult> => {
+  const payload = await postCsvImport(`/v1/households/${householdId}/schedules/import`, items);
+  return parseImportResult(payload, (e) => ({
+    id: String(e.id ?? ""),
+    name: String(e.name ?? ""),
+    assetId: String(e.assetId ?? "")
+  }));
+};
+
+export const exportHouseholdHobbiesCSV = async (householdId: string): Promise<string> =>
+  fetchCsvExport(`/v1/households/${householdId}/hobbies/export`);
+
+export const importHouseholdHobbies = async (
+  householdId: string,
+  items: Array<Record<string, unknown>>
+): Promise<ImportHobbiesResult> => {
+  const payload = await postCsvImport(`/v1/households/${householdId}/hobbies/import`, items);
+  return parseImportResult(payload, (e) => ({
+    id: String(e.id ?? ""),
+    name: String(e.name ?? ""),
+    status: String(e.status ?? "")
+  }));
+};
+
+export const exportHouseholdIdeasCSV = async (householdId: string): Promise<string> =>
+  fetchCsvExport(`/v1/households/${householdId}/ideas/export`);
+
+export const importHouseholdIdeas = async (
+  householdId: string,
+  items: Array<Record<string, unknown>>
+): Promise<ImportIdeasResult> => {
+  const payload = await postCsvImport(`/v1/households/${householdId}/ideas/import`, items);
+  return parseImportResult(payload, (e) => ({
+    id: String(e.id ?? ""),
+    title: String(e.title ?? ""),
+    stage: String(e.stage ?? "")
+  }));
+};
+
 export const addIdeaNote = async (
   householdId: string,
   ideaId: string,

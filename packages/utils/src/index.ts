@@ -264,7 +264,7 @@ export const LEGACY_ENTRY_SOURCE_TYPES = {
   hobbyLog: "hobby_log"
 } as const;
 
-const ASSET_CATEGORY_PREFIX = "lk:asset-category:";
+export const ASSET_CATEGORY_PREFIX = "lk:asset-category:";
 const ASSET_VENDOR_TAG = "lk:asset-vendor";
 const PROJECT_NOTE_CATEGORY_PREFIX = "lk:project-note-category:";
 const HOBBY_LOG_TYPE_PREFIX = "lk:hobby-log-type:";

@@ -71,11 +71,17 @@ import { noteTemplateRoutes } from "./routes/notes/templates.js";
 import { ideaCanvasRoutes } from "./routes/canvases/index.js";
 import { ideaRoutes } from "./routes/ideas/index.js";
 import { ideaBulkRoutes } from "./routes/ideas/bulk.js";
+import { ideaExportRoutes } from "./routes/ideas/export.js";
+import { assetExportRoutes } from "./routes/assets/export.js";
+import { projectExportRoutes } from "./routes/projects/export.js";
+import { scheduleExportRoutes } from "./routes/schedules/export.js";
+import { hobbyExportRoutes } from "./routes/hobbies/export.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
 import { layoutPreferenceRoutes } from "./routes/layout-preferences.js";
 import { dashboardPinRoutes } from "./routes/dashboard-pins.js";
+import { ensureLegacyEntriesMigrated } from "./services/legacy-migration.js";
 
 const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPluginAsync[]) => {
   for (const plugin of plugins) {
@@ -139,7 +145,12 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   noteTemplateRoutes,
   ideaCanvasRoutes,
   ideaBulkRoutes,
-  ideaRoutes
+  ideaExportRoutes,
+  ideaRoutes,
+  assetExportRoutes,
+  projectExportRoutes,
+  scheduleExportRoutes,
+  hobbyExportRoutes
 ];
 
 const assetRoutePlugins: FastifyPluginAsync[] = [
@@ -183,6 +194,13 @@ export const buildApp = () => {
   app.register(storagePlugin);
   app.register(errorHandlerPlugin);
   app.register(async (authenticatedApp) => {
+    authenticatedApp.addHook("preHandler", async (request) => {
+      const params = request.params as Record<string, string | undefined>;
+      const householdId = params.householdId;
+      if (householdId) {
+        void ensureLegacyEntriesMigrated(app.prisma, householdId);
+      }
+    });
     await registerRouteGroup(authenticatedApp, accountRoutePlugins);
     await authenticatedApp.register(async (householdScope) => {
       await registerRouteGroup(householdScope, householdRoutePlugins);

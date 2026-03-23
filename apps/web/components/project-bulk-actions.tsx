@@ -3,7 +3,6 @@
 import type {
   BulkProjectOperationResult,
   BulkTaskOperationResult,
-  ProjectPortfolioItem
 } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
@@ -13,9 +12,11 @@ import {
   bulkChangeProjectsStatus,
   bulkCompleteTasks,
   bulkReassignTasks,
+  exportHouseholdProjectsCSV,
+  importHouseholdProjects,
+  type ImportProjectsResult,
 } from "../lib/api";
-import { generateCSVDownload } from "../lib/csv";
-import { formatCurrency, formatDate } from "../lib/formatters";
+import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { useToast } from "./toast-provider";
 import {
   Dialog,
@@ -39,42 +40,28 @@ const PROJECT_STATUS_LABELS: Record<string, string> = {
 
 const PROJECT_STATUS_VALUES = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
 
-const escapeCSVCell = (value: string): string =>
-  value.includes(",") || value.includes('"') || value.includes("\n")
-    ? `"${value.replace(/"/g, '""')}"`
-    : value;
+const readFileAsText = async (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => { resolve(typeof reader.result === "string" ? reader.result : ""); };
+  reader.onerror = () => { reject(reader.error ?? new Error("Unable to read CSV file.")); };
+  reader.readAsText(file);
+});
 
-const buildProjectCsv = (items: ProjectPortfolioItem[]): string => {
-  const header = [
-    "Name",
-    "Status",
-    "Start Date",
-    "Target End Date",
-    "Budget",
-    "Total Spent",
-    "% Complete",
-    "Tasks",
-    "Completed Tasks"
-  ].join(",");
-
-  const rows = items.map((item) =>
-    [
-      item.name,
-      PROJECT_STATUS_LABELS[item.status] ?? item.status,
-      item.startDate ? formatDate(item.startDate, "") : "",
-      item.targetEndDate ? formatDate(item.targetEndDate, "") : "",
-      formatCurrency(item.budgetAmount ?? 0, "0.00"),
-      formatCurrency(item.totalSpent ?? 0, "0.00"),
-      `${Math.round(item.percentComplete)}%`,
-      String(item.taskCount),
-      String(item.completedTaskCount)
-    ]
-      .map(escapeCSVCell)
-      .join(",")
-  );
-
-  return [header, ...rows].join("\n");
-};
+const normalizeProjectImportItems = (rows: Array<Record<string, string>>): Array<Record<string, unknown>> =>
+  rows.map((row) => {
+    const norm = Object.fromEntries(
+      Object.entries(row).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, ""), v.trim()])
+    );
+    const out: Record<string, unknown> = {};
+    if (norm.name) out.name = norm.name;
+    if (norm.status) out.status = norm.status;
+    if (norm.description) out.description = norm.description;
+    if (norm.startdate) out.startDate = norm.startdate;
+    if (norm.targetenddate) out.targetEndDate = norm.targetenddate;
+    if (norm.budgetamount) out.budgetAmount = norm.budgetamount;
+    if (norm.notes) out.notes = norm.notes;
+    return out;
+  });
 
 // ── ProjectBulkActions ───────────────────────────────────────────────────────
 
@@ -95,6 +82,9 @@ export function ProjectBulkActions({
   const { pushToast } = useToast();
 
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportProjectsResult | null>(null);
 
   const [statusOpen, setStatusOpen] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -109,16 +99,35 @@ export function ProjectBulkActions({
   }, [statusResult]);
 
   const handleExport = async (): Promise<void> => {
-    const itemsToExport = selectedItems.length > 0 ? selectedItems : allItems;
     try {
       setIsExporting(true);
       setErrorMessage(null);
-      const csvText = buildProjectCsv(itemsToExport);
+      const csvText = await exportHouseholdProjectsCSV(householdId);
       generateCSVDownload(csvText, "projects-export.csv");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to export projects CSV.");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleImport = async (): Promise<void> => {
+    if (!selectedImportFile) return;
+    try {
+      setIsImporting(true);
+      setErrorMessage(null);
+      setImportResult(null);
+      const fileText = await readFileAsText(selectedImportFile);
+      const parsedRows = parseCSV(fileText);
+      if (parsedRows.length === 0) throw new Error("The CSV file does not contain any rows.");
+      const result = await importHouseholdProjects(householdId, normalizeProjectImportItems(parsedRows));
+      setImportResult(result);
+      if (result.created > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof ApiError || error instanceof Error ? error.message : "Unable to import projects CSV.";
+      setErrorMessage(message);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -166,8 +175,38 @@ export function ProjectBulkActions({
           onClick={() => void handleExport()}
           disabled={isExporting}
         >
-          {isExporting ? "Exporting…" : selectedItems.length > 0 ? `Export ${selectedItems.length}` : "Export All"}
+          {isExporting ? "Exporting…" : "Export CSV"}
         </button>
+
+        <div className="inventory-bulk-actions__import">
+          <input
+            className="inventory-bulk-actions__file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedImportFile(event.target.files?.[0] ?? null);
+              setErrorMessage(null);
+              setImportResult(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button button--sm button--ghost"
+            onClick={() => void handleImport()}
+            disabled={!selectedImportFile || isImporting}
+          >
+            {isImporting ? "Importing…" : "Import"}
+          </button>
+        </div>
+
+        {importResult ? (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${importResult.skipped > 0 || importResult.errors.length > 0 ? "warning" : "success"}`}>
+            <p>Created {importResult.created} project{importResult.created === 1 ? "" : "s"}, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}{importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}</p>
+            {importResult.errors.length > 0 ? (
+              <ul>{importResult.errors.map((e) => <li key={`${e.index}-${e.message}`}>Row {e.index + 2}: {e.message}</li>)}</ul>
+            ) : null}
+          </div>
+        ) : null}
 
         {selectedItems.length > 0 && (
           <button

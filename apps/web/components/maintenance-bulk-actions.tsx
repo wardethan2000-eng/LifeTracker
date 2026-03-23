@@ -9,7 +9,11 @@ import {
   bulkCompleteSchedules,
   bulkPauseSchedules,
   bulkSnoozeSchedules,
+  exportHouseholdSchedulesCSV,
+  importHouseholdSchedules,
+  type ImportSchedulesResult,
 } from "../lib/api";
+import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { useToast } from "./toast-provider";
 import {
   Dialog,
@@ -19,6 +23,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+
+const readFileAsText = async (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => { resolve(typeof reader.result === "string" ? reader.result : ""); };
+  reader.onerror = () => { reject(reader.error ?? new Error("Unable to read CSV file.")); };
+  reader.readAsText(file);
+});
+
+const normalizeScheduleImportItems = (rows: Array<Record<string, string>>): Array<Record<string, unknown>> =>
+  rows.map((row) => {
+    const norm = Object.fromEntries(
+      Object.entries(row).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, ""), v.trim()])
+    );
+    const out: Record<string, unknown> = {};
+    if (norm.assetid) out.assetId = norm.assetid;
+    if (norm.name) out.name = norm.name;
+    if (norm.description) out.description = norm.description;
+    if (norm.intervaldays) out.intervalDays = norm.intervaldays;
+    if (norm.estimatedcost) out.estimatedCost = norm.estimatedcost;
+    if (norm.estimatedminutes) out.estimatedMinutes = norm.estimatedminutes;
+    return out;
+  });
 
 type MaintenanceBulkActionsProps = {
   householdId: string;
@@ -47,6 +73,11 @@ export function MaintenanceBulkActions({
   const [isCompleting, setIsCompleting] = useState(false);
   const [completeNotes, setCompleteNotes] = useState("");
   const [completeResult, setCompleteResult] = useState<BulkScheduleOperationResult | null>(null);
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportSchedulesResult | null>(null);
 
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [isSnoozeing, setIsSnoozeing] = useState(false);
@@ -168,6 +199,39 @@ export function MaintenanceBulkActions({
     }
   };
 
+  const handleExport = async (): Promise<void> => {
+    try {
+      setIsExporting(true);
+      setErrorMessage(null);
+      const csvText = await exportHouseholdSchedulesCSV(householdId);
+      generateCSVDownload(csvText, "schedules-export.csv");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to export schedules CSV.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async (): Promise<void> => {
+    if (!selectedImportFile) return;
+    try {
+      setIsImporting(true);
+      setErrorMessage(null);
+      setImportResult(null);
+      const fileText = await readFileAsText(selectedImportFile);
+      const parsedRows = parseCSV(fileText);
+      if (parsedRows.length === 0) throw new Error("The CSV file does not contain any rows.");
+      const result = await importHouseholdSchedules(householdId, normalizeScheduleImportItems(parsedRows));
+      setImportResult(result);
+      if (result.created > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof ApiError || error instanceof Error ? error.message : "Unable to import schedules CSV.";
+      setErrorMessage(message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <>
       <div className="inventory-bulk-actions">
@@ -205,6 +269,44 @@ export function MaintenanceBulkActions({
         >
           Pause
         </button>
+        <button
+          type="button"
+          className="button button--secondary button--sm"
+          onClick={() => { void handleExport(); }}
+          disabled={isExporting}
+        >
+          {isExporting ? "Exporting..." : "Export CSV"}
+        </button>
+
+        <div className="inventory-bulk-actions__import">
+          <input
+            className="inventory-bulk-actions__file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedImportFile(event.target.files?.[0] ?? null);
+              setErrorMessage(null);
+              setImportResult(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button button--secondary button--sm"
+            onClick={() => { void handleImport(); }}
+            disabled={!selectedImportFile || isImporting}
+          >
+            {isImporting ? "Importing..." : "Import"}
+          </button>
+        </div>
+
+        {importResult ? (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${importResult.skipped > 0 || importResult.errors.length > 0 ? "warning" : "success"}`}>
+            <p>Created {importResult.created} schedule{importResult.created === 1 ? "" : "s"}, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}{importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}</p>
+            {importResult.errors.length > 0 ? (
+              <ul>{importResult.errors.map((e) => <li key={`${e.index}-${e.message}`}>Row {e.index + 2}: {e.message}</li>)}</ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {/* ── Complete Dialog ── */}

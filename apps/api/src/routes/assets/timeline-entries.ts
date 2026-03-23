@@ -1,15 +1,15 @@
-import type { Prisma } from "@prisma/client";
 import {
   createAssetTimelineEntrySchema,
   updateAssetTimelineEntrySchema
 } from "@lifekeeper/types";
+import { ASSET_CATEGORY_PREFIX, buildAssetEntryPayload, parseAssetEntryPayload } from "@lifekeeper/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
-import { toAssetTimelineEntryResponse } from "../../lib/serializers/index.js";
-import { removeSearchIndexEntry, syncTimelineEntryToSearchIndex } from "../../lib/search-index.js";
+import { toEntryAsTimelineEntry } from "../../lib/serializers/index.js";
+import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
 
 const assetParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -27,7 +27,22 @@ const listTimelineEntriesQuerySchema = z.object({
   cursor: z.string().cuid().optional()
 });
 
-// TODO(2026-06): Remove this legacy CRUD surface after all asset timeline writes and attachments are fully Entry-backed.
+const parseTags = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((t): t is string => typeof t === "string");
+};
+
+const parseMeasurements = (value: unknown): Array<{ name: string; value: number; unit: string }> => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (m): m is { name: string; value: number; unit: string } =>
+      m !== null && typeof m === "object" && !Array.isArray(m) &&
+      typeof (m as Record<string, unknown>).name === "string" &&
+      typeof (m as Record<string, unknown>).value === "number" &&
+      typeof (m as Record<string, unknown>).unit === "string"
+  );
+};
+
 export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/timeline-entries", async (request, reply) => {
     const params = assetParamsSchema.parse(request.params);
@@ -38,18 +53,16 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    let cursorWhere: Prisma.AssetTimelineEntryWhereInput = {};
+    let cursorWhere = {};
 
     if (query.cursor) {
-      const cursorEntry = await app.prisma.assetTimelineEntry.findFirst({
+      const cursorEntry = await app.prisma.entry.findFirst({
         where: {
           id: query.cursor,
-          assetId: asset.id
+          entityType: "asset",
+          entityId: asset.id
         },
-        select: {
-          id: true,
-          entryDate: true
-        }
+        select: { id: true, entryDate: true }
       });
 
       if (!cursorEntry) {
@@ -59,18 +72,16 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       cursorWhere = {
         OR: [
           { entryDate: { lt: cursorEntry.entryDate } },
-          {
-            entryDate: cursorEntry.entryDate,
-            id: { lt: cursorEntry.id }
-          }
+          { entryDate: cursorEntry.entryDate, id: { lt: cursorEntry.id } }
         ]
       };
     }
 
-    const entries = await app.prisma.assetTimelineEntry.findMany({
+    const entries = await app.prisma.entry.findMany({
       where: {
-        assetId: asset.id,
-        ...(query.category ? { category: query.category } : {}),
+        entityType: "asset",
+        entityId: asset.id,
+        ...(query.category ? { tags: { array_contains: [`${ASSET_CATEGORY_PREFIX}${query.category}`] } } : {}),
         ...(query.since || query.until
           ? {
               entryDate: {
@@ -88,7 +99,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       take: query.limit
     });
 
-    return entries.map(toAssetTimelineEntryResponse);
+    return entries.map(toEntryAsTimelineEntry);
   });
 
   app.post("/v1/assets/:assetId/timeline-entries", async (request, reply) => {
@@ -100,18 +111,28 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const entry = await app.prisma.assetTimelineEntry.create({
+    const details = buildAssetEntryPayload({
+      title: input.title,
+      description: input.description ?? null,
+      category: input.category ?? null,
+      cost: input.cost ?? null,
+      vendor: input.vendor ?? null,
+      tags: input.tags ?? []
+    });
+
+    const entry = await app.prisma.entry.create({
       data: {
-        assetId: asset.id,
+        householdId: asset.householdId,
         createdById: request.auth.userId,
         title: input.title,
+        body: details.body,
         entryDate: new Date(input.entryDate),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.category !== undefined ? { category: input.category } : {}),
-        ...(input.cost !== undefined ? { cost: input.cost } : {}),
-        ...(input.vendor !== undefined ? { vendor: input.vendor } : {}),
-        ...(input.tags !== undefined ? { tags: toInputJsonValue(input.tags) } : {}),
-        ...(input.metadata !== undefined ? { metadata: toInputJsonValue(input.metadata) } : {})
+        entityType: "asset",
+        entityId: asset.id,
+        entryType: details.entryType,
+        measurements: toInputJsonValue(details.measurements),
+        tags: toInputJsonValue(details.tags),
+        attachmentName: details.attachmentName
       }
     });
 
@@ -128,9 +149,9 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    void syncTimelineEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
+    void syncEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
 
-    return reply.code(201).send(toAssetTimelineEntryResponse(entry));
+    return reply.code(201).send(toEntryAsTimelineEntry(entry));
   });
 
   app.get("/v1/assets/:assetId/timeline-entries/:entryId", async (request, reply) => {
@@ -141,10 +162,11 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const entry = await app.prisma.assetTimelineEntry.findFirst({
+    const entry = await app.prisma.entry.findFirst({
       where: {
         id: params.entryId,
-        assetId: asset.id
+        entityType: "asset",
+        entityId: asset.id
       }
     });
 
@@ -152,7 +174,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Timeline entry not found." });
     }
 
-    return toAssetTimelineEntryResponse(entry);
+    return toEntryAsTimelineEntry(entry);
   });
 
   app.patch("/v1/assets/:assetId/timeline-entries/:entryId", async (request, reply) => {
@@ -164,10 +186,11 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const existing = await app.prisma.assetTimelineEntry.findFirst({
+    const existing = await app.prisma.entry.findFirst({
       where: {
         id: params.entryId,
-        assetId: asset.id
+        entityType: "asset",
+        entityId: asset.id
       }
     });
 
@@ -179,20 +202,35 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "Only the entry creator can edit this timeline entry." });
     }
 
-    const data: Prisma.AssetTimelineEntryUncheckedUpdateInput = {};
+    const current = parseAssetEntryPayload({
+      title: existing.title,
+      body: existing.body,
+      entryType: existing.entryType,
+      tags: parseTags(existing.tags),
+      measurements: parseMeasurements(existing.measurements),
+      attachmentName: existing.attachmentName
+    });
 
-    if (input.title !== undefined) data.title = input.title;
-    if (input.description !== undefined) data.description = input.description;
-    if (input.entryDate !== undefined) data.entryDate = new Date(input.entryDate);
-    if (input.category !== undefined) data.category = input.category;
-    if (input.cost !== undefined) data.cost = input.cost;
-    if (input.vendor !== undefined) data.vendor = input.vendor;
-    if (input.tags !== undefined) data.tags = toInputJsonValue(input.tags);
-    if (input.metadata !== undefined) data.metadata = toInputJsonValue(input.metadata);
+    const details = buildAssetEntryPayload({
+      title: input.title ?? existing.title ?? "",
+      description: input.description !== undefined ? input.description : current.description,
+      category: input.category !== undefined ? input.category : current.category,
+      cost: input.cost !== undefined ? input.cost : current.cost,
+      vendor: input.vendor !== undefined ? input.vendor : current.vendor,
+      tags: input.tags !== undefined ? input.tags : current.tags
+    });
 
-    const entry = await app.prisma.assetTimelineEntry.update({
+    const entry = await app.prisma.entry.update({
       where: { id: existing.id },
-      data
+      data: {
+        title: input.title ?? existing.title,
+        body: details.body,
+        entryType: details.entryType,
+        measurements: toInputJsonValue(details.measurements),
+        tags: toInputJsonValue(details.tags),
+        attachmentName: details.attachmentName,
+        ...(input.entryDate !== undefined ? { entryDate: new Date(input.entryDate) } : {})
+      }
     });
 
     await logActivity(app.prisma, {
@@ -208,9 +246,9 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    void syncTimelineEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
+    void syncEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
 
-    return toAssetTimelineEntryResponse(entry);
+    return toEntryAsTimelineEntry(entry);
   });
 
   app.delete("/v1/assets/:assetId/timeline-entries/:entryId", async (request, reply) => {
@@ -221,10 +259,11 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Asset not found." });
     }
 
-    const existing = await app.prisma.assetTimelineEntry.findFirst({
+    const existing = await app.prisma.entry.findFirst({
       where: {
         id: params.entryId,
-        assetId: asset.id
+        entityType: "asset",
+        entityId: asset.id
       }
     });
 
@@ -236,7 +275,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "Only the entry creator can delete this timeline entry." });
     }
 
-    await app.prisma.assetTimelineEntry.delete({
+    await app.prisma.entry.delete({
       where: { id: existing.id }
     });
 
@@ -253,7 +292,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    void removeSearchIndexEntry(app.prisma, "timeline_entry", existing.id).catch(console.error);
+    void removeSearchIndexEntry(app.prisma, "entry", existing.id).catch(console.error);
 
     return reply.code(204).send();
   });

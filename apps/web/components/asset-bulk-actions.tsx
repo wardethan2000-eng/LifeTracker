@@ -9,10 +9,12 @@ import {
   ApiError,
   bulkArchiveAssets,
   bulkReassignAssetCategory,
-  exportHouseholdAssets,
+  exportHouseholdAssetsCSV,
+  importHouseholdAssets,
+  type ImportAssetsResult,
 } from "../lib/api";
-import { formatCategoryLabel, formatDate } from "../lib/formatters";
-import { generateCSVDownload } from "../lib/csv";
+import { formatCategoryLabel } from "../lib/formatters";
+import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { useToast } from "./toast-provider";
 import {
   Dialog,
@@ -30,43 +32,29 @@ type AssetBulkActionsProps = {
   onBulkComplete?: () => void;
 };
 
-const csvEscape = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-};
+const readFileAsText = async (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => { resolve(typeof reader.result === "string" ? reader.result : ""); };
+  reader.onerror = () => { reject(reader.error ?? new Error("Unable to read CSV file.")); };
+  reader.readAsText(file);
+});
 
-const csvCell = (value: string | number | null | undefined): string => {
-  if (value === null || value === undefined) return "";
-  return csvEscape(String(value));
-};
-
-const buildAssetCsv = (assets: Asset[]): string => {
-  const headers = ["assetTag", "name", "category", "visibility", "purchaseDate", "purchasePrice", "warrantyExpiration", "location"];
-
-  const rows = assets.map((asset) => {
-    const purchase = (asset.purchaseDetails as Record<string, unknown> | null) ?? {};
-    const warranty = (asset.warrantyDetails as Record<string, unknown> | null) ?? {};
-    const location = (asset.locationDetails as Record<string, unknown> | null) ?? {};
-    const locationStr = [location.propertyName, location.room].filter(Boolean).join(", ");
-    const purchaseDate = asset.purchaseDate ? formatDate(asset.purchaseDate) : null;
-    const warrantyEnd = typeof warranty.endDate === "string" ? warranty.endDate.split("T")[0] : null;
-
-    return [
-      csvCell(asset.assetTag),
-      csvCell(asset.name),
-      csvCell(asset.category),
-      csvCell(asset.visibility),
-      csvCell(purchaseDate),
-      csvCell(typeof purchase.price === "number" ? purchase.price : null),
-      csvCell(warrantyEnd),
-      csvCell(locationStr || null),
-    ].join(",");
+const normalizeAssetImportItems = (rows: Array<Record<string, string>>): Array<Record<string, unknown>> =>
+  rows.map((row) => {
+    const norm = Object.fromEntries(
+      Object.entries(row).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, ""), v.trim()])
+    );
+    const out: Record<string, unknown> = {};
+    if (norm.name) out.name = norm.name;
+    if (norm.category) out.category = norm.category;
+    if (norm.description) out.description = norm.description;
+    if (norm.manufacturer) out.manufacturer = norm.manufacturer;
+    if (norm.model) out.model = norm.model;
+    if (norm.serialnumber) out.serialNumber = norm.serialnumber;
+    if (norm.conditionscore) out.conditionScore = norm.conditionscore;
+    if (norm.isarchived) out.isArchived = norm.isarchived;
+    return out;
   });
-
-  return [headers.join(","), ...rows].join("\n");
-};
 
 export function AssetBulkActions({
   householdId,
@@ -78,6 +66,9 @@ export function AssetBulkActions({
   const { pushToast } = useToast();
 
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportAssetsResult | null>(null);
 
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
@@ -101,17 +92,35 @@ export function AssetBulkActions({
   }, [reassignResult]);
 
   const handleExport = async (): Promise<void> => {
-    const itemsToExport = selectedItems.length > 0 ? selectedItems : allItems;
-
     try {
       setIsExporting(true);
       setErrorMessage(null);
-      const csvText = buildAssetCsv(itemsToExport);
+      const csvText = await exportHouseholdAssetsCSV(householdId);
       generateCSVDownload(csvText, "assets-export.csv");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to export assets CSV.");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleImport = async (): Promise<void> => {
+    if (!selectedImportFile) return;
+    try {
+      setIsImporting(true);
+      setErrorMessage(null);
+      setImportResult(null);
+      const fileText = await readFileAsText(selectedImportFile);
+      const parsedRows = parseCSV(fileText);
+      if (parsedRows.length === 0) throw new Error("The CSV file does not contain any rows.");
+      const result = await importHouseholdAssets(householdId, normalizeAssetImportItems(parsedRows));
+      setImportResult(result);
+      if (result.created > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof ApiError || error instanceof Error ? error.message : "Unable to import assets CSV.";
+      setErrorMessage(message);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -182,8 +191,38 @@ export function AssetBulkActions({
           onClick={() => { void handleExport(); }}
           disabled={isExporting}
         >
-          {isExporting ? "Exporting..." : selectedItems.length > 0 ? `Export Selected (${selectedItems.length})` : "Export All CSV"}
+          {isExporting ? "Exporting..." : "Export CSV"}
         </button>
+
+        <div className="inventory-bulk-actions__import">
+          <input
+            className="inventory-bulk-actions__file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedImportFile(event.target.files?.[0] ?? null);
+              setErrorMessage(null);
+              setImportResult(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button button--secondary button--sm"
+            onClick={() => { void handleImport(); }}
+            disabled={!selectedImportFile || isImporting}
+          >
+            {isImporting ? "Importing..." : "Import"}
+          </button>
+        </div>
+
+        {importResult ? (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${importResult.skipped > 0 || importResult.errors.length > 0 ? "warning" : "success"}`}>
+            <p>Created {importResult.created} asset{importResult.created === 1 ? "" : "s"}, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}{importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}</p>
+            {importResult.errors.length > 0 ? (
+              <ul>{importResult.errors.map((e) => <li key={`${e.index}-${e.message}`}>Row {e.index + 2}: {e.message}</li>)}</ul>
+            ) : null}
+          </div>
+        ) : null}
 
         <button
           type="button"

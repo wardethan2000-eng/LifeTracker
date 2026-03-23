@@ -9,7 +9,11 @@ import {
   bulkArchiveIdeas,
   bulkMoveIdeas,
   bulkSetIdeaPriority,
+  exportHouseholdIdeasCSV,
+  importHouseholdIdeas,
+  type ImportIdeasResult,
 } from "../lib/api";
+import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { useToast } from "./toast-provider";
 import {
   Dialog,
@@ -34,6 +38,27 @@ const PRIORITY_LABELS: Record<IdeaPriority, string> = {
 
 const STAGE_VALUES: IdeaStage[] = ["spark", "developing", "ready"];
 const PRIORITY_VALUES: IdeaPriority[] = ["low", "medium", "high"];
+
+const readFileAsText = async (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => { resolve(typeof reader.result === "string" ? reader.result : ""); };
+  reader.onerror = () => { reject(reader.error ?? new Error("Unable to read CSV file.")); };
+  reader.readAsText(file);
+});
+
+const normalizeIdeaImportItems = (rows: Array<Record<string, string>>): Array<Record<string, unknown>> =>
+  rows.map((row) => {
+    const norm = Object.fromEntries(
+      Object.entries(row).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, ""), v.trim()])
+    );
+    const out: Record<string, unknown> = {};
+    if (norm.title) out.title = norm.title;
+    if (norm.description) out.description = norm.description;
+    if (norm.stage) out.stage = norm.stage;
+    if (norm.priority) out.priority = norm.priority;
+    if (norm.category) out.category = norm.category;
+    return out;
+  });
 
 type IdeaBulkActionsProps = {
   householdId: string;
@@ -64,6 +89,11 @@ export function IdeaBulkActions({
   const [priorityResult, setPriorityResult] = useState<BulkIdeaOperationResult | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportIdeasResult | null>(null);
 
   const stageResultTone = useMemo(() => {
     if (!stageResult) return null;
@@ -184,6 +214,39 @@ export function IdeaBulkActions({
     }
   };
 
+  const handleExport = async (): Promise<void> => {
+    try {
+      setIsExporting(true);
+      setErrorMessage(null);
+      const csvText = await exportHouseholdIdeasCSV(householdId);
+      generateCSVDownload(csvText, "ideas-export.csv");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to export ideas CSV.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async (): Promise<void> => {
+    if (!selectedImportFile) return;
+    try {
+      setIsImporting(true);
+      setErrorMessage(null);
+      setImportResult(null);
+      const fileText = await readFileAsText(selectedImportFile);
+      const parsedRows = parseCSV(fileText);
+      if (parsedRows.length === 0) throw new Error("The CSV file does not contain any rows.");
+      const result = await importHouseholdIdeas(householdId, normalizeIdeaImportItems(parsedRows));
+      setImportResult(result);
+      if (result.created > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof ApiError || error instanceof Error ? error.message : "Unable to import ideas CSV.";
+      setErrorMessage(message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <>
       <div className="bulk-action-bar__actions">
@@ -211,6 +274,45 @@ export function IdeaBulkActions({
         >
           Archive
         </button>
+
+        <button
+          type="button"
+          className="button button--sm button--ghost"
+          onClick={() => { void handleExport(); }}
+          disabled={isExporting}
+        >
+          {isExporting ? "Exporting…" : "Export CSV"}
+        </button>
+
+        <div className="inventory-bulk-actions__import">
+          <input
+            className="inventory-bulk-actions__file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedImportFile(event.target.files?.[0] ?? null);
+              setErrorMessage(null);
+              setImportResult(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button button--sm button--ghost"
+            onClick={() => { void handleImport(); }}
+            disabled={!selectedImportFile || isImporting}
+          >
+            {isImporting ? "Importing…" : "Import"}
+          </button>
+        </div>
+
+        {importResult ? (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${importResult.skipped > 0 || importResult.errors.length > 0 ? "warning" : "success"}`}>
+            <p>Created {importResult.created} idea{importResult.created === 1 ? "" : "s"}, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}{importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}</p>
+            {importResult.errors.length > 0 ? (
+              <ul>{importResult.errors.map((e) => <li key={`${e.index}-${e.message}`}>Row {e.index + 2}: {e.message}</li>)}</ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {errorMessage && <p className="bulk-action-bar__error">{errorMessage}</p>}

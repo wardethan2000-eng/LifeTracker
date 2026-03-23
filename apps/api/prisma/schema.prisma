@@ -386,11 +386,12 @@ model User {
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
 model Household {
-  id               String                @id @default(cuid())
-  name             String
-  createdById      String
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  id                       String                @id @default(cuid())
+  name                     String
+  createdById              String
+  legacyMigrationDoneAt    DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
   createdBy        User                  @relation("HouseholdCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members          HouseholdMember[]
   assets           Asset[]

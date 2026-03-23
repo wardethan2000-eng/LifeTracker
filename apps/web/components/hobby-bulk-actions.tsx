@@ -8,7 +8,11 @@ import {
   ApiError,
   bulkArchiveHobbySessions,
   bulkLogHobbySessions,
+  exportHouseholdHobbiesCSV,
+  importHouseholdHobbies,
+  type ImportHobbiesResult,
 } from "../lib/api";
+import { generateCSVDownload, parseCSV } from "../lib/csv";
 import { useToast } from "./toast-provider";
 import {
   Dialog,
@@ -50,6 +54,11 @@ export function HobbyBulkActions({
   const [archiveResult, setArchiveResult] = useState<BulkHobbySessionOperationResult | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportHobbiesResult | null>(null);
 
   const logResultTone = useMemo(() => {
     if (!logResult) return null;
@@ -136,6 +145,61 @@ export function HobbyBulkActions({
     }
   };
 
+  const handleExport = async (): Promise<void> => {
+    try {
+      setIsExporting(true);
+      setErrorMessage(null);
+      const csvText = await exportHouseholdHobbiesCSV(householdId);
+      generateCSVDownload(csvText, "hobbies-export.csv");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to export hobbies CSV.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const readFileAsText = async (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => { resolve(typeof reader.result === "string" ? reader.result : ""); };
+    reader.onerror = () => { reject(reader.error ?? new Error("Unable to read CSV file.")); };
+    reader.readAsText(file);
+  });
+
+  const normalizeHobbyImportItems = (rows: Array<Record<string, string>>): Array<Record<string, unknown>> =>
+    rows.map((row) => {
+      const norm = Object.fromEntries(
+        Object.entries(row).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, ""), v.trim()])
+      );
+      const out: Record<string, unknown> = {};
+      if (norm.name) out.name = norm.name;
+      if (norm.status) out.status = norm.status;
+      if (norm.activitymode) out.activityMode = norm.activitymode;
+      if (norm.hobbytype) out.hobbyType = norm.hobbytype;
+      if (norm.description) out.description = norm.description;
+      if (norm.notes) out.notes = norm.notes;
+      return out;
+    });
+
+  const handleImport = async (): Promise<void> => {
+    if (!selectedImportFile) return;
+    try {
+      setIsImporting(true);
+      setErrorMessage(null);
+      setImportResult(null);
+      const fileText = await readFileAsText(selectedImportFile);
+      const parsedRows = parseCSV(fileText);
+      if (parsedRows.length === 0) throw new Error("The CSV file does not contain any rows.");
+      const result = await importHouseholdHobbies(householdId, normalizeHobbyImportItems(parsedRows));
+      setImportResult(result);
+      if (result.created > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof ApiError || error instanceof Error ? error.message : "Unable to import hobbies CSV.";
+      setErrorMessage(message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <>
       <div className="bulk-action-bar__actions">
@@ -154,6 +218,45 @@ export function HobbyBulkActions({
         >
           Archive Selected
         </button>
+
+        <button
+          type="button"
+          className="button button--sm button--ghost"
+          onClick={() => { void handleExport(); }}
+          disabled={isExporting}
+        >
+          {isExporting ? "Exporting…" : "Export Hobbies CSV"}
+        </button>
+
+        <div className="inventory-bulk-actions__import">
+          <input
+            className="inventory-bulk-actions__file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedImportFile(event.target.files?.[0] ?? null);
+              setErrorMessage(null);
+              setImportResult(null);
+            }}
+          />
+          <button
+            type="button"
+            className="button button--sm button--ghost"
+            onClick={() => { void handleImport(); }}
+            disabled={!selectedImportFile || isImporting}
+          >
+            {isImporting ? "Importing…" : "Import Hobbies"}
+          </button>
+        </div>
+
+        {importResult ? (
+          <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${importResult.skipped > 0 || importResult.errors.length > 0 ? "warning" : "success"}`}>
+            <p>Created {importResult.created} hobb{importResult.created === 1 ? "y" : "ies"}, skipped {importResult.skipped} duplicate{importResult.skipped === 1 ? "" : "s"}{importResult.errors.length === 0 ? "." : `, with ${importResult.errors.length} error${importResult.errors.length === 1 ? "" : "s"}.`}</p>
+            {importResult.errors.length > 0 ? (
+              <ul>{importResult.errors.map((e) => <li key={`${e.index}-${e.message}`}>Row {e.index + 2}: {e.message}</li>)}</ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {errorMessage && <p className="bulk-action-bar__error">{errorMessage}</p>}
