@@ -10,6 +10,24 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC"
 });
 
+const dayFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+export const createDateTickFormatter = (timeZone: string): ((value: string) => string) => {
+  let formatter = dayFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone });
+    dayFormatterCache.set(timeZone, formatter);
+  }
+  const captured = formatter;
+  return (value: string): string => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return captured.format(date);
+  };
+};
+
 const dayFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "2-digit",

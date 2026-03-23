@@ -846,12 +846,17 @@ export const createHouseholdSchema = z.object({
 });
 
 export const updateHouseholdSchema = z.object({
-  name: z.string().min(1).max(120).optional()
+  name: z.string().min(1).max(120).optional(),
+  timezone: z.string().refine(
+    (tz) => { try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return true; } catch { return false; } },
+    { message: "Invalid IANA timezone identifier" }
+  ).optional()
 });
 
 export const householdSummarySchema = z.object({
   id: z.string().cuid(),
   name: z.string(),
+  timezone: z.string().default("America/New_York"),
   createdById: z.string().cuid(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

@@ -42,6 +42,7 @@ import {
   hobbySchema,
   inventoryItemSummarySchema
 } from "@lifekeeper/types";
+import { HOBBY_LOG_TYPE_PREFIX } from "@lifekeeper/utils";
 
 export const toHobbyResponse = (hobby: {
   id: string;
@@ -1007,6 +1008,45 @@ export const toHobbyRecipeShoppingListResponse = (payload: {
   }>;
   totalEstimatedCost: number | null;
 }) => hobbyRecipeShoppingListSchema.parse(payload);
+
+export const toEntryAsHobbyLog = (
+  entry: {
+    id: string;
+    entityType: string;
+    entityId: string;
+    title: string | null;
+    body: string;
+    entryDate: Date;
+    entryType: string;
+    tags: unknown;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  hobbyId: string
+) => {
+  const tags = Array.isArray(entry.tags)
+    ? (entry.tags as unknown[]).filter((t): t is string => typeof t === "string")
+    : [];
+  const logTypeTag = tags.find((t) => t.startsWith(HOBBY_LOG_TYPE_PREFIX));
+  const logType = logTypeTag
+    ? logTypeTag.slice(HOBBY_LOG_TYPE_PREFIX.length)
+    : entry.entryType === "lesson"
+    ? "lesson"
+    : entry.entryType === "milestone"
+    ? "milestone"
+    : "note";
+  return hobbyLogSchema.parse({
+    id: entry.id,
+    hobbyId,
+    sessionId: entry.entityType === "hobby_session" ? entry.entityId : null,
+    title: entry.title,
+    content: entry.body,
+    logDate: entry.entryDate.toISOString(),
+    logType,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString()
+  });
+};
 
 export const toLogResponse = (log: {
   id: string;

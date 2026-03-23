@@ -9,24 +9,13 @@ import {
   SectionFilterProvider,
   SectionFilterToggle,
 } from "./section-filter";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbySeriesListProps = {
   hobbyId: string;
   activityMode: HobbyActivityMode;
   series: HobbySeriesSummary[];
 };
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function statusBadgeClass(status: string): string {
   switch (status) {
@@ -75,6 +64,7 @@ function sortSeries(items: HobbySeriesSummary[]): HobbySeriesSummary[] {
 }
 
 export function HobbySeriesList({ hobbyId, activityMode, series }: HobbySeriesListProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "archived">("all");
 
   const activeCount = useMemo(

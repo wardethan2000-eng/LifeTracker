@@ -6,6 +6,7 @@ import { SearchCommandPaletteLazy } from "../../components/search-command-palett
 import { RoutePrefetcher } from "../../components/route-prefetcher";
 import { RealtimeStatusIndicator } from "../../components/realtime-status-indicator";
 import { SidebarNav, type SidebarNavItem } from "../../components/sidebar-nav";
+import { TimezoneProvider } from "../../lib/timezone-context";
 
 const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
@@ -36,12 +37,14 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   let userName = "User";
   let userRole = "Member";
   let fallbackHouseholdId: string | null = null;
+  let householdTimezone = "America/New_York";
 
   try {
     const me = await getMe();
     userName = me.user.displayName ?? me.user.email ?? "User";
     userRole = me.households[0] ? "Owner" : "Member";
     fallbackHouseholdId = me.households[0]?.id ?? null;
+    householdTimezone = me.households[0]?.timezone ?? "America/New_York";
   } catch {
     // Shell still renders even if user fetch fails.
   }
@@ -86,7 +89,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             <RealtimeStatusIndicator householdId={fallbackHouseholdId} />
           </div>
         </div>
-        {children}
+        <TimezoneProvider timezone={householdTimezone}>
+          {children}
+        </TimezoneProvider>
       </div>
     </div>
   );

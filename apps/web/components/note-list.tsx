@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { RichEditorDisplay } from "./rich-editor-display";
 import { SaveAsTemplateButton } from "./save-as-template-button";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type NoteListProps = {
   householdId: string;
@@ -23,14 +24,6 @@ function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + "…";
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export function NoteList({
   householdId,
   entries,
@@ -38,6 +31,7 @@ export function NoteList({
   activeFolder,
   onDelete,
 }: NoteListProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   return (
     <div className="note-list">
       <div className="note-list__header">

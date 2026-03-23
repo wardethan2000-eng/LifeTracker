@@ -1,3 +1,5 @@
+"use client";
+
 import type { Asset } from "@lifekeeper/types";
 import type { JSX } from "react";
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
@@ -13,6 +15,7 @@ import {
 import { Card } from "./card";
 import { CollapsibleCard } from "./collapsible-card";
 import { InlineError } from "./inline-error";
+import { useTimezone } from "../lib/timezone-context";
 
 type AssetWorkbenchAsideProps = {
   initialAsset: Asset | undefined;
@@ -35,6 +38,7 @@ export function AssetProfileWorkbenchAside({
   errors,
   onSaveAsPresetChange,
 }: AssetWorkbenchAsideProps): JSX.Element {
+  const { timezone } = useTimezone();
   return (
     <div className="resource-layout__aside">
       <Card title="Visibility">
@@ -77,7 +81,7 @@ export function AssetProfileWorkbenchAside({
 
       {initialAsset ? (
         <>
-          <CollapsibleCard title="Purchase Details" summary={purchaseSummary(initialAsset)}>
+          <CollapsibleCard title="Purchase Details" summary={purchaseSummary(initialAsset, timezone)}>
             <div className="workbench-grid">
               <label className="field"><span>Purchase Date</span><input type="date" {...register("purchaseDate")} /><InlineError message={errors.purchaseDate?.message} size="sm" /></label>
               <label className="field"><span>Purchase Price</span><input type="number" name="purchaseDetails.price" min="0" step="0.01" defaultValue={initialAsset.purchaseDetails?.price ?? ""} /></label>
@@ -88,7 +92,7 @@ export function AssetProfileWorkbenchAside({
             </div>
           </CollapsibleCard>
 
-          <CollapsibleCard title="Warranty Info" summary={warrantySummary(initialAsset)}>
+          <CollapsibleCard title="Warranty Info" summary={warrantySummary(initialAsset, timezone)}>
             <div className="workbench-grid">
               <label className="field"><span>Provider</span><input type="text" name="warrantyDetails.provider" defaultValue={initialAsset.warrantyDetails?.provider ?? ""} /></label>
               <label className="field"><span>Policy / Contract</span><input type="text" name="warrantyDetails.policyNumber" defaultValue={initialAsset.warrantyDetails?.policyNumber ?? ""} /></label>
@@ -121,7 +125,7 @@ export function AssetProfileWorkbenchAside({
             </div>
           </CollapsibleCard>
 
-          <CollapsibleCard title="Condition" summary={conditionSummary(initialAsset)}>
+          <CollapsibleCard title="Condition" summary={conditionSummary(initialAsset, timezone)}>
             <div className="workbench-grid">
               <label className="field">
                 <span>Condition Score (1–10)</span>
@@ -131,7 +135,7 @@ export function AssetProfileWorkbenchAside({
             </div>
           </CollapsibleCard>
 
-          <CollapsibleCard title="Disposition" summary={dispositionSummary(initialAsset)}>
+          <CollapsibleCard title="Disposition" summary={dispositionSummary(initialAsset, timezone)}>
             <div className="workbench-grid">
               <label className="field"><span>Method</span><select name="dispositionDetails.method" defaultValue={initialAsset.dispositionDetails?.method ?? ""}><option value="">None</option><option value="sold">Sold</option><option value="donated">Donated</option><option value="scrapped">Scrapped</option><option value="recycled">Recycled</option><option value="lost">Lost</option></select></label>
               <label className="field"><span>Date</span><input type="date" name="dispositionDetails.date" defaultValue={initialAsset.dispositionDetails?.date ? initialAsset.dispositionDetails.date.slice(0, 10) : ""} /></label>

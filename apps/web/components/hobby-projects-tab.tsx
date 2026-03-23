@@ -3,6 +3,7 @@
 import type { HobbyActivityMode, HobbyProjectStatus, HobbyProjectSummary } from "@lifekeeper/types";
 import Link from "next/link";
 import { useMemo, useState, type JSX } from "react";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbyProjectsTabProps = {
   hobbyId: string;
@@ -18,11 +19,6 @@ const statusOptions: Array<{ value: HobbyProjectStatus | "all"; label: string }>
   { value: "completed", label: "Completed" },
   { value: "abandoned", label: "Abandoned" },
 ];
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
 
 function formatHours(value: number): string {
   return `${value.toFixed(value >= 10 ? 0 : 1)} hr`;
@@ -46,6 +42,7 @@ function statusClass(status: HobbyProjectStatus): string {
 }
 
 export function HobbyProjectsTab({ hobbyId, activityMode, projects }: HobbyProjectsTabProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [statusFilter, setStatusFilter] = useState<HobbyProjectStatus | "all">("all");
 
   const visibleProjects = useMemo(() => projects

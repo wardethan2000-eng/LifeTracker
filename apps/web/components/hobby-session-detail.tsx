@@ -30,6 +30,7 @@ import {
   updateHobbySession,
   updateHobbySessionStep,
 } from "../lib/api";
+import { useFormattedDate } from "../lib/formatted-date";
 import { Card } from "./card";
 import { EntryTipsSurface } from "./entry-system";
 import { HobbySessionStageManager } from "./hobby-session-stage-manager";
@@ -124,32 +125,6 @@ const brewDayChecklistFields: Array<{ key: keyof BrewDayChecklist; label: string
   { key: "cleanupComplete", label: "Cleanup complete" },
 ];
 
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatDateTime(value: string | null | undefined, fallback = "-"): string {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 function formatCurrency(value: number | null | undefined): string {
   if (value == null) {
     return "-";
@@ -207,6 +182,7 @@ export function HobbySessionDetail({
   series,
   deleteHobbySessionAction,
 }: HobbySessionDetailProps): JSX.Element {
+  const { formatDate, formatDateTime } = useFormattedDate();
   const [sessionState, setSessionState] = useState(session);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingStepIds, setPendingStepIds] = useState<string[]>([]);

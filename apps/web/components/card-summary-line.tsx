@@ -1,12 +1,15 @@
 import type { Asset } from "@lifekeeper/types";
 
+const shortDateFmt = (timezone?: string) => new Intl.DateTimeFormat("en-US", { month: "numeric", day: "numeric", year: "numeric", ...(timezone ? { timeZone: timezone } : {}) });
+const monthYearFmt = (timezone?: string) => new Intl.DateTimeFormat("en-US", { month: "numeric", year: "numeric", ...(timezone ? { timeZone: timezone } : {}) });
+
 /** Format a purchase details summary line (collapsed view). */
-export function purchaseSummary(asset: Asset): string {
+export function purchaseSummary(asset: Asset, timezone?: string): string {
   const { purchaseDetails, purchaseDate } = asset;
   const parts: string[] = [];
 
   const date = purchaseDate
-    ? new Date(purchaseDate).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })
+    ? shortDateFmt(timezone).format(new Date(purchaseDate))
     : null;
   if (date) parts.push(`Purchased ${date}`);
 
@@ -19,14 +22,13 @@ export function purchaseSummary(asset: Asset): string {
 }
 
 /** Format a warranty summary line. */
-export function warrantySummary(asset: Asset): string {
+export function warrantySummary(asset: Asset, timezone?: string): string {
   const w = asset.warrantyDetails;
   if (!w) return "Not configured";
   const parts: string[] = [];
 
   if (w.endDate) {
-    const d = new Date(w.endDate);
-    parts.push(`Expires ${d.toLocaleDateString("en-US", { month: "numeric", year: "numeric" })}`);
+    parts.push(`Expires ${monthYearFmt(timezone).format(new Date(w.endDate))}`);
   }
   if (w.coverageType) parts.push(w.coverageType);
   if (w.provider) parts.push(w.provider);
@@ -60,7 +62,7 @@ export function insuranceSummary(asset: Asset): string {
 }
 
 /** Format a condition summary line. */
-export function conditionSummary(asset: Asset): string {
+export function conditionSummary(asset: Asset, timezone?: string): string {
   if (asset.conditionScore == null && asset.conditionHistory.length === 0) {
     return "Not configured";
   }
@@ -70,22 +72,20 @@ export function conditionSummary(asset: Asset): string {
 
   const latest = [...asset.conditionHistory].sort((a, b) => b.assessedAt.localeCompare(a.assessedAt))[0];
   if (latest) {
-    const d = new Date(latest.assessedAt);
-    parts.push(`Last assessed ${d.toLocaleDateString("en-US", { month: "numeric", year: "numeric" })}`);
+    parts.push(`Last assessed ${monthYearFmt(timezone).format(new Date(latest.assessedAt))}`);
   }
 
   return parts.length > 0 ? parts.join(" · ") : "Not configured";
 }
 
 /** Format a disposition summary line. */
-export function dispositionSummary(asset: Asset): string {
+export function dispositionSummary(asset: Asset, timezone?: string): string {
   const d = asset.dispositionDetails;
   if (!d || !d.method) return "Not configured";
   const parts = [d.method.charAt(0).toUpperCase() + d.method.slice(1)];
 
   if (d.date) {
-    const dt = new Date(d.date);
-    parts.push(dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" }));
+    parts.push(shortDateFmt(timezone).format(new Date(d.date)));
   }
 
   return parts.join(" · ");

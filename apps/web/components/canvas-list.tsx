@@ -5,21 +5,15 @@ import type { JSX } from "react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { createCanvas, deleteCanvas, getCanvases } from "../lib/api";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type CanvasListProps = {
   householdId: string;
   initialCanvases: IdeaCanvasSummary[];
 };
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export function CanvasList({ householdId, initialCanvases }: CanvasListProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [canvases, setCanvases] = useState<IdeaCanvasSummary[]>(initialCanvases);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");

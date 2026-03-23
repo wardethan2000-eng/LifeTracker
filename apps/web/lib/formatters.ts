@@ -7,19 +7,40 @@ import type {
   ScheduleStatus
 } from "@lifekeeper/types";
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric"
-});
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit"
-});
+const getDateFormatter = (timeZone?: string): Intl.DateTimeFormat => {
+  const key = timeZone ?? "__default__";
+  let formatter = dateFormatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      ...(timeZone ? { timeZone } : {})
+    });
+    dateFormatterCache.set(key, formatter);
+  }
+  return formatter;
+};
+
+const getDateTimeFormatter = (timeZone?: string): Intl.DateTimeFormat => {
+  const key = timeZone ?? "__default__";
+  let formatter = dateTimeFormatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      ...(timeZone ? { timeZone } : {})
+    });
+    dateTimeFormatterCache.set(key, formatter);
+  }
+  return formatter;
+};
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -54,20 +75,20 @@ const scheduleStatusLabels: Record<ScheduleStatus, string> = {
   upcoming: "Upcoming"
 };
 
-export const formatDate = (value: string | null | undefined, fallback = "Not set"): string => {
+export const formatDate = (value: string | null | undefined, fallback = "Not set", timeZone?: string): string => {
   if (!value) {
     return fallback;
   }
 
-  return dateFormatter.format(new Date(value));
+  return getDateFormatter(timeZone).format(new Date(value));
 };
 
-export const formatDateTime = (value: string | null | undefined, fallback = "Not set"): string => {
+export const formatDateTime = (value: string | null | undefined, fallback = "Not set", timeZone?: string): string => {
   if (!value) {
     return fallback;
   }
 
-  return dateTimeFormatter.format(new Date(value));
+  return getDateTimeFormatter(timeZone).format(new Date(value));
 };
 
 export const formatCurrency = (value: number | null | undefined, fallback = "No cost"): string => {
@@ -135,10 +156,11 @@ export const formatAssetStateLabel = (asset: AssetOverview): string => {
 export const formatDueLabel = (
   nextDueAt: string | null,
   nextDueMetricValue: number | null,
-  metricUnit: string | null
+  metricUnit: string | null,
+  timeZone?: string
 ): string => {
   if (nextDueAt) {
-    return formatDate(nextDueAt);
+    return formatDate(nextDueAt, "Not set", timeZone);
   }
 
   if (nextDueMetricValue !== null) {

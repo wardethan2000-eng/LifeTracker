@@ -22,13 +22,6 @@ const maintenanceLogHistoryOilSpringId = "clkeeperlog00000000000003";
 const maintenanceLogHistoryOilFallId = "clkeeperlog00000000000004";
 const maintenanceLogHistoryTireSummerId = "clkeeperlog00000000000005";
 const maintenanceLogHistoryTireWinterId = "clkeeperlog00000000000006";
-const timelineEntryRustSpotId = "clkeepertimeline00000001";
-const timelineEntryStormFenceId = "clkeepertimeline00000002";
-const timelineEntryCeramicCoatId = "clkeepertimeline00000003";
-const timelineEntryTaxAssessmentId = "clkeepertimeline00000004";
-const timelineEntryWinterizeId = "clkeepertimeline00000005";
-const timelineEntryWeatherStripId = "clkeepertimeline00000006";
-const timelineEntryPanelInspectId = "clkeepertimeline00000007";
 const presetProfileId = "clkeeperpreset000000000001";
 const serviceProviderId = "clkeeperprovider0000000001";
 const renovationProviderId = "clkeeperprovider0000000002";
@@ -1882,51 +1875,6 @@ async function main(): Promise<void> {
     ]
   });
 
-  // ── Project Notes ─────────────────────────────────────────────────────────
-  const noteIds = [
-    "clkeepernote00000000000001",
-    "clkeepernote00000000000002",
-    "clkeepernote00000000000003"
-  ] as const;
-
-  await prisma.projectNote.deleteMany({ where: { projectId } });
-
-  await prisma.projectNote.createMany({
-    data: [
-      {
-        id: noteIds[0],
-        projectId,
-        phaseId: phasePlanningId,
-        title: "Cabinet hardware finish comparison",
-        body: "## Finish Comparison\n\n**Brushed Brass**\n- Price: ~$12/pull\n- Lead time: 2–3 weeks\n- ✅ Recommended\n\n**Matte Black**\n- Price: ~$9/pull\n- Lead time: 1 week\n\n**Satin Nickel**\n- Price: ~$8/pull\n- Lead time: 1 week\n\nRecommendation: Brushed brass best matches the warm wood tones planned for the new cabinetry.",
-        url: "https://example.com/hardware-comparison",
-        category: "research",
-        isPinned: true,
-        createdById: ownerUserId
-      },
-      {
-        id: noteIds[1],
-        projectId,
-        phaseId: null,
-        title: "Decided against open shelving on the peninsula wall",
-        body: "After discussing with the household, open shelving on the peninsula wall was ruled out. Primary concerns: visible clutter with young children, dust accumulation on rarely-used items, and the cost difference did not justify the aesthetic. Will proceed with full upper cabinet run on that wall.",
-        category: "decision",
-        isPinned: false,
-        createdById: ownerUserId
-      },
-      {
-        id: noteIds[2],
-        projectId,
-        phaseId: phaseDemolitionId,
-        title: "Wall measurements after demo",
-        body: "## Post-Demo Measurements\n\n- North wall run: 142.5 in\n- East wall (sink): 76 in\n- Peninsula wall: 98 in\n- Ceiling height: 108 in\n- Electrical box center (north): 34 in from floor\n- Pendant drop target: 66 in from floor",
-        category: "measurement",
-        isPinned: false,
-        createdById: ownerUserId
-      }
-    ]
-  });
-
   // ── Tier 2: Household Invitation ──────────────────────────────────────────
   await prisma.householdInvitation.upsert({
     where: { id: invitationId },
@@ -2021,136 +1969,6 @@ async function main(): Promise<void> {
       body: "I noticed that too. It might just be the sensor, but let's check the level after the next oil change."
     }
   });
-
-  // ── Tier 2: Manual Asset Timeline Entries ───────────────────────────────
-  const manualTimelineEntries = [
-    {
-      id: timelineEntryRustSpotId,
-      assetId,
-      createdById: ownerUserId,
-      title: "Noticed minor rust spot on rear quarter panel",
-      description: "Small bubble forming near the wheel arch. Took photos to track whether it spreads before fall detailing.",
-      entryDate: new Date("2025-10-18T15:30:00.000Z"),
-      category: "observation",
-      cost: null,
-      vendor: null,
-      tags: ["body", "rust", "monitoring"],
-      metadata: {
-        severity: "low",
-        location: "rear quarter panel"
-      }
-    },
-    {
-      id: timelineEntryStormFenceId,
-      assetId: homeAssetId,
-      createdById: memberUserId,
-      title: "Neighbor's tree fell on fence near the AC unit — no damage to unit",
-      description: "Fence section took the hit, but the condenser cabinet and lineset stayed clear. Logged it here in case we need to reference the storm later.",
-      entryDate: new Date("2025-09-03T20:10:00.000Z"),
-      category: "incident",
-      cost: null,
-      vendor: null,
-      tags: ["storm", "fence", "hvac"],
-      metadata: {
-        followUpNeeded: false
-      }
-    },
-    {
-      id: timelineEntryCeramicCoatId,
-      assetId,
-      createdById: ownerUserId,
-      title: "Applied ceramic coating to exterior",
-      description: "Completed full wash, clay, and single-stage polish before applying the coating. Paint should be easier to maintain through winter.",
-      entryDate: new Date("2025-11-09T18:45:00.000Z"),
-      category: "modification",
-      cost: 89.99,
-      vendor: "Chemical Guys",
-      tags: ["detailing", "paint", "protection"],
-      metadata: {
-        product: "HydroSlick",
-        estimatedDurabilityMonths: 12
-      }
-    },
-    {
-      id: timelineEntryTaxAssessmentId,
-      assetId: homeAssetId,
-      createdById: ownerUserId,
-      title: "Annual property tax assessment — noted home value increase",
-      description: "Assessment letter came in higher than expected. Worth keeping in the property history alongside renovation planning notes.",
-      entryDate: new Date("2026-01-22T14:00:00.000Z"),
-      category: "note",
-      cost: null,
-      vendor: null,
-      tags: ["tax", "valuation", "records"],
-      metadata: {
-        assessedValueChange: "increase"
-      }
-    },
-    {
-      id: timelineEntryWinterizeId,
-      assetId: homeAssetId,
-      createdById: memberUserId,
-      title: "Winterized irrigation system before first freeze",
-      description: "Shut off supply, blew out all zones, and tagged the controller so no one starts a cycle accidentally.",
-      entryDate: new Date("2025-11-05T16:20:00.000Z"),
-      category: "seasonal",
-      cost: null,
-      vendor: null,
-      tags: ["irrigation", "winter", "preventive"],
-      metadata: {
-        zonesCleared: 6
-      }
-    },
-    {
-      id: timelineEntryWeatherStripId,
-      assetId: homeAssetId,
-      createdById: ownerUserId,
-      title: "Replaced garage door weather stripping — bought at Home Depot",
-      description: "Old seal had hardened and was letting in drafts. New bottom seal closed the gap on the driveway side.",
-      entryDate: new Date("2025-12-14T17:05:00.000Z"),
-      category: "repair",
-      cost: 34.5,
-      vendor: "Home Depot",
-      tags: ["garage", "weatherproofing"],
-      metadata: {
-        material: "vinyl"
-      }
-    },
-    {
-      id: timelineEntryPanelInspectId,
-      assetId: homeAssetId,
-      createdById: ownerUserId,
-      title: "Had electrician inspect panel after power surge",
-      description: "No immediate damage found, but one breaker showed heat discoloration and should be watched during the next service visit.",
-      entryDate: new Date("2026-02-27T13:40:00.000Z"),
-      category: "inspection",
-      cost: 150,
-      vendor: "Ray's Electric",
-      tags: ["electrical", "inspection", "surge"],
-      metadata: {
-        followUpWindowDays: 90
-      }
-    }
-  ] as const;
-
-  for (const entry of manualTimelineEntries) {
-    await prisma.assetTimelineEntry.upsert({
-      where: { id: entry.id },
-      update: {
-        assetId: entry.assetId,
-        createdById: entry.createdById,
-        title: entry.title,
-        description: entry.description,
-        entryDate: entry.entryDate,
-        category: entry.category,
-        cost: entry.cost,
-        vendor: entry.vendor,
-        tags: entry.tags,
-        metadata: entry.metadata
-      },
-      create: entry
-    });
-  }
 
   // ── Tier 3: Hobby — Beer Brewing ─────────────────────────────────────────
 
@@ -2447,29 +2265,6 @@ async function main(): Promise<void> {
     });
   }
 
-  // Session 1 journal entries
-  await prisma.hobbyLog.deleteMany({ where: { sessionId: hobbySessionBatch1Id } });
-  await prisma.hobbyLog.createMany({
-    data: [
-      {
-        hobbyId,
-        sessionId: hobbySessionBatch1Id,
-        title: "Brew Day Notes",
-        content: "Smooth brew day overall. Mash temp held well at 152°F. Pre-boil gravity was 1.044, right on target. Used immersion chiller — reached pitching temp in about 20 min. Wort looked crystal clear going into the fermenter.",
-        logDate: new Date("2026-02-01T16:00:00Z"),
-        logType: "progress",
-      },
-      {
-        hobbyId,
-        sessionId: hobbySessionBatch1Id,
-        title: "Tasting Notes — 2 Weeks in Bottle",
-        content: "Poured clear amber with a nice white head. Cascade aroma is prominent. Clean malt backbone with moderate bitterness. Slight chill haze when cold. Would bump up the flame-out hops to 1 oz next time for more aroma punch.",
-        logDate: new Date("2026-03-01T18:00:00Z"),
-        logType: "tasting",
-      },
-    ],
-  });
-
   // Session 2: Batch #2 — Oatmeal Stout (active, in primary fermentation)
   await prisma.hobbySession.upsert({
     where: { id: hobbySessionBatch2Id },
@@ -2541,27 +2336,6 @@ async function main(): Promise<void> {
       pipelineStepId: hobbyPipelinePlannedId,
       notes: "Planning a West Coast IPA. Need to develop the recipe first.",
     },
-  });
-
-  // General hobby journal entries (not scoped to a session)
-  await prisma.hobbyLog.deleteMany({ where: { hobbyId, sessionId: null } });
-  await prisma.hobbyLog.createMany({
-    data: [
-      {
-        hobbyId,
-        title: "Getting Started",
-        content: "Ordered the basic all-grain setup. Going to start with extract kits and transition to all-grain once I have the process down.",
-        logDate: new Date("2026-01-15T12:00:00Z"),
-        logType: "note",
-      },
-      {
-        hobbyId,
-        title: "Equipment Arrived",
-        content: "Brew kettle, fermenter, bottling bucket, auto-siphon, and hydrometer all arrived. Star San for sanitizing. Ready to brew!",
-        logDate: new Date("2026-01-25T14:00:00Z"),
-        logType: "progress",
-      },
-    ],
   });
 
   const existingForSaleShareLink = await prisma.shareLink.findFirst({

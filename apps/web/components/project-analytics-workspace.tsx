@@ -17,6 +17,7 @@ import {
   getProjectTimeline
 } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/formatters";
+import { useTimezone } from "../lib/timezone-context";
 
 type ProjectAnalyticsWorkspaceProps = {
   householdId: string;
@@ -50,12 +51,8 @@ const phaseStatusColors: Record<string, string> = {
 
 const monthFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
-  year: "2-digit"
-});
-
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric"
+  year: "2-digit",
+  timeZone: "UTC"
 });
 
 const decimalFormatter = new Intl.NumberFormat("en-US", {
@@ -127,6 +124,11 @@ const EmptyState = ({ message }: { message: string }): JSX.Element => (
 );
 
 export function ProjectAnalyticsWorkspace({ householdId, projects }: ProjectAnalyticsWorkspaceProps): JSX.Element {
+  const { timezone } = useTimezone();
+  const shortDateFormatter = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: timezone }),
+    [timezone]
+  );
   const sortedProjects = useMemo(() => [...projects].sort((left, right) => {
     const leftActive = left.status === "active" || left.status === "planning" || left.status === "on_hold";
     const rightActive = right.status === "active" || right.status === "planning" || right.status === "on_hold";

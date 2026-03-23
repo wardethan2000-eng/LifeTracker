@@ -13,6 +13,7 @@ import {
 import { useMultiSelect } from "../lib/use-multi-select";
 import { BulkActionBar } from "./bulk-action-bar";
 import { HobbyBulkActions } from "./hobby-bulk-actions";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbySessionListProps = {
   hobbyId: string;
@@ -37,6 +38,7 @@ function formatDate(value: string | null | undefined, fallback = "-"): string {
 }
 
 export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessionListProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
 
   const allIds = useMemo(() => sessions.map((s) => s.id), [sessions]);

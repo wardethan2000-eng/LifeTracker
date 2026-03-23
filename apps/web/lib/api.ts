@@ -171,6 +171,7 @@ import {
   type CreateAssetInput,
   type CreateAssetTransferInput,
   type CreateHouseholdInput,
+  type UpdateHouseholdInput,
   type CreateMaintenanceScheduleInput,
   type CreateMaintenanceLogInput,
   type CreateUsageMetricEntryInput,
@@ -3537,6 +3538,13 @@ export const deleteProjectInventoryItem = async (
 export const createHousehold = async (input: CreateHouseholdInput): Promise<HouseholdSummary> => apiRequest({
   path: "/v1/households",
   method: "POST",
+  body: input,
+  schema: householdSummarySchema
+});
+
+export const updateHousehold = async (householdId: string, input: UpdateHouseholdInput): Promise<HouseholdSummary> => apiRequest({
+  path: `/v1/households/${householdId}`,
+  method: "PATCH",
   body: input,
   schema: householdSummarySchema
 });

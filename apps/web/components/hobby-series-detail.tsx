@@ -15,6 +15,7 @@ import {
 import { Card } from "./card";
 import { EntryTimeline } from "./entry-system";
 import { InlineError } from "./inline-error";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbySeriesDetailProps = {
   householdId: string;
@@ -23,18 +24,6 @@ type HobbySeriesDetailProps = {
   allSessions: HobbySessionSummary[];
   deleteHobbySeriesAction: (formData: FormData) => Promise<void>;
 };
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function previewText(value: string | null | undefined, fallback = "-"): string {
   const normalized = value?.trim();
@@ -92,6 +81,7 @@ export function HobbySeriesDetail({
   allSessions,
   deleteHobbySeriesAction,
 }: HobbySeriesDetailProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const router = useRouter();
   const [seriesState, setSeriesState] = useState(series);
   const [allSessionsState, setAllSessionsState] = useState(allSessions);

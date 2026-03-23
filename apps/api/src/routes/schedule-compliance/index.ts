@@ -35,6 +35,12 @@ export const scheduleComplianceRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
+    const household = await app.prisma.household.findUnique({
+      where: { id: params.householdId },
+      select: { timezone: true }
+    });
+    const householdTimezone = household?.timezone ?? "UTC";
+
     const periodEnd = new Date();
     const periodStart = startOfUtcMonth(addUtcMonths(periodEnd, -(query.periodMonths - 1)));
 
@@ -108,7 +114,8 @@ export const scheduleComplianceRoutes: FastifyPluginAsync = async (app) => {
       logs,
       schedules,
       members.map((member) => member.user),
-      { periodStart, periodEnd }
+      { periodStart, periodEnd },
+      householdTimezone
     ));
   });
 };

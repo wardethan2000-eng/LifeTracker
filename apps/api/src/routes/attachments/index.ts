@@ -58,11 +58,11 @@ const validateEntityOwnership = async (
       return log !== null;
     }
     case "project_note": {
-      const note = await prisma.projectNote.findFirst({
-        where: { id: entityId, deletedAt: null, project: { householdId, deletedAt: null } },
+      const entry = await prisma.entry.findFirst({
+        where: { id: entityId, householdId },
         select: { id: true },
       });
-      return note !== null;
+      return entry !== null;
     }
     case "project_expense": {
       const expense = await prisma.projectExpense.findFirst({

@@ -431,9 +431,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
         where: { phaseId: phase.id, deletedAt: null },
         data: { deletedAt }
       });
-      await tx.projectNote.updateMany({
-        where: { phaseId: phase.id, deletedAt: null },
-        data: { deletedAt }
+      await tx.entry.deleteMany({
+        where: { entityType: "project_phase", entityId: phase.id }
       });
       await tx.projectPhaseSupply.updateMany({
         where: { phaseId: phase.id, deletedAt: null },

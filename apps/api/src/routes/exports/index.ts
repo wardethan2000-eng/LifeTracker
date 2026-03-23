@@ -26,7 +26,7 @@ import {
   generateComplianceAuditPdf,
   generateInventoryValuationPdf
 } from "../../lib/pdf-report.js";
-import { toTimelineItem } from "../../lib/serializers/index.js";
+import { toEntryBackedTimelineItem, toTimelineItem } from "../../lib/serializers/index.js";
 import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
 
 const assetParamsSchema = z.object({
@@ -269,9 +269,11 @@ export const buildAssetTimeline = async (
         }
       }
     }),
-    prisma.assetTimelineEntry.findMany({
+    prisma.entry.findMany({
       where: {
-        assetId: asset.id,
+        householdId: asset.householdId,
+        entityType: "asset" as const,
+        entityId: asset.id,
         ...(range.since || range.until
           ? {
               entryDate: {
@@ -439,7 +441,7 @@ export const buildAssetTimeline = async (
         displayName: log.completedBy.displayName
       });
     }),
-    ...timelineEntries.map((entry) => toTimelineItem("timeline_entry", entry, {
+    ...timelineEntries.map((entry) => toEntryBackedTimelineItem(entry, {
       id: entry.createdBy.id,
       displayName: entry.createdBy.displayName
     })),
@@ -1674,12 +1676,10 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       maintenanceSchedules,
       maintenanceLogs,
       maintenanceLogParts,
-      assetTimelineEntries,
       notifications,
       projects,
       projectAssets,
       projectTasks,
-      projectNotes,
       projectExpenses,
       projectPhases,
       projectPhaseChecklistItems,
@@ -1712,8 +1712,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       hobbySessionIngredients,
       hobbySessionSteps,
       hobbyMetricDefinitions,
-      hobbyMetricReadings,
-      hobbyLogs
+      hobbyMetricReadings
     ] = await Promise.all([
       app.prisma.household.findMany({ where: { id: params.householdId } }),
       app.prisma.householdMember.findMany({
@@ -1735,12 +1734,10 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       app.prisma.maintenanceSchedule.findMany({ where: { asset: { householdId: params.householdId } } }),
       app.prisma.maintenanceLog.findMany({ where: { asset: { householdId: params.householdId } } }),
       app.prisma.maintenanceLogPart.findMany({ where: { log: { asset: { householdId: params.householdId } } } }),
-      app.prisma.assetTimelineEntry.findMany({ where: { asset: { householdId: params.householdId } } }),
       app.prisma.notification.findMany({ where: { householdId: params.householdId } }),
       app.prisma.project.findMany({ where: { householdId: params.householdId, deletedAt: null } }),
       app.prisma.projectAsset.findMany({ where: { project: { householdId: params.householdId, deletedAt: null } } }),
       app.prisma.projectTask.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
-      app.prisma.projectNote.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
       app.prisma.projectExpense.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
       app.prisma.projectPhase.findMany({ where: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } }),
       app.prisma.projectPhaseChecklistItem.findMany({ where: { phase: { deletedAt: null, project: { householdId: params.householdId, deletedAt: null } } } }),
@@ -1773,8 +1770,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       app.prisma.hobbySessionIngredient.findMany({ where: { session: { hobby: { householdId: params.householdId } } } }),
       app.prisma.hobbySessionStep.findMany({ where: { session: { hobby: { householdId: params.householdId } } } }),
       app.prisma.hobbyMetricDefinition.findMany({ where: { hobby: { householdId: params.householdId } } }),
-      app.prisma.hobbyMetricReading.findMany({ where: { metricDefinition: { hobby: { householdId: params.householdId } } } }),
-      app.prisma.hobbyLog.findMany({ where: { hobby: { householdId: params.householdId } } })
+      app.prisma.hobbyMetricReading.findMany({ where: { metricDefinition: { hobby: { householdId: params.householdId } } } })
     ]);
 
     const exportPayload = householdDataExportSchema.parse({
@@ -1793,12 +1789,10 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
         maintenanceSchedules: toExportRecords(maintenanceSchedules),
         maintenanceLogs: toExportRecords(maintenanceLogs),
         maintenanceLogParts: toExportRecords(maintenanceLogParts),
-        assetTimelineEntries: toExportRecords(assetTimelineEntries),
         notifications: toExportRecords(notifications),
         projects: toExportRecords(projects),
         projectAssets: toExportRecords(projectAssets),
         projectTasks: toExportRecords(projectTasks),
-        projectNotes: toExportRecords(projectNotes),
         projectExpenses: toExportRecords(projectExpenses),
         projectPhases: toExportRecords(projectPhases),
         projectPhaseChecklistItems: toExportRecords(projectPhaseChecklistItems),
@@ -1831,8 +1825,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
         hobbySessionIngredients: toExportRecords(hobbySessionIngredients),
         hobbySessionSteps: toExportRecords(hobbySessionSteps),
         hobbyMetricDefinitions: toExportRecords(hobbyMetricDefinitions),
-        hobbyMetricReadings: toExportRecords(hobbyMetricReadings),
-        hobbyLogs: toExportRecords(hobbyLogs)
+        hobbyMetricReadings: toExportRecords(hobbyMetricReadings)
       }
     });
 

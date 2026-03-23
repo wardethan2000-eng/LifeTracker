@@ -5,6 +5,7 @@ import type { LayoutItem } from "react-grid-layout";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type SessionSummary = {
   id: string;
@@ -48,11 +49,6 @@ type HobbyDashboardProps = {
   recentEntries: EntrySummary[];
 };
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 function statusBadgeClass(status: string): string {
   switch (status) {
     case "active": return "pill pill--success";
@@ -64,6 +60,7 @@ function statusBadgeClass(status: string): string {
 }
 
 export function HobbyDashboard(props: HobbyDashboardProps) {
+  const { formatDate } = useFormattedDate();
   const {
     householdId,
     hobbyId,

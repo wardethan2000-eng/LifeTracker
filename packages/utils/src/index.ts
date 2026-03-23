@@ -92,6 +92,39 @@ const statusByRank = (rank: number): ScheduleStatus => {
   return "overdue";
 };
 
+/**
+ * Converts a calendar date string ("YYYY-MM-DD") interpreted as midnight in
+ * the given timezone to the corresponding UTC Date. Used for timezone-aware
+ * seasonal due date calculations.
+ */
+const localDateToUtc = (year: number, month: number, day: number, timezone: string): Date => {
+  // Use noon UTC as offset reference to avoid DST edge cases at midnight.
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12));
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).formatToParts(noonUtc);
+  const p = Object.fromEntries(
+    parts.filter((x) => x.type !== "literal").map((x) => [x.type, Number(x.value)])
+  ) as Record<string, number>;
+  const localNoonMs = Date.UTC(p["year"]!, p["month"]! - 1, p["day"]!, p["hour"]!, p["minute"]!);
+  const offsetMs = noonUtc.getTime() - localNoonMs;
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0) + offsetMs);
+};
+
+/**
+ * Returns the calendar year for a given date in the specified IANA timezone.
+ */
+const yearInTimezone = (date: Date, timezone: string): number => {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric" }).formatToParts(date);
+  return Number(parts.find((p) => p.type === "year")?.value ?? date.getUTCFullYear());
+};
+
 const addDays = (date: Date, days: number): Date => {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -103,16 +136,23 @@ const intervalDueDate = (trigger: IntervalTriggerSchema, lastCompletedAt?: Date)
   dueMetricValue: undefined
 });
 
-const seasonalDueDate = (trigger: SeasonalTriggerSchema, referenceDate = new Date()): DueDateResult => {
-  const year = referenceDate.getUTCFullYear();
-  const candidate = new Date(Date.UTC(year, trigger.month - 1, trigger.day));
+const seasonalDueDate = (trigger: SeasonalTriggerSchema, referenceDate = new Date(), timezone = "UTC"): DueDateResult => {
+  const year = timezone === "UTC"
+    ? referenceDate.getUTCFullYear()
+    : yearInTimezone(referenceDate, timezone);
+  const makeCandidate = (y: number): Date =>
+    timezone === "UTC"
+      ? new Date(Date.UTC(y, trigger.month - 1, trigger.day))
+      : localDateToUtc(y, trigger.month, trigger.day, timezone);
+
+  const candidate = makeCandidate(year);
 
   if (candidate >= referenceDate) {
     return { nextDueAt: candidate, dueMetricValue: undefined };
   }
 
   return {
-    nextDueAt: new Date(Date.UTC(year + 1, trigger.month - 1, trigger.day)),
+    nextDueAt: makeCandidate(year + 1),
     dueMetricValue: undefined
   };
 };
@@ -163,6 +203,8 @@ export const calculateNextDue = (
     lastCompletedAt?: Date;
     usageReading?: UsageReading;
     referenceDate?: Date;
+    /** IANA timezone identifier for timezone-aware seasonal calculations */
+    timezone?: string;
   } = {}
 ): DueDateResult => {
   switch (trigger.type) {
@@ -171,7 +213,7 @@ export const calculateNextDue = (
     case "usage":
       return usageDueDate(trigger, options.usageReading);
     case "seasonal":
-      return seasonalDueDate(trigger, options.referenceDate);
+      return seasonalDueDate(trigger, options.referenceDate, options.timezone);
     case "compound":
       return compoundDueDate(trigger, options.lastCompletedAt, options.usageReading);
     case "one_time":
@@ -266,8 +308,8 @@ export const LEGACY_ENTRY_SOURCE_TYPES = {
 
 export const ASSET_CATEGORY_PREFIX = "lk:asset-category:";
 const ASSET_VENDOR_TAG = "lk:asset-vendor";
-const PROJECT_NOTE_CATEGORY_PREFIX = "lk:project-note-category:";
-const HOBBY_LOG_TYPE_PREFIX = "lk:hobby-log-type:";
+export const PROJECT_NOTE_CATEGORY_PREFIX = "lk:project-note-category:";
+export const HOBBY_LOG_TYPE_PREFIX = "lk:hobby-log-type:";
 const ASSET_COST_MEASUREMENT_NAME = "asset_cost";
 const ASSET_COST_MEASUREMENT_UNIT = "currency";
 

@@ -3,6 +3,7 @@
 import type { HobbyActivityMode, HobbyCollectionItem, HobbyCollectionItemStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import { useMemo, useState, type JSX } from "react";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbyCollectionTabProps = {
   hobbyId: string;
@@ -11,11 +12,6 @@ type HobbyCollectionTabProps = {
 };
 
 type SortValue = "name" | "acquired" | "status";
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
 
 function statusClass(status: HobbyCollectionItemStatus): string {
   switch (status) {
@@ -35,6 +31,7 @@ function statusClass(status: HobbyCollectionItemStatus): string {
 }
 
 export function HobbyCollectionTab({ hobbyId, activityMode, items }: HobbyCollectionTabProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<HobbyCollectionItemStatus | "all">("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");

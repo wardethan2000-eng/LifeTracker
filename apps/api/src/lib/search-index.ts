@@ -954,16 +954,6 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
           taskType: true
         }
       },
-      noteEntries: {
-        where: { deletedAt: null },
-        select: {
-          title: true,
-          body: true,
-          category: true,
-          attachmentName: true,
-          url: true
-        }
-      },
       expenses: {
         where: { deletedAt: null },
         select: {
@@ -999,7 +989,6 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     ...phase.supplies.flatMap((supply) => [supply.name, supply.description, supply.supplier, supply.notes])
   ]).filter(Boolean).join(" ");
   const taskText = project.tasks.flatMap((task) => [task.title, task.description, task.status, task.taskType]).filter(Boolean).join(" ");
-  const noteText = project.noteEntries.flatMap((note) => [note.title, note.body, note.category, note.attachmentName, note.url]).filter(Boolean).join(" ");
   const expenseText = project.expenses.flatMap((expense) => [expense.description, expense.category, expense.notes]).filter(Boolean).join(" ");
   const hobbyText = project.hobbyLinks.flatMap((link) => [
     link.hobby.name,
@@ -1016,7 +1005,7 @@ export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: 
     parentEntityName: project.parentProject?.name ?? null,
     title: project.name,
     subtitle: project.status,
-    body: joinText(project.description, phaseText, taskText, noteText, expenseText, hobbyText),
+    body: joinText(project.description, phaseText, taskText, expenseText, hobbyText),
     entityUrl: `/projects/${project.id}?householdId=${project.householdId}`,
     entityMeta: {
       status: project.status
@@ -1368,50 +1357,6 @@ export const syncInvitationToSearchIndex = async (prisma: SearchPrisma, invitati
   }]);
 };
 
-export const syncTimelineEntryToSearchIndex = async (prisma: SearchPrisma, entryId: string): Promise<void> => {
-  const entry = await prisma.assetTimelineEntry.findUnique({
-    where: { id: entryId },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      entryDate: true,
-      category: true,
-      cost: true,
-      asset: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true,
-          deletedAt: true
-        }
-      }
-    }
-  });
-
-  if (!entry || entry.asset.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "timeline_entry", entryId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "timeline_entry", entry.id, [{
-    householdId: entry.asset.householdId,
-    entityType: "timeline_entry",
-    entityId: entry.id,
-    parentEntityId: entry.asset.id,
-    parentEntityName: entry.asset.name,
-    title: entry.title,
-    subtitle: entry.entryDate.toISOString(),
-    body: entry.description,
-    entityUrl: `/assets/${entry.asset.id}?tab=history`,
-    entityMeta: {
-      category: entry.category,
-      entryDate: entry.entryDate.toISOString(),
-      cost: entry.cost ?? null
-    }
-  }]);
-};
-
 export const syncAssetTransferToSearchIndex = async (prisma: SearchPrisma, transferId: string): Promise<void> => {
   const transfer = await prisma.assetTransfer.findUnique({
     where: { id: transferId },
@@ -1545,8 +1490,7 @@ export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId
       deletedAt: true,
       schedules: { select: { id: true } },
       logs: { select: { id: true } },
-      comments: { select: { id: true } },
-      timelineEntries: { select: { id: true } }
+      comments: { select: { id: true } }
     }
   });
 
@@ -1560,8 +1504,7 @@ export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId
   await Promise.all([
     ...asset.schedules.map((schedule) => syncScheduleToSearchIndex(prisma, schedule.id)),
     ...asset.logs.map((log) => syncLogToSearchIndex(prisma, log.id)),
-    ...asset.comments.map((comment) => syncCommentToSearchIndex(prisma, comment.id)),
-    ...asset.timelineEntries.map((entry) => syncTimelineEntryToSearchIndex(prisma, entry.id))
+    ...asset.comments.map((comment) => syncCommentToSearchIndex(prisma, comment.id))
   ]);
 };
 
@@ -1943,7 +1886,7 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
     WHERE "householdId" = ${householdId}
   `;
 
-  const [assets, schedules, logs, timelineEntries, assetTransfers, projects, providers, inventoryItems, spaces, comments, invitations, entries, hobbySeries, hobbyCollectionItems] = await Promise.all([
+  const [assets, schedules, logs, assetTransfers, projects, providers, inventoryItems, spaces, comments, invitations, entries, hobbySeries, hobbyCollectionItems] = await Promise.all([
     prisma.asset.findMany({
       where: { householdId },
       select: { id: true }
@@ -1953,10 +1896,6 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
       select: { id: true }
     }),
     prisma.maintenanceLog.findMany({
-      where: { asset: { householdId } },
-      select: { id: true }
-    }),
-    prisma.assetTimelineEntry.findMany({
       where: { asset: { householdId } },
       select: { id: true }
     }),
@@ -2020,10 +1959,6 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 
   for (const log of logs) {
     await syncLogToSearchIndex(prisma, log.id);
-  }
-
-  for (const entry of timelineEntries) {
-    await syncTimelineEntryToSearchIndex(prisma, entry.id);
   }
 
   for (const transfer of assetTransfers) {

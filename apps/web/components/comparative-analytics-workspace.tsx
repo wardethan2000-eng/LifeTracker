@@ -59,16 +59,18 @@ const getChartColor = (index: number): string => chartPalette[index % chartPalet
 
 const monthLabelFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
-  year: "2-digit"
+  year: "2-digit",
+  timeZone: "UTC"
 });
 
 const shortMonthFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short"
+  month: "short",
+  timeZone: "UTC"
 });
 
-const toIsoStartOfDay = (value: string): string => new Date(`${value}T00:00:00.000Z`).toISOString();
+const toIsoStartOfDay = (value: string, timezone: string): string => toIsoStartOfDayInTimezone(value, timezone);
 
-const toIsoEndOfDay = (value: string): string => new Date(`${value}T23:59:59.999Z`).toISOString();
+const toIsoEndOfDay = (value: string, timezone: string): string => toIsoEndOfDayInTimezone(value, timezone);
 
 const formatMonthKey = (value: string): string => {
   const [year, month] = value.split("-").map((entry) => Number.parseInt(entry, 10));
@@ -155,6 +157,7 @@ const tabs: Array<{ id: AnalyticsTab; label: string }> = [
 ];
 
 export function ComparativeAnalyticsWorkspace({ householdId, assets }: ComparativeAnalyticsWorkspaceProps): JSX.Element {
+  const { timezone } = useTimezone();
   const currentYear = new Date().getUTCFullYear();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("assets");
 
@@ -431,8 +434,8 @@ export function ComparativeAnalyticsWorkspace({ householdId, assets }: Comparati
                   disabled={selectedAssetIds.length < 2 || selectedAssetIds.length > 5}
                   onClick={() => setAssetRequest({
                     assetIds: selectedAssetIds,
-                    ...(assetStartDate ? { startDate: toIsoStartOfDay(assetStartDate) } : {}),
-                    ...(assetEndDate ? { endDate: toIsoEndOfDay(assetEndDate) } : {})
+                    ...(assetStartDate ? { startDate: toIsoStartOfDay(assetStartDate, timezone) } : {}),
+                    ...(assetEndDate ? { endDate: toIsoEndOfDay(assetEndDate, timezone) } : {})
                   })}
                 >
                   Compare assets
@@ -670,8 +673,8 @@ export function ComparativeAnalyticsWorkspace({ householdId, assets }: Comparati
                   type="button"
                   className="button button--primary"
                   onClick={() => setMemberRequest({
-                    ...(memberStartDate ? { startDate: toIsoStartOfDay(memberStartDate) } : {}),
-                    ...(memberEndDate ? { endDate: toIsoEndOfDay(memberEndDate) } : {})
+                    ...(memberStartDate ? { startDate: toIsoStartOfDay(memberStartDate, timezone) } : {}),
+                    ...(memberEndDate ? { endDate: toIsoEndOfDay(memberEndDate, timezone) } : {})
                   })}
                 >
                   Refresh contributions

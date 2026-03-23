@@ -9,6 +9,7 @@ import type {
 } from "@lifekeeper/types";
 import Link from "next/link";
 import { useMemo, useState, type JSX } from "react";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbyPracticeTabProps = {
   hobbyId: string;
@@ -25,11 +26,6 @@ const goalStatusOptions: Array<{ value: HobbyPracticeGoalStatus | "all"; label: 
   { value: "paused", label: "Paused" },
   { value: "abandoned", label: "Abandoned" },
 ];
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
 
 function goalStatusClass(status: HobbyPracticeGoalStatus): string {
   switch (status) {
@@ -55,6 +51,7 @@ function routineUrgencyLabel(targetDate: string | null): string | null {
 }
 
 export function HobbyPracticeTab({ hobbyId, activityMode, goals, routines, metrics }: HobbyPracticeTabProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [goalFilter, setGoalFilter] = useState<HobbyPracticeGoalStatus | "all">("all");
   const metricNameById = useMemo(() => new Map(metrics.map((metric) => [metric.id, metric.name])), [metrics]);
 

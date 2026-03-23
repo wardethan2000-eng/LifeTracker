@@ -5,6 +5,7 @@ import type { LayoutItem } from "react-grid-layout";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type ScheduleSummary = {
   id: string;
@@ -50,11 +51,6 @@ type AssetDashboardProps = {
   transferCount: number;
 };
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 function formatCurrency(amount: number | null): string {
   if (amount === null || amount === undefined) return "$0.00";
   return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -68,6 +64,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function AssetDashboard(props: AssetDashboardProps) {
+  const { formatDate } = useFormattedDate();
   const {
     householdId,
     assetId,

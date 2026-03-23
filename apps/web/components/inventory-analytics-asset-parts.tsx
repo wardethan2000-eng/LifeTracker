@@ -7,7 +7,8 @@ type InventoryAnalyticsAssetPartsProps = {
 };
 
 const monthFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short"
+  month: "short",
+  timeZone: "UTC"
 });
 
 const getBarWidth = (value: number, max: number): string => {

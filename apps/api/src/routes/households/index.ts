@@ -24,6 +24,7 @@ const memberParamsSchema = householdParamsSchema.extend({
 const toHouseholdSummary = (household: {
   id: string;
   name: string;
+  timezone: string;
   createdById: string;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +34,7 @@ const toHouseholdSummary = (household: {
 }, myRole: HouseholdRole) => householdSummarySchema.parse({
   id: household.id,
   name: household.name,
+  timezone: household.timezone,
   createdById: household.createdById,
   createdAt: household.createdAt.toISOString(),
   updatedAt: household.updatedAt.toISOString(),
@@ -215,10 +217,20 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Household not found." });
     }
 
+    if (input.timezone !== undefined) {
+      const isValidTimezone = (() => {
+        try { Intl.DateTimeFormat(undefined, { timeZone: input.timezone }); return true; } catch { return false; }
+      })();
+      if (!isValidTimezone) {
+        return reply.code(400).send({ message: "Invalid IANA timezone identifier." });
+      }
+    }
+
     const household = await app.prisma.household.update({
       where: { id: existing.id },
       data: {
-        ...(input.name !== undefined ? { name: input.name } : {})
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.timezone !== undefined ? { timezone: input.timezone } : {})
       },
       include: {
         _count: {

@@ -16,6 +16,7 @@ import {
   projectTaskChecklistItemSchema,
   projectTaskSchema
 } from "@lifekeeper/types";
+import { parseProjectEntryPayload } from "@lifekeeper/utils";
 import { buildProjectTaskGraphSummary } from "../project-task-graph.js";
 import { toShallowUserResponse } from "./users.js";
 
@@ -608,6 +609,55 @@ export const toProjectPhaseSupplyResponse = (supply: {
   createdAt: supply.createdAt.toISOString(),
   updatedAt: supply.updatedAt.toISOString()
 });
+
+export const toEntryAsProjectNote = (
+  entry: {
+    id: string;
+    entityType: string;
+    entityId: string;
+    title: string | null;
+    body: string;
+    entryType: string;
+    tags: unknown;
+    attachmentUrl: string | null;
+    attachmentName: string | null;
+    createdById: string;
+    createdAt: Date;
+    updatedAt: Date;
+    flags: Array<{ flag: string }>;
+    createdBy?: { id: string; displayName: string | null } | null;
+  },
+  context: { projectId: string; phaseName?: string | null }
+) => {
+  const tags = Array.isArray(entry.tags)
+    ? (entry.tags as unknown[]).filter((t): t is string => typeof t === "string")
+    : [];
+  const parsed = parseProjectEntryPayload({
+    title: entry.title,
+    body: entry.body,
+    entryType: entry.entryType,
+    tags,
+    flags: entry.flags.map((f) => f.flag),
+    attachmentUrl: entry.attachmentUrl
+  });
+  return projectNoteSchema.parse({
+    id: entry.id,
+    projectId: context.projectId,
+    phaseId: entry.entityType === "project_phase" ? entry.entityId : null,
+    title: entry.title ?? entry.body,
+    body: parsed.body,
+    url: parsed.url,
+    category: parsed.category,
+    attachmentUrl: null,
+    attachmentName: null,
+    isPinned: parsed.isPinned,
+    createdById: entry.createdById,
+    createdBy: entry.createdBy ? toShallowUserResponse(entry.createdBy) : null,
+    phaseName: context.phaseName ?? null,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString()
+  });
+};
 
 export const toProjectNoteResponse = (note: {
   id: string;

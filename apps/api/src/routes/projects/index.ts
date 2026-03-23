@@ -190,19 +190,6 @@ const buildProjectPortfolioWhere = (
         }
       },
       {
-        noteEntries: {
-          some: {
-            deletedAt: null,
-            OR: [
-              { title: { contains: searchText, mode: "insensitive" } },
-              { body: { contains: searchText, mode: "insensitive" } },
-              { url: { contains: searchText, mode: "insensitive" } },
-              { attachmentName: { contains: searchText, mode: "insensitive" } }
-            ]
-          }
-        }
-      },
-      {
         expenses: {
           some: {
             deletedAt: null,

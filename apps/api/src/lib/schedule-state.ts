@@ -44,6 +44,8 @@ export const recalculateScheduleFields = (options: {
   triggerConfig: Prisma.JsonValue;
   lastCompletedAt: Date | null;
   metric: Pick<UsageMetric, "id" | "currentValue"> | null;
+  /** IANA timezone for seasonal due date calculations */
+  timezone?: string;
 }): RecalculatedScheduleFields => {
   const trigger = maintenanceTriggerSchema.parse(options.triggerConfig);
   const dueOptions: {
@@ -52,6 +54,7 @@ export const recalculateScheduleFields = (options: {
       metricId: string;
       currentValue: number;
     };
+    timezone?: string;
   } = {};
 
   if (options.lastCompletedAt) {
@@ -63,6 +66,10 @@ export const recalculateScheduleFields = (options: {
       metricId: options.metric.id,
       currentValue: options.metric.currentValue
     };
+  }
+
+  if (options.timezone) {
+    dueOptions.timezone = options.timezone;
   }
 
   const due = calculateNextDue(trigger, dueOptions);
@@ -93,6 +100,13 @@ export const updateScheduleDueState = async (
           id: true,
           currentValue: true
         }
+      },
+      asset: {
+        select: {
+          household: {
+            select: { timezone: true }
+          }
+        }
       }
     }
   });
@@ -104,7 +118,8 @@ export const updateScheduleDueState = async (
   const recalculated = recalculateScheduleFields({
     triggerConfig: schedule.triggerConfig,
     lastCompletedAt: schedule.lastCompletedAt,
-    metric: schedule.metric
+    metric: schedule.metric,
+    timezone: schedule.asset.household.timezone
   });
 
   return prisma.maintenanceSchedule.update({

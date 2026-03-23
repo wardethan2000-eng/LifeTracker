@@ -19,20 +19,86 @@ const categoryLabels: Record<string, string> = {
 
 const getCategoryLabel = (category: string): string => categoryLabels[category] ?? category;
 
-const monthKeyFor = (date: Date): string => `${date.getUTCFullYear()}-${`${date.getUTCMonth() + 1}`.padStart(2, "0")}`;
+/** Convert a calendar date (year/month/day) interpreted as local midnight in the given timezone to a UTC Date. */
+const localDateToUtc = (year: number, month: number, day: number, timezone: string): Date => {
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12));
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).formatToParts(noonUtc);
+  const p = Object.fromEntries(
+    parts.filter((x) => x.type !== "literal").map((x) => [x.type, Number(x.value)])
+  ) as Record<string, number>;
+  const localNoonMs = Date.UTC(p["year"]!, p["month"]! - 1, p["day"]!, p["hour"]!, p["minute"]!);
+  const offsetMs = noonUtc.getTime() - localNoonMs;
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0) + offsetMs);
+};
 
-const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+/** Extract date parts (year, month, day) for a UTC instant in the given timezone. */
+const getLocalParts = (date: Date, timezone: string): { year: number; month: number; day: number } => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const p = Object.fromEntries(
+    parts.filter((x) => x.type !== "literal").map((x) => [x.type, Number(x.value)])
+  ) as Record<string, number>;
+  return { year: p["year"]!, month: p["month"]!, day: p["day"]! };
+};
 
-const addUtcMonths = (date: Date, months: number): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth() + months,
-  1,
-  date.getUTCHours(),
-  date.getUTCMinutes(),
-  date.getUTCSeconds(),
-  date.getUTCMilliseconds()
-));
+const monthKeyFor = (date: Date, timezone = "UTC"): string => {
+  if (timezone === "UTC") {
+    return `${date.getUTCFullYear()}-${`${date.getUTCMonth() + 1}`.padStart(2, "0")}`;
+  }
+  const { year, month } = getLocalParts(date, timezone);
+  return `${year}-${String(month).padStart(2, "0")}`;
+};
 
+const startOfMonthInTz = (date: Date, timezone = "UTC"): Date => {
+  if (timezone === "UTC") {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  }
+  const { year, month } = getLocalParts(date, timezone);
+  return localDateToUtc(year, month, 1, timezone);
+};
+
+const addCalendarMonths = (date: Date, months: number, timezone = "UTC"): Date => {
+  if (timezone === "UTC") {
+    return new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + months,
+      1,
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds(),
+      date.getUTCMilliseconds()
+    ));
+  }
+  const { year, month } = getLocalParts(date, timezone);
+  const targetMonth = month - 1 + months; // 0-based
+  const targetYear = year + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12 + 1;
+  return localDateToUtc(targetYear, normalizedMonth, 1, timezone);
+};
+
+const toDayStartInTz = (date: Date, timezone = "UTC"): number => {
+  if (timezone === "UTC") {
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  }
+  const { year, month, day } = getLocalParts(date, timezone);
+  return localDateToUtc(year, month, day, timezone).getTime();
+};
+
+// Keep backwards-compatible aliases used by existing callers within this file
+const startOfUtcMonth = (date: Date): Date => startOfMonthInTz(date, "UTC");
+const addUtcMonths = (date: Date, months: number): Date => addCalendarMonths(date, months, "UTC");
 const endOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth() + 1,
@@ -42,12 +108,7 @@ const endOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
   59,
   999
 ));
-
-const toUtcDayStart = (date: Date): number => Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth(),
-  date.getUTCDate()
-);
+const toUtcDayStart = (date: Date): number => toDayStartInTz(date, "UTC");
 
 const toCalendarDayDelta = (completedAt: Date, dueDate: Date): number => Math.max(
   0,
@@ -234,24 +295,31 @@ const getCurrentScheduleState = (schedule: ComplianceScheduleInput, now: Date): 
   }
 };
 
-const buildMonthRange = (periodStart: Date, periodEnd: Date): string[] => {
+const buildMonthRange = (periodStart: Date, periodEnd: Date, timezone = "UTC"): string[] => {
   const months: string[] = [];
-  let cursor = startOfUtcMonth(periodStart);
-  const lastMonth = startOfUtcMonth(periodEnd);
+  let cursor = startOfMonthInTz(periodStart, timezone);
+  const lastMonth = startOfMonthInTz(periodEnd, timezone);
 
   while (cursor <= lastMonth) {
-    months.push(monthKeyFor(cursor));
-    cursor = addUtcMonths(cursor, 1);
+    months.push(monthKeyFor(cursor, timezone));
+    cursor = addCalendarMonths(cursor, 1, timezone);
   }
 
   return months;
 };
 
+/** Calendar-day delta using the household timezone for day boundaries. */
+const toCalendarDayDeltaTz = (completedAt: Date, dueDate: Date, timezone = "UTC"): number => Math.max(
+  0,
+  Math.round((toDayStartInTz(completedAt, timezone) - toDayStartInTz(dueDate, timezone)) / MS_PER_DAY)
+);
+
 export const computeScheduleCompliance = (
   maintenanceLogs: ComplianceLogInput[],
   maintenanceSchedules: ComplianceScheduleInput[],
   users: ComplianceUserInput[],
-  period: { periodStart: Date; periodEnd: Date }
+  period: { periodStart: Date; periodEnd: Date },
+  timezone = "UTC"
 ): ScheduleComplianceDashboard => {
   const scheduleById = new Map(maintenanceSchedules.map((schedule) => [schedule.id, schedule]));
   const usersById = new Map(users.map((user) => [user.id, user]));
@@ -287,7 +355,7 @@ export const computeScheduleCompliance = (
       }
 
       const dueDate = getHistoricalDueDate(schedule, logs, index);
-      const daysOverdue = dueDate ? toCalendarDayDelta(log.completedAt, dueDate) : null;
+      const daysOverdue = dueDate ? toCalendarDayDeltaTz(log.completedAt, dueDate, timezone) : null;
       const onTime = dueDate ? daysOverdue === 0 : true;
 
       completions.push({
@@ -320,10 +388,10 @@ export const computeScheduleCompliance = (
   const currentOverdueCount = currentScheduleStates.filter((entry) => entry.state === "overdue").length;
   const currentDueCount = currentScheduleStates.filter((entry) => entry.state === "due").length;
 
-  const monthRange = buildMonthRange(period.periodStart, period.periodEnd);
-  const currentMonthKey = monthKeyFor(now);
+  const monthRange = buildMonthRange(period.periodStart, period.periodEnd, timezone);
+  const currentMonthKey = monthKeyFor(now, timezone);
   const completionsByMonth = completions.reduce<Map<string, CompletionAssessment[]>>((map, completion) => {
-    const month = monthKeyFor(completion.completedAt);
+    const month = monthKeyFor(completion.completedAt, timezone);
     const bucket = map.get(month) ?? [];
     bucket.push(completion);
     map.set(month, bucket);

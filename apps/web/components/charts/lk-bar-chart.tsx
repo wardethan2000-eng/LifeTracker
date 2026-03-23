@@ -2,7 +2,8 @@
 
 import type { ReactElement } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { chartColors, formatCurrencyTick, formatDateTick, formatMonthTick, formatPercentTick } from "../../lib/chart-theme";
+import { useTimezone } from "../../lib/timezone-context";
+import { chartColors, createDateTickFormatter, formatCurrencyTick, formatMonthTick, formatPercentTick } from "../../lib/chart-theme";
 
 type ChartStringFormatterKey = "date" | "month";
 type ChartNumberFormatterKey = "currency" | "percent";
@@ -20,18 +21,6 @@ export type LkBarChartProps = {
 
 const toNumber = (value: unknown): number => typeof value === "number" ? value : Number(value ?? 0);
 const getSeriesColor = (index: number): string => chartColors.series[index % chartColors.series.length] ?? chartColors.primary;
-const resolveStringFormatter = (formatter: LkBarChartProps["xTickFormatter"]): ((value: string) => string) | undefined => {
-  if (!formatter) {
-    return undefined;
-  }
-
-  if (typeof formatter === "function") {
-    return formatter;
-  }
-
-  return formatter === "month" ? formatMonthTick : formatDateTick;
-};
-
 const resolveNumberFormatter = (formatter: LkBarChartProps["yTickFormatter"]): ((value: number) => string) | undefined => {
   if (!formatter) {
     return undefined;
@@ -54,7 +43,14 @@ export function LkBarChart({
   layout = "horizontal",
   emptyMessage = "No data available"
 }: LkBarChartProps): ReactElement {
-  const resolvedXTickFormatter = resolveStringFormatter(xTickFormatter);
+  const { timezone } = useTimezone();
+  const resolvedXTickFormatter = xTickFormatter == null
+    ? undefined
+    : typeof xTickFormatter === "function"
+      ? xTickFormatter
+      : xTickFormatter === "month"
+        ? formatMonthTick
+        : createDateTickFormatter(timezone);
   const resolvedYTickFormatter = resolveNumberFormatter(yTickFormatter);
 
   if (data.length === 0) {

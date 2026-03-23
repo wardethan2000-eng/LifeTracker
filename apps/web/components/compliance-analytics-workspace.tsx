@@ -32,6 +32,8 @@ import {
 } from "../lib/api";
 import { AnalyticsWorkspaceShell } from "./analytics-workspace-shell";
 import { formatCategoryLabel, formatDate, formatDateTime } from "../lib/formatters";
+import { useTimezone } from "../lib/timezone-context";
+import { toIsoStartOfDayInTimezone, toIsoEndOfDayInTimezone } from "../lib/date-input-utils";
 
 type ComplianceAnalyticsWorkspaceProps = {
   householdId: string;
@@ -63,11 +65,6 @@ const triggerTypeLabels: Record<string, string> = {
   one_time: "One-Time"
 };
 
-const monthFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  year: "2-digit"
-});
-
 const shortPercentFormatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 1
@@ -77,17 +74,9 @@ const numberFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1
 });
 
-const todayAsInput = (): string => new Date().toISOString().slice(0, 10);
+const toIsoStartOfDay = (value: string, timezone: string): string => toIsoStartOfDayInTimezone(value, timezone);
 
-const trailingYearStart = (): string => {
-  const date = new Date();
-  date.setUTCFullYear(date.getUTCFullYear() - 1);
-  return date.toISOString().slice(0, 10);
-};
-
-const toIsoStartOfDay = (value: string): string => new Date(`${value}T00:00:00.000Z`).toISOString();
-
-const toIsoEndOfDay = (value: string): string => new Date(`${value}T23:59:59.999Z`).toISOString();
+const toIsoEndOfDay = (value: string, timezone: string): string => toIsoEndOfDayInTimezone(value, timezone);
 
 const formatPercent = (value: number | null | undefined): string => `${shortPercentFormatter.format(value ?? 0)}%`;
 
@@ -198,6 +187,31 @@ const BreakdownChartPanel = ({
 );
 
 export function ComplianceAnalyticsWorkspace({ householdId, assets }: ComplianceAnalyticsWorkspaceProps): JSX.Element {
+  const { timezone } = useTimezone();
+
+  const monthFormatter = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "2-digit",
+    timeZone: timezone
+  });
+
+  const formatMonth = (value: string): string => {
+    const [year, month] = value.split("-").map((entry) => Number.parseInt(entry, 10));
+    if (!year || !month) return value;
+    return monthFormatter.format(new Date(Date.UTC(year, month - 1, 1)));
+  };
+
+  const todayAsInput = (): string => {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  };
+
+  const trailingYearStart = (): string => {
+    const date = new Date();
+    const yearAgo = new Date(date);
+    yearAgo.setUTCFullYear(yearAgo.getUTCFullYear() - 1);
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(yearAgo);
+  };
+
   const [activeTab, setActiveTab] = useState<ComplianceTab>("on-time");
 
   const [startDate, setStartDate] = useState(trailingYearStart);
@@ -240,8 +254,8 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
 
       try {
         const next = await getComplianceOnTimeRate(householdId, {
-          startDate: toIsoStartOfDay(startDate),
-          endDate: toIsoEndOfDay(endDate),
+          startDate: toIsoStartOfDay(startDate, timezone),
+          endDate: toIsoEndOfDay(endDate, timezone),
           ...(assetId ? { assetId } : {})
         });
 
@@ -265,7 +279,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
     return () => {
       cancelled = true;
     };
-  }, [assetId, endDate, householdId, startDate]);
+  }, [assetId, endDate, householdId, startDate, timezone]);
 
   useEffect(() => {
     if (activeTab !== "trend") {
@@ -280,8 +294,8 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
 
       try {
         const next = await getComplianceOverdueTrend(householdId, {
-          startDate: toIsoStartOfDay(startDate),
-          endDate: toIsoEndOfDay(endDate),
+          startDate: toIsoStartOfDay(startDate, timezone),
+          endDate: toIsoEndOfDay(endDate, timezone),
           ...(assetId ? { assetId } : {})
         });
 
@@ -305,7 +319,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
     return () => {
       cancelled = true;
     };
-  }, [activeTab, assetId, endDate, householdId, startDate]);
+  }, [activeTab, assetId, endDate, householdId, startDate, timezone]);
 
   useEffect(() => {
     if (activeTab !== "categories") {
@@ -320,8 +334,8 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
 
       try {
         const next = await getComplianceCategoryAdherence(householdId, {
-          startDate: toIsoStartOfDay(startDate),
-          endDate: toIsoEndOfDay(endDate)
+          startDate: toIsoStartOfDay(startDate, timezone),
+          endDate: toIsoEndOfDay(endDate, timezone)
         });
 
         if (!cancelled) {
@@ -344,7 +358,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
     return () => {
       cancelled = true;
     };
-  }, [activeTab, endDate, householdId, startDate]);
+  }, [activeTab, endDate, householdId, startDate, timezone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -391,8 +405,8 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
 
       try {
         const next = await getComplianceReport(reportAssetId, householdId, {
-          ...(reportStartDate ? { startDate: toIsoStartOfDay(reportStartDate) } : {}),
-          ...(reportEndDate ? { endDate: toIsoEndOfDay(reportEndDate) } : {}),
+          ...(reportStartDate ? { startDate: toIsoStartOfDay(reportStartDate, timezone) } : {}),
+          ...(reportEndDate ? { endDate: toIsoEndOfDay(reportEndDate, timezone) } : {}),
           gracePeriodDays: Number.parseInt(gracePeriodDays, 10) || 0
         });
 
@@ -417,7 +431,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
     return () => {
       cancelled = true;
     };
-  }, [activeTab, gracePeriodDays, householdId, reportAssetId, reportEndDate, reportStartDate]);
+  }, [activeTab, gracePeriodDays, householdId, reportAssetId, reportEndDate, reportStartDate, timezone]);
 
   useEffect(() => {
     if (activeTab !== "trend" || overdueData?.trendDirection !== "worsening") {
@@ -494,7 +508,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
   const trendChartData = useMemo(() => (overdueData?.months ?? []).map((point) => ({
     ...point,
     monthLabel: formatMonth(point.month)
-  })), [overdueData]);
+  })), [overdueData, formatMonth]);
 
   const trendContributors = useMemo(() => {
     if (!recentTrendSupportData) {
@@ -793,7 +807,7 @@ export function ComplianceAnalyticsWorkspace({ householdId, assets }: Compliance
                       <div className={`compliance-status-pill compliance-status-pill--${reportStatusTone(reportData.overallComplianceStatus)}`}>
                         {reportData.overallComplianceStatus}
                       </div>
-                      <p className="comparative-note">{reportAssetName || reportData.assetName} in {formatCategoryLabel(reportData.assetCategory)}. Generated {formatDateTime(reportData.reportGeneratedAt)}.</p>
+                      <p className="comparative-note">{reportAssetName || reportData.assetName} in {formatCategoryLabel(reportData.assetCategory)}. Generated {formatDateTime(reportData.reportGeneratedAt, "Not set", timezone)}.</p>
                     </div>
                     <div className="compliance-kpi-grid">
                       <div className="analytics-inline-metric">

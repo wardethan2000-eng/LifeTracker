@@ -19,6 +19,7 @@ import { syncHobbySeriesBatchCount } from "../../lib/hobby-series.js";
 import { applyInventoryTransaction } from "../../lib/inventory.js";
 import { syncEntryToSearchIndex, syncHobbySeriesToSearchIndex } from "../../lib/search-index.js";
 import {
+  toEntryAsHobbyLog,
   toSessionIngredientResponse,
   toSessionResponse,
   toSessionStepResponse,
@@ -398,8 +399,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
           select: {
             ingredients: true,
             steps: true,
-            metricReadings: true,
-            logs: true
+            metricReadings: true
           }
         },
         steps: { select: { isCompleted: true } }
@@ -410,8 +410,22 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
     const items = hasMore ? sessions.slice(0, limit) : sessions;
     const nextCursor = hasMore ? items[items.length - 1]!.id : null;
 
+    // Batch-fetch log counts from Entry (previously from HobbyLog)
+    const sessionIds = items.map((s) => s.id);
+    const logCountRows = sessionIds.length > 0
+      ? await app.prisma.entry.groupBy({
+          by: ["entityId"],
+          where: { entityType: "hobby_session", entityId: { in: sessionIds } },
+          _count: { id: true }
+        })
+      : [];
+    const logCountMap = new Map(logCountRows.map((r) => [r.entityId, r._count.id]));
+
     return reply.send({
-      items: items.map(toSessionSummaryResponse),
+      items: items.map((s) => toSessionSummaryResponse({
+        ...s,
+        _count: { ...s._count, logs: logCountMap.get(s.id) ?? 0 }
+      })),
       nextCursor,
     });
   });
@@ -614,14 +628,19 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
           include: {
             metricDefinition: { select: { name: true, unit: true } }
           }
-        },
-        logs: { orderBy: { logDate: "desc" } }
+        }
       }
     });
 
     if (!session) {
       return reply.code(404).send({ message: "Session not found" });
     }
+
+    // Fetch logs from Entry (previously from HobbyLog)
+    const sessionLogEntries = await app.prisma.entry.findMany({
+      where: { householdId, entityType: "hobby_session", entityId: sessionId },
+      orderBy: { entryDate: "desc" }
+    });
 
     return reply.send({
       ...toSessionResponse(session),
@@ -646,17 +665,7 @@ export const hobbySessionRoutes: FastifyPluginAsync = async (app) => {
         metricName: r.metricDefinition.name,
         metricUnit: r.metricDefinition.unit,
       })),
-      logs: session.logs.map((l) => ({
-        id: l.id,
-        hobbyId: l.hobbyId,
-        sessionId: l.sessionId,
-        title: l.title,
-        content: l.content,
-        logDate: l.logDate.toISOString(),
-        logType: l.logType,
-        createdAt: l.createdAt.toISOString(),
-        updatedAt: l.updatedAt.toISOString(),
-      })),
+      logs: sessionLogEntries.map((entry) => toEntryAsHobbyLog(entry, hobbyId)),
     });
   });
 

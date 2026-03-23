@@ -7,6 +7,7 @@ import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
 import type { ProjectPhaseProgress } from "@lifekeeper/types";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type ProjectDashboardProps = {
   householdId: string;
@@ -41,14 +42,6 @@ function formatCurrency(amount: number | null, fallback = "Not set"): string {
   return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function formatShortDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  } catch {
-    return iso;
-  }
-}
-
 const statusColors: Record<string, string> = {
   planning: "info",
   active: "success",
@@ -58,6 +51,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function ProjectDashboard(props: ProjectDashboardProps) {
+  const { formatDate: formatShortDate } = useFormattedDate();
   const {
     householdId,
     projectId,

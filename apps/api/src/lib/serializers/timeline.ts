@@ -1,6 +1,5 @@
 import type {
   ActivityLog,
-  AssetTimelineEntry,
   Comment,
   Entry,
   MaintenanceLog,
@@ -171,24 +170,6 @@ export const toEntryAsTimelineEntry = (
   });
 };
 
-export const toAssetTimelineEntryResponse = (
-  entry: Pick<AssetTimelineEntry, "id" | "assetId" | "createdById" | "title" | "description" | "entryDate" | "category" | "cost" | "vendor" | "tags" | "metadata" | "createdAt" | "updatedAt">
-) => assetTimelineEntrySchema.parse({
-  id: entry.id,
-  assetId: entry.assetId,
-  createdById: entry.createdById,
-  title: entry.title,
-  description: entry.description ?? null,
-  entryDate: entry.entryDate.toISOString(),
-  category: entry.category,
-  cost: entry.cost ?? null,
-  vendor: entry.vendor ?? null,
-  tags: asStringArray(entry.tags),
-  metadata: entry.metadata ?? {},
-  createdAt: entry.createdAt.toISOString(),
-  updatedAt: entry.updatedAt.toISOString()
-});
-
 export const toEntryBackedTimelineItem = (
   entry: Pick<Entry, "id" | "entityId" | "createdById" | "title" | "body" | "entryDate" | "entryType" | "measurements" | "tags" | "attachmentName" | "sourceType" | "createdAt">,
   userInfo?: TimelineUserInfo | null
@@ -268,33 +249,6 @@ export const toTimelineItem = (
         },
         isEditable: false,
         createdAt: log.createdAt.toISOString()
-      });
-    }
-
-    case "timeline_entry": {
-      const entry = raw as Pick<AssetTimelineEntry, "id" | "assetId" | "createdById" | "title" | "description" | "entryDate" | "category" | "cost" | "vendor" | "tags" | "metadata" | "createdAt">;
-
-      return assetTimelineItemSchema.parse({
-        id: `entry_${entry.id}`,
-        sourceType,
-        sourceId: entry.id,
-        assetId: entry.assetId,
-        title: entry.title,
-        description: entry.description ?? null,
-        eventDate: entry.entryDate.toISOString(),
-        category: entry.category,
-        cost: entry.cost ?? null,
-        userId: entry.createdById,
-        userName: toDisplayName(userInfo),
-        metadata: {
-          vendor: entry.vendor ?? null,
-          tags: asStringArray(entry.tags),
-          entrySystem: "legacy",
-          importedFromLegacy: false,
-          ...(asRecord(entry.metadata))
-        },
-        isEditable: true,
-        createdAt: entry.createdAt.toISOString()
       });
     }
 
@@ -450,6 +404,10 @@ export const toTimelineItem = (
         isEditable: false,
         createdAt: reading.createdAt.toISOString()
       });
+    }
+
+    default: {
+      throw new Error(`toTimelineItem: unhandled sourceType "${sourceType as string}"`);
     }
   }
 };

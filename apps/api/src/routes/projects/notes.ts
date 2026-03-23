@@ -1,13 +1,19 @@
-import type { Prisma } from "@prisma/client";
-import {
+﻿import {
   createProjectNoteSchema,
   updateProjectNoteSchema
 } from "@lifekeeper/types";
+import {
+  PROJECT_NOTE_CATEGORY_PREFIX,
+  buildProjectEntryPayload,
+  parseProjectEntryPayload
+} from "@lifekeeper/utils";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
-import { toProjectNoteResponse } from "../../lib/serializers/index.js";
+import { toInputJsonValue } from "../../lib/prisma-json.js";
+import { toEntryAsProjectNote } from "../../lib/serializers/index.js";
+import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -27,12 +33,16 @@ const noteListQuerySchema = z.object({
   pinned: z.enum(["true", "false"]).optional()
 });
 
+const parseTags = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((t): t is string => typeof t === "string");
+};
+
 const getProject = (app: FastifyInstance, householdId: string, projectId: string) => app.prisma.project.findFirst({
   where: { id: projectId, householdId, deletedAt: null },
   select: { id: true, householdId: true, name: true }
 });
 
-// TODO(2026-06): Remove this legacy CRUD surface after project note attachments and edit flows are fully Entry-backed.
 export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/projects/:projectId/notes
   app.get("/v1/households/:householdId/projects/:projectId/notes", async (request, reply) => {
@@ -49,30 +59,76 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const where: Prisma.ProjectNoteWhereInput = { projectId: project.id, deletedAt: null };
+    const categoryFilter = query.category
+      ? { tags: { array_contains: [`${PROJECT_NOTE_CATEGORY_PREFIX}${query.category}`] } }
+      : {};
 
-    if (query.category) {
-      where.category = query.category as import("@prisma/client").NoteCategory;
-    }
+    const pinnedFilter = query.pinned !== undefined
+      ? query.pinned === "true"
+        ? { flags: { some: { flag: "pinned" as const } } }
+        : { flags: { none: { flag: "pinned" as const } } }
+      : {};
+
+    let entityFilter: object;
 
     if (query.phaseId) {
-      where.phaseId = query.phaseId;
+      entityFilter = { entityType: "project_phase" as const, entityId: query.phaseId };
+    } else {
+      const phases = await app.prisma.projectPhase.findMany({
+        where: { projectId: project.id },
+        select: { id: true }
+      });
+      const phaseIds = phases.map((p) => p.id);
+      entityFilter = {
+        OR: [
+          { entityType: "project" as const, entityId: project.id },
+          ...(phaseIds.length > 0 ? [{ entityType: "project_phase" as const, entityId: { in: phaseIds } }] : [])
+        ]
+      };
     }
 
-    if (query.pinned !== undefined) {
-      where.isPinned = query.pinned === "true";
-    }
-
-    const notes = await app.prisma.projectNote.findMany({
-      where,
-      include: {
-        createdBy: { select: { id: true, displayName: true } },
-        phase: { select: { name: true } }
+    const entries = await app.prisma.entry.findMany({
+      where: {
+        householdId: params.householdId,
+        ...entityFilter,
+        ...categoryFilter,
+        ...pinnedFilter
       },
-      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }]
+      include: {
+        flags: true,
+        createdBy: { select: { id: true, displayName: true } }
+      },
+      orderBy: { createdAt: "desc" }
     });
 
-    return notes.map(toProjectNoteResponse);
+    // Sort pinned entries first (stable â€” createdAt desc order preserved within groups)
+    entries.sort((a, b) => {
+      const aPin = a.flags.some((f) => f.flag === "pinned") ? 1 : 0;
+      const bPin = b.flags.some((f) => f.flag === "pinned") ? 1 : 0;
+      return bPin - aPin;
+    });
+
+    // Batch-fetch phase names for nested entries
+    const phaseEntries = entries.filter((e) => e.entityType === "project_phase");
+    const phaseNameMap = new Map<string, string>();
+
+    if (phaseEntries.length > 0) {
+      const uniquePhaseIds = [...new Set(phaseEntries.map((e) => e.entityId))];
+      const phases = await app.prisma.projectPhase.findMany({
+        where: { id: { in: uniquePhaseIds } },
+        select: { id: true, name: true }
+      });
+      for (const phase of phases) {
+        phaseNameMap.set(phase.id, phase.name);
+      }
+    }
+
+    return entries.map((entry) =>
+      toEntryAsProjectNote(entry, {
+        projectId: project.id,
+        phaseName: entry.entityType === "project_phase" ? (phaseNameMap.get(entry.entityId) ?? null) : null
+      })
+    );
   });
 
   // GET /v1/households/:householdId/projects/:projectId/notes/:noteId
@@ -89,19 +145,36 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const note = await app.prisma.projectNote.findFirst({
-      where: { id: params.noteId, projectId: project.id, deletedAt: null },
+    const phases = await app.prisma.projectPhase.findMany({
+      where: { projectId: project.id },
+      select: { id: true, name: true }
+    });
+    const phaseIds = phases.map((p) => p.id);
+
+    const entry = await app.prisma.entry.findFirst({
+      where: {
+        id: params.noteId,
+        householdId: params.householdId,
+        OR: [
+          { entityType: "project" as const, entityId: project.id },
+          ...(phaseIds.length > 0 ? [{ entityType: "project_phase" as const, entityId: { in: phaseIds } }] : [])
+        ]
+      },
       include: {
-        createdBy: { select: { id: true, displayName: true } },
-        phase: { select: { name: true } }
+        flags: true,
+        createdBy: { select: { id: true, displayName: true } }
       }
     });
 
-    if (!note) {
+    if (!entry) {
       return reply.code(404).send({ message: "Project note not found." });
     }
 
-    return toProjectNoteResponse(note);
+    const phaseName = entry.entityType === "project_phase"
+      ? (phases.find((p) => p.id === entry.entityId)?.name ?? null)
+      : null;
+
+    return toEntryAsProjectNote(entry, { projectId: project.id, phaseName });
   });
 
   // POST /v1/households/:householdId/projects/:projectId/notes
@@ -119,33 +192,49 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
+    let phaseName: string | null = null;
+
     if (input.phaseId) {
       const phase = await app.prisma.projectPhase.findFirst({
         where: { id: input.phaseId, projectId: project.id, deletedAt: null },
-        select: { id: true }
+        select: { id: true, name: true }
       });
 
       if (!phase) {
         return reply.code(400).send({ message: "Phase not found in this project." });
       }
+
+      phaseName = phase.name;
     }
 
-    const note = await app.prisma.projectNote.create({
+    const details = buildProjectEntryPayload({
+      title: input.title,
+      body: input.body ?? null,
+      category: input.category ?? null,
+      url: input.url ?? null,
+      isPinned: input.isPinned ?? false
+    });
+
+    const entry = await app.prisma.entry.create({
       data: {
-        projectId: project.id,
-        phaseId: input.phaseId ?? null,
+        householdId: params.householdId,
+        createdById: request.auth.userId,
         title: input.title,
-        body: input.body ?? "",
-        url: input.url ?? null,
-        category: input.category ?? "general",
-        attachmentUrl: input.attachmentUrl ?? null,
-        attachmentName: input.attachmentName ?? null,
-        isPinned: input.isPinned ?? false,
-        createdById: request.auth.userId
+        body: details.body,
+        entryDate: new Date(),
+        entityType: input.phaseId ? "project_phase" : "project",
+        entityId: input.phaseId ?? project.id,
+        entryType: details.entryType,
+        tags: toInputJsonValue(details.tags),
+        attachmentUrl: details.attachmentUrl,
+        attachmentName: details.attachmentName,
+        ...(details.flags.length > 0
+          ? { flags: { create: details.flags.map((flag) => ({ flag })) } }
+          : {})
       },
       include: {
-        createdBy: { select: { id: true, displayName: true } },
-        phase: { select: { name: true } }
+        flags: true,
+        createdBy: { select: { id: true, displayName: true } }
       }
     });
 
@@ -154,11 +243,13 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       userId: request.auth.userId,
       action: "project.note.created",
       entityType: "project_note",
-      entityId: note.id,
-      metadata: { projectId: project.id, title: note.title, category: note.category }
+      entityId: entry.id,
+      metadata: { projectId: project.id, title: entry.title, category: input.category ?? "general" }
     });
 
-    return reply.code(201).send(toProjectNoteResponse(note));
+    void syncEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
+
+    return reply.code(201).send(toEntryAsProjectNote(entry, { projectId: project.id, phaseName }));
   });
 
   // PATCH /v1/households/:householdId/projects/:projectId/notes/:noteId
@@ -176,44 +267,102 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const existing = await app.prisma.projectNote.findFirst({
-      where: { id: params.noteId, projectId: project.id, deletedAt: null }
+    const phases = await app.prisma.projectPhase.findMany({
+      where: { projectId: project.id },
+      select: { id: true, name: true }
+    });
+    const phaseIds = phases.map((p) => p.id);
+
+    const existing = await app.prisma.entry.findFirst({
+      where: {
+        id: params.noteId,
+        householdId: params.householdId,
+        OR: [
+          { entityType: "project" as const, entityId: project.id },
+          ...(phaseIds.length > 0 ? [{ entityType: "project_phase" as const, entityId: { in: phaseIds } }] : [])
+        ]
+      },
+      include: { flags: true }
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Project note not found." });
     }
 
+    // Validate new phaseId if provided
+    let newPhaseName: string | null | undefined;
+
     if (input.phaseId !== undefined && input.phaseId !== null) {
-      const phase = await app.prisma.projectPhase.findFirst({
-        where: { id: input.phaseId, projectId: project.id, deletedAt: null },
-        select: { id: true }
-      });
+      const phase = phases.find((p) => p.id === input.phaseId);
 
       if (!phase) {
         return reply.code(400).send({ message: "Phase not found in this project." });
       }
+
+      newPhaseName = phase.name;
     }
 
-    const data: Prisma.ProjectNoteUncheckedUpdateInput = {};
+    // Parse current state to merge with incoming update
+    const current = parseProjectEntryPayload({
+      title: existing.title,
+      body: existing.body,
+      entryType: existing.entryType,
+      tags: parseTags(existing.tags),
+      flags: existing.flags.map((f) => f.flag),
+      attachmentUrl: existing.attachmentUrl
+    });
 
-    if (input.title !== undefined) data.title = input.title;
-    if (input.body !== undefined) data.body = input.body ?? "";
-    if (input.url !== undefined) data.url = input.url ?? null;
-    if (input.category !== undefined) data.category = input.category;
-    if (input.phaseId !== undefined) data.phaseId = input.phaseId ?? null;
-    if (input.attachmentUrl !== undefined) data.attachmentUrl = input.attachmentUrl ?? null;
-    if (input.attachmentName !== undefined) data.attachmentName = input.attachmentName ?? null;
-    if (input.isPinned !== undefined) data.isPinned = input.isPinned;
+    const details = buildProjectEntryPayload({
+      title: input.title ?? (existing.title ?? existing.body),
+      body: input.body !== undefined ? (input.body ?? null) : current.body || null,
+      category: input.category !== undefined ? (input.category ?? null) : current.category,
+      url: input.url !== undefined ? (input.url ?? null) : current.url,
+      isPinned: input.isPinned !== undefined ? (input.isPinned ?? false) : current.isPinned
+    });
 
-    const updated = await app.prisma.projectNote.update({
+    // Determine entity assignment
+    let entityType: "project" | "project_phase" = existing.entityType as "project" | "project_phase";
+    let entityId = existing.entityId;
+
+    if (input.phaseId !== undefined) {
+      if (input.phaseId === null) {
+        entityType = "project";
+        entityId = project.id;
+        newPhaseName = null;
+      } else {
+        entityType = "project_phase";
+        entityId = input.phaseId;
+      }
+    }
+
+    // Update entry fields
+    const updated = await app.prisma.entry.update({
       where: { id: existing.id },
-      data,
+      data: {
+        title: input.title !== undefined ? input.title : existing.title,
+        body: details.body,
+        entityType,
+        entityId,
+        entryType: details.entryType,
+        tags: toInputJsonValue(details.tags),
+        attachmentUrl: details.attachmentUrl,
+        attachmentName: details.attachmentName
+      },
       include: {
-        createdBy: { select: { id: true, displayName: true } },
-        phase: { select: { name: true } }
+        flags: true,
+        createdBy: { select: { id: true, displayName: true } }
       }
     });
+
+    // Sync pin flag separately
+    const wasPinned = existing.flags.some((f) => f.flag === "pinned");
+    const shouldBePinned = details.flags.includes("pinned");
+
+    if (wasPinned && !shouldBePinned) {
+      await app.prisma.entryFlagEntry.delete({ where: { entryId_flag: { entryId: existing.id, flag: "pinned" } } });
+    } else if (!wasPinned && shouldBePinned) {
+      await app.prisma.entryFlagEntry.create({ data: { entryId: existing.id, flag: "pinned" } });
+    }
 
     await logActivity(app.prisma, {
       householdId: params.householdId,
@@ -224,7 +373,22 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       metadata: { projectId: project.id, title: updated.title }
     });
 
-    return toProjectNoteResponse(updated);
+    // Re-fetch with updated flags
+    const refreshed = await app.prisma.entry.findUniqueOrThrow({
+      where: { id: updated.id },
+      include: {
+        flags: true,
+        createdBy: { select: { id: true, displayName: true } }
+      }
+    });
+
+    const resolvedPhaseName = refreshed.entityType === "project_phase"
+      ? (newPhaseName !== undefined
+        ? newPhaseName
+        : (phases.find((p) => p.id === refreshed.entityId)?.name ?? null))
+      : null;
+
+    return toEntryAsProjectNote(refreshed, { projectId: project.id, phaseName: resolvedPhaseName });
   });
 
   // DELETE /v1/households/:householdId/projects/:projectId/notes/:noteId
@@ -241,18 +405,29 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Project not found." });
     }
 
-    const existing = await app.prisma.projectNote.findFirst({
-      where: { id: params.noteId, projectId: project.id, deletedAt: null }
+    const phases = await app.prisma.projectPhase.findMany({
+      where: { projectId: project.id },
+      select: { id: true }
+    });
+    const phaseIds = phases.map((p) => p.id);
+
+    const existing = await app.prisma.entry.findFirst({
+      where: {
+        id: params.noteId,
+        householdId: params.householdId,
+        OR: [
+          { entityType: "project" as const, entityId: project.id },
+          ...(phaseIds.length > 0 ? [{ entityType: "project_phase" as const, entityId: { in: phaseIds } }] : [])
+        ]
+      },
+      select: { id: true, title: true }
     });
 
     if (!existing) {
       return reply.code(404).send({ message: "Project note not found." });
     }
 
-    await app.prisma.projectNote.update({
-      where: { id: existing.id },
-      data: { deletedAt: new Date() }
-    });
+    await app.prisma.entry.delete({ where: { id: existing.id } });
 
     await logActivity(app.prisma, {
       householdId: params.householdId,
@@ -263,7 +438,8 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       metadata: { projectId: project.id, title: existing.title }
     });
 
+    await removeSearchIndexEntry(app.prisma, "entry", existing.id);
+
     return reply.code(204).send();
   });
 };
-
