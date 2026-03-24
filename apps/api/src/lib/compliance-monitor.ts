@@ -11,11 +11,10 @@ import {
   type ComplianceStatus,
   type NotificationPreferences
 } from "@lifekeeper/types";
+import { MS_PER_DAY, addDays } from "@lifekeeper/utils";
 import { buildCompletionCycleLedger } from "../services/schedule-adherence.js";
 
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type ComplianceRecipient = {
   userId: string;
@@ -82,7 +81,7 @@ const resolveChannels = (preferences: NotificationPreferences): NotificationChan
   return preferences.enabledChannels;
 };
 
-const addDays = (date: Date, days: number): Date => new Date(date.getTime() + (days * MS_PER_DAY));
+
 
 export const getComplianceStatus = (cycles: CompletionCycleRecord[], gracePeriodDays: number): ComplianceStatus => {
   const now = new Date();

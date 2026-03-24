@@ -5,7 +5,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
@@ -132,8 +132,8 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
   app.get("/v1/households/:householdId/inventory/shopping-list", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const purchases = await listActivePurchases(app.prisma, params.householdId);
@@ -143,8 +143,8 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
   app.post("/v1/households/:householdId/inventory/shopping-list/generate", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const [items, existingPurchases] = await Promise.all([
@@ -239,8 +239,8 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
     const params = purchaseLineParamsSchema.parse(request.params);
     const input = updateInventoryPurchaseLineSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.inventoryPurchaseLine.findFirst({
@@ -450,8 +450,8 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
     const params = householdParamsSchema.parse(request.params);
     const input = createQuickRestockSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     for (const line of input.items) {

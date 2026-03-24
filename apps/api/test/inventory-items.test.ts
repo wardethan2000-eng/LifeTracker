@@ -296,3 +296,103 @@ describe("household inventory item routes", () => {
     }
   });
 });
+
+describe("barcode labels endpoint", () => {
+  const createBarcodeLabelsApp = async (findManyItems: unknown[]) => {
+    const app = Fastify();
+
+    app.decorate("prisma", {
+      householdMember: {
+        findUnique: async () => ({ householdId, userId, role: "owner" })
+      },
+      inventoryItem: {
+        fields: { reorderThreshold: Symbol("reorderThreshold") },
+        findFirst: async () => null,
+        findMany: async () => findManyItems,
+        update: async () => ({})
+      },
+      activityLog: { create: async () => ({}) },
+      maintenanceSchedule: { findMany: async () => [] },
+      $transaction: async <T>(callback: (tx: object) => Promise<T>) => callback({})
+    } as never);
+
+    app.decorateRequest("auth", undefined as never);
+    app.addHook("preHandler", async (request) => {
+      request.auth = { userId, clerkUserId: null, source: "dev-bypass" };
+    });
+
+    await app.register(householdInventoryItemRoutes);
+    return app;
+  };
+
+  it("returns a PDF when items have valid part numbers", async () => {
+    const app = await createBarcodeLabelsApp([
+      { id: targetInventoryItemId, name: "Oil Filter", partNumber: "012345678905", manufacturer: "Acme" }
+    ]);
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/households/${householdId}/inventory/barcode-labels?itemIds=${targetInventoryItemId}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("application/pdf");
+      expect(response.body.slice(0, 4)).toBe("%PDF");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns 400 when no items have a part number", async () => {
+    const app = await createBarcodeLabelsApp([
+      { id: targetInventoryItemId, name: "Oil Filter", partNumber: null, manufacturer: null }
+    ]);
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/households/${householdId}/inventory/barcode-labels?itemIds=${targetInventoryItemId}`
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain("part number");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns 403 when user is not a household member", async () => {
+    const app = Fastify();
+
+    app.decorate("prisma", {
+      householdMember: { findUnique: async () => null },
+      inventoryItem: {
+        fields: { reorderThreshold: Symbol("reorderThreshold") },
+        findFirst: async () => null,
+        findMany: async () => []
+      },
+      activityLog: { create: async () => ({}) },
+      maintenanceSchedule: { findMany: async () => [] },
+      $transaction: async <T>(callback: (tx: object) => Promise<T>) => callback({})
+    } as never);
+
+    app.decorateRequest("auth", undefined as never);
+    app.addHook("preHandler", async (request) => {
+      request.auth = { userId, clerkUserId: null, source: "dev-bypass" };
+    });
+
+    await app.register(householdInventoryItemRoutes);
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/households/${householdId}/inventory/barcode-labels?itemIds=${targetInventoryItemId}`
+      });
+
+      expect(response.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+});

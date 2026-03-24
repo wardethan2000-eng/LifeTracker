@@ -7,7 +7,8 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
   buildPracticeGoalProgressHistory,
@@ -62,8 +63,8 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const query = hobbyPracticeGoalListQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const goals = await app.prisma.hobbyPracticeGoal.findMany({
@@ -71,15 +72,13 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
         hobbyId,
         householdId,
         ...(query.status ? { status: query.status } : {}),
-        ...(query.cursor ? { id: { lt: query.cursor } } : {}),
+        ...cursorWhere(query.cursor),
       },
       orderBy: { createdAt: "desc" },
       take: query.limit + 1,
     });
 
-    const hasMore = goals.length > query.limit;
-    const items = hasMore ? goals.slice(0, query.limit) : goals;
-    const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+    const { items, nextCursor } = buildCursorPage(goals, query.limit);
 
     return reply.send(hobbyPracticeGoalListResponseSchema.parse({
       items: items.map((goal) => toHobbyPracticeGoalSummaryResponse(goal, toProgressPercentage(goal.currentValue, goal.targetValue))),
@@ -92,8 +91,8 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyPracticeGoalInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const hobby = await getScopedHobby(app.prisma, householdId, hobbyId);
@@ -159,8 +158,8 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
   app.get(`${BASE}/:goalId`, async (request, reply) => {
     const { householdId, hobbyId, goalId } = goalParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const goal = await app.prisma.hobbyPracticeGoal.findFirst({
@@ -182,8 +181,8 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyPracticeGoalInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyPracticeGoal.findFirst({
@@ -255,8 +254,8 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, goalId } = goalParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyPracticeGoal.findFirst({

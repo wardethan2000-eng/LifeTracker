@@ -741,6 +741,9 @@ export const bulkReassignTasksSchema = z.object({
   assignedToId: z.string().cuid().nullable().optional()
 });
 
+export const projectStatusValues = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
+export const projectStatusSchema = z.enum(projectStatusValues);
+
 export const bulkChangeProjectStatusSchema = z.object({
   householdId: z.string().cuid(),
   projectIds: z.array(z.string().cuid()).min(1).max(100),
@@ -2190,8 +2193,6 @@ export const assetDetailResponseSchema = z.object({
 
 // ── Project Schemas ──────────────────────────────────────────────────
 
-export const projectStatusValues = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
-export const projectStatusSchema = z.enum(projectStatusValues);
 export const projectStatusCountSchema = z.object({
   status: projectStatusSchema,
   count: z.number().int().min(0)
@@ -3824,6 +3825,21 @@ export const barcodeLookupResultSchema = z.object({
 
 export type BarcodeLookupRequest = z.infer<typeof barcodeLookupRequestSchema>;
 export type BarcodeLookupResult = z.infer<typeof barcodeLookupResultSchema>;
+
+export const barcodeImageQuerySchema = z.object({
+  value: z.string().min(1).max(100),
+  format: z.string().max(30).optional(),
+  output: z.enum(["png", "svg"]).default("png"),
+  scale: z.coerce.number().int().min(1).max(5).default(2)
+});
+
+export type BarcodeImageQuery = z.infer<typeof barcodeImageQuerySchema>;
+
+export const barcodeLabelsQuerySchema = z.object({
+  itemIds: z.string().min(1)
+});
+
+export type BarcodeLabelsQuery = z.infer<typeof barcodeLabelsQuerySchema>;
 
 // ── Attachment Schemas ───────────────────────────────────────────────
 

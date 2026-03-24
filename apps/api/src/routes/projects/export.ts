@@ -1,7 +1,7 @@
 import { projectStatusSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { csvValue } from "../../lib/csv.js";
 
 const householdParamsSchema = z.object({
@@ -27,7 +27,7 @@ export const projectExportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/export", async (request, reply) => {
     const { householdId } = householdParamsSchema.parse(request.params);
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -70,7 +70,7 @@ export const projectExportRoutes: FastifyPluginAsync = async (app) => {
     const { householdId } = householdParamsSchema.parse(request.params);
     const input = importProjectsSchema.parse(request.body);
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 

@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
+import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -25,7 +26,7 @@ export const activityLogRoutes: FastifyPluginAsync = async (app) => {
       ...(query.entityId ? { entityId: query.entityId } : {}),
       ...(query.userId ? { userId: query.userId } : {}),
       ...(query.since ? { createdAt: { gte: new Date(query.since) } } : {}),
-      ...(query.cursor ? { id: { lt: query.cursor } } : {})
+      ...cursorWhere(query.cursor)
     };
 
     const rawEntries = await app.prisma.activityLog.findMany({
@@ -34,9 +35,7 @@ export const activityLogRoutes: FastifyPluginAsync = async (app) => {
       take: query.limit + 1
     });
 
-    const hasMore = rawEntries.length > query.limit;
-    const entries = hasMore ? rawEntries.slice(0, query.limit) : rawEntries;
-    const nextCursor = hasMore ? entries[entries.length - 1]!.id : null;
+    const { items: entries, nextCursor } = buildCursorPage(rawEntries, query.limit);
 
     return {
       entries: entries.map((entry) => ({

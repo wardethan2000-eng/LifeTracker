@@ -12,6 +12,7 @@ import {
   notificationPreferencesSchema,
   type NotificationPreferences
 } from "@lifekeeper/types";
+import { addDays } from "@lifekeeper/utils";
 import { toNotificationResponse } from "./serializers/index.js";
 import { sendEmail } from "./adapters/email-adapter.js";
 import { sendPush } from "./adapters/push-adapter.js";
@@ -107,6 +108,13 @@ export interface NotificationScanResult {
 
 const parsePreferences = (value: Prisma.JsonValue | null | undefined): NotificationPreferences => notificationPreferencesSchema.parse(value ?? {});
 
+const resolveRecipients = (
+  members: Array<{ userId: string; user: Pick<User, "id" | "notificationPreferences"> }>
+): Recipient[] => members.map((member) => ({
+  userId: member.userId,
+  preferences: parsePreferences(member.user.notificationPreferences)
+}));
+
 const phaseRank = (phase: NotificationPhase): number => {
   switch (phase) {
     case "upcoming":
@@ -134,12 +142,6 @@ const phaseByRank = (rank: number): NotificationPhase => {
   }
 
   return "overdue";
-};
-
-const addDays = (date: Date, days: number): Date => {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
 };
 
 const describeDuePoint = (schedule: ScheduleCandidate): string => {
@@ -348,21 +350,12 @@ const getRecipients = (schedule: ScheduleCandidate): Recipient[] => {
     }];
   }
 
-  return schedule.asset.household.members.map((member) => ({
-    userId: member.userId,
-    preferences: parsePreferences(member.user.notificationPreferences)
-  }));
+  return resolveRecipients(schedule.asset.household.members);
 };
 
-const getHouseholdRecipients = (item: LowStockCandidate): Recipient[] => item.household.members.map((member) => ({
-  userId: member.userId,
-  preferences: parsePreferences(member.user.notificationPreferences)
-}));
+const getHouseholdRecipients = (item: LowStockCandidate): Recipient[] => resolveRecipients(item.household.members);
 
-const getProjectRecipients = (project: ProjectCandidate): Recipient[] => project.household.members.map((member) => ({
-  userId: member.userId,
-  preferences: parsePreferences(member.user.notificationPreferences)
-}));
+const getProjectRecipients = (project: ProjectCandidate): Recipient[] => resolveRecipients(project.household.members);
 
 const formatQuantityValue = (value: number): string => Number.isInteger(value)
   ? String(value)

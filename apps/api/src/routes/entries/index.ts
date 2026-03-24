@@ -14,7 +14,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import {
   createEntryEntityKey,
   resolveEntryEntityContexts,
@@ -568,8 +568,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     try {
@@ -591,8 +591,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = createEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const result = await createEntry(app, householdId, userId, input);
@@ -608,8 +608,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entrySurfaceQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await validateEntryTarget(app.prisma, householdId, query.entityType, query.entityId);
@@ -681,8 +681,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const { householdId } = householdParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const entries = await app.prisma.entry.findMany({
@@ -731,8 +731,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, entryId } = entryParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const entry = await app.prisma.entry.findFirst({
@@ -757,8 +757,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = updateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.entry.findFirst({
@@ -852,8 +852,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, entryId } = entryParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.entry.findFirst({
@@ -908,8 +908,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby", entityId: hobbyId });
@@ -940,8 +940,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = scopedCreateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     if ((input.entityType && input.entityType !== "hobby") || (input.entityId && input.entityId !== hobbyId)) {
@@ -966,8 +966,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_session", entityId: sessionId }, hobbyId);
@@ -998,8 +998,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = scopedCreateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     if ((input.entityType && input.entityType !== "hobby_session") || (input.entityId && input.entityId !== sessionId)) {
@@ -1024,8 +1024,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_collection_item", entityId: collectionItemId }, hobbyId);
@@ -1056,8 +1056,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = scopedCreateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     if ((input.entityType && input.entityType !== "hobby_collection_item") || (input.entityId && input.entityId !== collectionItemId)) {
@@ -1082,8 +1082,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "project", entityId: projectId });
@@ -1114,8 +1114,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = scopedCreateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     if ((input.entityType && input.entityType !== "project") || (input.entityId && input.entityId !== projectId)) {
@@ -1140,8 +1140,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "asset", entityId: assetId });
@@ -1172,8 +1172,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = scopedCreateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     if ((input.entityType && input.entityType !== "asset") || (input.entityId && input.entityId !== assetId)) {
@@ -1198,8 +1198,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const query = entryListQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "inventory_item", entityId: itemId });
@@ -1230,8 +1230,8 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     const input = scopedCreateEntrySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     if ((input.entityType && input.entityType !== "inventory_item") || (input.entityId && input.entityId !== itemId)) {

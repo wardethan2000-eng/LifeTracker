@@ -7,7 +7,8 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
@@ -44,11 +45,11 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
     const params = householdInventoryTransactionParamsSchema.parse(request.params);
     const query = inventoryTransactionQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
-    const transactions = await app.prisma.inventoryTransaction.findMany({
+    const rawTransactions = await app.prisma.inventoryTransaction.findMany({
       where: {
         inventoryItem: {
           householdId: params.householdId
@@ -64,7 +65,7 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
               }
             }
           : {}),
-        ...(query.cursor ? { id: { lt: query.cursor } } : {})
+        ...cursorWhere(query.cursor)
       },
       include: {
         correctionOfTransaction: {
@@ -101,22 +102,15 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
       take: query.limit + 1
     });
 
+    const { items: transactions, nextCursor } = buildCursorPage(rawTransactions, query.limit);
     const referenceLinks = await resolveInventoryTransactionReferenceLinks(app.prisma, params.householdId, transactions);
-
-    const hasNextPage = transactions.length > query.limit;
-
-    if (hasNextPage) {
-      transactions.pop();
-    }
 
     return reply.send(inventoryTransactionListSchema.parse({
       transactions: transactions.map((transaction) => toInventoryTransactionWithItemResponse(
         transaction,
         referenceLinks.get(getInventoryTransactionReferenceKey(transaction.referenceType, transaction.referenceId) ?? "") ?? null
       )),
-      nextCursor: hasNextPage && transactions.length > 0
-        ? transactions[transactions.length - 1]?.id ?? null
-        : null
+      nextCursor
     }));
   });
 
@@ -124,8 +118,8 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
     const params = inventoryTransactionParamsSchema.parse(request.params);
     const input = createInventoryTransactionSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
@@ -164,8 +158,8 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
     const params = inventoryTransactionCorrectionParamsSchema.parse(request.params);
     const input = createInventoryTransactionCorrectionSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     try {

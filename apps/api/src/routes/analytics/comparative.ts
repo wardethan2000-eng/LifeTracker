@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
+import { isCountableCycle } from "../../lib/compliance-analytics.js";
 import { addUtcMonths, getMonthRange, startOfUtcMonth, toMonthKey } from "../../lib/date-utils.js";
 import {
   toAssetComparisonPayloadResponse,
@@ -75,12 +76,6 @@ const toPercentageChange = (current: number, previous: number): number | null =>
 
   return ((current - previous) / previous) * 100;
 };
-
-const isCountableCycle = (cycle: CompletionCycleRecord): cycle is CompletionCycleRecord & {
-  dueDate: string;
-  completedAt: string;
-  deltaInDays: number;
-} => cycle.dueDate !== null && cycle.completedAt !== null && cycle.deltaInDays !== null;
 
 const summarizeCycles = (cycles: CompletionCycleRecord[]): {
   onTimeCount: number;

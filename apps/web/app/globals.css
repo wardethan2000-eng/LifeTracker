@@ -6707,6 +6707,54 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--ink-muted);
 }
 
+.barcode-lookup__preview {
+  width: 100%;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.barcode-lookup__image {
+  max-width: 260px;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #fff;
+}
+
+.barcode-lookup__format {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barcode panel on inventory item detail */
+.barcode-panel__preview {
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.barcode-panel__image {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #fff;
+}
+
+.barcode-panel__caption {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 53. Attachments
    ═══════════════════════════════════════════════════════════════════ */

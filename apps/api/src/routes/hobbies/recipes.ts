@@ -9,7 +9,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
   toIngredientResponse,
@@ -53,8 +53,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const query = listRecipesQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const where: Prisma.HobbyRecipeWhereInput = {
@@ -83,8 +83,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyRecipeInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const hobby = await app.prisma.hobby.findFirst({
@@ -170,8 +170,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
@@ -209,8 +209,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyRecipeInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyRecipe.findFirst({
@@ -244,8 +244,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyRecipe.findFirst({
@@ -275,8 +275,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyRecipeIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
@@ -313,8 +313,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyRecipeIngredientInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyRecipeIngredient.findFirst({
@@ -345,8 +345,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId, ingredientId } = ingredientParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyRecipeIngredient.findFirst({
@@ -367,8 +367,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyRecipeStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({
@@ -403,8 +403,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyRecipeStepInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyRecipeStep.findFirst({
@@ -433,8 +433,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, recipeId, stepId } = stepParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyRecipeStep.findFirst({
@@ -455,8 +455,8 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     const { stepIds } = reorderStepsBodySchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const recipe = await app.prisma.hobbyRecipe.findFirst({

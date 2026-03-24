@@ -50,6 +50,9 @@ importers:
       bullmq:
         specifier: ^5.70.4
         version: 5.70.4
+      bwip-js:
+        specifier: ^4.8.0
+        version: 4.8.0
       cheerio:
         specifier: ^1.2.0
         version: 1.2.0
@@ -3195,6 +3198,10 @@ packages:
 
   bullmq@5.70.4:
     resolution: {integrity: sha512-S58YT/tGdhc4pEPcIahtZRBR1TcTLpss1UKiXimF+Vy4yZwF38pW2IvhHqs4j4dEbZqDt8oi0jGGN/WYQHbPDg==}
+
+  bwip-js@4.8.0:
+    resolution: {integrity: sha512-gUDkDHSTv8/DJhomSIbO0fX/Dx0MO/sgllLxJyJfu4WixCQe9nfGJzmHm64ZCbxo+gUYQEsQcRmqcwcwPRwUkg==}
+    hasBin: true
 
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
@@ -10145,6 +10152,8 @@ snapshots:
       uuid: 11.1.0
     transitivePeerDependencies:
       - supports-color
+
+  bwip-js@4.8.0: {}
 
   bytes@3.1.2: {}
 

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { toHobbyRecipeShoppingListResponse } from "../../lib/serializers/index.js";
 
 const recipeParamsSchema = z.object({
@@ -17,8 +17,8 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
       const { householdId, hobbyId, recipeId } = recipeParamsSchema.parse(request.params);
       const userId = request.auth.userId;
 
-      if (!await checkMembership(app.prisma, householdId, userId)) {
-        return reply.code(403).send({ message: "You do not have access to this household." });
+      if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+        return;
       }
 
       const recipe = await app.prisma.hobbyRecipe.findFirst({

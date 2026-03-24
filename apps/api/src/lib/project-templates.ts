@@ -1,4 +1,5 @@
 import type { Prisma, ProjectAssetRelationship, ProjectStatus } from "@prisma/client";
+import { MS_PER_DAY } from "@lifekeeper/utils";
 
 type SnapshotAssetLink = {
   assetId: string;
@@ -89,7 +90,7 @@ type SnapshotSourceProject = {
   }>;
 };
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 
 const toDayOffset = (anchorDate: Date | null, value: Date | null): number | null => {
   if (!anchorDate || !value) {

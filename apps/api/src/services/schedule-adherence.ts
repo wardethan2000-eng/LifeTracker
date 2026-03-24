@@ -5,11 +5,9 @@ import {
   type CompletionCycleRecord,
   type MaintenanceTrigger
 } from "@lifekeeper/types";
-import { calculateNextDue, calculateUsageRate } from "@lifekeeper/utils";
+import { MS_PER_DAY, addDays, calculateNextDue, calculateUsageRate } from "@lifekeeper/utils";
 
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type ScheduleWithContext = {
   id: string;
@@ -50,16 +48,14 @@ export interface BuildCompletionLedgerOptions {
   includeOpenCycles?: boolean;
 }
 
-const addDays = (date: Date, days: number): Date => new Date(date.getTime() + (days * MS_PER_DAY));
-
-const startOfUtcDay = (date: Date): number => Date.UTC(
+const toUtcDayMs = (date: Date): number => Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth(),
   date.getUTCDate()
 );
 
 const toCalendarDayDelta = (completedAt: Date, dueDate: Date): number => (
-  Math.round((startOfUtcDay(completedAt) - startOfUtcDay(dueDate)) / MS_PER_DAY)
+  Math.round((toUtcDayMs(completedAt) - toUtcDayMs(dueDate)) / MS_PER_DAY)
 );
 
 const toCycleRecord = (input: {

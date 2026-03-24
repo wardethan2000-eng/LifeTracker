@@ -53,7 +53,7 @@ async function lookupUpcItemDb(barcode: string): Promise<{ item: UpcItemDbItem; 
   }
 }
 
-function detectBarcodeFormat(barcode: string, hintFormat?: string): string {
+export function detectBarcodeFormat(barcode: string, hintFormat?: string): string {
   if (hintFormat) {
     return hintFormat;
   }

@@ -14,3 +14,13 @@ export const buildOffsetPage = <T>(
   offset: pagination.offset,
   hasMore: pagination.offset + items.length < total
 });
+
+export const buildCursorPage = <T extends { id: string }>(results: T[], limit: number) => {
+  const hasMore = results.length > limit;
+  const items = hasMore ? results.slice(0, limit) : results;
+  const nextCursor = hasMore ? items[items.length - 1]!.id : null;
+  return { items, nextCursor };
+};
+
+export const cursorWhere = (cursor: string | undefined) =>
+  cursor ? { id: { lt: cursor } } : {};

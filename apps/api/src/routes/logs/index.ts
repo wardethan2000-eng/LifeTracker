@@ -6,6 +6,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
+import { buildCursorPage } from "../../lib/pagination.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import {
   createScheduleLinkedLogParts,
@@ -74,9 +75,7 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {})
     });
 
-    const hasMore = logs.length > query.limit;
-    const page = hasMore ? logs.slice(0, query.limit) : logs;
-    const nextCursor = hasMore ? (page[page.length - 1]?.id ?? null) : null;
+    const { items: page, nextCursor } = buildCursorPage(logs, query.limit);
 
     return {
       logs: page.map(log => toMaintenanceLogResponse(log, log.parts)),

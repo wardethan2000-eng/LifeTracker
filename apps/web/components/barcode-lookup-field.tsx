@@ -16,9 +16,15 @@ type StatusState = {
   variant: "success" | "error" | "neutral";
 } | null;
 
+type BarcodePreview = {
+  value: string;
+  format: string;
+} | null;
+
 export function BarcodeLookupField({ onResult, disabled, className }: BarcodeLookupFieldProps): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<StatusState>(null);
+  const [barcodePreview, setBarcodePreview] = useState<BarcodePreview>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,10 +47,12 @@ export function BarcodeLookupField({ onResult, disabled, className }: BarcodeLoo
 
     setLoading(true);
     setStatus(null);
+    setBarcodePreview(null);
 
     try {
       const result = await lookupBarcode(barcode);
       onResult(result);
+      setBarcodePreview({ value: result.barcode, format: result.barcodeFormat });
 
       if (result.found) {
         showStatus(`Found: ${result.productName ?? barcode}`, "success");
@@ -69,6 +77,10 @@ export function BarcodeLookupField({ onResult, disabled, className }: BarcodeLoo
     }
   }, [handleLookup]);
 
+  const barcodeImageSrc = barcodePreview
+    ? `/api/v1/barcode/image?value=${encodeURIComponent(barcodePreview.value)}&format=${encodeURIComponent(barcodePreview.format)}&output=png`
+    : null;
+
   return (
     <div className={`barcode-lookup${className ? ` ${className}` : ""}`}>
       <input
@@ -92,6 +104,17 @@ export function BarcodeLookupField({ onResult, disabled, className }: BarcodeLoo
           {status.message}
         </span>
       )}
+      {barcodeImageSrc && barcodePreview && (
+        <figure className="barcode-lookup__preview">
+          <img
+            src={barcodeImageSrc}
+            alt={`Barcode for ${barcodePreview.value}`}
+            className="barcode-lookup__image"
+          />
+          <figcaption className="barcode-lookup__format">{barcodePreview.format}</figcaption>
+        </figure>
+      )}
     </div>
   );
 }
+

@@ -8,7 +8,8 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { resolveEntryEntityContexts } from "../../lib/entries.js";
 import {
@@ -37,11 +38,11 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const query = hobbyCollectionItemListQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
-    const items = await app.prisma.hobbyCollectionItem.findMany({
+    const rawItems = await app.prisma.hobbyCollectionItem.findMany({
       where: {
         hobbyId,
         householdId,
@@ -49,18 +50,16 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
         ...(query.location ? { location: query.location } : {}),
         ...(query.tag ? { tags: { array_contains: [query.tag] } } : {}),
         ...(query.search ? { name: { contains: query.search, mode: "insensitive" } } : {}),
-        ...(query.cursor ? { id: { lt: query.cursor } } : {}),
+        ...cursorWhere(query.cursor),
       },
       orderBy: { createdAt: "desc" },
       take: query.limit + 1,
     });
 
-    const hasMore = items.length > query.limit;
-    const pageItems = hasMore ? items.slice(0, query.limit) : items;
-    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
+    const { items, nextCursor } = buildCursorPage(rawItems, query.limit);
 
     return reply.send(hobbyCollectionItemListResponseSchema.parse({
-      items: pageItems.map(toHobbyCollectionItemResponse),
+      items: items.map(toHobbyCollectionItemResponse),
       nextCursor,
     }));
   });
@@ -70,8 +69,8 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyCollectionItemInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const hobby = await app.prisma.hobby.findFirst({ where: { id: hobbyId, householdId }, select: { id: true } });
@@ -127,8 +126,8 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
   app.get(`${BASE}/:collectionItemId`, async (request, reply) => {
     const { householdId, hobbyId, collectionItemId } = collectionItemParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.hobbyCollectionItem.findFirst({
@@ -212,8 +211,8 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyCollectionItemInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyCollectionItem.findFirst({
@@ -276,8 +275,8 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
     const input = bulkUpdateHobbyCollectionItemStatusInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const items = await app.prisma.hobbyCollectionItem.findMany({
@@ -318,8 +317,8 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, collectionItemId } = collectionItemParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyCollectionItem.findFirst({

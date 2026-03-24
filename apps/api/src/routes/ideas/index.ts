@@ -12,7 +12,8 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { syncIdeaToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { toIdeaResponse, toIdeaSummaryResponse } from "../../lib/serializers/index.js";
@@ -60,7 +61,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const query = listIdeasQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -71,7 +72,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       ...(query.priority ? { priority: query.priority } : {}),
       ...(query.search ? { title: { contains: query.search, mode: "insensitive" as const } } : {}),
       ...(!query.includeArchived ? { archivedAt: null } : {}),
-      ...(query.cursor ? { id: { lt: query.cursor } } : {}),
+      ...cursorWhere(query.cursor),
     };
 
     const limit = query.limit ?? 50;
@@ -82,9 +83,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       take: limit + 1,
     });
 
-    const hasMore = ideas.length > limit;
-    const items = hasMore ? ideas.slice(0, limit) : ideas;
-    const nextCursor = hasMore ? items[items.length - 1]!.id : null;
+    const { items, nextCursor } = buildCursorPage(ideas, limit);
 
     return reply.send({
       items: items.map(toIdeaSummaryResponse),
@@ -98,7 +97,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = createIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -148,7 +147,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId } = ideaParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -169,7 +168,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = updateIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -214,7 +213,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId } = ideaParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -251,7 +250,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = addIdeaNoteSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -293,7 +292,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId, noteId } = noteParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -324,7 +323,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = addIdeaLinkSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -367,7 +366,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId, linkId } = linkParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -398,7 +397,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { stage } = z.object({ stage: ideaStageSchema }).parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -433,7 +432,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = promoteIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -548,7 +547,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     }).parse(request.query);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -573,7 +572,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = demoteToIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await checkMembership(app.prisma, householdId, userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 

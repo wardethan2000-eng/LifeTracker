@@ -88,3 +88,111 @@ test("barcode lookup enforces the route rate limit", async () => {
     await resetRateLimitState();
   }
 });
+
+// ── Barcode image endpoint ────────────────────────────────────────────
+
+test("barcode image endpoint returns a PNG buffer for a valid UPC-A", async () => {
+  process.env.RATE_LIMIT_STORE = "memory";
+  await resetRateLimitState();
+  const app = await createBarcodeApp();
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/barcode/image?value=012345678905"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("image/png");
+    const body = response.rawPayload;
+    // PNG magic bytes: 89 50 4E 47
+    expect(body[0]).toBe(0x89);
+    expect(body[1]).toBe(0x50);
+    expect(body[2]).toBe(0x4e);
+    expect(body[3]).toBe(0x47);
+  } finally {
+    await app.close();
+    await resetRateLimitState();
+  }
+});
+
+test("barcode image endpoint returns SVG when output=svg", async () => {
+  process.env.RATE_LIMIT_STORE = "memory";
+  await resetRateLimitState();
+  const app = await createBarcodeApp();
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/barcode/image?value=012345678905&output=svg"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toMatch(/image\/svg\+xml/);
+    expect(response.body).toContain("<svg");
+  } finally {
+    await app.close();
+    await resetRateLimitState();
+  }
+});
+
+test("barcode image endpoint sets Cache-Control header", async () => {
+  process.env.RATE_LIMIT_STORE = "memory";
+  await resetRateLimitState();
+  const app = await createBarcodeApp();
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/barcode/image?value=012345678905"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=86400");
+  } finally {
+    await app.close();
+    await resetRateLimitState();
+  }
+});
+
+test("barcode image endpoint uses code128 fallback for non-standard format", async () => {
+  process.env.RATE_LIMIT_STORE = "memory";
+  await resetRateLimitState();
+  const app = await createBarcodeApp();
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/barcode/image?value=INTERNAL-REF-001"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("image/png");
+  } finally {
+    await app.close();
+    await resetRateLimitState();
+  }
+});
+
+test("barcode image endpoint enforces rate limit at 100 requests", async () => {
+  process.env.RATE_LIMIT_STORE = "memory";
+  await resetRateLimitState();
+  const app = await createBarcodeApp();
+  try {
+    for (let index = 0; index < 100; index += 1) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/barcode/image?value=ITEM-${index}`
+      });
+
+      expect(response.statusCode).toBe(200);
+    }
+
+    const limitedResponse = await app.inject({
+      method: "GET",
+      url: "/v1/barcode/image?value=ITEM-LIMIT"
+    });
+
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.json().message).toBe("Barcode image rate limit exceeded. Try again shortly.");
+  } finally {
+    await app.close();
+    await resetRateLimitState();
+  }
+});

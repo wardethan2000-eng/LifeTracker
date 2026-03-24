@@ -1,8 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { maintenanceTriggerSchema, type ScheduleComplianceDashboard } from "@lifekeeper/types";
-import { calculateNextDue } from "@lifekeeper/utils";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { calculateNextDue, MS_PER_DAY } from "@lifekeeper/utils";
+import { average } from "./analytics-helpers.js";
 
 const categoryLabels: Record<string, string> = {
   vehicle: "Vehicle",
@@ -97,8 +96,7 @@ const toDayStartInTz = (date: Date, timezone = "UTC"): number => {
 };
 
 // Keep backwards-compatible aliases used by existing callers within this file
-const startOfUtcMonth = (date: Date): Date => startOfMonthInTz(date, "UTC");
-const addUtcMonths = (date: Date, months: number): Date => addCalendarMonths(date, months, "UTC");
+
 const endOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth() + 1,
@@ -160,10 +158,6 @@ type CompletionAssessment = {
   onTime: boolean;
   daysOverdue: number | null;
 };
-
-const average = (values: number[]): number | null => values.length > 0
-  ? values.reduce((sum, value) => sum + value, 0) / values.length
-  : null;
 
 const getFirstTimeBasedDueDate = (schedule: ComplianceScheduleInput, fallbackDate: Date): Date | null => {
   const trigger = maintenanceTriggerSchema.parse(schedule.triggerConfig);

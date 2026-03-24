@@ -4,7 +4,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { recalculatePracticeGoalsForHobby } from "../../lib/hobby-practice.js";
 
@@ -28,7 +28,7 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkLogHobbySessionsSchema.parse({ ...body, householdId, hobbyId });
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -100,7 +100,7 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkArchiveHobbySessionsSchema.parse({ ...body, householdId, hobbyId });
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 

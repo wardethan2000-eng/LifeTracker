@@ -5,7 +5,8 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 import { recalculatePracticeGoalsForHobby } from "../../lib/hobby-practice.js";
 import {
   toHobbyMetricDefinitionResponse,
@@ -43,8 +44,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const metrics = await app.prisma.hobbyMetricDefinition.findMany({
@@ -61,8 +62,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyMetricDefinitionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const hobby = await app.prisma.hobby.findFirst({
@@ -91,8 +92,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const input = updateHobbyMetricDefinitionInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyMetricDefinition.findFirst({
@@ -120,8 +121,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, metricId } = metricParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyMetricDefinition.findFirst({
@@ -142,8 +143,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const query = listReadingsQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const limit = query.limit ?? 50;
@@ -159,15 +160,13 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
             ...(query.endDate ? { lte: new Date(query.endDate) } : {}),
           }
         } : {}),
-        ...(query.cursor ? { id: { lt: query.cursor } } : {})
+        ...cursorWhere(query.cursor)
       },
       orderBy: { readingDate: "desc" },
       take: limit + 1,
     });
 
-    const hasMore = readings.length > limit;
-    const items = hasMore ? readings.slice(0, limit) : readings;
-    const nextCursor = hasMore ? items[items.length - 1]!.id : null;
+    const { items, nextCursor } = buildCursorPage(readings, limit);
 
     return reply.send(toHobbyMetricReadingPageResponse({
       items,
@@ -181,8 +180,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const input = createHobbyMetricReadingInputSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const metric = await app.prisma.hobbyMetricDefinition.findFirst({
@@ -228,8 +227,8 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, hobbyId, metricId, readingId } = readingParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!await checkMembership(app.prisma, householdId, userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.hobbyMetricReading.findFirst({

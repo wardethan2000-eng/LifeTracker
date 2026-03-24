@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../lib/asset-access.js";
+import { requireHouseholdMembership } from "../lib/asset-access.js";
 import { recordSpaceScanLog } from "../lib/space-scan-log.js";
 import {
   serializeSpace,
@@ -67,8 +67,8 @@ export const scanDetailRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Space not found." });
     }
 
-    if (!await checkMembership(app.prisma, space.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, space.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     await recordSpaceScanLog(app.prisma, {
@@ -191,8 +191,8 @@ export const scanDetailRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "Inventory item not found." });
     }
 
-    if (!await checkMembership(app.prisma, item.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, item.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const spaceBreadcrumbs = await Promise.all(item.spaceLinks.map((link) => getSpaceBreadcrumb(app.prisma, link.space.id)));

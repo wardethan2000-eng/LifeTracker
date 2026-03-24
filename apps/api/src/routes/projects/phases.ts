@@ -17,7 +17,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assertMembership, checkMembership, ForbiddenError } from "../../lib/asset-access.js";
+import { assertMembership, requireHouseholdMembership, ForbiddenError } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
@@ -155,8 +155,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/phases", async (request, reply) => {
     const params = projectParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -194,8 +194,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = projectParamsSchema.parse(request.params);
     const input = createProjectPhaseSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -265,8 +265,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/phases/:phaseId", async (request, reply) => {
     const params = phaseParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -319,8 +319,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = phaseParamsSchema.parse(request.params);
     const input = updateProjectPhaseSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -394,8 +394,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/projects/:projectId/phases/:phaseId", async (request, reply) => {
     const params = phaseParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -459,8 +459,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = projectParamsSchema.parse(request.params);
     const input = reorderProjectPhasesSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -489,8 +489,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/phases/:phaseId/checklist", async (request, reply) => {
     const params = phaseParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -511,8 +511,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = phaseParamsSchema.parse(request.params);
     const input = createProjectPhaseChecklistItemSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -541,8 +541,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = phaseChecklistParamsSchema.parse(request.params);
     const input = updateProjectPhaseChecklistItemSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.projectPhaseChecklistItem.findFirst({
@@ -577,8 +577,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/projects/:projectId/phases/:phaseId/checklist/:checklistItemId", async (request, reply) => {
     const params = phaseChecklistParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.projectPhaseChecklistItem.findFirst({
@@ -601,8 +601,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = phaseParamsSchema.parse(request.params);
     const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -634,8 +634,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/tasks/:taskId/checklist", async (request, reply) => {
     const params = taskParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const task = await app.prisma.projectTask.findFirst({
@@ -658,8 +658,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = taskParamsSchema.parse(request.params);
     const input = createProjectTaskChecklistItemSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const task = await app.prisma.projectTask.findFirst({
@@ -690,8 +690,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = taskChecklistParamsSchema.parse(request.params);
     const input = updateProjectTaskChecklistItemSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.projectTaskChecklistItem.findFirst({
@@ -724,8 +724,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/projects/:projectId/tasks/:taskId/checklist/:checklistItemId", async (request, reply) => {
     const params = taskChecklistParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.projectTaskChecklistItem.findFirst({
@@ -748,8 +748,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = taskParamsSchema.parse(request.params);
     const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const task = await app.prisma.projectTask.findFirst({
@@ -783,8 +783,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/budget-categories", async (request, reply) => {
     const params = projectParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -808,8 +808,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = projectParamsSchema.parse(request.params);
     const input = createProjectBudgetCategorySchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -847,8 +847,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = budgetCategoryParamsSchema.parse(request.params);
     const input = updateProjectBudgetCategorySchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const category = await app.prisma.projectBudgetCategory.findFirst({
@@ -879,8 +879,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/projects/:projectId/budget-categories/:categoryId", async (request, reply) => {
     const params = budgetCategoryParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const category = await app.prisma.projectBudgetCategory.findFirst({
@@ -908,8 +908,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/phases/:phaseId/supplies", async (request, reply) => {
     const params = phaseParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -936,8 +936,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = phaseParamsSchema.parse(request.params);
     const input = createProjectPhaseSupplySchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -1035,8 +1035,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = supplyParamsSchema.parse(request.params);
     const input = updateProjectPhaseSupplySchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -1166,8 +1166,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = phaseParamsSchema.parse(request.params);
     const input = reorderProjectPhaseSuppliesSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
@@ -1200,8 +1200,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/projects/:projectId/phases/:phaseId/supplies/:supplyId", async (request, reply) => {
     const params = supplyParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const supply = await app.prisma.projectPhaseSupply.findFirst({
@@ -1240,8 +1240,8 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const params = supplyParamsSchema.parse(request.params);
     const input = allocateProjectInventorySchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const phase = await getPhase(app, params.projectId, params.phaseId);

@@ -283,6 +283,23 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
           Assign to Space{selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
         </button>
 
+        {(() => {
+          const barcodeItems = selectedItems.filter((item) => item.partNumber && item.partNumber.trim().length > 0);
+          const href = `/api/households/${householdId}/inventory/barcode-labels?itemIds=${barcodeItems.map((item) => item.id).join(",")}`;
+          return (
+            <a
+              href={barcodeItems.length > 0 ? href : undefined}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={barcodeItems.length === 0}
+              className={`button button--secondary button--sm${barcodeItems.length === 0 ? " button--disabled" : ""}`}
+              onClick={barcodeItems.length === 0 ? (event) => event.preventDefault() : undefined}
+            >
+              Print Barcode Labels{barcodeItems.length > 0 ? ` (${barcodeItems.length})` : ""}
+            </a>
+          );
+        })()}
+
         <div className="inventory-bulk-actions__import">
           <input
             className="inventory-bulk-actions__file"

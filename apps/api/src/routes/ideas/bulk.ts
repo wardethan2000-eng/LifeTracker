@@ -5,7 +5,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { removeSearchIndexEntry, syncIdeaToSearchIndex } from "../../lib/search-index.js";
 
@@ -26,7 +26,7 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkMoveIdeasSchema.parse({ ...body, householdId });
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -83,7 +83,7 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkArchiveIdeasSchema.parse({ ...body, householdId });
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 
@@ -141,7 +141,7 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkSetIdeaPrioritySchema.parse({ ...body, householdId });
 
-    if (!(await checkMembership(app.prisma, householdId, request.auth.userId))) {
+    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
       return reply.code(403).send({ message: "You do not have access to this household." });
     }
 

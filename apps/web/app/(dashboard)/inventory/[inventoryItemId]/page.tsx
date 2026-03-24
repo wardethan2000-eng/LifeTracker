@@ -170,6 +170,32 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                 </div>
               </section>
 
+              {item.partNumber && (
+                <section className="panel">
+                  <div className="panel__header">
+                    <h2>Barcode</h2>
+                  </div>
+                  <div className="panel__body--padded">
+                    <figure className="barcode-panel__preview">
+                      <img
+                        src={`/api/v1/barcode/image?value=${encodeURIComponent(item.partNumber)}&output=png`}
+                        alt={`Barcode for ${item.partNumber}`}
+                        className="barcode-panel__image"
+                      />
+                      <figcaption className="barcode-panel__caption">{item.partNumber}</figcaption>
+                    </figure>
+                    <a
+                      href={`/api/households/${household.id}/inventory/barcode-labels?itemIds=${item.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button button--secondary button--sm"
+                    >
+                      Print Barcode Label
+                    </a>
+                  </div>
+                </section>
+              )}
+
               <section className="panel">
                 <div className="panel__header">
                   <h2>Linked Assets</h2>

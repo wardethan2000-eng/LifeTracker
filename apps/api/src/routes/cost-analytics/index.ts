@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { maintenanceTriggerSchema } from "@lifekeeper/types";
+import { average } from "../../lib/analytics-helpers.js";
 import {
   aggregateCostsByPeriod,
   calculateUsageRate,
@@ -47,10 +48,6 @@ const categoryLabels: Record<string, string> = {
 };
 
 const categoryLabel = (category: string): string => categoryLabels[category] ?? category;
-
-const average = (values: number[]): number | null => values.length > 0
-  ? values.reduce((sum, value) => sum + value, 0) / values.length
-  : null;
 
 type ScheduleForecastSource = {
   id: string;

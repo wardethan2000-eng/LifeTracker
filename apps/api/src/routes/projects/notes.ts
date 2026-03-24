@@ -1,4 +1,4 @@
-﻿import {
+import {
   createProjectNoteSchema,
   updateProjectNoteSchema
 } from "@lifekeeper/types";
@@ -9,7 +9,7 @@ import {
 } from "@lifekeeper/utils";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { toInputJsonValue, parseTags } from "../../lib/prisma-json.js";
 import { toEntryAsProjectNote } from "../../lib/serializers/index.js";
@@ -44,8 +44,8 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const params = projectParamsSchema.parse(request.params);
     const query = noteListQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -96,7 +96,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       orderBy: { createdAt: "desc" }
     });
 
-    // Sort pinned entries first (stable â€” createdAt desc order preserved within groups)
+    // Sort pinned entries first (stable — createdAt desc order preserved within groups)
     entries.sort((a, b) => {
       const aPin = a.flags.some((f) => f.flag === "pinned") ? 1 : 0;
       const bPin = b.flags.some((f) => f.flag === "pinned") ? 1 : 0;
@@ -130,8 +130,8 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/:projectId/notes/:noteId", async (request, reply) => {
     const params = noteParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -177,8 +177,8 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const params = projectParamsSchema.parse(request.params);
     const input = createProjectNoteSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -252,8 +252,8 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const params = noteParamsSchema.parse(request.params);
     const input = updateProjectNoteSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);
@@ -390,8 +390,8 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/projects/:projectId/notes/:noteId", async (request, reply) => {
     const params = noteParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const project = await getProject(app, params.householdId, params.projectId);

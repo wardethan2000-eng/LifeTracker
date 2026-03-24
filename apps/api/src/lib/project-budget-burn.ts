@@ -1,3 +1,5 @@
+import { MS_PER_DAY } from "@lifekeeper/utils";
+
 export type ProjectBudgetBurnCadence = "day" | "month";
 
 export type ProjectBudgetBurnProjectionInput = {
@@ -9,7 +11,6 @@ export type ProjectBudgetBurnProjectionInput = {
   cadence?: ProjectBudgetBurnCadence;
 };
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const AVERAGE_DAYS_PER_MONTH = 30.4375;
 
 const getDurationUnits = (start: Date, end: Date, cadence: ProjectBudgetBurnCadence): number => {

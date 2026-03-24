@@ -11,7 +11,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { checkMembership } from "../../lib/asset-access.js";
+import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { csvValue } from "../../lib/csv.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
@@ -24,6 +24,8 @@ import {
   mergeHouseholdInventoryItems
 } from "../../lib/inventory.js";
 import { createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
+import { createBatchBarcodeLabelPdf } from "../../lib/barcode-label-pdf.js";
+import { detectBarcodeFormat } from "../../lib/barcode-lookup.js";
 import { getSpaceBreadcrumb } from "../../lib/spaces.js";
 import { toMaintenanceScheduleResponse } from "../../lib/schedule-state.js";
 import {
@@ -203,8 +205,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const input = createInventoryItemSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.$transaction(async (tx) => {
@@ -281,8 +283,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/inventory/export", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const items = await app.prisma.inventoryItem.findMany({
@@ -311,8 +313,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const query = bulkInventoryReadinessQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const scheduleIds = query.scheduleIds
@@ -375,8 +377,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const input = importInventorySchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const result = await app.prisma.$transaction(async (tx) => {
@@ -454,8 +456,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
     const query = listInventoryQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const where: Prisma.InventoryItemWhereInput = {
@@ -498,8 +500,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/inventory/low-stock", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const items = await app.prisma.inventoryItem.findMany({
@@ -518,12 +520,69 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       .map(toLowStockInventoryItemResponse);
   });
 
+  app.get("/v1/households/:householdId/inventory/barcode-labels", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const rawQuery = z.object({ itemIds: z.string().min(1) }).parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const itemIds = z.array(z.string().cuid()).parse(
+      rawQuery.itemIds.split(",").map((id) => id.trim()).filter(Boolean)
+    );
+
+    if (itemIds.length === 0 || itemIds.length > 100) {
+      return reply.code(400).send({ message: "Provide between 1 and 100 item IDs." });
+    }
+
+    const items = await app.prisma.inventoryItem.findMany({
+      where: {
+        id: { in: itemIds },
+        householdId: params.householdId,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        name: true,
+        partNumber: true,
+        manufacturer: true
+      }
+    });
+
+    const printableItems = items
+      .filter((item) => item.partNumber && item.partNumber.trim().length > 0)
+      .map((item) => {
+        const value = item.partNumber!.trim();
+        const format = detectBarcodeFormat(value);
+        return {
+          value,
+          format,
+          title: item.name,
+          subtitle: item.manufacturer ?? null
+        };
+      });
+
+    if (printableItems.length === 0) {
+      return reply.code(400).send({ message: "None of the selected items have a part number suitable for barcode printing." });
+    }
+
+    const doc = await createBatchBarcodeLabelPdf(printableItems);
+
+    reply.hijack();
+    reply.raw.setHeader("content-type", "application/pdf");
+    reply.raw.setHeader("content-disposition", `inline; filename="barcode-labels.pdf"`);
+    doc.pipe(reply.raw);
+    doc.end();
+    return reply;
+  });
+
   app.get("/v1/households/:householdId/inventory/:inventoryItemId/qr", async (request, reply) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const query = qrCodeQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.inventoryItem.findFirst({
@@ -571,8 +630,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/inventory/:inventoryItemId/label", async (request, reply) => {
     const params = inventoryItemParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.inventoryItem.findFirst({
@@ -613,8 +672,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const query = inventoryDetailQuerySchema.parse(request.query);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const item = await app.prisma.inventoryItem.findFirst({
@@ -747,8 +806,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const input = updateInventoryItemSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
@@ -851,8 +910,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/households/:householdId/inventory/:inventoryItemId/restore", async (request, reply) => {
     const params = inventoryItemParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.inventoryItem.findFirst({
@@ -901,8 +960,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const params = inventoryItemParamsSchema.parse(request.params);
     const input = mergeInventoryItemsSchema.parse(request.body);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     try {
@@ -954,8 +1013,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/households/:householdId/inventory/:inventoryItemId", async (request, reply) => {
     const params = inventoryItemParamsSchema.parse(request.params);
 
-    if (!await checkMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
