@@ -1,7 +1,9 @@
 import type { Idea as PrismaIdea } from "@prisma/client";
 
-type IdeaNoteItem = { id: string; text: string; createdAt: string };
-type IdeaStepItem = { id: string; label: string; done: boolean };
+export type IdeaNoteItem = { id: string; text: string; createdAt: string };
+export type IdeaLinkItem = { id: string; url: string; label: string; createdAt: string };
+export type IdeaMaterialItem = { id: string; name: string; quantity: string; notes: string };
+export type IdeaStepItem = { id: string; label: string; done: boolean };
 
 export function toIdeaResponse(idea: PrismaIdea) {
   const notes = (idea.notes as unknown as IdeaNoteItem[]) ?? [];

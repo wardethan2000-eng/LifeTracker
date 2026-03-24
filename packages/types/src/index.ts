@@ -692,13 +692,15 @@ export const bulkReassignCategorySchema = z.object({
   category: assetCategorySchema
 });
 
+export const bulkFailedItemSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().nullable(),
+  error: z.string()
+});
+
 export const bulkAssetOperationResultSchema = z.object({
   succeeded: z.number(),
-  failed: z.array(z.object({
-    assetId: z.string(),
-    name: z.string().nullable(),
-    message: z.string()
-  }))
+  failed: z.array(bulkFailedItemSchema)
 });
 
 export const bulkCompleteSchedulesSchema = z.object({
@@ -720,11 +722,7 @@ export const bulkPauseSchedulesSchema = z.object({
 
 export const bulkScheduleOperationResultSchema = z.object({
   succeeded: z.number(),
-  failed: z.array(z.object({
-    scheduleId: z.string(),
-    name: z.string().nullable(),
-    message: z.string()
-  }))
+  failed: z.array(bulkFailedItemSchema)
 });
 
 export const bulkCompleteTasksSchema = z.object({
@@ -752,20 +750,12 @@ export const bulkChangeProjectStatusSchema = z.object({
 
 export const bulkTaskOperationResultSchema = z.object({
   succeeded: z.number(),
-  failed: z.array(z.object({
-    taskId: z.string(),
-    title: z.string().nullable(),
-    message: z.string()
-  }))
+  failed: z.array(bulkFailedItemSchema)
 });
 
 export const bulkProjectOperationResultSchema = z.object({
   succeeded: z.number(),
-  failed: z.array(z.object({
-    projectId: z.string(),
-    name: z.string().nullable(),
-    message: z.string()
-  }))
+  failed: z.array(bulkFailedItemSchema)
 });
 
 export const shallowAssetSchema = z.object({
@@ -3467,6 +3457,8 @@ export type CreateAssetInput = z.infer<typeof createAssetSchema>;
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
 export type BulkArchiveAssetsInput = z.infer<typeof bulkArchiveAssetsSchema>;
 export type BulkReassignCategoryInput = z.infer<typeof bulkReassignCategorySchema>;
+export type BulkFailedItem = z.infer<typeof bulkFailedItemSchema>;
+export type BulkOperationResult = z.infer<typeof bulkAssetOperationResultSchema>;
 export type BulkAssetOperationResult = z.infer<typeof bulkAssetOperationResultSchema>;
 export type BulkCompleteSchedulesInput = z.infer<typeof bulkCompleteSchedulesSchema>;
 export type BulkSnoozeSchedulesInput = z.infer<typeof bulkSnoozeSchedulesSchema>;
@@ -5036,11 +5028,7 @@ export const bulkArchiveHobbySessionsSchema = z.object({
 
 export const bulkHobbySessionOperationResultSchema = z.object({
   succeeded: z.number(),
-  failed: z.array(z.object({
-    sessionId: z.string().optional(),
-    name: z.string().nullable(),
-    message: z.string()
-  }))
+  failed: z.array(bulkFailedItemSchema)
 });
 
 const hobbySeriesTagSchema = z.string().trim().min(1).max(80);
@@ -5930,10 +5918,68 @@ export const bulkSetIdeaPrioritySchema = z.object({
 
 export const bulkIdeaOperationResultSchema = z.object({
   succeeded: z.number(),
-  failed: z.array(z.object({
-    ideaId: z.string(),
-    title: z.string().nullable(),
-    message: z.string()
-  }))
+  failed: z.array(bulkFailedItemSchema)
 });
+
+// ── Delete Impact ────────────────────────────────────────────────────
+
+export const assetDeleteImpactSchema = z.object({
+  schedules: z.number().int(),
+  logs: z.number().int(),
+  entries: z.number().int(),
+  comments: z.number().int(),
+  transfers: z.number().int(),
+});
+export type AssetDeleteImpact = z.infer<typeof assetDeleteImpactSchema>;
+
+export const projectDeleteImpactSchema = z.object({
+  tasks: z.number().int(),
+  phases: z.number().int(),
+  expenses: z.number().int(),
+  budgetCategories: z.number().int(),
+  linkedAssets: z.number().int(),
+  linkedInventoryItems: z.number().int(),
+  comments: z.number().int(),
+});
+export type ProjectDeleteImpact = z.infer<typeof projectDeleteImpactSchema>;
+
+export const inventoryDeleteImpactSchema = z.object({
+  maintenanceLogParts: z.number().int(),
+  projectPhaseSupplies: z.number().int(),
+  hobbyRecipeIngredients: z.number().int(),
+  hobbySessionIngredients: z.number().int(),
+  assetLinks: z.number().int(),
+});
+export type InventoryDeleteImpact = z.infer<typeof inventoryDeleteImpactSchema>;
+
+export const hobbyDeleteImpactSchema = z.object({
+  sessions: z.number().int(),
+  recipes: z.number().int(),
+  series: z.number().int(),
+  practiceGoals: z.number().int(),
+  practiceRoutines: z.number().int(),
+  metricDefinitions: z.number().int(),
+  collectionItems: z.number().int(),
+});
+export type HobbyDeleteImpact = z.infer<typeof hobbyDeleteImpactSchema>;
+
+// ── Trash (Recently Deleted) ─────────────────────────────────────────
+
+export const trashItemTypeSchema = z.enum(["asset", "project", "inventory_item"]);
+export type TrashItemType = z.infer<typeof trashItemTypeSchema>;
+
+export const trashItemSchema = z.object({
+  id: z.string().cuid(),
+  type: trashItemTypeSchema,
+  name: z.string(),
+  deletedAt: z.string().datetime(),
+  householdId: z.string().cuid(),
+});
+export type TrashItem = z.infer<typeof trashItemSchema>;
+
+export const trashListResponseSchema = z.object({
+  items: z.array(trashItemSchema),
+  total: z.number().int(),
+});
+export type TrashListResponse = z.infer<typeof trashListResponseSchema>;
 

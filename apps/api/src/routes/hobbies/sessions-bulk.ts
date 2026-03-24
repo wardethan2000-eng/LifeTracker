@@ -9,10 +9,10 @@ import { recalculatePracticeGoalsForHobby } from "../../lib/hobby-practice.js";
 import { notFound } from "../../lib/errors.js";
 import { hobbyParamsSchema } from "../../lib/schemas.js";
 
-type SessionFailedItem = {
-  sessionId?: string;
-  name: string | null;
-  message: string;
+type BulkFailedItem = {
+  id?: string;
+  label: string | null;
+  error: string;
 };
 
 export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
@@ -36,7 +36,7 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, "Hobby");
     }
 
-    const failed: SessionFailedItem[] = [];
+    const failed: BulkFailedItem[] = [];
     let succeeded = 0;
 
     for (const sessionInput of input.sessions) {
@@ -70,8 +70,8 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
         succeeded++;
       } catch (err) {
         failed.push({
-          name: sessionInput.name,
-          message: err instanceof Error ? err.message : "Failed to create session."
+          label: sessionInput.name,
+          error: err instanceof Error ? err.message : "Failed to create session."
         });
       }
     }
@@ -103,9 +103,9 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     const found = new Set(sessions.map((s) => s.id));
-    const failed: SessionFailedItem[] = input.sessionIds
+    const failed: BulkFailedItem[] = input.sessionIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ sessionId: id, name: null, message: "Session not found." }));
+      .map((id) => ({ id, label: null, error: "Session not found." }));
 
     if (sessions.length > 0) {
       try {
@@ -120,9 +120,9 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
       } catch (err) {
         for (const session of sessions) {
           failed.push({
-            sessionId: session.id,
-            name: session.name,
-            message: err instanceof Error ? err.message : "Failed to archive session."
+            id: session.id,
+            label: session.name,
+            error: err instanceof Error ? err.message : "Failed to archive session."
           });
         }
         return { succeeded: 0, failed };

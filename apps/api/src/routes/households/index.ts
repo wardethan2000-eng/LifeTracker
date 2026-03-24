@@ -12,7 +12,7 @@ import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
 import { toUserProfileResponse } from "../../lib/serializers/index.js";
 import { createActivityLogger } from "../../lib/activity-log.js";
-import { forbidden, notFound } from "../../lib/errors.js";
+import { forbidden, notFound, badRequest } from "../../lib/errors.js";
 import { householdParamsSchema } from "../../lib/schemas.js";
 
 const memberParamsSchema = householdParamsSchema.extend({
@@ -400,5 +400,77 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
         message: error instanceof Error ? error.message : "Failed to remove household member."
       });
     }
+  });
+
+  // ── Trash (Recently Deleted) ─────────────────────────────────────
+
+  app.get("/v1/households/:householdId/trash", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    if (!await ensureHouseholdMember(app, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const [assets, projects, inventoryItems] = await Promise.all([
+      app.prisma.asset.findMany({
+        where: { householdId: params.householdId, deletedAt: { not: null } },
+        select: { id: true, name: true, deletedAt: true },
+        orderBy: { deletedAt: "desc" },
+        take: 100
+      }),
+      app.prisma.project.findMany({
+        where: { householdId: params.householdId, deletedAt: { not: null } },
+        select: { id: true, name: true, deletedAt: true },
+        orderBy: { deletedAt: "desc" },
+        take: 100
+      }),
+      app.prisma.inventoryItem.findMany({
+        where: { householdId: params.householdId, deletedAt: { not: null } },
+        select: { id: true, name: true, deletedAt: true },
+        orderBy: { deletedAt: "desc" },
+        take: 100
+      }),
+    ]);
+
+    const items = [
+      ...assets.map((a) => ({ id: a.id, type: "asset" as const, name: a.name, deletedAt: a.deletedAt!.toISOString(), householdId: params.householdId })),
+      ...projects.map((p) => ({ id: p.id, type: "project" as const, name: p.name, deletedAt: p.deletedAt!.toISOString(), householdId: params.householdId })),
+      ...inventoryItems.map((i) => ({ id: i.id, type: "inventory_item" as const, name: i.name, deletedAt: i.deletedAt!.toISOString(), householdId: params.householdId })),
+    ].sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+
+    return { items, total: items.length };
+  });
+
+  app.delete("/v1/households/:householdId/trash", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const query = z.object({
+      olderThanDays: z.coerce.number().int().min(0).max(365).optional()
+    }).parse(request.query);
+
+    if (!await ensureHouseholdMember(app, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const cutoff = query.olderThanDays !== undefined
+      ? new Date(Date.now() - query.olderThanDays * 86400000)
+      : undefined;
+
+    const deletedAtFilter = cutoff ? { not: null, lte: cutoff } : { not: null };
+
+    await Promise.all([
+      app.prisma.asset.deleteMany({
+        where: { householdId: params.householdId, deletedAt: deletedAtFilter as { not: null; lte?: Date } }
+      }),
+      app.prisma.project.deleteMany({
+        where: { householdId: params.householdId, deletedAt: deletedAtFilter as { not: null; lte?: Date } }
+      }),
+      app.prisma.inventoryItem.deleteMany({
+        where: { householdId: params.householdId, deletedAt: deletedAtFilter as { not: null; lte?: Date } }
+      }),
+    ]);
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("household", params.householdId, "trash.purged", params.householdId, {});
+
+    return reply.code(204).send();
   });
 };

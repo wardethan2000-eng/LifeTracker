@@ -291,7 +291,7 @@ export function AssetBulkActions({
                 {archiveResult.failed.length > 0 ? (
                   <ul>
                     {archiveResult.failed.map((entry) => (
-                      <li key={entry.assetId}>{entry.name ?? entry.assetId}: {entry.message}</li>
+                      <li key={entry.id}>{entry.label ?? entry.id}: {entry.error}</li>
                     ))}
                   </ul>
                 ) : null}
@@ -358,7 +358,7 @@ export function AssetBulkActions({
                 {reassignResult.failed.length > 0 ? (
                   <ul>
                     {reassignResult.failed.map((entry) => (
-                      <li key={entry.assetId}>{entry.name ?? entry.assetId}: {entry.message}</li>
+                      <li key={entry.id}>{entry.label ?? entry.id}: {entry.error}</li>
                     ))}
                   </ul>
                 ) : null}

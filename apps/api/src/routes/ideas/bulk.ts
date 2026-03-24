@@ -9,10 +9,10 @@ import { createActivityLogger } from "../../lib/activity-log.js";
 import { removeSearchIndexEntry, syncIdeaToSearchIndex } from "../../lib/search-index.js";
 import { householdParamsSchema } from "../../lib/schemas.js";
 
-type IdeaFailedItem = {
-  ideaId: string;
-  title: string | null;
-  message: string;
+type BulkFailedItem = {
+  id?: string;
+  label: string | null;
+  error: string;
 };
 
 export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
@@ -36,9 +36,9 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     const found = new Set(ideas.map((i) => i.id));
-    const failed: IdeaFailedItem[] = input.ideaIds
+    const failed: BulkFailedItem[] = input.ideaIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ ideaId: id, title: null, message: "Idea not found or already archived." }));
+      .map((id) => ({ id, label: null, error: "Idea not found or already archived." }));
 
     let succeeded = 0;
 
@@ -52,9 +52,9 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
         void syncIdeaToSearchIndex(app.prisma, idea.id).catch(console.error);
       } catch (err) {
         failed.push({
-          ideaId: idea.id,
-          title: idea.title,
-          message: err instanceof Error ? err.message : "Failed to update stage."
+          id: idea.id,
+          label: idea.title,
+          error: err instanceof Error ? err.message : "Failed to update stage."
         });
       }
     }
@@ -86,9 +86,9 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     const found = new Set(ideas.map((i) => i.id));
-    const failed: IdeaFailedItem[] = input.ideaIds
+    const failed: BulkFailedItem[] = input.ideaIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ ideaId: id, title: null, message: "Idea not found or already archived." }));
+      .map((id) => ({ id, label: null, error: "Idea not found or already archived." }));
 
     let succeeded = 0;
     const now = new Date();
@@ -103,9 +103,9 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
         void removeSearchIndexEntry(app.prisma, "idea", idea.id).catch(console.error);
       } catch (err) {
         failed.push({
-          ideaId: idea.id,
-          title: idea.title,
-          message: err instanceof Error ? err.message : "Failed to archive idea."
+          id: idea.id,
+          label: idea.title,
+          error: err instanceof Error ? err.message : "Failed to archive idea."
         });
       }
     }
@@ -137,9 +137,9 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     const found = new Set(ideas.map((i) => i.id));
-    const failed: IdeaFailedItem[] = input.ideaIds
+    const failed: BulkFailedItem[] = input.ideaIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ ideaId: id, title: null, message: "Idea not found or already archived." }));
+      .map((id) => ({ id, label: null, error: "Idea not found or already archived." }));
 
     let succeeded = 0;
 
@@ -159,9 +159,9 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
       } catch (err) {
         for (const idea of ideas) {
           failed.push({
-            ideaId: idea.id,
-            title: idea.title,
-            message: err instanceof Error ? err.message : "Failed to update priority."
+            id: idea.id,
+            label: idea.title,
+            error: err instanceof Error ? err.message : "Failed to update priority."
           });
         }
       }

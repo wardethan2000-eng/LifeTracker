@@ -1,9 +1,10 @@
 "use client";
 
-import type { ProjectPortfolioItem } from "@lifekeeper/types";
+import type { ProjectPortfolioItem, ProjectStatus } from "@lifekeeper/types";
+import { projectStatusValues } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";
 import { formatCurrency, formatDate } from "../lib/formatters";
 import {
@@ -18,6 +19,10 @@ import {
 import { ProjectProgressBar } from "./project-progress-bar";
 import { ProjectBulkActions } from "./project-bulk-actions";
 import { BulkActionBar } from "./bulk-action-bar";
+import { ClickToEdit } from "./click-to-edit";
+import { ClickToEditSelect } from "./click-to-edit-select";
+import { useToast } from "./toast-provider";
+import { updateProjectFieldAction } from "../app/actions";
 
 type ProjectPortfolioWorkspaceProps = {
   householdId: string;
@@ -25,6 +30,29 @@ type ProjectPortfolioWorkspaceProps = {
   selectedSort: ProjectSort;
   total: number;
 };
+
+const STATUS_LABELS: Record<ProjectStatus, string> = {
+  planning: "Planning",
+  active: "Active",
+  on_hold: "On Hold",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const STATUS_CHIP_CLASS: Record<ProjectStatus, string> = {
+  planning: "status-chip--pending",
+  active: "status-chip--upcoming",
+  on_hold: "status-chip--due",
+  completed: "status-chip--clear",
+  cancelled: "status-chip--overdue",
+};
+
+const STATUS_OPTIONS = projectStatusValues.map((v) => ({
+  value: v,
+  label: STATUS_LABELS[v],
+}));
+
+type OptimisticProjectFields = { name?: string; status?: ProjectStatus };
 
 export function ProjectPortfolioWorkspace({
   householdId,
@@ -38,6 +66,10 @@ export function ProjectPortfolioWorkspace({
   );
 
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
+  const { pushToast } = useToast();
+
+  const [optimistic, setOptimistic] = useState<Record<string, OptimisticProjectFields>>({});
+  const [saving, setSaving] = useState<Set<string>>(new Set());
 
   const selectedItems = useMemo(
     () => portfolioProjects.filter((p) => isSelected(p.id)),
@@ -45,6 +77,41 @@ export function ProjectPortfolioWorkspace({
   );
 
   const allSelected = portfolioProjects.length > 0 && selectedCount === portfolioProjects.length;
+
+  const handleSave = useCallback(
+    async (projectId: string, field: "name" | "status", value: string) => {
+      const key = `${projectId}:${field}`;
+      setSaving((prev) => new Set([...prev, key]));
+      setOptimistic((prev) => ({
+        ...prev,
+        [projectId]: { ...prev[projectId], [field]: value },
+      }));
+
+      const result = await updateProjectFieldAction(householdId, projectId, {
+        [field]: value,
+      });
+
+      if (!result.success) {
+        setOptimistic((prev) => {
+          const next = { ...prev };
+          if (next[projectId]) {
+            const fields = { ...next[projectId] };
+            delete (fields as Record<string, unknown>)[field];
+            next[projectId] = fields;
+          }
+          return next;
+        });
+        pushToast({ message: result.message ?? "Update failed", tone: "danger" });
+      }
+
+      setSaving((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    },
+    [householdId, pushToast],
+  );
 
   return (
     <>
@@ -103,6 +170,9 @@ export function ProjectPortfolioWorkspace({
                     project.description && project.description.length > 50
                       ? `${project.description.slice(0, 50)}...`
                       : project.description;
+                  const ov = optimistic[project.id] ?? {};
+                  const name = ov.name ?? project.name;
+                  const status = (ov.status ?? project.status) as ProjectStatus;
 
                   return (
                     <tr
@@ -118,14 +188,13 @@ export function ProjectPortfolioWorkspace({
                         />
                       </td>
                       <td>
-                        <div className="data-table__primary">
-                          <Link
-                            href={`/projects/${project.id}?householdId=${householdId}`}
-                            className="data-table__link"
-                          >
-                            {project.name}
-                          </Link>
-                        </div>
+                        <ClickToEdit
+                          value={name}
+                          required
+                          disabled={saving.has(`${project.id}:name`)}
+                          aria-label={`Edit name of ${project.name}`}
+                          onSave={(v) => { void handleSave(project.id, "name", v); }}
+                        />
                         <div className="data-table__secondary">
                           {project.depth > 0 && (
                             <span style={{ marginRight: 6, opacity: 0.7 }}>Sub-project ·</span>
@@ -144,12 +213,18 @@ export function ProjectPortfolioWorkspace({
                         </div>
                       </td>
                       <td>
-                        <span
-                          className={`status-chip status-chip--${tone === "neutral" ? "default" : tone}`}
-                        >
-                          {project.status}
-                        </span>
-                      </td>
+                        <ClickToEditSelect
+                          value={status}
+                          options={STATUS_OPTIONS}
+                          disabled={saving.has(`${project.id}:status`)}
+                          aria-label={`Edit status of ${project.name}`}
+                          renderValue={(v) => (
+                            <span className={`status-chip ${STATUS_CHIP_CLASS[v as ProjectStatus] ?? ""}`}>
+                              {STATUS_LABELS[v as ProjectStatus] ?? v}
+                            </span>
+                          )}
+                          onSave={(v) => { void handleSave(project.id, "status", v); }}
+                        />
                       <td>
                         <ProjectProgressBar
                           phases={project.phaseProgress ?? []}

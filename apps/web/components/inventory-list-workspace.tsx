@@ -1,15 +1,17 @@
 "use client";
 
 import type { InventoryItemConsumption, InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
-import Link from "next/link";
 import type { JSX } from "react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";
-import { formatCurrency } from "../lib/formatters";
 import { BulkActionBar } from "./bulk-action-bar";
 import { InventoryBulkActions } from "./inventory-bulk-actions";
 import { InventoryEditableRow } from "./inventory-editable-row";
 import { InventorySection } from "./inventory-section";
+import { ClickToEdit } from "./click-to-edit";
+import { ClickToEditNumber } from "./click-to-edit-number";
+import { useToast } from "./toast-provider";
+import { updateInventoryItemFieldAction } from "../app/actions";
 
 type InventoryGroup = {
   label: string;
@@ -28,20 +30,6 @@ type InventoryListWorkspaceProps = {
 };
 
 const normalizeUnit = (unit: string): string => unit.trim().toLowerCase();
-
-const formatStockAmount = (value: number, unit: string): string => {
-  const normalizedUnit = normalizeUnit(unit);
-
-  if (value === 0) {
-    return "Out of stock";
-  }
-
-  if (normalizedUnit === "each") {
-    return `${value} item${value === 1 ? "" : "s"}`;
-  }
-
-  return `${value} ${unit}`;
-};
 
 const formatReorderPoint = (value: number | null, unit: string): string => {
   if (value === null) {
@@ -71,8 +59,6 @@ const formatRestockPlan = (value: number | null, unit: string): string => {
   return `Usually buy ${value} ${unit}`;
 };
 
-const buildInventoryItemHref = (householdId: string, inventoryItemId: string): string => `/inventory/${inventoryItemId}?householdId=${householdId}`;
-
 export function InventoryListWorkspace({
   householdId,
   totalCount,
@@ -84,6 +70,55 @@ export function InventoryListWorkspace({
   spaces,
 }: InventoryListWorkspaceProps): JSX.Element {
   const { selectedIds, selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
+  const { pushToast } = useToast();
+
+  type OptimisticItemFields = {
+    name?: string;
+    quantityOnHand?: number;
+    unitCost?: number | null;
+    storageLocation?: string | null;
+  };
+  const [optimistic, setOptimistic] = useState<Record<string, OptimisticItemFields>>({});
+  const [saving, setSaving] = useState<Set<string>>(new Set());
+
+  const handleSave = useCallback(
+    async (
+      itemId: string,
+      field: "name" | "quantityOnHand" | "unitCost" | "storageLocation",
+      value: string | number | null,
+    ) => {
+      const key = `${itemId}:${field}`;
+      setSaving((prev) => new Set([...prev, key]));
+      setOptimistic((prev) => ({
+        ...prev,
+        [itemId]: { ...prev[itemId], [field]: value },
+      }));
+
+      const result = await updateInventoryItemFieldAction(householdId, itemId, {
+        [field]: value,
+      });
+
+      if (!result.success) {
+        setOptimistic((prev) => {
+          const next = { ...prev };
+          if (next[itemId]) {
+            const fields = { ...next[itemId] };
+            delete (fields as Record<string, unknown>)[field];
+            next[itemId] = fields;
+          }
+          return next;
+        });
+        pushToast({ message: result.message ?? "Update failed", tone: "danger" });
+      }
+
+      setSaving((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    },
+    [householdId, pushToast],
+  );
 
   const allItems = useMemo(() => groupedItems.flatMap((group) => group.items), [groupedItems]);
   const selectedItems = useMemo(() => allItems.filter((item) => selectedIds.has(item.id)), [allItems, selectedIds]);
@@ -141,7 +176,14 @@ export function InventoryListWorkspace({
                     </tr>
                   </thead>
                   <tbody>
-                    {group.items.map((item) => (
+                    {group.items.map((item) => {
+                      const ov = optimistic[item.id] ?? {};
+                      const name = ov.name ?? item.name;
+                      const quantityOnHand = ov.quantityOnHand !== undefined ? ov.quantityOnHand : item.quantityOnHand;
+                      const unitCost = ov.unitCost !== undefined ? ov.unitCost : item.unitCost;
+                      const storageLocation = ov.storageLocation !== undefined ? ov.storageLocation : item.storageLocation;
+
+                      return (
                       <InventoryEditableRow
                         key={item.id}
                         householdId={householdId}
@@ -159,15 +201,39 @@ export function InventoryListWorkspace({
                             onChange={() => toggleItem(item.id)}
                           />
                         </td>
-                        <td>
-                          <div className="data-table__primary">
-                            <Link href={buildInventoryItemHref(householdId, item.id)} className="data-table__link">{item.name}</Link>
-                          </div>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <ClickToEdit
+                            value={name}
+                            required
+                            disabled={saving.has(`${item.id}:name`)}
+                            aria-label={`Edit name of ${item.name}`}
+                            onSave={(v) => { void handleSave(item.id, "name", v); }}
+                          />
                           <div className="data-table__secondary">
                             {[item.partNumber, item.manufacturer].filter(Boolean).join(" • ") || "No part number or maker recorded"}
                           </div>
                         </td>
-                        <td>{item.itemType === "equipment" ? `${item.quantityOnHand} unit${item.quantityOnHand === 1 ? "" : "s"}` : formatStockAmount(item.quantityOnHand, item.unit)}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {item.itemType === "equipment" ? (
+                            <ClickToEditNumber
+                              value={quantityOnHand}
+                              min={0}
+                              suffix={`unit${quantityOnHand === 1 ? "" : "s"}`}
+                              disabled={saving.has(`${item.id}:quantityOnHand`)}
+                              aria-label={`Edit count of ${item.name}`}
+                              onSave={(v) => { void handleSave(item.id, "quantityOnHand", v); }}
+                            />
+                          ) : (
+                            <ClickToEditNumber
+                              value={quantityOnHand}
+                              min={0}
+                              suffix={item.unit !== "each" ? item.unit : undefined}
+                              disabled={saving.has(`${item.id}:quantityOnHand`)}
+                              aria-label={`Edit on hand quantity of ${item.name}`}
+                              onSave={(v) => { void handleSave(item.id, "quantityOnHand", v); }}
+                            />
+                          )}
+                        </td>
                         <td>
                           {item.itemType === "equipment" ? (
                             <div className="data-table__primary">{item.conditionStatus ? item.conditionStatus.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) : "No condition set"}</div>
@@ -178,16 +244,35 @@ export function InventoryListWorkspace({
                             </>
                           )}
                         </td>
-                        <td>{formatCurrency(item.unitCost, "No recent price")}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <ClickToEditNumber
+                            value={unitCost}
+                            min={0}
+                            step={0.01}
+                            prefix="$"
+                            disabled={saving.has(`${item.id}:unitCost`)}
+                            aria-label={`Edit last price of ${item.name}`}
+                            onSave={(v) => { void handleSave(item.id, "unitCost", v); }}
+                          />
+                        </td>
                         <td>{item.preferredSupplier ?? "—"}</td>
                         <td>
                           <span className={`status-chip status-chip--${item.lowStock ? "due" : "upcoming"}`}>
                             {item.lowStock ? "Needs reorder" : "OK"}
                           </span>
                         </td>
-                        <td>{item.storageLocation ?? "—"}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <ClickToEdit
+                            value={storageLocation ?? ""}
+                            placeholder="—"
+                            disabled={saving.has(`${item.id}:storageLocation`)}
+                            aria-label={`Edit storage location of ${item.name}`}
+                            onSave={(v) => { void handleSave(item.id, "storageLocation", v || null as unknown as string); }}
+                          />
+                        </td>
                       </InventoryEditableRow>
-                    ))}
+                    );})}
+
                   </tbody>
                 </table>
               </section>

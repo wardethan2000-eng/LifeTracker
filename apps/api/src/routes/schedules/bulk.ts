@@ -15,10 +15,10 @@ import { syncScheduleToSearchIndex } from "../../lib/search-index.js";
 import { forbidden } from "../../lib/errors.js";
 import { householdParamsSchema } from "../../lib/schemas.js";
 
-type FailedItem = {
-  scheduleId: string;
-  name: string | null;
-  message: string;
+type BulkFailedItem = {
+  id?: string;
+  label: string | null;
+  error: string;
 };
 
 export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
@@ -48,9 +48,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
 
     const found = new Set(schedules.map((s) => s.id));
 
-    const failed: FailedItem[] = input.scheduleIds
+    const failed: BulkFailedItem[] = input.scheduleIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ scheduleId: id, name: null, message: "Schedule not found." }));
+      .map((id) => ({ id, label: null, error: "Schedule not found." }));
 
     const completedAt = new Date();
     let succeeded = 0;
@@ -80,9 +80,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
         void syncScheduleToSearchIndex(app.prisma, schedule.id).catch(console.error);
       } catch (err) {
         failed.push({
-          scheduleId: schedule.id,
-          name: schedule.name,
-          message: err instanceof Error ? err.message : "Failed to complete schedule."
+          id: schedule.id,
+          label: schedule.name,
+          error: err instanceof Error ? err.message : "Failed to complete schedule."
         });
       }
     }
@@ -133,9 +133,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
 
     const found = new Set(schedules.map((s) => s.id));
 
-    const failed: FailedItem[] = input.scheduleIds
+    const failed: BulkFailedItem[] = input.scheduleIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ scheduleId: id, name: null, message: "Schedule not found." }));
+      .map((id) => ({ id, label: null, error: "Schedule not found." }));
 
     let succeeded = 0;
 
@@ -145,9 +145,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
 
         if (triggerConfig.type !== "interval" && triggerConfig.type !== "compound") {
           failed.push({
-            scheduleId: schedule.id,
-            name: schedule.name,
-            message: "Only interval-based schedules can be snoozed."
+            id: schedule.id,
+            label: schedule.name,
+            error: "Only interval-based schedules can be snoozed."
           });
           continue;
         }
@@ -177,9 +177,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
         void syncScheduleToSearchIndex(app.prisma, schedule.id).catch(console.error);
       } catch (err) {
         failed.push({
-          scheduleId: schedule.id,
-          name: schedule.name,
-          message: err instanceof Error ? err.message : "Failed to snooze schedule."
+          id: schedule.id,
+          label: schedule.name,
+          error: err instanceof Error ? err.message : "Failed to snooze schedule."
         });
       }
     }
@@ -226,9 +226,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
 
     const found = new Set(schedules.map((s) => s.id));
 
-    const failed: FailedItem[] = input.scheduleIds
+    const failed: BulkFailedItem[] = input.scheduleIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ scheduleId: id, name: null, message: "Schedule not found." }));
+      .map((id) => ({ id, label: null, error: "Schedule not found." }));
 
     let succeeded = 0;
 
@@ -242,9 +242,9 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
         succeeded++;
       } catch (err) {
         failed.push({
-          scheduleId: schedule.id,
-          name: schedule.name,
-          message: err instanceof Error ? err.message : "Failed to pause schedule."
+          id: schedule.id,
+          label: schedule.name,
+          error: err instanceof Error ? err.message : "Failed to pause schedule."
         });
       }
     }

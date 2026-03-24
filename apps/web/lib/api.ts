@@ -525,6 +525,16 @@ import {
   updateNotificationPreferencesSchema,
   type NotificationPreferences,
   type UpdateNotificationPreferencesInput,
+  assetDeleteImpactSchema,
+  type AssetDeleteImpact,
+  projectDeleteImpactSchema,
+  type ProjectDeleteImpact,
+  inventoryDeleteImpactSchema,
+  type InventoryDeleteImpact,
+  hobbyDeleteImpactSchema,
+  type HobbyDeleteImpact,
+  trashListResponseSchema,
+  type TrashListResponse,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -6089,4 +6099,46 @@ export const removeDashboardPin = async (pinId: string): Promise<void> => {
     path: `/v1/dashboard-pins/${encodeURIComponent(pinId)}`,
     method: "DELETE",
   });
+};
+
+// ── Delete Impact ────────────────────────────────────────────────────
+
+export const getAssetDeleteImpact = async (assetId: string): Promise<AssetDeleteImpact> =>
+  apiRequest({ path: `/v1/assets/${assetId}/delete-impact`, schema: assetDeleteImpactSchema });
+
+export const getProjectDeleteImpact = async (householdId: string, projectId: string): Promise<ProjectDeleteImpact> =>
+  apiRequest({ path: `/v1/households/${householdId}/projects/${projectId}/delete-impact`, schema: projectDeleteImpactSchema });
+
+export const getInventoryItemDeleteImpact = async (householdId: string, inventoryItemId: string): Promise<InventoryDeleteImpact> =>
+  apiRequest({ path: `/v1/households/${householdId}/inventory/${inventoryItemId}/delete-impact`, schema: inventoryDeleteImpactSchema });
+
+export const getHobbyDeleteImpact = async (householdId: string, hobbyId: string): Promise<HobbyDeleteImpact> =>
+  apiRequest({ path: `/v1/households/${householdId}/hobbies/${hobbyId}/delete-impact`, schema: hobbyDeleteImpactSchema });
+
+// ── Trash (Recently Deleted) ─────────────────────────────────────────
+
+export const getHouseholdTrash = async (householdId: string): Promise<TrashListResponse> =>
+  apiRequest({ path: `/v1/households/${householdId}/trash`, schema: trashListResponseSchema });
+
+export const restoreProject = async (householdId: string, projectId: string): Promise<Project> =>
+  apiRequest({ path: `/v1/households/${householdId}/projects/${projectId}/restore`, method: "POST", schema: projectSchema });
+
+export const restoreInventoryItem = async (householdId: string, inventoryItemId: string): Promise<InventoryItemSummary> =>
+  apiRequest({ path: `/v1/households/${householdId}/inventory/${inventoryItemId}/restore`, method: "POST", schema: inventoryItemSummarySchema });
+
+export const purgeAsset = async (assetId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/assets/${assetId}/purge`, method: "DELETE" });
+};
+
+export const purgeProject = async (householdId: string, projectId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/projects/${projectId}/purge`, method: "DELETE" });
+};
+
+export const purgeInventoryItem = async (householdId: string, inventoryItemId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/inventory/${inventoryItemId}/purge`, method: "DELETE" });
+};
+
+export const purgeAllTrash = async (householdId: string, olderThanDays?: number): Promise<void> => {
+  const params = olderThanDays !== undefined ? `?olderThanDays=${olderThanDays}` : "";
+  await apiRequest({ path: `/v1/households/${householdId}/trash${params}`, method: "DELETE" });
 };

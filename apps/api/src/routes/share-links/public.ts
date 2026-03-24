@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { buildRateLimitKey, enforceRateLimit } from "../../lib/rate-limit.js";
+import { applyTier, buildRateLimitKey } from "../../lib/rate-limit-tiers.js";
 import { toPublicAssetReportResponse } from "../../lib/serializers/index.js";
 import { buildAssetCostSummary, buildAssetTimeline } from "../exports/index.js";
 
@@ -12,13 +12,7 @@ export const publicShareRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/public/share/:token", async (request, reply) => {
     const params = publicShareParamsSchema.parse(request.params);
 
-    if (await enforceRateLimit(request, reply, {
-      scope: "public-share",
-      key: buildRateLimitKey(request, params.token),
-      max: 30,
-      windowMs: 10 * 60 * 1000,
-      message: "Share link rate limit exceeded. Try again shortly."
-    })) {
+    if (await applyTier(request, reply, "public-share", buildRateLimitKey(request, params.token))) {
       return reply;
     }
 

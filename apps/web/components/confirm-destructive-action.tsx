@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { useToast } from "./toast-provider";
@@ -12,7 +12,7 @@ type ConfirmDestructiveActionProps = {
   hiddenFields?: Array<{ name: string; value: string }>;
   triggerLabel: string;
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmDestructiveActionTone;
@@ -25,6 +25,7 @@ type ConfirmDestructiveActionProps = {
   onUndoRestore?: () => void;
   toastMessage?: string;
   toastDuration?: number;
+  defaultOpen?: boolean;
 };
 
 export function ConfirmDestructiveAction({
@@ -45,10 +46,11 @@ export function ConfirmDestructiveAction({
   onUndoRestore,
   toastMessage,
   toastDuration,
+  defaultOpen = false,
 }: ConfirmDestructiveActionProps): JSX.Element {
   const router = useRouter();
   const { pushToast } = useToast();
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(defaultOpen);
   const titleId = useId();
   const messageId = useId();
 

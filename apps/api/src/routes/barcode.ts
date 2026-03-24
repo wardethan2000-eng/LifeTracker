@@ -1,18 +1,12 @@
 import { barcodeLookupRequestSchema, barcodeImageQuerySchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { buildRateLimitKey, enforceRateLimit } from "../lib/rate-limit.js";
+import { applyTier, buildRateLimitKey } from "../lib/rate-limit-tiers.js";
 import { resolveBarcode, detectBarcodeFormat } from "../lib/barcode-lookup.js";
 import { generateBarcodePng, generateBarcodeSvg } from "../lib/barcode-image.js";
 
 export const barcodeRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/barcode/lookup", async (request, reply) => {
-    if (await enforceRateLimit(request, reply, {
-      scope: "barcode",
-      key: buildRateLimitKey(request, request.auth.userId),
-      max: 20,
-      windowMs: 5 * 60 * 1000,
-      message: "Barcode lookup rate limit exceeded. Try again shortly."
-    })) {
+    if (await applyTier(request, reply, "barcode", buildRateLimitKey(request, request.auth.userId))) {
       return reply;
     }
 
@@ -23,13 +17,7 @@ export const barcodeRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/barcode/image", async (request, reply) => {
-    if (await enforceRateLimit(request, reply, {
-      scope: "barcode-image",
-      key: buildRateLimitKey(request, request.auth.userId),
-      max: 100,
-      windowMs: 5 * 60 * 1000,
-      message: "Barcode image rate limit exceeded. Try again shortly."
-    })) {
+    if (await applyTier(request, reply, "barcode-image", buildRateLimitKey(request, request.auth.userId))) {
       return reply;
     }
 

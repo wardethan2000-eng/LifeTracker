@@ -11,6 +11,8 @@ type ClickToEditProps = {
   inputClassName?: string;
   rows?: number;
   required?: boolean;
+  disabled?: boolean;
+  "aria-label"?: string;
 };
 
 export function ClickToEdit({
@@ -22,16 +24,19 @@ export function ClickToEdit({
   inputClassName,
   rows = 3,
   required = false,
+  disabled = false,
+  "aria-label": ariaLabel,
 }: ClickToEditProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   const startEditing = useCallback(() => {
+    if (disabled) return;
     setDraft(value);
     setEditing(true);
     requestAnimationFrame(() => ref.current?.focus());
-  }, [value]);
+  }, [value, disabled]);
 
   const commitEdit = useCallback(() => {
     const trimmed = draft.trim();
@@ -64,16 +69,17 @@ export function ClickToEdit({
   if (!editing) {
     return (
       <div
-        className={`click-to-edit ${className ?? ""}`}
+        className={`click-to-edit ${disabled ? "click-to-edit--disabled" : ""} ${className ?? ""}`.trim()}
         onClick={startEditing}
         role="button"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
+        aria-label={ariaLabel}
         onKeyDown={(e) => { if (e.key === "Enter") startEditing(); }}
       >
         <span className={value ? "click-to-edit__value" : "click-to-edit__placeholder"}>
           {value || placeholder}
         </span>
-        <span className="click-to-edit__hint">✎</span>
+        {!disabled && <span className="click-to-edit__hint">✎</span>}
       </div>
     );
   }

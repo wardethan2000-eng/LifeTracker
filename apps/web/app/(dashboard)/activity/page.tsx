@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import type { ActivityLog } from "@lifekeeper/types";
 import { HouseholdCsvExportButton } from "../../../components/asset-export-actions";
 import { ApiError, getHouseholdActivity, getMe } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/formatters";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
+import { getEntityLabel, getEntityUrl, getEntityDisplayName } from "../../../lib/entity-url";
 
 type ActivityPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -24,6 +26,34 @@ const formatMetadataLabel = (value: string): string => formatActionLabel(
 );
 
 const isIsoDateTime = (value: string): boolean => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value);
+
+const isDeleteAction = (action: string): boolean => /delete|purge/i.test(action);
+
+const renderEntityRef = (entry: ActivityLog): JSX.Element => {
+  const url = getEntityUrl(entry.entityType, entry.entityId, entry.metadata);
+  const name = getEntityDisplayName(entry.entityType, entry.entityId, entry.metadata);
+  const deleted = isDeleteAction(entry.action);
+  return (
+    <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+      <span className="pill pill--sm">{getEntityLabel(entry.entityType)}</span>
+      {url ? (
+        <Link
+          href={url}
+          className={`activity-entity-link${deleted ? " activity-entity-link--deleted" : ""}`}
+        >
+          {name}
+        </Link>
+      ) : (
+        <span title={entry.entityId} style={deleted ? { textDecoration: "line-through" } : undefined}>
+          {name}
+        </span>
+      )}
+      {deleted && (
+        <span style={{ fontSize: "0.78rem" }}>(deleted)</span>
+      )}
+    </p>
+  );
+};
 
 const formatMetadataValue = (value: unknown): string => {
   if (value === null || value === undefined) {
@@ -185,9 +215,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
                       <div className="schedule-card__summary">
                         <div>
                           <h3>{formatActionLabel(entry.action)}</h3>
-                          <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                            {entry.entityType} • {entry.entityId}
-                          </p>
+                          {renderEntityRef(entry)}
                         </div>
                         <span className="pill">{formatDateTime(entry.createdAt)}</span>
                       </div>

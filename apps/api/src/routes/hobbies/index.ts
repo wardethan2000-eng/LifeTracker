@@ -9,14 +9,14 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { makeHouseholdPreHandler } from "../../plugins/household-context.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
 import { createActivityLogger } from "../../lib/activity-log.js";
 import { syncHobbyToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { findHobbyPreset, hobbyPresetToDefinition, applyHobbyPreset } from "../../lib/hobby-presets.js";
 import { toHobbyResponse, toHobbySummaryResponse } from "../../lib/serializers/index.js";
 import { notFound } from "../../lib/errors.js";
-import { hobbyParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const listHobbiesQuerySchema = z.object({
   status: hobbyStatusSchema.optional(),
@@ -179,14 +179,9 @@ const syncHobbyStatusPipeline = async (
 
 export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/hobbies
-  app.get("/v1/households/:householdId/hobbies", async (request, reply) => {
-    const { householdId } = householdParamsSchema.parse(request.params);
+  app.get("/v1/households/:householdId/hobbies", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId } = request.householdContext;
     const query = listHobbiesQuerySchema.parse(request.query);
-    const userId = request.auth.userId;
-
-    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
-      return;
-    }
 
     const where: Prisma.HobbyWhereInput = {
       householdId,
@@ -226,14 +221,9 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // POST /v1/households/:householdId/hobbies
-  app.post("/v1/households/:householdId/hobbies", async (request, reply) => {
-    const { householdId } = householdParamsSchema.parse(request.params);
+  app.post("/v1/households/:householdId/hobbies", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId, userId } = request.householdContext;
     const input = createHobbyInputSchema.parse(request.body);
-    const userId = request.auth.userId;
-
-    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
-      return;
-    }
 
     const hobby = await app.prisma.$transaction(async (prisma) => {
       const createdHobby = await prisma.hobby.create({
@@ -291,7 +281,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
       return createdHobby;
     });
 
-        await createActivityLogger(app.prisma, userId).log("hobby", hobby.id, "hobby_created", householdId);
+        await createActivityLogger(app.prisma, userId).log("hobby", hobby.id, "hobby_created", householdId, { name: hobby.name });
 
     await syncHobbyToSearchIndex(app.prisma, hobby.id);
 
@@ -299,13 +289,9 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // GET /v1/households/:householdId/hobbies/:hobbyId
-  app.get("/v1/households/:householdId/hobbies/:hobbyId", async (request, reply) => {
-    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
-    const userId = request.auth.userId;
-
-    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
-      return;
-    }
+  app.get("/v1/households/:householdId/hobbies/:hobbyId", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId } = request.householdContext;
+    const { hobbyId } = hobbyParamsSchema.parse(request.params);
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId },
@@ -430,14 +416,10 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // PATCH /v1/households/:householdId/hobbies/:hobbyId
-  app.patch("/v1/households/:householdId/hobbies/:hobbyId", async (request, reply) => {
-    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
+  app.patch("/v1/households/:householdId/hobbies/:hobbyId", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId, userId } = request.householdContext;
+    const { hobbyId } = hobbyParamsSchema.parse(request.params);
     const input = updateHobbyInputSchema.parse(request.body);
-    const userId = request.auth.userId;
-
-    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
-      return;
-    }
 
     const existing = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId },
@@ -475,7 +457,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
       return updatedHobby;
     });
 
-        await createActivityLogger(app.prisma, userId).log("hobby", hobby.id, "hobby_updated", householdId);
+        await createActivityLogger(app.prisma, userId).log("hobby", hobby.id, "hobby_updated", householdId, { name: hobby.name });
 
     await syncHobbyToSearchIndex(app.prisma, hobby.id);
 
@@ -483,13 +465,9 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // DELETE /v1/households/:householdId/hobbies/:hobbyId
-  app.delete("/v1/households/:householdId/hobbies/:hobbyId", async (request, reply) => {
-    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
-    const userId = request.auth.userId;
-
-    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
-      return;
-    }
+  app.delete("/v1/households/:householdId/hobbies/:hobbyId", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId, userId } = request.householdContext;
+    const { hobbyId } = hobbyParamsSchema.parse(request.params);
 
     const existing = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }
@@ -508,15 +486,37 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(204).send();
   });
 
-  // PATCH /v1/households/:householdId/hobbies/:hobbyId/workflow-stages/reorder
-  app.patch("/v1/households/:householdId/hobbies/:hobbyId/workflow-stages/reorder", async (request, reply) => {
-    const { householdId, hobbyId } = hobbyParamsSchema.parse(request.params);
-    const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
-    const userId = request.auth.userId;
+  // GET /v1/households/:householdId/hobbies/:hobbyId/delete-impact
+  app.get("/v1/households/:householdId/hobbies/:hobbyId/delete-impact", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId } = request.householdContext;
+    const { hobbyId } = hobbyParamsSchema.parse(request.params);
 
-    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
-      return;
+    const existing = await app.prisma.hobby.findFirst({
+      where: { id: hobbyId, householdId }
+    });
+
+    if (!existing) {
+      return notFound(reply, "Hobby");
     }
+
+    const [sessions, recipes, series, practiceGoals, practiceRoutines, metricDefinitions, collectionItems] = await Promise.all([
+      app.prisma.hobbySession.count({ where: { hobbyId: existing.id } }),
+      app.prisma.hobbyRecipe.count({ where: { hobbyId: existing.id, isArchived: false } }),
+      app.prisma.hobbySeries.count({ where: { hobbyId: existing.id } }),
+      app.prisma.hobbyPracticeGoal.count({ where: { hobbyId: existing.id } }),
+      app.prisma.hobbyPracticeRoutine.count({ where: { hobbyId: existing.id } }),
+      app.prisma.hobbyMetricDefinition.count({ where: { hobbyId: existing.id } }),
+      app.prisma.hobbyCollectionItem.count({ where: { hobbyId: existing.id } }),
+    ]);
+
+    return { sessions, recipes, series, practiceGoals, practiceRoutines, metricDefinitions, collectionItems };
+  });
+
+  // PATCH /v1/households/:householdId/hobbies/:hobbyId/workflow-stages/reorder
+  app.patch("/v1/households/:householdId/hobbies/:hobbyId/workflow-stages/reorder", { preHandler: [makeHouseholdPreHandler(app)] }, async (request, reply) => {
+    const { householdId } = request.householdContext;
+    const { hobbyId } = hobbyParamsSchema.parse(request.params);
+    const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
 
     const hobby = await app.prisma.hobby.findFirst({
       where: { id: hobbyId, householdId }

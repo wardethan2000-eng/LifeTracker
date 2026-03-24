@@ -35,7 +35,7 @@ import {
 } from "../../lib/serializers/index.js";
 import { calculateInventoryDeficit } from "@lifekeeper/utils";
 import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
-import { notFound } from "../../lib/errors.js";
+import { notFound, badRequest } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
 
 import { householdParamsSchema, qrCodeQuerySchema } from "../../lib/schemas.js";
@@ -990,6 +990,58 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     });
 
     void removeSearchIndexEntry(app.prisma, "inventory_item", existing.id).catch(console.error);
+
+    return reply.code(204).send();
+  });
+
+  // ── Delete impact ──────────────────────────────────────────────────
+
+  app.get("/v1/households/:householdId/inventory/:inventoryItemId/delete-impact", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
+    if (!existing) return notFound(reply, "Inventory item");
+
+    const [maintenanceLogParts, projectPhaseSupplies, hobbyRecipeIngredients, hobbySessionIngredients, assetLinks] = await Promise.all([
+      app.prisma.maintenanceLogPart.count({ where: { inventoryItemId: existing.id } }),
+      app.prisma.projectPhaseSupply.count({ where: { inventoryItemId: existing.id } }),
+      app.prisma.hobbyRecipeIngredient.count({ where: { inventoryItemId: existing.id } }),
+      app.prisma.hobbySessionIngredient.count({ where: { inventoryItemId: existing.id } }),
+      app.prisma.assetInventoryItem.count({ where: { inventoryItemId: existing.id } }),
+    ]);
+
+    return { maintenanceLogParts, projectPhaseSupplies, hobbyRecipeIngredients, hobbySessionIngredients, assetLinks };
+  });
+
+  // ── Permanent purge (hard-delete from Trash) ───────────────────────
+
+  app.delete("/v1/households/:householdId/inventory/:inventoryItemId/purge", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const existing = await app.prisma.inventoryItem.findFirst({
+      where: { id: params.inventoryItemId, householdId: params.householdId }
+    });
+
+    if (!existing) return notFound(reply, "Inventory item");
+    if (!existing.deletedAt) return badRequest(reply, "Inventory item must be in Trash before it can be permanently deleted.");
+
+    // Nullify references in related tables that use SetNull cascade
+    await app.prisma.$transaction(async (tx) => {
+      await tx.maintenanceLogPart.deleteMany({ where: { inventoryItemId: existing.id } });
+      await tx.inventoryItem.delete({ where: { id: existing.id } });
+    });
+
+    void removeSearchIndexEntry(app.prisma, "inventory_item", existing.id).catch(console.error);
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", existing.id, "inventory_item.purged", params.householdId, { name: existing.name });
 
     return reply.code(204).send();
   });

@@ -1,4 +1,4 @@
-﻿import type { Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Prisma, PrismaClient, Project } from "@prisma/client";
 import {
   cloneProjectSchema,
   createOffsetPaginationQuerySchema,
@@ -56,6 +56,7 @@ import {
 } from "../../lib/serializers/index.js";
 import { syncLogToSearchIndex, syncProjectToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { forbidden, notFound, badRequest } from "../../lib/errors.js";
+import { findOwnedEntity } from "../../lib/entity-access.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
 import { householdParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
@@ -900,13 +901,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply);
     }
 
-    const existing = await app.prisma.project.findFirst({
-      where: activeProjectWhere(params.householdId, params.projectId)
-    });
+    const existing = await findOwnedEntity<Project>(
+      app.prisma, "project", params.projectId, params.householdId, reply, { deletedAt: null }
+    );
 
-    if (!existing) {
-      return notFound(reply, "Project");
-    }
+    if (!existing) return reply;
 
     if (input.status === "completed") {
       const summary = await getProjectCompletionSummary(app.prisma, existing.id);
@@ -978,13 +977,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply);
     }
 
-    const existing = await app.prisma.project.findFirst({
-      where: activeProjectWhere(params.householdId, params.projectId)
-    });
+    const existing = await findOwnedEntity<Project>(
+      app.prisma, "project", params.projectId, params.householdId, reply, { deletedAt: null }
+    );
 
-    if (!existing) {
-      return notFound(reply, "Project");
-    }
+    if (!existing) return reply;
 
     await app.prisma.project.update({
       where: { id: existing.id },
@@ -1003,6 +1000,92 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     void removeSearchIndexEntry(app.prisma, "project", existing.id).catch(console.error);
+
+    return reply.code(204).send();
+  });
+
+  // ── Delete impact ──────────────────────────────────────────────────
+
+  app.get("/v1/households/:householdId/projects/:projectId/delete-impact", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return forbidden(reply);
+    }
+
+    const existing = await findOwnedEntity<Project>(
+      app.prisma, "project", params.projectId, params.householdId, reply, { deletedAt: null }
+    );
+    if (!existing) return reply;
+
+    const [tasks, phases, expenses, budgetCategories, linkedAssets, linkedInventoryItems, comments] = await Promise.all([
+      app.prisma.projectTask.count({ where: { projectId: existing.id, deletedAt: null } }),
+      app.prisma.projectPhase.count({ where: { projectId: existing.id, deletedAt: null } }),
+      app.prisma.projectExpense.count({ where: { projectId: existing.id, deletedAt: null } }),
+      app.prisma.projectBudgetCategory.count({ where: { projectId: existing.id } }),
+      app.prisma.projectAsset.count({ where: { projectId: existing.id } }),
+      app.prisma.projectInventoryItem.count({ where: { projectId: existing.id } }),
+      app.prisma.comment.count({ where: { projectId: existing.id, deletedAt: null } }),
+    ]);
+
+    return { tasks, phases, expenses, budgetCategories, linkedAssets, linkedInventoryItems, comments };
+  });
+
+  // ── Project restore (from Trash) ───────────────────────────────────
+
+  app.post("/v1/households/:householdId/projects/:projectId/restore", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return forbidden(reply);
+    }
+
+    const existing = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId }
+    });
+
+    if (!existing) return notFound(reply, "Project");
+    if (!existing.deletedAt) return badRequest(reply, "Project is not in Trash.");
+
+    const project = await app.prisma.project.update({
+      where: { id: existing.id },
+      data: { deletedAt: null }
+    });
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.restored", params.householdId, { name: project.name });
+
+    void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
+
+    return toProjectResponse(project);
+  });
+
+  // ── Permanent purge (hard-delete from Trash) ───────────────────────
+
+  app.delete("/v1/households/:householdId/projects/:projectId/purge", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+
+    try {
+      await assertMembership(app.prisma, params.householdId, request.auth.userId);
+    } catch {
+      return forbidden(reply);
+    }
+
+    const existing = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId }
+    });
+
+    if (!existing) return notFound(reply, "Project");
+    if (!existing.deletedAt) return badRequest(reply, "Project must be in Trash before it can be permanently deleted.");
+
+    await app.prisma.project.delete({ where: { id: existing.id } });
+
+    void removeSearchIndexEntry(app.prisma, "project", existing.id).catch(console.error);
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("project", existing.id, "project.purged", params.householdId, { name: existing.name });
 
     return reply.code(204).send();
   });
@@ -1297,13 +1380,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply);
     }
 
-    const existing = await app.prisma.project.findFirst({
-      where: activeProjectWhere(params.householdId, params.projectId)
-    });
+    const existing = await findOwnedEntity<Project>(
+      app.prisma, "project", params.projectId, params.householdId, reply, { deletedAt: null }
+    );
 
-    if (!existing) {
-      return notFound(reply, "Project");
-    }
+    if (!existing) return reply;
 
     if (status === "completed") {
       const summary = await getProjectCompletionSummary(app.prisma, existing.id);
@@ -1348,13 +1429,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply);
     }
 
-    const project = await app.prisma.project.findFirst({
-      where: activeProjectWhere(params.householdId, params.projectId)
-    });
+    const project = await findOwnedEntity<Project>(
+      app.prisma, "project", params.projectId, params.householdId, reply, { deletedAt: null }
+    );
 
-    if (!project) {
-      return notFound(reply, "Project");
-    }
+    if (!project) return reply;
 
     const asset = await app.prisma.asset.findFirst({
       where: { id: input.assetId, householdId: params.householdId }

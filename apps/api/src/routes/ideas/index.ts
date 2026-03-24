@@ -45,10 +45,7 @@ const listIdeasQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
-type IdeaNoteItem = { id: string; text: string; createdAt: string };
-type IdeaLinkItem = { id: string; url: string; label: string; createdAt: string };
-type IdeaMaterialItem = { id: string; name: string; quantity: string; notes: string };
-type IdeaStepItem = { id: string; label: string; done: boolean };
+import type { IdeaNoteItem, IdeaLinkItem, IdeaMaterialItem, IdeaStepItem } from "../../lib/serializers/ideas.js";
 
 const generateId = (): string => crypto.randomUUID();
 
@@ -127,7 +124,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.created", householdId);
+        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.created", householdId, { title: idea.title });
 
     await syncIdeaToSearchIndex(app.prisma, idea.id);
 
@@ -187,7 +184,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.updated", householdId);
+        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.updated", householdId, { title: idea.title });
 
     await syncIdeaToSearchIndex(app.prisma, idea.id);
 

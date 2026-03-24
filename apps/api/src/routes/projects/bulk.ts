@@ -12,16 +12,10 @@ import { syncProjectToSearchIndex } from "../../lib/search-index.js";
 import { forbidden, badRequest } from "../../lib/errors.js";
 import { householdParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
-type ProjectFailedItem = {
-  projectId: string;
-  name: string | null;
-  message: string;
-};
-
-type TaskFailedItem = {
-  taskId: string;
-  title: string | null;
-  message: string;
+type BulkFailedItem = {
+  id?: string;
+  label: string | null;
+  error: string;
 };
 
 export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
@@ -47,9 +41,9 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
 
     const found = new Set(projects.map((p) => p.id));
 
-    const failed: ProjectFailedItem[] = input.projectIds
+    const failed: BulkFailedItem[] = input.projectIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ projectId: id, name: null, message: "Project not found." }));
+      .map((id) => ({ id, label: null, error: "Project not found." }));
 
     let succeeded = 0;
 
@@ -65,9 +59,9 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
         void syncProjectToSearchIndex(app.prisma, project.id).catch(console.error);
       } catch (err) {
         failed.push({
-          projectId: project.id,
-          name: project.name,
-          message: err instanceof Error ? err.message : "Failed to update project status."
+          id: project.id,
+          label: project.name,
+          error: err instanceof Error ? err.message : "Failed to update project status."
         });
       }
     }
@@ -119,9 +113,9 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
 
     const found = new Set(tasks.map((t) => t.id));
 
-    const failed: TaskFailedItem[] = input.taskIds
+    const failed: BulkFailedItem[] = input.taskIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ taskId: id, title: null, message: "Task not found." }));
+      .map((id) => ({ id, label: null, error: "Task not found." }));
 
     const toComplete = tasks.filter((t) => t.status !== "completed");
     const alreadyDone = tasks.length - toComplete.length;
@@ -148,9 +142,9 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
       } catch (err) {
         for (const task of toComplete) {
           failed.push({
-            taskId: task.id,
-            title: task.title,
-            message: err instanceof Error ? err.message : "Failed to complete task."
+            id: task.id,
+            label: task.title,
+            error: err instanceof Error ? err.message : "Failed to complete task."
           });
         }
       }
@@ -215,9 +209,9 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
 
     const found = new Set(tasks.map((t) => t.id));
 
-    const failed: TaskFailedItem[] = input.taskIds
+    const failed: BulkFailedItem[] = input.taskIds
       .filter((id) => !found.has(id))
-      .map((id) => ({ taskId: id, title: null, message: "Task not found." }));
+      .map((id) => ({ id, label: null, error: "Task not found." }));
 
     let succeeded = 0;
 
@@ -253,9 +247,9 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
       } catch (err) {
         for (const task of tasks) {
           failed.push({
-            taskId: task.id,
-            title: task.title,
-            message: err instanceof Error ? err.message : "Failed to reassign task."
+            id: task.id,
+            label: task.title,
+            error: err instanceof Error ? err.message : "Failed to reassign task."
           });
         }
       }

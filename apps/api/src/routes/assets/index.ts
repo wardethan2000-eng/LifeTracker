@@ -32,7 +32,7 @@ import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { toAssetResponse } from "../../lib/serializers/index.js";
 import { createActivityLogger } from "../../lib/activity-log.js";
-import { syncAssetFamilyToSearchIndex } from "../../lib/search-index.js";
+import { syncAssetFamilyToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { notFound, badRequest } from "../../lib/errors.js";
 import { softDeleteData, optionallyIncludeDeleted } from "../../lib/soft-delete.js";
 
@@ -152,7 +152,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const accessibleIds = new Set(accessible.map((a) => a.id));
     const failed = input.assetIds
       .filter((id) => !accessibleIds.has(id))
-      .map((assetId) => ({ assetId, name: null, message: "Asset not found or not accessible." }));
+      .map((id) => ({ id, label: null, error: "Asset not found or not accessible." }));
 
     if (accessible.length > 0) {
       await app.prisma.$transaction(async (tx) => {
@@ -192,7 +192,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const accessibleIds = new Set(accessible.map((a) => a.id));
     const failed = input.assetIds
       .filter((id) => !accessibleIds.has(id))
-      .map((assetId) => ({ assetId, name: null, message: "Asset not found or not accessible." }));
+      .map((id) => ({ id, label: null, error: "Asset not found or not accessible." }));
 
     if (accessible.length > 0) {
       await app.prisma.$transaction(async (tx) => {
@@ -558,5 +558,48 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
         await createActivityLogger(app.prisma, request.auth.userId).log("asset", asset.id, "asset.condition_recorded", existing.householdId, { name: existing.name, score: input.score });
 
     return toAssetResponse(asset);
+  });
+
+  // ── Delete impact ──────────────────────────────────────────────────
+
+  app.get("/v1/assets/:assetId/delete-impact", async (request, reply) => {
+    const params = assetIdParamsSchema.parse(request.params);
+    const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
+    if (!existing) return notFound(reply, "Asset");
+
+    const [schedules, logs, entries, comments, transfers] = await Promise.all([
+      app.prisma.maintenanceSchedule.count({ where: { assetId: existing.id, deletedAt: null } }),
+      app.prisma.maintenanceLog.count({ where: { assetId: existing.id, deletedAt: null } }),
+      app.prisma.entry.count({ where: { entityType: "asset", entityId: existing.id } }),
+      app.prisma.comment.count({ where: { assetId: existing.id, deletedAt: null } }),
+      app.prisma.assetTransfer.count({ where: { assetId: existing.id } }),
+    ]);
+
+    return { schedules, logs, entries, comments, transfers };
+  });
+
+  // ── Permanent purge (hard-delete from Trash) ───────────────────────
+
+  app.delete("/v1/assets/:assetId/purge", async (request, reply) => {
+    const params = assetIdParamsSchema.parse(request.params);
+
+    const existing = await app.prisma.asset.findFirst({
+      where: {
+        id: params.assetId,
+        household: { members: { some: { userId: request.auth.userId } } },
+        ...personalAssetAccessWhere(request.auth.userId)
+      }
+    });
+
+    if (!existing) return notFound(reply, "Asset");
+    if (!existing.deletedAt) return badRequest(reply, "Asset must be moved to Trash before it can be permanently deleted.");
+
+    await app.prisma.asset.delete({ where: { id: existing.id } });
+
+    void removeSearchIndexEntry(app.prisma, "asset", existing.id).catch(console.error);
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("asset", existing.id, "asset.purged", existing.householdId, { name: existing.name });
+
+    return reply.code(204).send();
   });
 };

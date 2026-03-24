@@ -49,6 +49,7 @@ import type {
   ProjectStatus,
   ProjectTaskStatus,
   CreateQuickRestockInput,
+  UpdateAssetInput,
   UpdateCommentInput,
   UpdateAssetTimelineEntryInput,
   UpdateProjectBudgetCategoryInput,
@@ -229,6 +230,12 @@ import {
   promoteIdea,
   demoteToIdea,
   updateNotificationPreferences,
+  restoreProject,
+  restoreInventoryItem,
+  purgeAsset as purgeAssetApi,
+  purgeProject as purgeProjectApi,
+  purgeInventoryItem as purgeInventoryItemApi,
+  purgeAllTrash as purgeAllTrashApi,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
@@ -1217,6 +1224,22 @@ export async function updateInventoryItemAction(formData: FormData): Promise<voi
   revalidateInventoryDetailPath(inventoryItemId);
 }
 
+export async function updateInventoryItemFieldAction(
+  householdId: string,
+  inventoryItemId: string,
+  input: UpdateInventoryItemInput
+): Promise<{ success: true } | { success: false; message: string }> {
+  try {
+    await updateInventoryItem(householdId, inventoryItemId, input);
+    await emitRealtimeEvent(householdId, "inventory.changed", inventoryItemId);
+    revalidateInventoryPaths(householdId);
+    revalidateInventoryDetailPath(inventoryItemId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Update failed" };
+  }
+}
+
 export async function deleteInventoryItemAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const inventoryItemId = getRequiredString(formData, "inventoryItemId");
@@ -1555,6 +1578,21 @@ export async function updateAssetAction(formData: FormData): Promise<void> {
 
   await emitRealtimeEvent(input.householdId, "asset.updated", assetId);
   revalidateAssetPaths(assetId);
+}
+
+export async function updateAssetFieldAction(
+  assetId: string,
+  householdId: string,
+  input: UpdateAssetInput
+): Promise<{ success: true } | { success: false; message: string }> {
+  try {
+    await updateAsset(assetId, input);
+    await emitRealtimeEvent(householdId, "asset.updated", assetId);
+    revalidateAssetPaths(assetId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Update failed" };
+  }
 }
 
 export async function transferAssetAction(formData: FormData): Promise<void> {
@@ -2495,6 +2533,20 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
 
   await updateProject(householdId, projectId, input);
   revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateProjectFieldAction(
+  householdId: string,
+  projectId: string,
+  input: UpdateProjectInput
+): Promise<{ success: true } | { success: false; message: string }> {
+  try {
+    await updateProject(householdId, projectId, input);
+    revalidateProjectPaths(householdId, projectId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Update failed" };
+  }
 }
 
 export async function saveProjectAsTemplateAction(formData: FormData): Promise<void> {
@@ -3816,4 +3868,57 @@ export async function demoteToIdeaAction(
   const idea = await demoteToIdea(householdId, data);
   revalidateIdeaPaths();
   return { id: idea.id, title: idea.title };
+}
+
+// ── Restore Actions ──────────────────────────────────────────────────
+
+export async function restoreAssetByIdAction(assetId: string): Promise<void> {
+  await restoreAsset(assetId);
+  revalidateAssetPaths(assetId);
+  revalidatePath("/assets");
+  revalidatePath("/trash");
+}
+
+export async function restoreProjectAction(householdId: string, projectId: string): Promise<void> {
+  await restoreProject(householdId, projectId);
+  revalidateProjectPaths(householdId, projectId);
+  revalidatePath("/trash");
+}
+
+export async function restoreInventoryItemAction(householdId: string, inventoryItemId: string): Promise<void> {
+  await restoreInventoryItem(householdId, inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidateInventoryDetailPath(inventoryItemId);
+  revalidatePath("/trash");
+}
+
+// ── Purge Actions ────────────────────────────────────────────────────
+
+export async function purgeAssetAction(assetId: string, householdId: string): Promise<void> {
+  await purgeAssetApi(assetId);
+  revalidatePath("/assets");
+  revalidatePath("/trash");
+  revalidateDashboardPath();
+}
+
+export async function purgeProjectAction(householdId: string, projectId: string): Promise<void> {
+  await purgeProjectApi(householdId, projectId);
+  revalidateProjectPaths(householdId);
+  revalidatePath("/trash");
+  revalidateDashboardPath();
+}
+
+export async function purgeInventoryItemAction(householdId: string, inventoryItemId: string): Promise<void> {
+  await purgeInventoryItemApi(householdId, inventoryItemId);
+  revalidateInventoryPaths(householdId);
+  revalidatePath("/trash");
+}
+
+export async function purgeAllTrashAction(householdId: string): Promise<void> {
+  await purgeAllTrashApi(householdId);
+  revalidatePath("/assets");
+  revalidateProjectPaths(householdId);
+  revalidateInventoryPaths(householdId);
+  revalidatePath("/trash");
+  revalidateDashboardPath();
 }

@@ -9550,6 +9550,34 @@ html[data-ui-density="compact"] .resource-layout__aside {
   border-color: var(--accent);
 }
 
+.click-to-edit--disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.click-to-edit__input--select {
+  appearance: auto;
+  padding-right: 24px;
+}
+
+.click-to-edit__number-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.click-to-edit__input--number {
+  width: 100%;
+  min-width: 60px;
+}
+
+.click-to-edit__affix {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
 /* ─── Phase List/Detail Split ─── */
 
 .phase-split {
@@ -14336,4 +14364,205 @@ html[data-ui-density="compact"] .resource-layout__aside {
   .onboarding-checklist {
     padding: 16px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 58. Recently Deleted (Trash)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Trash Page */
+.trash-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.trash-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.trash-page__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.trash-page__subtitle {
+  font-size: 0.85rem;
+  color: var(--ink-secondary, #666);
+  margin: 0;
+  max-width: 560px;
+}
+
+.trash-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 64px 24px;
+  color: var(--ink-secondary, #888);
+  text-align: center;
+}
+
+.trash-page__empty svg {
+  opacity: 0.3;
+  margin-bottom: 8px;
+}
+
+.trash-page__empty p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.trash-page__empty-sub {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+/* Trash List */
+.trash-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.trash-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.trash-list-count {
+  font-size: 0.85rem;
+  color: var(--ink-secondary, #666);
+}
+
+.trash-purge-all-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.trash-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Trash Item Row */
+.trash-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.trash-item:last-child {
+  border-bottom: none;
+}
+
+.trash-item__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.trash-item__type-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--surface-raised, #f0f0f0);
+  color: var(--ink-secondary, #555);
+}
+
+.trash-item__type-badge--asset {
+  background: #e8f0fe;
+  color: #3c4fa0;
+}
+
+.trash-item__type-badge--project {
+  background: #fef3e0;
+  color: #7a4f00;
+}
+
+.trash-item__type-badge--inventory_item {
+  background: #e8faf0;
+  color: #1a6640;
+}
+
+.trash-item__name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trash-item__meta {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--ink-secondary, #888);
+  white-space: nowrap;
+}
+
+.trash-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.trash-item__purge-btn {
+  color: var(--danger, #c0392b) !important;
+}
+
+[data-theme="dark"] .trash-item__type-badge--asset {
+  background: rgba(100, 130, 220, 0.15);
+  color: #8ba4e8;
+}
+
+[data-theme="dark"] .trash-item__type-badge--project {
+  background: rgba(200, 140, 40, 0.15);
+  color: #d4a850;
+}
+
+[data-theme="dark"] .trash-item__type-badge--inventory_item {
+  background: rgba(40, 160, 100, 0.15);
+  color: #5cc990;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 59. Activity Log — Entity Links
+   ═══════════════════════════════════════════════════════════════════ */
+
+.activity-entity-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.activity-entity-link:hover {
+  text-decoration: underline;
+}
+
+.activity-entity-link--deleted {
+  text-decoration: line-through;
+  opacity: 0.65;
 }
