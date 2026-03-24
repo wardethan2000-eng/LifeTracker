@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ApiError,
   bulkArchiveIdeas,
+  bulkDeleteIdeas,
   bulkMoveIdeas,
   bulkSetIdeaPriority,
   exportHouseholdIdeasCSV,
@@ -83,6 +84,10 @@ export function IdeaBulkActions({
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveResult, setArchiveResult] = useState<BulkIdeaOperationResult | null>(null);
 
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<BulkIdeaOperationResult | null>(null);
+
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [isSettingPriority, setIsSettingPriority] = useState(false);
   const [targetPriority, setTargetPriority] = useState<IdeaPriority>("medium");
@@ -104,6 +109,11 @@ export function IdeaBulkActions({
     if (!archiveResult) return null;
     return archiveResult.failed.length > 0 ? "warning" : "success";
   }, [archiveResult]);
+
+  const deleteResultTone = useMemo(() => {
+    if (!deleteResult) return null;
+    return deleteResult.failed.length > 0 ? "warning" : "success";
+  }, [deleteResult]);
 
   const priorityResultTone = useMemo(() => {
     if (!priorityResult) return null;
@@ -176,6 +186,40 @@ export function IdeaBulkActions({
       );
     } finally {
       setIsArchiving(false);
+    }
+  };
+
+  const handlePermanentDelete = async (): Promise<void> => {
+    try {
+      setIsDeleting(true);
+      setErrorMessage(null);
+      setDeleteResult(null);
+
+      const result = await bulkDeleteIdeas(
+        householdId,
+        selectedItems.map((i) => i.id)
+      );
+      setDeleteResult(result);
+      router.refresh();
+
+      if (result.failed.length === 0) {
+        pushToast({ message: `Permanently deleted ${result.succeeded} idea${result.succeeded === 1 ? "" : "s"}.` });
+        setDeleteOpen(false);
+        onBulkComplete?.();
+      } else {
+        pushToast({
+          message: `Deleted ${result.succeeded}; ${result.failed.length} failed.`,
+          tone: "danger"
+        });
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Unable to delete ideas."
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -273,6 +317,14 @@ export function IdeaBulkActions({
           onClick={() => { setArchiveResult(null); setErrorMessage(null); setArchiveOpen(true); }}
         >
           Archive
+        </button>
+        <button
+          type="button"
+          className="button button--sm button--ghost button--danger"
+          disabled={selectedItems.length === 0}
+          onClick={() => { setDeleteResult(null); setErrorMessage(null); setDeleteOpen(true); }}
+        >
+          Delete Permanently
         </button>
 
         <button
@@ -431,6 +483,59 @@ export function IdeaBulkActions({
               disabled={isArchiving || selectedItems.length === 0}
             >
               {isArchiving ? "Archiving…" : `Archive ${selectedItems.length} Idea${selectedItems.length === 1 ? "" : "s"}`}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Permanent Delete Dialog ── */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently Delete {selectedItems.length} Idea{selectedItems.length === 1 ? "" : "s"}</DialogTitle>
+            <DialogDescription>
+              This cannot be undone. Deleted ideas are gone permanently and cannot be recovered.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="workbench-section">
+            <ul className="bulk-action-bar__preview-list">
+              {selectedItems.slice(0, 10).map((idea) => (
+                <li key={idea.id}>{idea.title}</li>
+              ))}
+              {selectedItems.length > 10 && <li>…and {selectedItems.length - 10} more</li>}
+            </ul>
+
+            {deleteResult && deleteResultTone && (
+              <div className={`inventory-bulk-actions__result inventory-bulk-actions__result--${deleteResultTone}`}>
+                {deleteResult.succeeded > 0 && <p>Deleted {deleteResult.succeeded} idea{deleteResult.succeeded === 1 ? "" : "s"}.</p>}
+                {deleteResult.failed.length > 0 && (
+                  <ul>
+                    {deleteResult.failed.map((f) => (
+                      <li key={f.ideaId}>{f.title ?? f.ideaId}: {f.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setDeleteOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button button--danger"
+              onClick={() => void handlePermanentDelete()}
+              disabled={isDeleting || selectedItems.length === 0}
+            >
+              {isDeleting ? "Deleting…" : `Delete ${selectedItems.length} Idea${selectedItems.length === 1 ? "" : "s"} Permanently`}
             </button>
           </DialogFooter>
         </DialogContent>

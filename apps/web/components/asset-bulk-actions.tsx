@@ -9,6 +9,7 @@ import {
   ApiError,
   bulkArchiveAssets,
   bulkReassignAssetCategory,
+  downloadHouseholdCsv,
   exportHouseholdAssetsCSV,
   importHouseholdAssets,
   type ImportAssetsResult,
@@ -95,8 +96,12 @@ export function AssetBulkActions({
     try {
       setIsExporting(true);
       setErrorMessage(null);
-      const csvText = await exportHouseholdAssetsCSV(householdId);
-      generateCSVDownload(csvText, "assets-export.csv");
+      if (selectedItems.length > 0) {
+        await downloadHouseholdCsv(householdId, "cost-dashboard", { assetIds: selectedItems.map((a) => a.id) });
+      } else {
+        const csvText = await exportHouseholdAssetsCSV(householdId);
+        generateCSVDownload(csvText, "assets-export.csv");
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to export assets CSV.");
     } finally {
@@ -191,7 +196,7 @@ export function AssetBulkActions({
           onClick={() => { void handleExport(); }}
           disabled={isExporting}
         >
-          {isExporting ? "Exporting..." : "Export CSV"}
+          {isExporting ? "Exporting..." : selectedItems.length > 0 ? `Export Selected (${selectedItems.length})` : "Export All"}
         </button>
 
         <div className="inventory-bulk-actions__import">

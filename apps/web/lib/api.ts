@@ -525,6 +525,10 @@ import {
   updateNotificationPreferencesSchema,
   type NotificationPreferences,
   type UpdateNotificationPreferencesInput,
+  displayPreferencesSchema,
+  updateDisplayPreferencesSchema,
+  type DisplayPreferences,
+  type UpdateDisplayPreferencesInput,
   assetDeleteImpactSchema,
   type AssetDeleteImpact,
   projectDeleteImpactSchema,
@@ -1451,7 +1455,7 @@ export const downloadAssetCsv = async (
 export const downloadHouseholdCsv = async (
   householdId: string,
   dataset: string,
-  options?: { since?: string; until?: string }
+  options?: { since?: string; until?: string; assetIds?: string[] }
 ): Promise<void> => {
   const params = new URLSearchParams({ dataset });
 
@@ -1461,6 +1465,10 @@ export const downloadHouseholdCsv = async (
 
   if (options?.until) {
     params.set("until", options.until);
+  }
+
+  if (options?.assetIds && options.assetIds.length > 0) {
+    params.set("assetIds", options.assetIds.join(","));
   }
 
   await downloadFileFromProxy(`/v1/households/${householdId}/export/csv?${params.toString()}`, `${dataset}-${householdId}.csv`);
@@ -1473,6 +1481,10 @@ export const downloadAnnualCostPdf = async (householdId: string, year: number): 
 
 export const downloadInventoryValuationPdf = async (householdId: string): Promise<void> => {
   await downloadFileFromProxy(`/v1/households/${householdId}/export/inventory-valuation-pdf`, `inventory-valuation-${householdId}.pdf`);
+};
+
+export const downloadHouseholdJson = async (householdId: string): Promise<void> => {
+  await downloadFileFromProxy(`/v1/households/${householdId}/export/json`, `lifekeeper-export-${householdId}.json`);
 };
 
 export const createShareLink = async (
@@ -4054,6 +4066,24 @@ export const updateNotificationPreferences = async (input: UpdateNotificationPre
   });
 };
 
+export const getDisplayPreferences = cache(async (): Promise<DisplayPreferences> => apiRequest({
+  path: "/v1/me/display-preferences",
+  schema: displayPreferencesSchema,
+  revalidate: 60
+}));
+
+export const updateDisplayPreferences = async (input: UpdateDisplayPreferencesInput): Promise<DisplayPreferences> =>
+  apiRequest({
+    path: "/v1/me/display-preferences",
+    method: "PATCH",
+    body: input,
+    schema: displayPreferencesSchema
+  });
+
+export const deleteAccount = async (): Promise<void> => {
+  await apiRequest({ path: "/v1/me", method: "DELETE" });
+};
+
 export const enqueueNotificationScan = async (householdId: string): Promise<void> => {
   await apiRequest({
     path: "/v1/notifications/scan",
@@ -5615,6 +5645,16 @@ export const deleteIdea = async (
   });
 };
 
+export const permanentlyDeleteIdea = async (
+  householdId: string,
+  ideaId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/ideas/${ideaId}/permanent`,
+    method: "DELETE",
+  });
+};
+
 export const bulkMoveIdeas = async (
   householdId: string,
   ideaIds: string[],
@@ -5633,6 +5673,17 @@ export const bulkArchiveIdeas = async (
 ): Promise<BulkIdeaOperationResult> =>
   apiRequest({
     path: `/v1/households/${householdId}/ideas/bulk/archive`,
+    method: "POST",
+    body: { ideaIds },
+    schema: bulkIdeaOperationResultSchema
+  });
+
+export const bulkDeleteIdeas = async (
+  householdId: string,
+  ideaIds: string[]
+): Promise<BulkIdeaOperationResult> =>
+  apiRequest({
+    path: `/v1/households/${householdId}/ideas/bulk/delete`,
     method: "POST",
     body: { ideaIds },
     schema: bulkIdeaOperationResultSchema

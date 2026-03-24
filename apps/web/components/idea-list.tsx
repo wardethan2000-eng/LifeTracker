@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import type { IdeaCategory, IdeaPriority, IdeaStage, IdeaSummary } from "@lifekeeper/types";
-import { updateIdeaStageAction, deleteIdeaAction } from "../app/actions";
+import { updateIdeaStageAction, deleteIdeaAction, permanentlyDeleteIdeaAction } from "../app/actions";
 import { useMultiSelect } from "../lib/use-multi-select";
 import { useFormattedDate } from "../lib/formatted-date";
 import { BulkActionBar } from "./bulk-action-bar";
@@ -97,6 +97,16 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
       if (!confirm("Archive this idea?")) return;
       startTransition(async () => {
         await deleteIdeaAction(householdId, ideaId);
+      });
+    },
+    [householdId]
+  );
+
+  const handlePermanentDelete = useCallback(
+    (ideaId: string) => {
+      if (!confirm("Permanently delete this idea? This cannot be undone.")) return;
+      startTransition(async () => {
+        await permanentlyDeleteIdeaAction(householdId, ideaId);
       });
     },
     [householdId]
@@ -327,6 +337,16 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                           >
                             Archive
                           </button>
+                          <button
+                            type="button"
+                            className="dropdown-menu__item dropdown-menu__item--danger"
+                            onClick={() => {
+                              setStageMenu(null);
+                              handlePermanentDelete(idea.id);
+                            }}
+                          >
+                            Delete Permanently
+                          </button>
                         </div>
                       )}
                     </div>
@@ -419,6 +439,13 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                         onClick={() => handleDelete(idea.id)}
                       >
                         Archive
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--ghost button--sm button--danger"
+                        onClick={() => handlePermanentDelete(idea.id)}
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>

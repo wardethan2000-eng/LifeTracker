@@ -1,5 +1,6 @@
 import {
   bulkArchiveIdeasSchema,
+  bulkDeleteIdeasSchema,
   bulkMoveIdeasSchema,
   bulkSetIdeaPrioritySchema
 } from "@lifekeeper/types";
@@ -165,6 +166,52 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
           });
         }
       }
+    }
+
+    return { succeeded, failed };
+  });
+
+  // POST /v1/households/:householdId/ideas/bulk/delete
+  app.post("/v1/households/:householdId/ideas/bulk/delete", async (request, reply) => {
+    const { householdId } = householdParamsSchema.parse(request.params);
+    const body = request.body as Record<string, unknown>;
+    const input = bulkDeleteIdeasSchema.parse({ ...body, householdId });
+
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const ideas = await app.prisma.idea.findMany({
+      where: {
+        id: { in: input.ideaIds },
+        householdId
+      },
+      select: { id: true, title: true }
+    });
+
+    const found = new Set(ideas.map((i) => i.id));
+    const failed: BulkFailedItem[] = input.ideaIds
+      .filter((id) => !found.has(id))
+      .map((id) => ({ id, label: null, error: "Idea not found." }));
+
+    let succeeded = 0;
+
+    for (const idea of ideas) {
+      try {
+        await app.prisma.idea.delete({ where: { id: idea.id } });
+        succeeded++;
+        void removeSearchIndexEntry(app.prisma, "idea", idea.id).catch(console.error);
+      } catch (err) {
+        failed.push({
+          id: idea.id,
+          label: idea.title,
+          error: err instanceof Error ? err.message : "Failed to delete idea."
+        });
+      }
+    }
+
+    if (succeeded > 0) {
+            await createActivityLogger(app.prisma, request.auth.userId).log("idea", householdId, "idea.bulk_deleted", householdId, { count: succeeded });
     }
 
     return { succeeded, failed };

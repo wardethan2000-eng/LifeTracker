@@ -824,6 +824,19 @@ export const notificationPreferencesSchema = z.object({
   preferDigest: z.boolean().default(false)
 });
 
+export const dateFormatSchema = z.enum(["US", "ISO", "locale"]);
+export type DateFormat = z.infer<typeof dateFormatSchema>;
+
+export const displayPreferencesSchema = z.object({
+  pageSize: z.number().int().min(10).max(100).default(25),
+  dateFormat: dateFormatSchema.default("US"),
+  currencyCode: z.string().length(3).default("USD")
+});
+export type DisplayPreferences = z.infer<typeof displayPreferencesSchema>;
+
+export const updateDisplayPreferencesSchema = displayPreferencesSchema.partial();
+export type UpdateDisplayPreferencesInput = z.infer<typeof updateDisplayPreferencesSchema>;
+
 export const userProfileSchema = z.object({
   id: z.string().cuid(),
   clerkUserId: z.string(),
@@ -3474,6 +3487,7 @@ export type BulkArchiveHobbySessionsInput = z.infer<typeof bulkArchiveHobbySessi
 export type BulkHobbySessionOperationResult = z.infer<typeof bulkHobbySessionOperationResultSchema>;
 export type BulkMoveIdeasInput = z.infer<typeof bulkMoveIdeasSchema>;
 export type BulkArchiveIdeasInput = z.infer<typeof bulkArchiveIdeasSchema>;
+export type BulkDeleteIdeasInput = z.infer<typeof bulkDeleteIdeasSchema>;
 export type BulkSetIdeaPriorityInput = z.infer<typeof bulkSetIdeaPrioritySchema>;
 export type BulkIdeaOperationResult = z.infer<typeof bulkIdeaOperationResultSchema>;
 export type Asset = z.infer<typeof assetSchema>;
@@ -5906,6 +5920,11 @@ export const bulkMoveIdeasSchema = z.object({
 });
 
 export const bulkArchiveIdeasSchema = z.object({
+  householdId: z.string().cuid(),
+  ideaIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkDeleteIdeasSchema = z.object({
   householdId: z.string().cuid(),
   ideaIds: z.array(z.string().cuid()).min(1).max(100)
 });

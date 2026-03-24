@@ -81,6 +81,7 @@ import type {
   PromoteIdeaInput,
   DemoteToIdeaInput,
   UpdateNotificationPreferencesInput,
+  UpdateDisplayPreferencesInput,
 } from "@lifekeeper/types";
 import {
   assetCustomFieldsSchema,
@@ -222,6 +223,7 @@ import {
   createIdea,
   updateIdea,
   deleteIdea,
+  permanentlyDeleteIdea,
   addIdeaNote,
   removeIdeaNote,
   addIdeaLink,
@@ -230,6 +232,8 @@ import {
   promoteIdea,
   demoteToIdea,
   updateNotificationPreferences,
+  updateDisplayPreferences,
+  deleteAccount,
   restoreProject,
   restoreInventoryItem,
   purgeAsset as purgeAssetApi,
@@ -3802,6 +3806,14 @@ export async function deleteIdeaAction(
   revalidateIdeaPaths(ideaId);
 }
 
+export async function permanentlyDeleteIdeaAction(
+  householdId: string,
+  ideaId: string
+): Promise<void> {
+  await permanentlyDeleteIdea(householdId, ideaId);
+  revalidateIdeaPaths(ideaId);
+}
+
 export async function addIdeaNoteAction(
   householdId: string,
   ideaId: string,
@@ -3921,4 +3933,14 @@ export async function purgeAllTrashAction(householdId: string): Promise<void> {
   revalidateInventoryPaths(householdId);
   revalidatePath("/trash");
   revalidateDashboardPath();
+}
+
+export async function updateDisplayPreferencesAction(input: UpdateDisplayPreferencesInput): Promise<void> {
+  await updateDisplayPreferences(input);
+  revalidatePath("/settings");
+}
+
+export async function deleteAccountAction(): Promise<void> {
+  await deleteAccount();
+  redirect("/sign-in");
 }

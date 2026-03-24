@@ -220,6 +220,32 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(204).send();
   });
 
+  // DELETE /v1/households/:householdId/ideas/:ideaId/permanent
+  app.delete("/v1/households/:householdId/ideas/:ideaId/permanent", async (request, reply) => {
+    const { householdId, ideaId } = ideaParamsSchema.parse(request.params);
+    const userId = request.auth.userId;
+
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
+    }
+
+    const existing = await app.prisma.idea.findFirst({
+      where: { id: ideaId, householdId },
+    });
+
+    if (!existing) {
+      return notFound(reply, "Idea");
+    }
+
+    await app.prisma.idea.delete({ where: { id: ideaId } });
+
+        await createActivityLogger(app.prisma, userId).log("idea", ideaId, "idea.deleted", householdId, { title: existing.title });
+
+    await removeSearchIndexEntry(app.prisma, "idea", ideaId);
+
+    return reply.code(204).send();
+  });
+
   // POST /v1/households/:householdId/ideas/:ideaId/notes
   app.post("/v1/households/:householdId/ideas/:ideaId/notes", async (request, reply) => {
     const { householdId, ideaId } = ideaParamsSchema.parse(request.params);

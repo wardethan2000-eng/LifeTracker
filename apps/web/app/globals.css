@@ -10795,6 +10795,48 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--error, #d00);
 }
 
+.folder-tree__menu-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--ink-muted, #888);
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: auto;
+}
+
+.folder-tree__menu-btn:hover {
+  background: var(--surface-hover, #eee);
+  color: var(--ink);
+}
+
+.folder-tree__confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--error-bg, #fff5f5);
+  border-radius: 4px;
+  margin: 2px 0;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.folder-tree__confirm-label {
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-tree__confirm-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .folder-tree__rename-input {
   font: inherit;
   font-size: 0.9rem;

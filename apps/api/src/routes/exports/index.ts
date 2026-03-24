@@ -51,7 +51,8 @@ const householdCsvDatasetSchema = z.enum([
 ]);
 
 const householdCsvQuerySchema = dateRangeQuerySchema.extend({
-  dataset: householdCsvDatasetSchema
+  dataset: householdCsvDatasetSchema,
+  assetIds: z.string().optional()
 });
 
 const annualCostPdfQuerySchema = z.object({
@@ -1440,6 +1441,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     if (await applyTier(request, reply, "bulk-export")) return reply;
     const params = householdParamsSchema.parse(request.params);
     const query = householdCsvQuerySchema.parse(request.query);
+    const assetIdList = query.assetIds ? query.assetIds.split(",").filter(Boolean) : [];
 
     if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
       return;
@@ -1451,7 +1453,10 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       case "cost-dashboard": {
         const logs = await app.prisma.maintenanceLog.findMany({
           where: {
-            asset: { householdId: params.householdId },
+            asset: {
+              householdId: params.householdId,
+              ...(assetIdList.length > 0 ? { id: { in: assetIdList } } : {})
+            },
             ...(query.since || query.until
               ? {
                   completedAt: {
@@ -1545,7 +1550,8 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
         const schedules = await app.prisma.maintenanceSchedule.findMany({
           where: {
             asset: {
-              householdId: params.householdId
+              householdId: params.householdId,
+              ...(assetIdList.length > 0 ? { id: { in: assetIdList } } : {})
             }
           },
           include: {
