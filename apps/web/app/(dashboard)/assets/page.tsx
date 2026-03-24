@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
-import { ApiError, getHouseholdAssetsPaginated, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdAssetsPaginated, getMe } from "../../../lib/api";
 import { AssetListWorkspace } from "../../../components/asset-list-workspace";
 import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
@@ -16,11 +16,12 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
   const t = await getTranslations("assets");
   const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const includeArchived = params.includeArchived === "true";
   const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
     ? Number(params.limit)
-    : 25;
+    : prefs.pageSize;
   const offset = typeof params.offset === "string" && Number.isInteger(Number(params.offset)) && Number(params.offset) >= 0
     ? Number(params.offset)
     : 0;

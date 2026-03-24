@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
-import { ApiError, getHouseholdDueWork, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdDueWork, getMe } from "../../../lib/api";
 import { formatCategoryLabel } from "../../../lib/formatters";
 import { MaintenanceListWorkspace } from "../../../components/maintenance-list-workspace";
 import { OffsetPaginationControls } from "../../../components/pagination-controls";
@@ -30,6 +30,7 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
   const t = await getTranslations("maintenance");
   const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const statusFilter = typeof params.status === "string" && statusOptions.includes(params.status as (typeof statusOptions)[number])
     ? params.status as (typeof statusOptions)[number]
     : "all";
@@ -37,8 +38,8 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
   const sort = typeof params.sort === "string" && sortOptions.includes(params.sort as (typeof sortOptions)[number])
     ? params.sort as (typeof sortOptions)[number]
     : "priority";
-  const rawLimit = typeof params.limit === "string" ? parseInt(params.limit, 10) : 25;
-  const limit = (limitOptions as readonly number[]).includes(rawLimit) ? rawLimit : 25;
+  const rawLimit = typeof params.limit === "string" ? parseInt(params.limit, 10) : prefs.pageSize;
+  const limit = (limitOptions as readonly number[]).includes(rawLimit) ? rawLimit : prefs.pageSize;
   const offset = typeof params.offset === "string" ? Math.max(0, parseInt(params.offset, 10)) : 0;
 
   try {

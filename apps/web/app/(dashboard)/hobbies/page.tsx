@@ -2,7 +2,7 @@ import type { HobbyStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
-import { ApiError, getHouseholdHobbies, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdHobbies, getMe } from "../../../lib/api";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
 
 type HobbiesPageProps = {
@@ -30,6 +30,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
   const t = await getTranslations("hobbies");
   const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const statusParam = getParam(params.status);
   const selectedStatus = (statusParam === "active" || statusParam === "paused" || statusParam === "archived")
     ? statusParam as HobbyStatus
@@ -40,7 +41,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
     : [];
   const limit = typeof params.limit === "string" && [25, 50, 100].includes(Number(params.limit))
     ? Number(params.limit)
-    : 25;
+    : prefs.pageSize;
 
   const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
     const q = new URLSearchParams();

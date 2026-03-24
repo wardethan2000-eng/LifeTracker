@@ -9,7 +9,7 @@ import {
   markNotificationsReadAction,
   markNotificationsUnreadAction
 } from "../../actions";
-import { ApiError, getHouseholdNotifications, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdNotifications, getMe } from "../../../lib/api";
 import { formatDateTime, formatNotificationTone } from "../../../lib/formatters";
 
 type NotificationsPageProps = {
@@ -147,6 +147,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const t = await getTranslations("notifications");
   const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const status = typeof params.status === "string" && statusOptions.includes(params.status as (typeof statusOptions)[number])
     ? params.status as (typeof statusOptions)[number]
     : "all";
@@ -158,7 +159,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     : "all";
   const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
     ? Number(params.limit)
-    : 25;
+    : prefs.pageSize;
   const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
   const history = typeof params.history === "string"
     ? params.history.split(",").map((value) => value.trim()).filter(Boolean)

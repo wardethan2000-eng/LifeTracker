@@ -6,7 +6,7 @@ import { getTranslations } from "next-intl/server";
 import { ProjectPortfolioAside } from "../../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../../components/project-portfolio-stats";
 import { ProjectPortfolioWorkspace } from "../../../components/project-portfolio-workspace";
-import { ApiError, getHouseholdProjectPortfolioPaginated, getHouseholdProjectStatusCounts, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdProjectPortfolioPaginated, getHouseholdProjectStatusCounts, getMe } from "../../../lib/api";
 import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
 type ProjectsPageProps = {
@@ -158,6 +158,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
   const t = await getTranslations("projects");
   const tCommon = await getTranslations("common");
   const params = searchParams ? await searchParams : {};
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const householdId = getParam(params.householdId);
   const statusParam = getParam(params.status);
   const sortParam = getParam(params.sort);
@@ -167,7 +168,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
   const searchQuery = normalizeSearchValue(rawSearchQuery);
   const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
     ? Number(params.limit)
-    : 25;
+    : prefs.pageSize;
   const offset = typeof params.offset === "string" && Number.isInteger(Number(params.offset)) && Number(params.offset) >= 0
     ? Number(params.offset)
     : 0;
