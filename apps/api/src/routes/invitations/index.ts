@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import {
   createInvitationSchema,
   acceptInvitationSchema,
@@ -7,13 +7,11 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertOwner, assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { toInvitationResponse } from "../../lib/serializers/index.js";
 import { syncInvitationToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const invitationParamsSchema = householdParamsSchema.extend({
   invitationId: z.string().cuid()
@@ -52,14 +50,7 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
     // TODO: Wire in email send call here once an email provider (SendGrid, SES, etc.) is integrated.
     // For now, the token is returned in the response so the owner can share the link manually.
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "member.invited",
-      entityType: "invitation",
-      entityId: invitation.id,
-      metadata: { email: input.email }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("invitation", invitation.id, "member.invited", params.householdId, { email: input.email });
 
     void syncInvitationToSearchIndex(app.prisma, invitation.id).catch(console.error);
 
@@ -75,7 +66,7 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const invitations = await app.prisma.householdInvitation.findMany({
@@ -99,7 +90,7 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!invitation) {
-      return reply.code(404).send({ message: "Invitation not found." });
+      return notFound(reply, "Invitation");
     }
 
     if (invitation.status !== "pending") {
@@ -166,17 +157,10 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!result) {
-      return reply.code(404).send({ message: "Household not found." });
+      return notFound(reply, "Household");
     }
 
-    await logActivity(app.prisma, {
-      householdId: invitation.householdId,
-      userId: request.auth.userId,
-      action: "member.joined",
-      entityType: "invitation",
-      entityId: invitation.id,
-      metadata: { email: invitation.email }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("invitation", invitation.id, "member.joined", invitation.householdId, { email: invitation.email });
 
     void syncInvitationToSearchIndex(app.prisma, invitation.id).catch(console.error);
 
@@ -211,7 +195,7 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!invitation) {
-      return reply.code(404).send({ message: "Pending invitation not found." });
+      return notFound(reply, "Pending invitation");
     }
 
     const updated = await app.prisma.householdInvitation.update({
@@ -219,14 +203,7 @@ export const invitationRoutes: FastifyPluginAsync = async (app) => {
       data: { status: "revoked" }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "member.invitation_revoked",
-      entityType: "invitation",
-      entityId: invitation.id,
-      metadata: { email: invitation.email }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("invitation", invitation.id, "member.invitation_revoked", params.householdId, { email: invitation.email });
 
     void syncInvitationToSearchIndex(app.prisma, updated.id).catch(console.error);
 

@@ -1,4 +1,4 @@
-import type { Asset, Prisma, PrismaClient, UsageMetric } from "@prisma/client";
+import type { Asset, Prisma, UsageMetric } from "@prisma/client";
 import { presetLibrary } from "@lifekeeper/presets";
 import {
   assetFieldDefinitionsSchema,
@@ -13,12 +13,12 @@ import {
 } from "@lifekeeper/types";
 import { toInputJsonValue } from "./prisma-json.js";
 import { recalculateScheduleFields } from "./schedule-state.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 
 const customFieldTemplatesArraySchema = presetCustomFieldTemplateSchema.array();
 const metricTemplatesArraySchema = presetUsageMetricTemplateSchema.array();
 const scheduleTemplatesArraySchema = presetScheduleTemplateSchema.array();
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 const normalizePresetFieldDefinition = (field: PresetDefinition["suggestedCustomFields"][number], index: number) => ({
   key: field.key,

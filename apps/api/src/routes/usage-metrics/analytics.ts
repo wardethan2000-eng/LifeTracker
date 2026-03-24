@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+﻿import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { householdUsageHighlightListSchema } from "@lifekeeper/types";
 import {
@@ -16,14 +16,8 @@ import {
   toUsageCostNormalizationResponse,
   toUsageRateAnalyticsResponse
 } from "../../lib/serializers/index.js";
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { assetParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
 
 const metricParamsSchema = assetParamsSchema.extend({
   metricId: z.string().cuid()
@@ -50,7 +44,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const since = new Date();
@@ -194,7 +188,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const metric = await app.prisma.usageMetric.findFirst({
@@ -205,7 +199,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!metric) {
-      return reply.code(404).send({ message: "Usage metric not found." });
+      return notFound(reply, "Usage metric");
     }
 
     const since = new Date();
@@ -239,7 +233,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const metric = await app.prisma.usageMetric.findFirst({
@@ -250,7 +244,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!metric) {
-      return reply.code(404).send({ message: "Usage metric not found." });
+      return notFound(reply, "Usage metric");
     }
 
     const [baselineEntry, logs] = await Promise.all([
@@ -320,7 +314,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const metric = await app.prisma.usageMetric.findFirst({
@@ -331,7 +325,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!metric) {
-      return reply.code(404).send({ message: "Usage metric not found." });
+      return notFound(reply, "Usage metric");
     }
 
     const [entries, schedules] = await Promise.all([
@@ -382,7 +376,7 @@ export const usageMetricAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const metrics = await app.prisma.usageMetric.findMany({

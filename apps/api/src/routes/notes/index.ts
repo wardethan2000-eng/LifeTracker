@@ -1,15 +1,14 @@
-import {
+﻿import {
   createNoteFolderSchema,
   updateNoteFolderSchema,
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { createActivityLogger } from "../../lib/activity-log.js";
+import { notFound } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const folderParamsSchema = householdParamsSchema.extend({
   folderId: z.string().cuid()
@@ -80,7 +79,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
         where: { id: input.parentFolderId, householdId, deletedAt: null }
       });
       if (!parent) {
-        return reply.code(404).send({ message: "Parent folder not found" });
+        return notFound(reply, "Parent folder");
       }
     }
 
@@ -103,14 +102,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "note_folder_created",
-      entityType: "note_folder",
-      entityId: folder.id,
-      metadata: { name: folder.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("note_folder", folder.id, "note_folder_created", householdId, { name: folder.name });
 
     reply.code(201);
     return {
@@ -138,7 +130,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
       where: { id: folderId, householdId, deletedAt: null }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Folder not found" });
+      return notFound(reply, "Folder");
     }
 
     if (input.parentFolderId !== undefined) {
@@ -150,7 +142,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
           where: { id: input.parentFolderId, householdId, deletedAt: null }
         });
         if (!parent) {
-          return reply.code(404).send({ message: "Parent folder not found" });
+          return notFound(reply, "Parent folder");
         }
         // Check for circular reference
         let checkId: string | null = input.parentFolderId;
@@ -187,14 +179,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "note_folder_updated",
-      entityType: "note_folder",
-      entityId: folder.id,
-      metadata: { name: folder.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("note_folder", folder.id, "note_folder_updated", householdId, { name: folder.name });
 
     return {
       id: folder.id,
@@ -220,7 +205,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
       where: { id: folderId, householdId, deletedAt: null }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Folder not found" });
+      return notFound(reply, "Folder");
     }
 
     // Soft-delete folder and orphan children + entries
@@ -235,18 +220,11 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
       }),
       app.prisma.noteFolder.update({
         where: { id: folderId },
-        data: { deletedAt: new Date() }
+        data: softDeleteData()
       })
     ]);
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "note_folder_deleted",
-      entityType: "note_folder",
-      entityId: folderId,
-      metadata: { name: existing.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("note_folder", folderId, "note_folder_deleted", householdId, { name: existing.name });
 
     return { success: true };
   });

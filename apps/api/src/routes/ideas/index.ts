@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   createIdeaSchema,
   updateIdeaSchema,
@@ -14,13 +14,11 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { syncIdeaToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { toIdeaResponse, toIdeaSummaryResponse } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid(),
-});
+import { notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const ideaParamsSchema = householdParamsSchema.extend({
   ideaId: z.string().cuid(),
@@ -129,13 +127,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.created",
-      entityType: "idea",
-      entityId: idea.id,
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.created", householdId);
 
     await syncIdeaToSearchIndex(app.prisma, idea.id);
 
@@ -156,7 +148,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!idea) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     return reply.send(toIdeaResponse(idea));
@@ -177,7 +169,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     const idea = await app.prisma.idea.update({
@@ -195,13 +187,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.updated",
-      entityType: "idea",
-      entityId: idea.id,
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.updated", householdId);
 
     await syncIdeaToSearchIndex(app.prisma, idea.id);
 
@@ -222,7 +208,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     await app.prisma.idea.update({
@@ -230,14 +216,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       data: { archivedAt: new Date() },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.archived",
-      entityType: "idea",
-      entityId: ideaId,
-      metadata: { title: existing.title },
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", ideaId, "idea.archived", householdId, { title: existing.title });
 
     await removeSearchIndexEntry(app.prisma, "idea", ideaId);
 
@@ -259,7 +238,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     const existingNotes = (existing.notes as unknown as IdeaNoteItem[]) ?? [];
@@ -276,13 +255,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.note_added",
-      entityType: "idea",
-      entityId: ideaId,
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", ideaId, "idea.note_added", householdId);
 
     return reply.send(toIdeaResponse(idea));
   });
@@ -301,7 +274,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     const existingNotes = (existing.notes as unknown as IdeaNoteItem[]) ?? [];
@@ -332,7 +305,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     const existingLinks = (existing.links as unknown as IdeaLinkItem[]) ?? [];
@@ -350,13 +323,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.link_added",
-      entityType: "idea",
-      entityId: ideaId,
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", ideaId, "idea.link_added", householdId);
 
     return reply.send(toIdeaResponse(idea));
   });
@@ -375,7 +342,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     const existingLinks = (existing.links as unknown as IdeaLinkItem[]) ?? [];
@@ -406,7 +373,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     const idea = await app.prisma.idea.update({
@@ -414,14 +381,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       data: { stage },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.stage_changed",
-      entityType: "idea",
-      entityId: ideaId,
-      metadata: { from: existing.stage, to: stage },
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", ideaId, "idea.stage_changed", householdId, { from: existing.stage, to: stage });
 
     return reply.send(toIdeaResponse(idea));
   });
@@ -441,7 +401,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Idea not found" });
+      return notFound(reply, "Idea");
     }
 
     if (existing.promotedAt) {
@@ -521,14 +481,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.promoted",
-      entityType: "idea",
-      entityId: ideaId,
-      metadata: { targetType, targetId },
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", ideaId, "idea.promoted", householdId, { targetType, targetId });
 
     await removeSearchIndexEntry(app.prisma, "idea", ideaId);
 
@@ -585,7 +538,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
         select: { name: true, description: true },
       });
       if (!project) {
-        return reply.code(404).send({ message: "Source project not found" });
+        return notFound(reply, "Source project");
       }
       sourceName = project.name;
       sourceDescription = project.description;
@@ -595,7 +548,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
         select: { name: true, description: true },
       });
       if (!asset) {
-        return reply.code(404).send({ message: "Source asset not found" });
+        return notFound(reply, "Source asset");
       }
       sourceName = asset.name;
       sourceDescription = asset.description;
@@ -605,7 +558,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
         select: { name: true, description: true },
       });
       if (!hobby) {
-        return reply.code(404).send({ message: "Source hobby not found" });
+        return notFound(reply, "Source hobby");
       }
       sourceName = hobby.name;
       sourceDescription = hobby.description;
@@ -623,14 +576,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "idea.demoted_from",
-      entityType: "idea",
-      entityId: idea.id,
-      metadata: { sourceType: input.sourceType, sourceId: input.sourceId },
-    });
+        await createActivityLogger(app.prisma, userId).log("idea", idea.id, "idea.demoted_from", householdId, { sourceType: input.sourceType, sourceId: input.sourceId });
 
     await syncIdeaToSearchIndex(app.prisma, idea.id);
 

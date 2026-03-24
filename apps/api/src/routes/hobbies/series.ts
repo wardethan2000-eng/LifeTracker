@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+﻿import { Prisma } from "@prisma/client";
 import {
   createHobbySeriesInputSchema,
   hobbySeriesComparisonSchema,
@@ -11,7 +11,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   createEntryEntityKey,
   resolveEntryEntityContexts
@@ -33,11 +33,8 @@ import {
   removeSearchIndexEntry,
   syncHobbySeriesToSearchIndex
 } from "../../lib/search-index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const seriesParamsSchema = hobbyParamsSchema.extend({
   seriesId: z.string().cuid()
@@ -116,7 +113,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
 
     const hobby = await ensureHobbyExists(app.prisma, householdId, hobbyId);
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const where: Prisma.HobbySeriesWhereInput = {
@@ -182,7 +179,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!series) {
-      return reply.code(404).send({ message: "Series not found" });
+      return notFound(reply, "Series");
     }
 
     const entries = await app.prisma.entry.findMany({
@@ -236,7 +233,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
 
     const hobby = await ensureHobbyExists(app.prisma, householdId, hobbyId);
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const sessionIds = Array.from(new Set(input.sessionIds ?? []));
@@ -286,14 +283,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_series_created",
-      entityType: "hobby_series",
-      entityId: series.id,
-      metadata: { hobbyId, name: series.name, linkedSessionCount: sessionIds.length }
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby_series", series.id, "hobby_series_created", householdId, { hobbyId, name: series.name, linkedSessionCount: sessionIds.length });
 
     await syncHobbySeriesToSearchIndex(app.prisma, series.id);
 
@@ -315,7 +305,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Series not found" });
+      return notFound(reply, "Series");
     }
 
     if (input.bestBatchSessionId) {
@@ -346,14 +336,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
       include: seriesSummaryInclude
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_series_updated",
-      entityType: "hobby_series",
-      entityId: updated.id,
-      metadata: { hobbyId, name: updated.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby_series", updated.id, "hobby_series_updated", householdId, { hobbyId, name: updated.name });
 
     await syncHobbySeriesToSearchIndex(app.prisma, updated.id);
 
@@ -377,7 +360,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Series not found" });
+      return notFound(reply, "Series");
     }
 
     const linkedEntries = await app.prisma.entry.findMany({
@@ -401,14 +384,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
       await tx.hobbySeries.delete({ where: { id: seriesId } });
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_series_deleted",
-      entityType: "hobby_series",
-      entityId: seriesId,
-      metadata: { hobbyId, name: existing.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby_series", seriesId, "hobby_series_deleted", householdId, { hobbyId, name: existing.name });
 
     await Promise.all([
       removeSearchIndexEntry(app.prisma, "hobby_series", seriesId),
@@ -442,10 +418,10 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
     ]);
 
     if (!series) {
-      return reply.code(404).send({ message: "Series not found" });
+      return notFound(reply, "Series");
     }
     if (!session) {
-      return reply.code(404).send({ message: "Session not found" });
+      return notFound(reply, "Session");
     }
     if (session.seriesId === seriesId) {
       return reply.code(400).send({ message: "Session is already linked to this series." });
@@ -459,14 +435,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
       return updateHobbySessionSeriesLink(tx, input.sessionId, seriesId, batchNumber);
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_series_session_linked",
-      entityType: "hobby_series",
-      entityId: seriesId,
-      metadata: { hobbyId, sessionId: updated.id, batchNumber: updated.batchNumber }
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby_series", seriesId, "hobby_series_session_linked", householdId, { hobbyId, sessionId: updated.id, batchNumber: updated.batchNumber });
 
     await syncHobbySeriesToSearchIndex(app.prisma, seriesId);
 
@@ -499,14 +468,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
       await updateHobbySessionSeriesLink(tx, sessionId, null, null);
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_series_session_unlinked",
-      entityType: "hobby_series",
-      entityId: seriesId,
-      metadata: { hobbyId, sessionId }
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby_series", seriesId, "hobby_series_session_unlinked", householdId, { hobbyId, sessionId });
 
     await syncHobbySeriesToSearchIndex(app.prisma, seriesId);
 
@@ -554,14 +516,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
       data: { batchNumber: input.batchNumber }
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_series_session_reordered",
-      entityType: "hobby_series",
-      entityId: seriesId,
-      metadata: { hobbyId, sessionId, batchNumber: input.batchNumber }
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby_series", seriesId, "hobby_series_session_reordered", householdId, { hobbyId, sessionId, batchNumber: input.batchNumber });
 
     await syncHobbySeriesToSearchIndex(app.prisma, seriesId);
 
@@ -582,7 +537,7 @@ export const hobbySeriesRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!series) {
-      return reply.code(404).send({ message: "Series not found" });
+      return notFound(reply, "Series");
     }
 
     const sessions = await app.prisma.hobbySession.findMany({

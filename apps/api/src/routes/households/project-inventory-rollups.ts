@@ -1,11 +1,8 @@
-import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
+﻿import type { FastifyPluginAsync } from "fastify";
 import { assertMembership, ForbiddenError } from "../../lib/asset-access.js";
 import { toProjectInventoryRollupResponse } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 export const householdProjectInventoryRollupRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/projects/inventory-rollups", async (request, reply) => {
@@ -15,7 +12,7 @@ export const householdProjectInventoryRollupRoutes: FastifyPluginAsync = async (
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch (error) {
       if (error instanceof ForbiddenError) {
-        return reply.code(403).send({ message: "You do not have access to this household." });
+        return forbidden(reply);
       }
 
       throw error;

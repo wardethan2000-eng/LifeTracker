@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   addSpaceItemInputSchema,
   createSpaceInputSchema,
@@ -22,7 +22,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { sendQrCode } from "../../lib/qr.js";
 import { z } from "zod";
 import { checkMembership, requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { csvValue } from "../../lib/csv.js";
 import { createBatchLabelPdf, createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
 import { removeSearchIndexEntry, syncSpaceToSearchIndex } from "../../lib/search-index.js";
@@ -43,10 +43,10 @@ import {
   getSpaceBreadcrumb,
   getSpaceTree
 } from "../../lib/spaces.js";
+import { forbidden, notFound } from "../../lib/errors.js";
+import { softDeleteData, optionallyIncludeDeleted } from "../../lib/soft-delete.js";
 
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema, qrCodeQuerySchema } from "../../lib/schemas.js";
 
 const spaceParamsSchema = householdParamsSchema.extend({
   spaceId: z.string().cuid()
@@ -71,11 +71,6 @@ const spaceListQuerySchema = z.object({
   includeDeleted: z.coerce.boolean().default(false),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   cursor: z.string().cuid().optional()
-});
-
-const qrCodeQuerySchema = z.object({
-  format: z.enum(["png", "svg"]).default("svg"),
-  size: z.coerce.number().int().min(100).max(1000).default(300)
 });
 
 const orphanInventoryQuerySchema = z.object({
@@ -303,7 +298,7 @@ const getSpaceOrNull = async (
   where: {
     id: spaceId,
     householdId,
-    ...(options.includeDeleted ? {} : { deletedAt: null })
+    ...optionallyIncludeDeleted(options.includeDeleted)
   }
 });
 
@@ -518,7 +513,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = createSpaceInputSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const created = await app.prisma.$transaction(async (tx) => {
@@ -546,18 +541,11 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, created.id);
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "space.created",
-      entityType: "inventory_item",
-      entityId: created.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", created.id, "space.created", params.householdId, {
         name: created.name,
         type: created.type,
         shortCode: created.shortCode
-      }
-    });
+      });
 
     void syncSpaceToSearchIndex(app.prisma, created.id).catch(console.error);
 
@@ -569,12 +557,12 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const query = spaceListQuerySchema.parse(request.query);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const where: Prisma.SpaceWhereInput = {
       householdId: params.householdId,
-      ...(query.includeDeleted ? {} : { deletedAt: null }),
+      ...optionallyIncludeDeleted(query.includeDeleted),
       ...(query.type ? { type: query.type } : {}),
       ...(query.search
         ? {
@@ -636,7 +624,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const tree = await getSpaceTree(app.prisma, params.householdId);
@@ -647,7 +635,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceLookupParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await app.prisma.space.findFirst({
@@ -660,7 +648,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     await recordSpaceScanLog(app.prisma, {
@@ -678,7 +666,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const count = await app.prisma.inventoryItem.count({
@@ -699,7 +687,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const query = orphanInventoryQuerySchema.parse(request.query);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const where: Prisma.InventoryItemWhereInput = {
@@ -749,7 +737,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const [tree, lastActivity] = await Promise.all([
@@ -787,7 +775,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const query = recentScanQuerySchema.parse(request.query);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const entries = await app.prisma.spaceScanLog.findMany({
@@ -841,7 +829,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = householdParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const spaces = await app.prisma.space.findMany({
@@ -908,7 +896,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = importSpacesSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const nameCounts = new Map<string, number>();
@@ -1130,18 +1118,11 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (result.created > 0 || result.updated > 0) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "space.imported",
-        entityType: "inventory_item",
-        entityId: params.householdId,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", params.householdId, "space.imported", params.householdId, {
           created: result.created,
           updated: result.updated,
           errorCount: result.errors.length
-        }
-      });
+        });
 
       void syncSpacesToSearchIndex(app.prisma, result.touchedSpaceIds).catch(console.error);
     }
@@ -1158,7 +1139,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = batchLabelBodySchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const spaces = await app.prisma.space.findMany({
@@ -1205,13 +1186,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const query = qrCodeQuerySchema.parse(request.query);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const scanTag = space.scanTag ?? await ensureSpaceScanTag(app.prisma, space.id);
@@ -1224,13 +1205,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const [scanTag, breadcrumb] = await Promise.all([
@@ -1257,7 +1238,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await app.prisma.space.findFirst({
@@ -1270,7 +1251,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, space.id);
@@ -1281,13 +1262,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     await recordSpaceScanLog(app.prisma, {
@@ -1305,13 +1286,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = updateSpaceInputSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const nextParentSpaceId = input.parentSpaceId !== undefined
@@ -1333,17 +1314,10 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, updated.id);
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "space.updated",
-      entityType: "inventory_item",
-      entityId: updated.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", updated.id, "space.updated", params.householdId, {
         name: updated.name,
         type: updated.type
-      }
-    });
+      });
 
     const householdSpaces = await app.prisma.space.findMany({
       where: { householdId: params.householdId },
@@ -1362,13 +1336,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const allSpaces = await app.prisma.space.findMany({
@@ -1404,17 +1378,10 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "space.deleted",
-      entityType: "inventory_item",
-      entityId: existing.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", existing.id, "space.deleted", params.householdId, {
         affectedSpaceCount: affectedSpaceIds.length,
         name: existing.name
-      }
-    });
+      });
 
     void removeSpacesFromSearchIndex(app.prisma, affectedSpaceIds).catch(console.error);
 
@@ -1425,13 +1392,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId, { includeDeleted: true });
 
     if (!existing || existing.deletedAt === null) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const parent = existing.parentSpaceId
@@ -1463,16 +1430,9 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, restored.id);
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "space.restored",
-      entityType: "inventory_item",
-      entityId: restored.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", restored.id, "space.restored", params.householdId, {
         name: restored.name
-      }
-    });
+      });
 
     void syncSpaceToSearchIndex(app.prisma, restored.id).catch(console.error);
 
@@ -1484,7 +1444,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = addSpaceItemInputSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const [space, inventoryItem] = await Promise.all([
@@ -1499,11 +1459,11 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     ]);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const link = await app.prisma.$transaction(async (tx) => {
@@ -1562,13 +1522,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceItemParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const existingLink = await app.prisma.spaceInventoryItem.findUnique({
@@ -1585,7 +1545,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existingLink) {
-      return reply.code(404).send({ message: "Inventory item assignment not found." });
+      return notFound(reply, "Inventory item assignment");
     }
 
     await app.prisma.$transaction(async (tx) => {
@@ -1618,13 +1578,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const items = await app.prisma.spaceInventoryItem.findMany({
@@ -1651,13 +1611,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = spaceGeneralItemInputSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const item = await app.prisma.$transaction(async (tx) => {
@@ -1691,7 +1651,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = updateSpaceGeneralItemInputSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const item = await app.prisma.spaceGeneralItem.findFirst({
@@ -1704,7 +1664,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "General item not found." });
+      return notFound(reply, "General item");
     }
 
     const updated = await app.prisma.spaceGeneralItem.update({
@@ -1723,7 +1683,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = generalItemParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const item = await app.prisma.spaceGeneralItem.findFirst({
@@ -1737,13 +1697,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "General item not found." });
+      return notFound(reply, "General item");
     }
 
     await app.prisma.$transaction(async (tx) => {
       await tx.spaceGeneralItem.update({
         where: { id: item.id },
-        data: { deletedAt: new Date() }
+        data: softDeleteData()
       });
 
       await recordGeneralItemHistory(tx, {
@@ -1763,13 +1723,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const params = spaceParamsSchema.parse(request.params);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const [inventoryItems, generalItems, childSpaces] = await Promise.all([
@@ -1827,13 +1787,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const query = spaceHistoryQuerySchema.parse(request.query);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const space = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const items = await app.prisma.spaceItemHistory.findMany({
@@ -1898,13 +1858,13 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const input = moveSpaceInputSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await getSpaceOrNull(app.prisma, params.householdId, params.spaceId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const newParentSpaceId = await assertParentCandidate(app.prisma, params.householdId, existing.id, input.newParentSpaceId);
@@ -1916,17 +1876,10 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, moved.id);
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "space.moved",
-      entityType: "inventory_item",
-      entityId: moved.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", moved.id, "space.moved", params.householdId, {
         previousParentSpaceId: existing.parentSpaceId,
         newParentSpaceId
-      }
-    });
+      });
 
     const householdSpaces = await app.prisma.space.findMany({
       where: { householdId: params.householdId },
@@ -1947,7 +1900,7 @@ export const householdSpaceRoutes: FastifyPluginAsync = async (app) => {
     const { orderedIds } = reorderByOrderedIdsSchema.parse(request.body);
 
     if (!await ensureMembership(app.prisma, params.householdId, request.auth.userId)) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.space.findMany({

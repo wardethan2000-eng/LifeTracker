@@ -1,6 +1,7 @@
-import { meResponseSchema } from "@lifekeeper/types";
+﻿import { meResponseSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { toUserProfileResponse } from "../lib/serializers/index.js";
+import { notFound } from "../lib/errors.js";
 
 export const meRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/me", async (request, reply) => {
@@ -9,7 +10,7 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!user) {
-      return reply.code(404).send({ message: "Current user not found." });
+      return notFound(reply, "Current user");
     }
 
     const memberships = await app.prisma.householdMember.findMany({

@@ -1,8 +1,9 @@
-import { type FastifyPluginAsync } from "fastify";
+﻿import { type FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { calculateProjectBudgetBurnProjection } from "../../lib/project-budget-burn.js";
 import { toProjectBudgetAnalysisResponse } from "../../lib/serializers/index.js";
+import { forbidden, notFound } from "../../lib/errors.js";
 
 const paramsSchema = z.object({
   householdId: z.string().cuid(),
@@ -16,7 +17,7 @@ export const projectBudgetAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -42,7 +43,7 @@ export const projectBudgetAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);

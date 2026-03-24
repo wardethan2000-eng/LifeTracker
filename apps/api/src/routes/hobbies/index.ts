@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   createHobbyInputSchema,
   hobbyActivityModeSchema,
@@ -11,18 +11,12 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { syncHobbyToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { findHobbyPreset, hobbyPresetToDefinition, applyHobbyPreset } from "../../lib/hobby-presets.js";
 import { toHobbyResponse, toHobbySummaryResponse } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const hobbyParamsSchema = householdParamsSchema.extend({
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
 
 const listHobbiesQuerySchema = z.object({
   status: hobbyStatusSchema.optional(),
@@ -297,13 +291,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
       return createdHobby;
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_created",
-      entityType: "hobby",
-      entityId: hobby.id,
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobby.id, "hobby_created", householdId);
 
     await syncHobbyToSearchIndex(app.prisma, hobby.id);
 
@@ -360,7 +348,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     return reply.send({
@@ -461,7 +449,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const hobby = await app.prisma.$transaction(async (prisma) => {
@@ -487,13 +475,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
       return updatedHobby;
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_updated",
-      entityType: "hobby",
-      entityId: hobby.id,
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobby.id, "hobby_updated", householdId);
 
     await syncHobbyToSearchIndex(app.prisma, hobby.id);
 
@@ -514,19 +496,12 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     await app.prisma.hobby.delete({ where: { id: hobbyId } });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_deleted",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { name: existing.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_deleted", householdId, { name: existing.name });
 
     await removeSearchIndexEntry(app.prisma, "hobby", hobbyId);
 
@@ -548,7 +523,7 @@ export const hobbyRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const existing = await app.prisma.hobbySessionStatusStep.findMany({

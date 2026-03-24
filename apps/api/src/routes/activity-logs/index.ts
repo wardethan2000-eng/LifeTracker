@@ -1,13 +1,10 @@
-import { activityLogQuerySchema } from "@lifekeeper/types";
+﻿import { activityLogQuerySchema } from "@lifekeeper/types";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
+import { householdParamsSchema } from "../../lib/schemas.js";
 import { assertMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden } from "../../lib/errors.js";
 
 export const activityLogRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/activity", async (request, reply) => {
@@ -17,7 +14,7 @@ export const activityLogRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const where: Prisma.ActivityLogWhereInput = {

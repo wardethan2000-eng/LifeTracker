@@ -1,9 +1,9 @@
-import type { Prisma, PrismaClient, SpaceScanMethod } from "@prisma/client";
+import type { Prisma, SpaceScanMethod } from "@prisma/client";
+import type { PrismaExecutor } from "./prisma-types.js";
 
-type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 export const recordSpaceScanLog = async (
-  prisma: PrismaLike,
+  prisma: PrismaExecutor,
   params: {
     householdId: string;
     spaceId: string;

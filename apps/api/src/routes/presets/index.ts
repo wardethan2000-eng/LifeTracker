@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import { presetLibrary } from "@lifekeeper/presets";
 import {
   applyPresetSchema,
@@ -15,10 +15,8 @@ import {
   toCustomPresetProfileResponse
 } from "../../lib/presets.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { assetParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
 
 const presetProfileParamsSchema = householdParamsSchema.extend({
   presetProfileId: z.string().cuid()
@@ -26,10 +24,6 @@ const presetProfileParamsSchema = householdParamsSchema.extend({
 
 const libraryPresetParamsSchema = z.object({
   presetKey: z.string().min(1)
-});
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
 });
 
 export const presetRoutes: FastifyPluginAsync = async (app) => {
@@ -40,7 +34,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     const preset = getLibraryPresetByKey(params.presetKey);
 
     if (!preset) {
-      return reply.code(404).send({ message: "Preset not found." });
+      return notFound(reply, "Preset");
     }
 
     return preset;
@@ -52,7 +46,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const presets = await app.prisma.presetProfile.findMany({
@@ -70,7 +64,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const key = slugifyPresetKey(input.key ?? input.label);
@@ -102,7 +96,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const preset = await app.prisma.presetProfile.findFirst({
@@ -113,7 +107,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!preset) {
-      return reply.code(404).send({ message: "Preset profile not found." });
+      return notFound(reply, "Preset profile");
     }
 
     return toCustomPresetProfileResponse(preset);
@@ -126,7 +120,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.presetProfile.findFirst({
@@ -137,7 +131,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Preset profile not found." });
+      return notFound(reply, "Preset profile");
     }
 
     const data: Prisma.PresetProfileUncheckedUpdateInput = {};
@@ -188,7 +182,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.presetProfile.findFirst({
@@ -199,7 +193,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Preset profile not found." });
+      return notFound(reply, "Preset profile");
     }
 
     await app.prisma.presetProfile.delete({ where: { id: existing.id } });
@@ -213,7 +207,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     let preset;
@@ -232,7 +226,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!customPreset) {
-        return reply.code(404).send({ message: "Preset profile not found." });
+        return notFound(reply, "Preset profile");
       }
 
       preset = toCustomPresetProfileResponse(customPreset);
@@ -240,7 +234,7 @@ export const presetRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (!preset) {
-      return reply.code(404).send({ message: "Preset not found." });
+      return notFound(reply, "Preset");
     }
 
     try {

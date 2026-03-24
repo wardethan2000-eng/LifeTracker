@@ -23,7 +23,7 @@ const activityMocks = vi.hoisted(() => ({
 
 vi.mock("../src/lib/hobby-practice.js", () => practiceMocks);
 vi.mock("../src/lib/search-index.js", () => searchMocks);
-vi.mock("../src/lib/activity-log.js", () => ({ logActivity: activityMocks.logActivity }));
+vi.mock("../src/lib/activity-log.js", () => ({ logActivity: activityMocks.logActivity, createActivityLogger: vi.fn(() => ({ log: vi.fn(async () => undefined) })) }));
 
 import { hobbyCollectionRoutes } from "../src/routes/hobbies/collection.js";
 import { hobbyGoalRoutes } from "../src/routes/hobbies/goals.js";

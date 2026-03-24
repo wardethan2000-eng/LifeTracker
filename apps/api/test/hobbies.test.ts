@@ -12,6 +12,7 @@ const searchMocks = vi.hoisted(() => ({
 
 vi.mock("../src/lib/activity-log.js", () => ({
   logActivity: activityMocks.logActivity,
+  createActivityLogger: vi.fn(() => ({ log: vi.fn(async () => undefined) }))
 }));
 
 vi.mock("../src/lib/search-index.js", () => ({

@@ -1,7 +1,8 @@
-import type { FastifyPluginAsync } from "fastify";
+﻿import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { toHobbyRecipeShoppingListResponse } from "../../lib/serializers/index.js";
+import { notFound } from "../../lib/errors.js";
 
 const recipeParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -36,7 +37,7 @@ export const hobbyShoppingListRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!recipe) {
-        return reply.code(404).send({ message: "Recipe not found" });
+        return notFound(reply, "Recipe");
       }
 
       const items = recipe.ingredients.map((ing) => {

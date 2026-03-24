@@ -1,4 +1,4 @@
-import {
+﻿import {
   createProjectNoteSchema,
   updateProjectNoteSchema
 } from "@lifekeeper/types";
@@ -10,18 +10,12 @@ import {
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { toInputJsonValue, parseTags } from "../../lib/prisma-json.js";
 import { toEntryAsProjectNote } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const projectParamsSchema = householdParamsSchema.extend({
-  projectId: z.string().cuid()
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { projectParamsSchema } from "../../lib/schemas.js";
 
 const noteParamsSchema = projectParamsSchema.extend({
   noteId: z.string().cuid()
@@ -51,7 +45,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const categoryFilter = query.category
@@ -137,7 +131,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const phases = await app.prisma.projectPhase.findMany({
@@ -162,7 +156,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!entry) {
-      return reply.code(404).send({ message: "Project note not found." });
+      return notFound(reply, "Project note");
     }
 
     const phaseName = entry.entityType === "project_phase"
@@ -184,7 +178,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     let phaseName: string | null = null;
@@ -196,7 +190,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Phase not found in this project." });
+        return badRequest(reply, "Phase not found in this project.");
       }
 
       phaseName = phase.name;
@@ -233,14 +227,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.note.created",
-      entityType: "project_note",
-      entityId: entry.id,
-      metadata: { projectId: project.id, title: entry.title, category: input.category ?? "general" }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_note", entry.id, "project.note.created", params.householdId, { projectId: project.id, title: entry.title, category: input.category ?? "general" });
 
     void syncEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
 
@@ -259,7 +246,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const phases = await app.prisma.projectPhase.findMany({
@@ -281,7 +268,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project note not found." });
+      return notFound(reply, "Project note");
     }
 
     // Validate new phaseId if provided
@@ -291,7 +278,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       const phase = phases.find((p) => p.id === input.phaseId);
 
       if (!phase) {
-        return reply.code(400).send({ message: "Phase not found in this project." });
+        return badRequest(reply, "Phase not found in this project.");
       }
 
       newPhaseName = phase.name;
@@ -359,14 +346,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
       await app.prisma.entryFlagEntry.create({ data: { entryId: existing.id, flag: "pinned" } });
     }
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.note.updated",
-      entityType: "project_note",
-      entityId: updated.id,
-      metadata: { projectId: project.id, title: updated.title }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_note", updated.id, "project.note.updated", params.householdId, { projectId: project.id, title: updated.title });
 
     // Re-fetch with updated flags
     const refreshed = await app.prisma.entry.findUniqueOrThrow({
@@ -397,7 +377,7 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const phases = await app.prisma.projectPhase.findMany({
@@ -419,19 +399,12 @@ export const projectNoteRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project note not found." });
+      return notFound(reply, "Project note");
     }
 
     await app.prisma.entry.delete({ where: { id: existing.id } });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.note.deleted",
-      entityType: "project_note",
-      entityId: existing.id,
-      metadata: { projectId: project.id, title: existing.title }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_note", existing.id, "project.note.deleted", params.householdId, { projectId: project.id, title: existing.title });
 
     await removeSearchIndexEntry(app.prisma, "entry", existing.id);
 

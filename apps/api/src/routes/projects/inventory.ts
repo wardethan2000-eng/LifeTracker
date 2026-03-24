@@ -1,4 +1,4 @@
-import {
+﻿import {
   allocateProjectInventorySchema,
   createProjectInventoryItemSchema,
   updateProjectInventoryItemSchema
@@ -17,11 +17,8 @@ import {
   toProjectInventoryItemResponse,
   toProjectInventoryLinkDetailResponse
 } from "../../lib/serializers/index.js";
-
-const projectParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  projectId: z.string().cuid()
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { projectParamsSchema } from "../../lib/schemas.js";
 
 const projectInventoryItemParamsSchema = projectParamsSchema.extend({
   inventoryItemId: z.string().cuid()
@@ -46,7 +43,7 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const links = await app.prisma.projectInventoryItem.findMany({
@@ -74,13 +71,13 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const inventoryItem = await getHouseholdInventoryItem(app.prisma, params.householdId, input.inventoryItemId);
 
     if (!inventoryItem) {
-      return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+      return badRequest(reply, "Inventory item not found or belongs to a different household.");
     }
 
     const existing = await app.prisma.projectInventoryItem.findUnique({
@@ -127,7 +124,7 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const existing = await app.prisma.projectInventoryItem.findUnique({
@@ -140,7 +137,7 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project inventory link not found." });
+      return notFound(reply, "Project inventory link");
     }
 
     const nextQuantityNeeded = input.quantityNeeded ?? existing.quantityNeeded;
@@ -177,13 +174,13 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const inventoryItem = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const existing = await app.prisma.projectInventoryItem.findUnique({
@@ -196,11 +193,11 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project inventory link not found." });
+      return notFound(reply, "Project inventory link");
     }
 
     if (inventoryItem.quantityOnHand < input.quantity) {
-      return reply.code(400).send({ message: "Insufficient stock for this allocation." });
+      return badRequest(reply, "Insufficient stock for this allocation.");
     }
 
     if (existing.quantityAllocated + input.quantity > existing.quantityNeeded) {
@@ -264,7 +261,7 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const existing = await app.prisma.projectInventoryItem.findUnique({
@@ -277,13 +274,13 @@ export const projectInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project inventory link not found." });
+      return notFound(reply, "Project inventory link");
     }
 
     const inventoryItem = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     await app.prisma.$transaction(async (tx) => {

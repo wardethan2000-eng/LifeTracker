@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+﻿import { Prisma } from "@prisma/client";
 import {
   createHobbyPracticeGoalInputSchema,
   hobbyPracticeGoalListQuerySchema,
@@ -9,7 +9,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   buildPracticeGoalProgressHistory,
   recalculatePracticeGoalsForHobby,
@@ -21,11 +21,8 @@ import {
   toHobbyPracticeGoalSummaryResponse,
 } from "../../lib/serializers/index.js";
 import { syncEntryToSearchIndex } from "../../lib/search-index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid(),
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const goalParamsSchema = hobbyParamsSchema.extend({
   goalId: z.string().cuid(),
@@ -97,15 +94,15 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
 
     const hobby = await getScopedHobby(app.prisma, householdId, hobbyId);
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     if (input.goalType === "metric_target" && !input.metricDefinitionId) {
-      return reply.code(400).send({ message: "metricDefinitionId is required for metric_target goals." });
+      return badRequest(reply, "metricDefinitionId is required for metric_target goals.");
     }
 
     if (input.metricDefinitionId && !await validateMetricDefinition(app.prisma, hobbyId, householdId, input.metricDefinitionId)) {
-      return reply.code(400).send({ message: "Metric definition must belong to this hobby." });
+      return badRequest(reply, "Metric definition must belong to this hobby.");
     }
 
     let createdEntryIds: string[] = [];
@@ -143,14 +140,7 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
     });
 
     await Promise.all(createdEntryIds.map((entryId) => syncEntryToSearchIndex(app.prisma, entryId)));
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_practice_goal_created",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { goalId: goal.id, goalName: goal.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_practice_goal_created", householdId, { goalId: goal.id, goalName: goal.name });
 
     return reply.code(201).send(toHobbyPracticeGoalResponse(goal));
   });
@@ -166,7 +156,7 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
       where: { id: goalId, hobbyId, householdId },
     });
     if (!goal) {
-      return reply.code(404).send({ message: "Practice goal not found." });
+      return notFound(reply, "Practice goal");
     }
 
     const progressHistory = await buildPracticeGoalProgressHistory(app.prisma, goal);
@@ -189,18 +179,18 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
       where: { id: goalId, hobbyId, householdId },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Practice goal not found." });
+      return notFound(reply, "Practice goal");
     }
 
     const nextGoalType = input.goalType ?? existing.goalType;
     const nextMetricDefinitionId = input.metricDefinitionId === undefined ? existing.metricDefinitionId : input.metricDefinitionId;
 
     if (nextGoalType === "metric_target" && !nextMetricDefinitionId) {
-      return reply.code(400).send({ message: "metricDefinitionId is required for metric_target goals." });
+      return badRequest(reply, "metricDefinitionId is required for metric_target goals.");
     }
 
     if (nextMetricDefinitionId && !await validateMetricDefinition(app.prisma, hobbyId, householdId, nextMetricDefinitionId)) {
-      return reply.code(400).send({ message: "Metric definition must belong to this hobby." });
+      return badRequest(reply, "Metric definition must belong to this hobby.");
     }
 
     let createdEntryIds: string[] = [];
@@ -238,14 +228,7 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
     });
 
     await Promise.all(createdEntryIds.map((entryId) => syncEntryToSearchIndex(app.prisma, entryId)));
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_practice_goal_updated",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { goalId: goal.id, goalName: goal.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_practice_goal_updated", householdId, { goalId: goal.id, goalName: goal.name });
 
     return reply.send(toHobbyPracticeGoalResponse(goal));
   });
@@ -262,18 +245,11 @@ export const hobbyGoalRoutes: FastifyPluginAsync = async (app) => {
       where: { id: goalId, hobbyId, householdId },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Practice goal not found." });
+      return notFound(reply, "Practice goal");
     }
 
     await app.prisma.hobbyPracticeGoal.delete({ where: { id: existing.id } });
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_practice_goal_deleted",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { goalId: existing.id, goalName: existing.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_practice_goal_deleted", householdId, { goalId: existing.id, goalName: existing.name });
 
     return reply.code(204).send();
   });

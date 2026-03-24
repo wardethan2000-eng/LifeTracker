@@ -1,17 +1,13 @@
-import {
+﻿import {
   bulkArchiveHobbySessionsSchema,
   bulkLogHobbySessionsSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { recalculatePracticeGoalsForHobby } from "../../lib/hobby-practice.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 type SessionFailedItem = {
   sessionId?: string;
@@ -37,7 +33,7 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const failed: SessionFailedItem[] = [];
@@ -81,14 +77,7 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (succeeded > 0) {
-      await logActivity(app.prisma, {
-        householdId,
-        userId: request.auth.userId,
-        action: "hobby_session_bulk_logged",
-        entityType: "hobby",
-        entityId: hobbyId,
-        metadata: { count: succeeded }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("hobby", hobbyId, "hobby_session_bulk_logged", householdId, { count: succeeded });
     }
 
     return { succeeded, failed };
@@ -125,14 +114,7 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
           data: { status: "archived" }
         });
 
-        await logActivity(app.prisma, {
-          householdId,
-          userId: request.auth.userId,
-          action: "hobby_session_bulk_archived",
-          entityType: "hobby",
-          entityId: hobbyId,
-          metadata: { count: sessions.length }
-        });
+                await createActivityLogger(app.prisma, request.auth.userId).log("hobby", hobbyId, "hobby_session_bulk_archived", householdId, { count: sessions.length });
 
         return { succeeded: sessions.length, failed };
       } catch (err) {

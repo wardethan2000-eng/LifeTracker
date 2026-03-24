@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   assetCategorySchema,
   assetLabelDataSchema,
@@ -31,8 +31,10 @@ import {
 import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { toAssetResponse } from "../../lib/serializers/index.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { syncAssetFamilyToSearchIndex } from "../../lib/search-index.js";
+import { notFound, badRequest } from "../../lib/errors.js";
+import { softDeleteData, optionallyIncludeDeleted } from "../../lib/soft-delete.js";
 
 const assetIdParamsSchema = z.object({
   assetId: z.string().cuid()
@@ -79,7 +81,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       householdId: query.householdId,
       ...personalAssetAccessWhere(request.auth.userId),
       ...(query.includeArchived ? {} : { isArchived: false }),
-      ...(query.includeDeleted ? {} : { deletedAt: null })
+      ...optionallyIncludeDeleted(query.includeDeleted)
     };
 
     if (query.paginated) {
@@ -122,7 +124,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     return toAssetResponse(asset);
@@ -156,18 +158,11 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       await app.prisma.$transaction(async (tx) => {
         await tx.asset.updateMany({
           where: { id: { in: accessible.map((a) => a.id) } },
-          data: { deletedAt: new Date() }
+          data: softDeleteData()
         });
       });
 
-      await logActivity(app.prisma, {
-        householdId: input.householdId,
-        userId: request.auth.userId,
-        action: "asset.bulk_archived",
-        entityType: "asset",
-        entityId: input.householdId,
-        metadata: { count: accessible.length, assetIds: accessible.map((a) => a.id) }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("asset", input.householdId, "asset.bulk_archived", input.householdId, { count: accessible.length, assetIds: accessible.map((a) => a.id) });
 
       for (const asset of accessible) {
         void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
@@ -207,14 +202,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
         });
       });
 
-      await logActivity(app.prisma, {
-        householdId: input.householdId,
-        userId: request.auth.userId,
-        action: "asset.bulk_category_changed",
-        entityType: "asset",
-        entityId: input.householdId,
-        metadata: { count: accessible.length, category: input.category, assetIds: accessible.map((a) => a.id) }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("asset", input.householdId, "asset.bulk_category_changed", input.householdId, { count: accessible.length, category: input.category, assetIds: accessible.map((a) => a.id) });
 
       for (const asset of accessible) {
         void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
@@ -283,7 +271,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!parent) {
-        return reply.code(400).send({ message: "Parent asset not found or belongs to a different household." });
+        return badRequest(reply, "Parent asset not found or belongs to a different household.");
       }
     }
 
@@ -323,14 +311,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       assetTag
     };
 
-    await logActivity(app.prisma, {
-      householdId: input.householdId,
-      userId: request.auth.userId,
-      action: "asset.created",
-      entityType: "asset",
-      entityId: asset.id,
-      metadata: { name: asset.name, category: asset.category, assetTag }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("asset", asset.id, "asset.created", input.householdId, { name: asset.name, category: asset.category, assetTag });
 
     void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
 
@@ -343,7 +324,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const assetTag = asset.assetTag ?? await ensureAssetTag(app.prisma, asset.id);
@@ -357,7 +338,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const assetTag = asset.assetTag ?? await ensureAssetTag(app.prisma, asset.id);
@@ -390,7 +371,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     return toAssetResponse(asset, {
@@ -406,7 +387,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     // Validate parent asset if specified
@@ -417,7 +398,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!parent) {
-        return reply.code(400).send({ message: "Parent asset not found or belongs to a different household." });
+        return badRequest(reply, "Parent asset not found or belongs to a different household.");
       }
 
       if (input.parentAssetId === existing.id) {
@@ -455,14 +436,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
-    await logActivity(app.prisma, {
-      householdId: existing.householdId,
-      userId: request.auth.userId,
-      action: "asset.updated",
-      entityType: "asset",
-      entityId: asset.id,
-      metadata: { name: asset.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("asset", asset.id, "asset.updated", existing.householdId, { name: asset.name });
 
     void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
 
@@ -472,7 +446,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/assets/:assetId/archive", async (request, reply) => {
     const params = assetIdParamsSchema.parse(request.params);
     const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-    if (!existing) return reply.code(404).send({ message: "Asset not found." });
+    if (!existing) return notFound(reply, "Asset");
 
     // Detach child assets so they become top-level
     await app.prisma.asset.updateMany({
@@ -485,14 +459,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       data: { isArchived: true }
     });
 
-    await logActivity(app.prisma, {
-      householdId: existing.householdId,
-      userId: request.auth.userId,
-      action: "asset.archived",
-      entityType: "asset",
-      entityId: asset.id,
-      metadata: { name: existing.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("asset", asset.id, "asset.archived", existing.householdId, { name: existing.name });
 
     void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
 
@@ -502,7 +469,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/assets/:assetId/unarchive", async (request, reply) => {
     const params = assetIdParamsSchema.parse(request.params);
     const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-    if (!existing) return reply.code(404).send({ message: "Asset not found." });
+    if (!existing) return notFound(reply, "Asset");
 
     const asset = await app.prisma.asset.update({
       where: { id: existing.id },
@@ -517,11 +484,11 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/v1/assets/:assetId", async (request, reply) => {
     const params = assetIdParamsSchema.parse(request.params);
     const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-    if (!existing) return reply.code(404).send({ message: "Asset not found." });
+    if (!existing) return notFound(reply, "Asset");
 
     const asset = await app.prisma.asset.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date() }
+      data: softDeleteData()
     });
 
     void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
@@ -532,7 +499,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/assets/:assetId/restore", async (request, reply) => {
     const params = assetIdParamsSchema.parse(request.params);
     const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
-    if (!existing) return reply.code(404).send({ message: "Asset not found." });
+    if (!existing) return notFound(reply, "Asset");
 
     const asset = await app.prisma.asset.update({
       where: { id: existing.id },
@@ -551,7 +518,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const children = await app.prisma.asset.findMany({
@@ -570,7 +537,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const existing = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const history = Array.isArray(existing.conditionHistory) ? existing.conditionHistory : [];
@@ -588,14 +555,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: existing.householdId,
-      userId: request.auth.userId,
-      action: "asset.condition_recorded",
-      entityType: "asset",
-      entityId: asset.id,
-      metadata: { name: existing.name, score: input.score }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("asset", asset.id, "asset.condition_recorded", existing.householdId, { name: existing.name, score: input.score });
 
     return toAssetResponse(asset);
   });

@@ -4,14 +4,10 @@ import {
   bulkSetIdeaPrioritySchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { removeSearchIndexEntry, syncIdeaToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 type IdeaFailedItem = {
   ideaId: string;
@@ -64,14 +60,7 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (succeeded > 0) {
-      await logActivity(app.prisma, {
-        householdId,
-        userId: request.auth.userId,
-        action: "idea.bulk_stage_moved",
-        entityType: "idea",
-        entityId: householdId,
-        metadata: { count: succeeded, stage: input.stage }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("idea", householdId, "idea.bulk_stage_moved", householdId, { count: succeeded, stage: input.stage });
     }
 
     return { succeeded, failed };
@@ -122,14 +111,7 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (succeeded > 0) {
-      await logActivity(app.prisma, {
-        householdId,
-        userId: request.auth.userId,
-        action: "idea.bulk_archived",
-        entityType: "idea",
-        entityId: householdId,
-        metadata: { count: succeeded }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("idea", householdId, "idea.bulk_archived", householdId, { count: succeeded });
     }
 
     return { succeeded, failed };
@@ -169,14 +151,7 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
         });
         succeeded = ideas.length;
 
-        await logActivity(app.prisma, {
-          householdId,
-          userId: request.auth.userId,
-          action: "idea.bulk_priority_changed",
-          entityType: "idea",
-          entityId: householdId,
-          metadata: { count: succeeded, priority: input.priority }
-        });
+                await createActivityLogger(app.prisma, request.auth.userId).log("idea", householdId, "idea.bulk_priority_changed", householdId, { count: succeeded, priority: input.priority });
 
         for (const idea of ideas) {
           void syncIdeaToSearchIndex(app.prisma, idea.id).catch(console.error);

@@ -1,4 +1,4 @@
-import {
+﻿import {
   batchUpdateCanvasNodesSchema,
   createCanvasEdgeSchema,
   createCanvasNodeSchema,
@@ -15,9 +15,11 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
+import { notFound } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { householdParamsSchema as householdParams } from "../../lib/schemas.js";
 
-const householdParams = z.object({ householdId: z.string().cuid() });
 const canvasParams = householdParams.extend({ canvasId: z.string().cuid() });
 const nodeParams = canvasParams.extend({ nodeId: z.string().cuid() });
 const edgeParams = canvasParams.extend({ edgeId: z.string().cuid() });
@@ -106,7 +108,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
       where: { id: canvasId, householdId, deletedAt: null },
       include: canvasInclude,
     });
-    if (!canvas) return reply.code(404).send({ message: "Canvas not found" });
+    if (!canvas) return notFound(reply, "Canvas");
 
     return serializeCanvas(canvas as unknown as CanvasWithRelations);
   });
@@ -129,13 +131,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
       include: canvasInclude,
     });
 
-    await logActivity(app.prisma, {
-      householdId, userId,
-      action: "idea_canvas_created",
-      entityType: "idea_canvas",
-      entityId: canvas.id,
-      metadata: { name: canvas.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("idea_canvas", canvas.id, "idea_canvas_created", householdId, { name: canvas.name });
 
     reply.code(201);
     return serializeCanvas(canvas as unknown as CanvasWithRelations);
@@ -151,7 +147,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.ideaCanvas.findFirst({
       where: { id: canvasId, householdId, deletedAt: null },
     });
-    if (!existing) return reply.code(404).send({ message: "Canvas not found" });
+    if (!existing) return notFound(reply, "Canvas");
 
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name;
@@ -166,13 +162,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (input.name !== undefined) {
-      await logActivity(app.prisma, {
-        householdId, userId,
-        action: "idea_canvas_updated",
-        entityType: "idea_canvas",
-        entityId: canvas.id,
-        metadata: { name: canvas.name },
-      });
+            await createActivityLogger(app.prisma, userId).log("idea_canvas", canvas.id, "idea_canvas_updated", householdId, { name: canvas.name });
     }
 
     return serializeCanvas(canvas as unknown as CanvasWithRelations);
@@ -187,20 +177,14 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const existing = await app.prisma.ideaCanvas.findFirst({
       where: { id: canvasId, householdId, deletedAt: null },
     });
-    if (!existing) return reply.code(404).send({ message: "Canvas not found" });
+    if (!existing) return notFound(reply, "Canvas");
 
     await app.prisma.ideaCanvas.update({
       where: { id: canvasId },
-      data: { deletedAt: new Date() },
+      data: softDeleteData(),
     });
 
-    await logActivity(app.prisma, {
-      householdId, userId,
-      action: "idea_canvas_deleted",
-      entityType: "idea_canvas",
-      entityId: canvasId,
-      metadata: { name: existing.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("idea_canvas", canvasId, "idea_canvas_deleted", householdId, { name: existing.name });
 
     reply.code(204);
     return;
@@ -217,7 +201,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const canvas = await app.prisma.ideaCanvas.findFirst({
       where: { id: canvasId, householdId, deletedAt: null },
     });
-    if (!canvas) return reply.code(404).send({ message: "Canvas not found" });
+    if (!canvas) return notFound(reply, "Canvas");
 
     const node = await app.prisma.ideaCanvasNode.create({
       data: {
@@ -248,7 +232,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const node = await app.prisma.ideaCanvasNode.findFirst({
       where: { id: nodeId, canvas: { id: canvasId, householdId, deletedAt: null } },
     });
-    if (!node) return reply.code(404).send({ message: "Node not found" });
+    if (!node) return notFound(reply, "Node");
 
     const data: Record<string, unknown> = {};
     if (input.label !== undefined) data.label = input.label;
@@ -278,7 +262,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const node = await app.prisma.ideaCanvasNode.findFirst({
       where: { id: nodeId, canvas: { id: canvasId, householdId, deletedAt: null } },
     });
-    if (!node) return reply.code(404).send({ message: "Node not found" });
+    if (!node) return notFound(reply, "Node");
 
     await app.prisma.ideaCanvasNode.delete({ where: { id: nodeId } });
 
@@ -295,7 +279,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const canvas = await app.prisma.ideaCanvas.findFirst({
       where: { id: canvasId, householdId, deletedAt: null },
     });
-    if (!canvas) return reply.code(404).send({ message: "Canvas not found" });
+    if (!canvas) return notFound(reply, "Canvas");
 
     await app.prisma.$transaction(
       input.nodes.map((n) => {
@@ -331,7 +315,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const canvas = await app.prisma.ideaCanvas.findFirst({
       where: { id: canvasId, householdId, deletedAt: null },
     });
-    if (!canvas) return reply.code(404).send({ message: "Canvas not found" });
+    if (!canvas) return notFound(reply, "Canvas");
 
     // Verify source and target nodes belong to this canvas
     const [sourceNode, targetNode] = await Promise.all([
@@ -365,7 +349,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const edge = await app.prisma.ideaCanvasEdge.findFirst({
       where: { id: edgeId, canvas: { id: canvasId, householdId, deletedAt: null } },
     });
-    if (!edge) return reply.code(404).send({ message: "Edge not found" });
+    if (!edge) return notFound(reply, "Edge");
 
     const data: Record<string, unknown> = {};
     if (input.label !== undefined) data.label = input.label;
@@ -387,7 +371,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const edge = await app.prisma.ideaCanvasEdge.findFirst({
       where: { id: edgeId, canvas: { id: canvasId, householdId, deletedAt: null } },
     });
-    if (!edge) return reply.code(404).send({ message: "Edge not found" });
+    if (!edge) return notFound(reply, "Edge");
 
     await app.prisma.ideaCanvasEdge.delete({ where: { id: edgeId } });
 

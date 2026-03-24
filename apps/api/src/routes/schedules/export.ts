@@ -3,10 +3,7 @@ import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const importScheduleItemSchema = z.object({
   assetId: z.string().cuid(),

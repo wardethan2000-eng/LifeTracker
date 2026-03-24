@@ -1,8 +1,8 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { updateScheduleDueState } from "./schedule-state.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 export { toMaintenanceLogResponse } from "./serializers/index.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 export const syncScheduleCompletionFromLogs = async (
   prisma: PrismaExecutor,

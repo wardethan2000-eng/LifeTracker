@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createCommentSchema,
   createOffsetPaginationQuerySchema,
@@ -7,25 +7,14 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { logAndEmit } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { buildOffsetPage } from "../../lib/pagination.js";
 import { commentResponseInclude, toCommentResponse, type CommentResponseRecord } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncCommentToSearchIndex } from "../../lib/search-index.js";
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
-
-const projectParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  projectId: z.string().cuid()
-});
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { assetParamsSchema, hobbyParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
 const inventoryParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -205,33 +194,18 @@ const createComment = async (
     include: commentInclude
   });
 
-  await Promise.all([
-    logActivity(app.prisma, {
-      householdId: target.householdId,
-      userId,
-      action: "comment.created",
-      entityType: "comment",
-      entityId: comment.id,
-      metadata: {
+    await logAndEmit(app.prisma, userId, {
+    householdId: target.householdId,
+    entityType: "comment",
+    entityId: comment.id,
+    action: "comment.created",
+    metadata: {
         targetType: target.entityType,
         targetId: target.entityId,
         targetName: target.targetName,
         bodyPreview: comment.body.slice(0, 100)
-      }
-    }),
-    emitDomainEvent(app.prisma, {
-      householdId: target.householdId,
-      eventType: "comment.created",
-      entityType: "comment",
-      entityId: comment.id,
-      payload: {
-        targetType: target.entityType,
-        targetId: target.entityId,
-        targetName: target.targetName,
-        bodyPreview: comment.body.slice(0, 100)
-      }
-    })
-  ]);
+      },
+  });
 
   void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
 
@@ -269,33 +243,18 @@ const updateComment = async (
     include: commentInclude
   });
 
-  await Promise.all([
-    logActivity(app.prisma, {
-      householdId: target.householdId,
-      userId,
-      action: "comment.updated",
-      entityType: "comment",
-      entityId: comment.id,
-      metadata: {
+    await logAndEmit(app.prisma, userId, {
+    householdId: target.householdId,
+    entityType: "comment",
+    entityId: comment.id,
+    action: "comment.updated",
+    metadata: {
         targetType: target.entityType,
         targetId: target.entityId,
         targetName: target.targetName,
         bodyPreview: comment.body.slice(0, 100)
-      }
-    }),
-    emitDomainEvent(app.prisma, {
-      householdId: target.householdId,
-      eventType: "comment.updated",
-      entityType: "comment",
-      entityId: comment.id,
-      payload: {
-        targetType: target.entityType,
-        targetId: target.entityId,
-        targetName: target.targetName,
-        bodyPreview: comment.body.slice(0, 100)
-      }
-    })
-  ]);
+      },
+  });
 
   void syncCommentToSearchIndex(app.prisma, comment.id).catch(console.error);
 
@@ -334,37 +293,22 @@ const deleteComment = async (
 
     await tx.comment.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date() }
+      data: softDeleteData()
     });
   });
 
-  await Promise.all([
-    logActivity(app.prisma, {
-      householdId: target.householdId,
-      userId,
-      action: "comment.deleted",
-      entityType: "comment",
-      entityId: existing.id,
-      metadata: {
+    await logAndEmit(app.prisma, userId, {
+    householdId: target.householdId,
+    entityType: "comment",
+    entityId: existing.id,
+    action: "comment.deleted",
+    metadata: {
         targetType: target.entityType,
         targetId: target.entityId,
         targetName: target.targetName,
         bodyPreview: existing.body.slice(0, 100)
-      }
-    }),
-    emitDomainEvent(app.prisma, {
-      householdId: target.householdId,
-      eventType: "comment.deleted",
-      entityType: "comment",
-      entityId: existing.id,
-      payload: {
-        targetType: target.entityType,
-        targetId: target.entityId,
-        targetName: target.targetName,
-        bodyPreview: existing.body.slice(0, 100)
-      }
-    })
-  ]);
+      },
+  });
 
   void removeSearchIndexEntry(app.prisma, "comment", existing.id).catch(console.error);
 
@@ -378,7 +322,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     return listTargetComments(app.prisma, {
@@ -396,7 +340,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const result = await createComment(app, {
@@ -420,7 +364,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const result = await updateComment(app, {
@@ -443,7 +387,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const result = await deleteComment(app, {
@@ -475,7 +419,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     return listTargetComments(app.prisma, {
@@ -501,7 +445,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const result = await createComment(app, {
@@ -533,7 +477,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const result = await updateComment(app, {
@@ -564,7 +508,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const result = await deleteComment(app, {
@@ -596,7 +540,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     return listTargetComments(app.prisma, {
@@ -622,7 +566,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const result = await createComment(app, {
@@ -654,7 +598,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const result = await updateComment(app, {
@@ -685,7 +629,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const result = await deleteComment(app, {
@@ -717,7 +661,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     return listTargetComments(app.prisma, {
@@ -743,7 +687,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const result = await createComment(app, {
@@ -775,7 +719,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const result = await updateComment(app, {
@@ -806,7 +750,7 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!inventoryItem) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const result = await deleteComment(app, {

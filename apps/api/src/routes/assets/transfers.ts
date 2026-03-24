@@ -1,4 +1,4 @@
-import {
+﻿import {
   assetTransferListSchema,
   createAssetTransferSchema
 } from "@lifekeeper/types";
@@ -6,17 +6,11 @@ import type { Asset, PrismaClient } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { toAssetTransferResponse } from "../../lib/serializers/index.js";
 import { syncAssetFamilyToSearchIndex, syncAssetTransferToSearchIndex } from "../../lib/search-index.js";
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { assetParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
 
 const householdTransferQuerySchema = z.object({
   since: z.string().datetime().optional(),
@@ -126,7 +120,7 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getTransferAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const fromUserId = getResponsibleUserId(asset);
@@ -165,19 +159,12 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
           }
         });
 
-        await logActivity(tx, {
-          householdId: asset.householdId,
-          userId: request.auth.userId,
-          action: "asset.reassigned",
-          entityType: "asset",
-          entityId: asset.id,
-          metadata: {
+                await createActivityLogger(tx, request.auth.userId).log("asset", asset.id, "asset.reassigned", asset.householdId, {
             assetName: asset.name,
             fromUserId,
             toUserId: input.toUserId,
             reason: input.reason ?? null
-          }
-        });
+          });
 
         return created;
       });
@@ -276,37 +263,23 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
         throw new Error("Asset transfer record was not created for the requested asset.");
       }
 
-      await logActivity(tx, {
-        householdId: asset.householdId,
-        userId: request.auth.userId,
-        action: "asset.household_transferred_out",
-        entityType: "asset",
-        entityId: asset.id,
-        metadata: {
+            await createActivityLogger(tx, request.auth.userId).log("asset", asset.id, "asset.household_transferred_out", asset.householdId, {
           assetName: asset.name,
           movedAssetIds: assetIds,
           movedAssetCount: assetIds.length,
           toHouseholdId: targetHouseholdId,
           toUserId: input.toUserId,
           reason: input.reason ?? null
-        }
-      });
+        });
 
-      await logActivity(tx, {
-        householdId: targetHouseholdId,
-        userId: request.auth.userId,
-        action: "asset.household_transferred_in",
-        entityType: "asset",
-        entityId: asset.id,
-        metadata: {
+            await createActivityLogger(tx, request.auth.userId).log("asset", asset.id, "asset.household_transferred_in", targetHouseholdId, {
           assetName: asset.name,
           movedAssetIds: assetIds,
           movedAssetCount: assetIds.length,
           fromHouseholdId: asset.householdId,
           toUserId: input.toUserId,
           reason: input.reason ?? null
-        }
-      });
+        });
 
       return {
         created,
@@ -338,13 +311,13 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     try {
       await assertMembership(app.prisma, asset.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const transfers = await app.prisma.assetTransfer.findMany({
@@ -377,7 +350,7 @@ export const assetTransferRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const transfers = await app.prisma.assetTransfer.findMany({

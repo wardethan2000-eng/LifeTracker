@@ -1,6 +1,6 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import type { PrismaExecutor } from "./prisma-types.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 type TaskCompletionShape = {
   status: string;

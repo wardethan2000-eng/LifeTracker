@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   cloneProjectSchema,
   createOffsetPaginationQuerySchema,
@@ -23,7 +23,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { buildOffsetPage } from "../../lib/pagination.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
@@ -55,14 +55,9 @@ import {
   toProjectTemplateResponse
 } from "../../lib/serializers/index.js";
 import { syncLogToSearchIndex, syncProjectToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const projectParamsSchema = householdParamsSchema.extend({
-  projectId: z.string().cuid()
-});
+import { forbidden, notFound, badRequest } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { householdParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
 const projectAssetParamsSchema = projectParamsSchema.extend({
   projectAssetId: z.string().cuid()
@@ -755,14 +750,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.created",
-      entityType: "project",
-      entityId: project.id,
-      metadata: { name: project.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.created", params.householdId, { name: project.name });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -820,7 +808,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const [breadcrumbs, childProjects] = await Promise.all([
@@ -909,7 +897,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.project.findFirst({
@@ -917,7 +905,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     if (input.status === "completed") {
@@ -974,14 +962,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.updated",
-      entityType: "project",
-      entityId: project.id,
-      metadata: { name: project.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.updated", params.householdId, { name: project.name });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -994,7 +975,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.project.findFirst({
@@ -1002,12 +983,12 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     await app.prisma.project.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date() }
+      data: softDeleteData()
     });
 
     await emitDomainEvent(app.prisma, {
@@ -1120,7 +1101,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!sourceProject) {
-      return reply.code(404).send({ message: "Source project not found." });
+      return notFound(reply, "Source project");
     }
 
     const snapshot = buildProjectTemplateSnapshot(sourceProject);
@@ -1136,14 +1117,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.template.created",
-      entityType: "project",
-      entityId: sourceProject.id,
-      metadata: { templateId: template.id, templateName: template.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", sourceProject.id, "project.template.created", params.householdId, { templateId: template.id, templateName: template.name });
 
     return reply.code(201).send(toProjectTemplateResponse({
       id: template.id,
@@ -1173,7 +1147,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!template) {
-      return reply.code(404).send({ message: "Project template not found." });
+      return notFound(reply, "Project template");
     }
 
     let hierarchy: { parentProjectId: string | null; depth: number };
@@ -1204,14 +1178,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     ));
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.template.instantiated",
-      entityType: "project",
-      entityId: project.id,
-      metadata: { templateId: template.id, templateName: template.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.template.instantiated", params.householdId, { templateId: template.id, templateName: template.name });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -1280,7 +1247,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!sourceProject) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     let hierarchy: { parentProjectId: string | null; depth: number };
@@ -1311,14 +1278,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     ));
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.cloned",
-      entityType: "project",
-      entityId: project.id,
-      metadata: { sourceProjectId: sourceProject.id, sourceProjectName: sourceProject.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.cloned", params.householdId, { sourceProjectId: sourceProject.id, sourceProjectName: sourceProject.name });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -1334,7 +1294,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.project.findFirst({
@@ -1342,7 +1302,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     if (status === "completed") {
@@ -1369,14 +1329,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.status_changed",
-      entityType: "project",
-      entityId: project.id,
-      metadata: { name: project.name, oldStatus: existing.status, newStatus: status }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.status_changed", params.householdId, { name: project.name, oldStatus: existing.status, newStatus: status });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -1392,7 +1345,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -1400,7 +1353,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const asset = await app.prisma.asset.findFirst({
@@ -1408,7 +1361,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!asset) {
-      return reply.code(400).send({ message: "Asset not found or belongs to a different household." });
+      return badRequest(reply, "Asset not found or belongs to a different household.");
     }
 
     const existingLink = await app.prisma.projectAsset.findUnique({
@@ -1432,14 +1385,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.asset.linked",
-      entityType: "project",
-      entityId: project.id,
-      metadata: { assetId: asset.id, assetName: asset.name, relationship: projectAsset.relationship }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.asset.linked", params.householdId, { assetId: asset.id, assetName: asset.name, relationship: projectAsset.relationship });
 
     return reply.code(201).send(toProjectAssetResponse(projectAsset));
   });
@@ -1451,7 +1397,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.projectAsset.findFirst({
@@ -1463,7 +1409,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project asset link not found." });
+      return notFound(reply, "Project asset link");
     }
 
     const data: Prisma.ProjectAssetUncheckedUpdateInput = {};
@@ -1477,14 +1423,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       include: { asset: { select: { id: true, name: true, category: true } } }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.asset.updated",
-      entityType: "project",
-      entityId: params.projectId,
-      metadata: { projectAssetId: existing.id, relationship: projectAsset.relationship }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project", params.projectId, "project.asset.updated", params.householdId, { projectAssetId: existing.id, relationship: projectAsset.relationship });
 
     return reply.send(toProjectAssetResponse(projectAsset));
   });
@@ -1495,7 +1434,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const projectAsset = await app.prisma.projectAsset.findFirst({
@@ -1506,7 +1445,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!projectAsset) {
-      return reply.code(404).send({ message: "Project asset link not found." });
+      return notFound(reply, "Project asset link");
     }
 
     await app.prisma.projectAsset.delete({ where: { id: projectAsset.id } });
@@ -1522,7 +1461,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -1531,7 +1470,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const tasks = await app.prisma.projectTask.findMany({
@@ -1566,7 +1505,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -1575,7 +1514,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     if (input.assignedToId) {
@@ -1584,7 +1523,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!membership) {
-        return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+        return badRequest(reply, "Assigned user is not a member of this household.");
       }
     }
 
@@ -1595,7 +1534,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+        return badRequest(reply, "Referenced phase not found in this project.");
       }
     }
 
@@ -1610,7 +1549,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!schedule) {
-        return reply.code(400).send({ message: "Linked schedule not found or belongs to a different household." });
+        return badRequest(reply, "Linked schedule not found or belongs to a different household.");
       }
     }
 
@@ -1674,14 +1613,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (input.assignedToId) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.task.assigned",
-        entityType: "project_task",
-        entityId: task.id,
-        metadata: { taskTitle: task.title, assignedToId: input.assignedToId }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_task", task.id, "project.task.assigned", params.householdId, { taskTitle: task.title, assignedToId: input.assignedToId });
     }
 
     refreshProjectArtifacts(params.householdId, project.id);
@@ -1696,7 +1628,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.projectTask.findFirst({
@@ -1708,7 +1640,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project task not found." });
+      return notFound(reply, "Project task");
     }
 
     if (input.assignedToId) {
@@ -1717,7 +1649,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!membership) {
-        return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+        return badRequest(reply, "Assigned user is not a member of this household.");
       }
     }
 
@@ -1728,7 +1660,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+        return badRequest(reply, "Referenced phase not found in this project.");
       }
     }
 
@@ -1743,7 +1675,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!schedule) {
-        return reply.code(400).send({ message: "Linked schedule not found or belongs to a different household." });
+        return badRequest(reply, "Linked schedule not found or belongs to a different household.");
       }
     }
 
@@ -1838,14 +1770,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
           }
         }
 
-        await logActivity(app.prisma, {
-          householdId: params.householdId,
-          userId: request.auth.userId,
-          action: "project.task.completed",
-          entityType: "project_task",
-          entityId: existing.id,
-          metadata: { taskTitle: existing.title }
-        });
+                await createActivityLogger(app.prisma, request.auth.userId).log("project_task", existing.id, "project.task.completed", params.householdId, { taskTitle: existing.title });
       } else if (input.status !== "completed") {
         data.completedAt = null;
       }
@@ -1855,18 +1780,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     // Track assignment changes
     if (input.assignedToId !== undefined && input.assignedToId !== existing.assignedToId) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.task.assigned",
-        entityType: "project_task",
-        entityId: existing.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_task", existing.id, "project.task.assigned", params.householdId, {
           taskTitle: existing.title,
           previousAssignedToId: existing.assignedToId,
           newAssignedToId: input.assignedToId
-        }
-      });
+        });
     }
 
     const task = await app.prisma.$transaction(async (tx) => {
@@ -1909,7 +1827,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.projectTask.findFirst({
@@ -1921,13 +1839,13 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project task not found." });
+      return notFound(reply, "Project task");
     }
 
     await app.prisma.$transaction(async (tx) => {
       await tx.projectTask.update({
         where: { id: existing.id },
-        data: { deletedAt: new Date() }
+        data: softDeleteData()
       });
       await tx.projectTaskDependency.deleteMany({
         where: {
@@ -1954,7 +1872,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -1963,7 +1881,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     if (input.phaseId) {
@@ -1973,7 +1891,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+        return badRequest(reply, "Referenced phase not found in this project.");
       }
     }
 
@@ -2004,14 +1922,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.quicktodo.created",
-      entityType: "project_task",
-      entityId: task.id,
-      metadata: { taskTitle: task.title }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_task", task.id, "project.quicktodo.created", params.householdId, { taskTitle: task.title });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -2025,7 +1936,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.projectTask.findFirst({
@@ -2036,7 +1947,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project task not found." });
+      return notFound(reply, "Project task");
     }
 
     if (existing.taskType === "full") {
@@ -2072,14 +1983,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.task.promoted",
-      entityType: "project_task",
-      entityId: existing.id,
-      metadata: { taskTitle: existing.title }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_task", existing.id, "project.task.promoted", params.householdId, { taskTitle: existing.title });
 
     refreshProjectArtifacts(params.householdId, params.projectId);
 
@@ -2094,7 +1998,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -2103,7 +2007,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const expenses = await app.prisma.projectExpense.findMany({
@@ -2121,7 +2025,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -2130,7 +2034,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     if (input.taskId) {
@@ -2140,7 +2044,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!task) {
-        return reply.code(400).send({ message: "Referenced task not found in this project." });
+        return badRequest(reply, "Referenced task not found in this project.");
       }
     }
 
@@ -2151,7 +2055,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+        return badRequest(reply, "Referenced phase not found in this project.");
       }
     }
 
@@ -2162,7 +2066,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!budgetCategory) {
-        return reply.code(400).send({ message: "Referenced budget category not found in this project." });
+        return badRequest(reply, "Referenced budget category not found in this project.");
       }
     }
 
@@ -2173,7 +2077,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!provider) {
-        return reply.code(400).send({ message: "Service provider not found or belongs to a different household." });
+        return badRequest(reply, "Service provider not found or belongs to a different household.");
       }
     }
 
@@ -2204,7 +2108,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.projectExpense.findFirst({
@@ -2216,7 +2120,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project expense not found." });
+      return notFound(reply, "Project expense");
     }
 
     if (input.taskId !== undefined && input.taskId !== null) {
@@ -2226,7 +2130,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!task) {
-        return reply.code(400).send({ message: "Referenced task not found in this project." });
+        return badRequest(reply, "Referenced task not found in this project.");
       }
     }
 
@@ -2237,7 +2141,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+        return badRequest(reply, "Referenced phase not found in this project.");
       }
     }
 
@@ -2248,7 +2152,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!budgetCategory) {
-        return reply.code(400).send({ message: "Referenced budget category not found in this project." });
+        return badRequest(reply, "Referenced budget category not found in this project.");
       }
     }
 
@@ -2259,7 +2163,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!provider) {
-        return reply.code(400).send({ message: "Service provider not found or belongs to a different household." });
+        return badRequest(reply, "Service provider not found or belongs to a different household.");
       }
     }
 
@@ -2291,7 +2195,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.projectExpense.findFirst({
@@ -2303,12 +2207,12 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Project expense not found." });
+      return notFound(reply, "Project expense");
     }
 
     await app.prisma.projectExpense.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date() }
+      data: softDeleteData()
     });
 
     refreshProjectArtifacts(params.householdId, params.projectId);
@@ -2324,7 +2228,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -2333,7 +2237,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const treeProjectIds = await getProjectTreeIds(app.prisma, params.projectId);
@@ -2444,7 +2348,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -2453,7 +2357,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const treeProjectIds = await getProjectTreeIds(app.prisma, params.projectId);
@@ -2661,18 +2565,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (summary.createdLineCount > 0) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.supplies.purchase_requests_created",
-        entityType: "project",
-        entityId: project.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("project", project.id, "project.supplies.purchase_requests_created", params.householdId, {
           purchaseCount: summary.purchaseCount,
           createdLineCount: summary.createdLineCount,
           reusedLineCount: summary.reusedLineCount
-        }
-      });
+        });
     }
 
     refreshProjectArtifacts(params.householdId, params.projectId);

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+﻿import { Prisma } from "@prisma/client";
 import {
   actionableEntryGroupListSchema,
   createEntrySchema,
@@ -21,7 +21,7 @@ import {
   validateEntryTarget,
   type EntryEntityContext
 } from "../../lib/entries.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { logAndEmit } from "../../lib/activity-log.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { sanitizeRichTextBody } from "../../lib/sanitize-html.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
@@ -32,17 +32,11 @@ import {
   type EntryResponseRecord
 } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { hobbyParamsSchema, householdParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
 const entryParamsSchema = householdParamsSchema.extend({
   entryId: z.string().cuid()
-});
-
-const hobbyParamsSchema = householdParamsSchema.extend({
-  hobbyId: z.string().cuid()
 });
 
 const hobbySessionParamsSchema = hobbyParamsSchema.extend({
@@ -51,10 +45,6 @@ const hobbySessionParamsSchema = hobbyParamsSchema.extend({
 
 const hobbyCollectionItemParamsSchema = hobbyParamsSchema.extend({
   collectionItemId: z.string().cuid()
-});
-
-const projectParamsSchema = householdParamsSchema.extend({
-  projectId: z.string().cuid()
 });
 
 const assetParamsSchema = householdParamsSchema.extend({
@@ -525,35 +515,25 @@ const createEntry = async (
     include: entryResponseInclude
   });
 
-  await Promise.all([
-    logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "entry.created",
-      entityType: "entry",
-      entityId: entry.id,
-      metadata: {
+    await logAndEmit(app.prisma, userId, {
+    householdId: householdId,
+    entityType: "entry",
+    entityId: entry.id,
+    action: "entry.created",
+    metadata: {
         entryType: entry.entryType,
         entityType: target.entityType,
         entityId: target.entityId,
         entityLabel: validation.context.label
-      }
-    }),
-    emitDomainEvent(app.prisma, {
-      householdId,
-      eventType: "entry.created",
-      entityType: "entry",
-      entityId: entry.id,
-      payload: {
+      },
+    payload: {
         entryType: entry.entryType,
         entityType: target.entityType,
         entityId: target.entityId,
         entityLabel: validation.context.label,
         flags: entry.flags.map((flag) => flag.flag)
-      }
-    }),
-    syncEntryToSearchIndex(app.prisma, entry.id)
-  ]);
+      },
+  });
 
   return { entry: toEntryResponse(entry, validation.context) } as const;
 };
@@ -579,7 +559,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -617,7 +597,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ message: target.message });
     }
     if (target.status === "missing") {
-      return reply.code(404).send({ message: "Target entity not found." });
+      return notFound(reply, "Target entity");
     }
 
     const scopedTargets: Prisma.EntryWhereInput[] = [{
@@ -741,12 +721,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!entry) {
-      return reply.code(404).send({ message: "Entry not found." });
+      return notFound(reply, "Entry");
     }
 
     const resolved = await validateEntryTarget(app.prisma, householdId, entry.entityType, entry.entityId);
     if (resolved.status !== "ok") {
-      return reply.code(404).send({ message: "Entry target not found." });
+      return notFound(reply, "Entry target");
     }
 
     return toEntryResponse(entry, resolved.context);
@@ -771,12 +751,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Entry not found." });
+      return notFound(reply, "Entry");
     }
 
     const resolved = await validateEntryTarget(app.prisma, householdId, existing.entityType, existing.entityId);
     if (resolved.status !== "ok") {
-      return reply.code(404).send({ message: "Entry target not found." });
+      return notFound(reply, "Entry target");
     }
 
     const updated = await app.prisma.$transaction(async (tx) => {
@@ -815,35 +795,25 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await Promise.all([
-      logActivity(app.prisma, {
-        householdId,
-        userId,
-        action: "entry.updated",
-        entityType: "entry",
-        entityId: updated.id,
-        metadata: {
+        await logAndEmit(app.prisma, userId, {
+      householdId: householdId,
+      entityType: "entry",
+      entityId: updated.id,
+      action: "entry.updated",
+      metadata: {
           entryType: updated.entryType,
           targetEntityType: updated.entityType,
           targetEntityId: updated.entityId,
           entityLabel: resolved.context.label
-        }
-      }),
-      emitDomainEvent(app.prisma, {
-        householdId,
-        eventType: "entry.updated",
-        entityType: "entry",
-        entityId: updated.id,
-        payload: {
+        },
+      payload: {
           entryType: updated.entryType,
           targetEntityType: updated.entityType,
           targetEntityId: updated.entityId,
           entityLabel: resolved.context.label,
           flags: updated.flags.map((flag) => flag.flag)
-        }
-      }),
-      syncEntryToSearchIndex(app.prisma, updated.id)
-    ]);
+        },
+    });
 
     return toEntryResponse(updated, resolved.context);
   });
@@ -862,7 +832,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Entry not found." });
+      return notFound(reply, "Entry");
     }
 
     const resolved = await validateEntryTarget(app.prisma, householdId, existing.entityType, existing.entityId);
@@ -871,34 +841,18 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id }
     });
 
-    await Promise.all([
-      logActivity(app.prisma, {
-        householdId,
-        userId,
-        action: "entry.deleted",
-        entityType: "entry",
-        entityId: existing.id,
-        metadata: {
+        await logAndEmit(app.prisma, userId, {
+      householdId: householdId,
+      entityType: "entry",
+      entityId: existing.id,
+      action: "entry.deleted",
+      metadata: {
           entryType: existing.entryType,
           targetEntityType: existing.entityType,
           targetEntityId: existing.entityId,
           entityLabel: resolved.status === "ok" ? resolved.context.label : null
-        }
-      }),
-      emitDomainEvent(app.prisma, {
-        householdId,
-        eventType: "entry.deleted",
-        entityType: "entry",
-        entityId: existing.id,
-        payload: {
-          entryType: existing.entryType,
-          targetEntityType: existing.entityType,
-          targetEntityId: existing.entityId,
-          entityLabel: resolved.status === "ok" ? resolved.context.label : null
-        }
-      }),
-      removeSearchIndexEntry(app.prisma, "entry", existing.id)
-    ]);
+        },
+    });
 
     return reply.code(204).send();
   });
@@ -914,11 +868,11 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby", entityId: hobbyId });
     if (!target) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     if ((query.entityType && query.entityType !== "hobby") || (query.entityId && query.entityId !== hobbyId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     try {
@@ -928,7 +882,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -945,12 +899,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if ((input.entityType && input.entityType !== "hobby") || (input.entityId && input.entityId !== hobbyId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby", entityId: hobbyId });
     if (!target) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "hobby", entityId: hobbyId });
@@ -972,11 +926,11 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_session", entityId: sessionId }, hobbyId);
     if (!target) {
-      return reply.code(404).send({ message: "Hobby session not found." });
+      return notFound(reply, "Hobby session");
     }
 
     if ((query.entityType && query.entityType !== "hobby_session") || (query.entityId && query.entityId !== sessionId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     try {
@@ -986,7 +940,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -1003,12 +957,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if ((input.entityType && input.entityType !== "hobby_session") || (input.entityId && input.entityId !== sessionId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_session", entityId: sessionId }, hobbyId);
     if (!target) {
-      return reply.code(404).send({ message: "Hobby session not found." });
+      return notFound(reply, "Hobby session");
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "hobby_session", entityId: sessionId });
@@ -1030,11 +984,11 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_collection_item", entityId: collectionItemId }, hobbyId);
     if (!target) {
-      return reply.code(404).send({ message: "Hobby collection item not found." });
+      return notFound(reply, "Hobby collection item");
     }
 
     if ((query.entityType && query.entityType !== "hobby_collection_item") || (query.entityId && query.entityId !== collectionItemId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     try {
@@ -1044,7 +998,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -1061,12 +1015,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if ((input.entityType && input.entityType !== "hobby_collection_item") || (input.entityId && input.entityId !== collectionItemId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "hobby_collection_item", entityId: collectionItemId }, hobbyId);
     if (!target) {
-      return reply.code(404).send({ message: "Hobby collection item not found." });
+      return notFound(reply, "Hobby collection item");
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "hobby_collection_item", entityId: collectionItemId });
@@ -1088,11 +1042,11 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "project", entityId: projectId });
     if (!target) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     if ((query.entityType && query.entityType !== "project") || (query.entityId && query.entityId !== projectId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     try {
@@ -1102,7 +1056,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -1119,12 +1073,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if ((input.entityType && input.entityType !== "project") || (input.entityId && input.entityId !== projectId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "project", entityId: projectId });
     if (!target) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "project", entityId: projectId });
@@ -1146,11 +1100,11 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "asset", entityId: assetId });
     if (!target) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     if ((query.entityType && query.entityType !== "asset") || (query.entityId && query.entityId !== assetId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     try {
@@ -1160,7 +1114,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -1177,12 +1131,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if ((input.entityType && input.entityType !== "asset") || (input.entityId && input.entityId !== assetId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "asset", entityId: assetId });
     if (!target) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "asset", entityId: assetId });
@@ -1204,11 +1158,11 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "inventory_item", entityId: itemId });
     if (!target) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     if ((query.entityType && query.entityType !== "inventory_item") || (query.entityId && query.entityId !== itemId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     try {
@@ -1218,7 +1172,7 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
       return entryListResponseSchema.parse({ items, nextCursor });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_CURSOR") {
-        return reply.code(400).send({ message: "Invalid entry cursor." });
+        return badRequest(reply, "Invalid entry cursor.");
       }
 
       throw error;
@@ -1235,12 +1189,12 @@ export const entryRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if ((input.entityType && input.entityType !== "inventory_item") || (input.entityId && input.entityId !== itemId)) {
-      return reply.code(400).send({ message: "entityType/entityId cannot conflict with the route target." });
+      return badRequest(reply, "entityType/entityId cannot conflict with the route target.");
     }
 
     const target = await resolveAliasTarget(app, householdId, { entityType: "inventory_item", entityId: itemId });
     if (!target) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const result = await createEntry(app, householdId, userId, input, { entityType: "inventory_item", entityId: itemId });

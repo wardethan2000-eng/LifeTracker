@@ -2,8 +2,6 @@ import type { Prisma } from "@prisma/client";
 import type { HobbyPreset } from "@lifekeeper/types";
 import { hobbyPresetLibrary } from "@lifekeeper/presets";
 
-type PrismaExecutor = Prisma.TransactionClient;
-
 export type HobbyPresetDefinition = {
   fieldDefinitions: unknown[];
   customFieldDefaults: Record<string, unknown>;
@@ -69,7 +67,7 @@ export type HobbyPresetDefinition = {
 };
 
 export const applyHobbyPreset = async (
-  prisma: PrismaExecutor,
+  prisma: Prisma.TransactionClient,
   hobbyId: string,
   preset: HobbyPresetDefinition
 ): Promise<void> => {

@@ -1,8 +1,8 @@
 import { createHmac } from "node:crypto";
-import type { Prisma, PrismaClient, WebhookDeliveryStatus } from "@prisma/client";
+import type { Prisma, WebhookDeliveryStatus } from "@prisma/client";
 import { toInputJsonValue } from "./prisma-json.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 type EmitDomainEventInput = {
   householdId: string;

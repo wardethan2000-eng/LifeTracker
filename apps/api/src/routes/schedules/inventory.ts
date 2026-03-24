@@ -1,4 +1,4 @@
-import {
+﻿import {
   createScheduleInventoryItemSchema,
   schedulePartsReadinessSchema,
   updateScheduleInventoryItemSchema
@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { computeSchedulePartsReadiness, getHouseholdInventoryItem } from "../../lib/inventory.js";
 import { toScheduleInventoryLinkDetailResponse } from "../../lib/serializers/index.js";
+import { notFound, badRequest } from "../../lib/errors.js";
 
 const scheduleParamsSchema = z.object({
   assetId: z.string().cuid(),
@@ -39,13 +40,13 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedule = await getScheduleForAsset(app, asset.id, params.scheduleId);
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const links = await app.prisma.scheduleInventoryItem.findMany({
@@ -68,13 +69,13 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedule = await getScheduleForAsset(app, asset.id, params.scheduleId);
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const readiness = await computeSchedulePartsReadiness(app.prisma, schedule.id);
@@ -88,19 +89,19 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedule = await getScheduleForAsset(app, asset.id, params.scheduleId);
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const inventoryItem = await getHouseholdInventoryItem(app.prisma, asset.householdId, input.inventoryItemId);
 
     if (!inventoryItem) {
-      return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+      return badRequest(reply, "Inventory item not found or belongs to a different household.");
     }
 
     const existing = await app.prisma.scheduleInventoryItem.findUnique({
@@ -137,13 +138,13 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedule = await getScheduleForAsset(app, asset.id, params.scheduleId);
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const existing = await app.prisma.scheduleInventoryItem.findUnique({
@@ -156,7 +157,7 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Schedule inventory link not found." });
+      return notFound(reply, "Schedule inventory link");
     }
 
     const link = await app.prisma.scheduleInventoryItem.update({
@@ -180,13 +181,13 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedule = await getScheduleForAsset(app, asset.id, params.scheduleId);
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const existing = await app.prisma.scheduleInventoryItem.findUnique({
@@ -199,7 +200,7 @@ export const scheduleInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Schedule inventory link not found." });
+      return notFound(reply, "Schedule inventory link");
     }
 
     await app.prisma.scheduleInventoryItem.delete({

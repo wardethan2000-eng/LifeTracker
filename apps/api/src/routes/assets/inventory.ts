@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import { createAssetInventoryItemSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -7,10 +7,8 @@ import {
   getHouseholdInventoryItem
 } from "../../lib/inventory.js";
 import { toAssetInventoryLinkDetailResponse } from "../../lib/serializers/index.js";
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { assetParamsSchema } from "../../lib/schemas.js";
 
 const assetInventoryItemParamsSchema = assetParamsSchema.extend({
   inventoryItemId: z.string().cuid()
@@ -32,7 +30,7 @@ export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const links = await app.prisma.assetInventoryItem.findMany({
@@ -60,13 +58,13 @@ export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const inventoryItem = await getHouseholdInventoryItem(app.prisma, asset.householdId, input.inventoryItemId);
 
     if (!inventoryItem) {
-      return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+      return badRequest(reply, "Inventory item not found or belongs to a different household.");
     }
 
     const existing = await app.prisma.assetInventoryItem.findUnique({
@@ -111,7 +109,7 @@ export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const link = await app.prisma.assetInventoryItem.findUnique({
@@ -124,7 +122,7 @@ export const assetInventoryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!link) {
-      return reply.code(404).send({ message: "Inventory link not found." });
+      return notFound(reply, "Inventory link");
     }
 
     await app.prisma.assetInventoryItem.delete({ where: { id: link.id } });

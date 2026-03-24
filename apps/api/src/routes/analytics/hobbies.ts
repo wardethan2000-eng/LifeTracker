@@ -1,4 +1,4 @@
-import type { HobbyPracticeRoutineFrequency } from "@prisma/client";
+﻿import type { HobbyPracticeRoutineFrequency } from "@prisma/client";
 import { hobbyPracticeGoalStatusSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import {
   toHobbyPracticeStreaksPayloadResponse,
   toHobbySessionFrequencyPayloadResponse
 } from "../../lib/serializers/index.js";
+import { forbidden } from "../../lib/errors.js";
 
 const completedSessionFilter = {
   OR: [
@@ -206,7 +207,7 @@ export const hobbyAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const now = new Date();
@@ -310,7 +311,7 @@ export const hobbyAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const routines = await app.prisma.hobbyPracticeRoutine.findMany({
@@ -375,7 +376,7 @@ export const hobbyAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const goals = await app.prisma.hobbyPracticeGoal.findMany({
@@ -438,7 +439,7 @@ export const hobbyAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const hobbies = await app.prisma.hobby.findMany({

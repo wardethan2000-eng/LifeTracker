@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   bulkPartsReadinessSchema,
   createInventoryItemSchema,
@@ -12,7 +12,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { sendQrCode } from "../../lib/qr.js";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { csvValue } from "../../lib/csv.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { buildInventoryItemScanUrl, ensureInventoryItemScanTag } from "../../lib/inventory-tags.js";
@@ -35,10 +35,10 @@ import {
 } from "../../lib/serializers/index.js";
 import { calculateInventoryDeficit } from "@lifekeeper/utils";
 import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
+import { notFound } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
 
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema, qrCodeQuerySchema } from "../../lib/schemas.js";
 
 const inventoryItemParamsSchema = householdParamsSchema.extend({
   inventoryItemId: z.string().cuid()
@@ -59,11 +59,6 @@ const inventoryDetailQuerySchema = z.object({
 
 const bulkInventoryReadinessQuerySchema = z.object({
   scheduleIds: z.string().optional()
-});
-
-const qrCodeQuerySchema = z.object({
-  format: z.enum(["png", "svg"]).default("svg"),
-  size: z.coerce.number().int().min(100).max(1000).default(300)
 });
 
 const inventoryExportColumns = [
@@ -252,17 +247,10 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       return created;
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "inventory_item.created",
-      entityType: "inventory_item",
-      entityId: item.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", item.id, "inventory_item.created", params.householdId, {
         name: item.name,
         itemType: item.itemType
-      }
-    });
+      });
 
     await emitDomainEvent(app.prisma, {
       householdId: params.householdId,
@@ -598,7 +586,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const scanTag = item.scanTag ?? await ensureInventoryItemScanTag(app.prisma, item.id);
@@ -629,7 +617,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const scanTag = item.scanTag ?? await ensureInventoryItemScanTag(app.prisma, item.id);
@@ -759,7 +747,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     if (!item.scanTag) {
@@ -793,7 +781,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const metadataChanges = buildInventoryRevisionChanges(existing, input);
@@ -856,18 +844,11 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (metadataChanges.length > 0 || input.quantityOnHand !== undefined) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "inventory_item.updated",
-        entityType: "inventory_item",
-        entityId: item.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", item.id, "inventory_item.updated", params.householdId, {
           name: item.name,
           quantityAdjusted: input.quantityOnHand !== undefined,
           metadataChanges
-        }
-      });
+        });
 
       await emitDomainEvent(app.prisma, {
         householdId: params.householdId,
@@ -902,7 +883,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const restored = await app.prisma.inventoryItem.update({
@@ -910,16 +891,9 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       data: { deletedAt: null }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "inventory_item.restored",
-      entityType: "inventory_item",
-      entityId: restored.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", restored.id, "inventory_item.restored", params.householdId, {
         name: restored.name
-      }
-    });
+      });
 
     await emitDomainEvent(app.prisma, {
       householdId: params.householdId,
@@ -962,17 +936,10 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "inventory_item.merged",
-        entityType: "inventory_item",
-        entityId: params.inventoryItemId,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", params.inventoryItemId, "inventory_item.merged", params.householdId, {
           sourceInventoryItemId: input.sourceInventoryItemId,
           targetInventoryItemId: params.inventoryItemId
-        }
-      });
+        });
 
       void removeSearchIndexEntry(app.prisma, "inventory_item", input.sourceInventoryItemId).catch(console.error);
       void syncInventoryItemToSearchIndex(app.prisma, params.inventoryItemId).catch(console.error);
@@ -1000,24 +967,17 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     await app.prisma.inventoryItem.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date() }
+      data: softDeleteData()
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "inventory_item.deleted",
-      entityType: "inventory_item",
-      entityId: existing.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", existing.id, "inventory_item.deleted", params.householdId, {
         name: existing.name
-      }
-    });
+      });
 
     await emitDomainEvent(app.prisma, {
       householdId: params.householdId,

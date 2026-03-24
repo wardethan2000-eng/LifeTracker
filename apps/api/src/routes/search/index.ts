@@ -1,13 +1,10 @@
-import { searchQuerySchema, searchResponseSchema } from "@lifekeeper/types";
+﻿import { searchQuerySchema, searchResponseSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { applyTier } from "../../lib/rate-limit-tiers.js";
 import { querySearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 export const searchRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/search", async (request, reply) => {
@@ -18,7 +15,7 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const include = query.include ?? query.types;

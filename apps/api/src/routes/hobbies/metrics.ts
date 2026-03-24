@@ -1,4 +1,4 @@
-import {
+﻿import {
   createHobbyMetricDefinitionInputSchema,
   updateHobbyMetricDefinitionInputSchema,
   createHobbyMetricReadingInputSchema
@@ -14,11 +14,8 @@ import {
   toHobbyMetricReadingResponse
 } from "../../lib/serializers/index.js";
 import { syncEntryToSearchIndex } from "../../lib/search-index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const metricParamsSchema = hobbyParamsSchema.extend({
   metricId: z.string().cuid()
@@ -70,7 +67,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const metric = await app.prisma.hobbyMetricDefinition.create({
@@ -100,7 +97,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       where: { id: metricId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Metric definition not found" });
+      return notFound(reply, "Metric definition");
     }
 
     const metric = await app.prisma.hobbyMetricDefinition.update({
@@ -129,7 +126,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       where: { id: metricId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Metric definition not found" });
+      return notFound(reply, "Metric definition");
     }
 
     await app.prisma.hobbyMetricDefinition.delete({ where: { id: metricId } });
@@ -188,7 +185,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       where: { id: metricId, hobbyId, hobby: { householdId } }
     });
     if (!metric) {
-      return reply.code(404).send({ message: "Metric definition not found" });
+      return notFound(reply, "Metric definition");
     }
 
     if (input.sessionId) {
@@ -239,7 +236,7 @@ export const hobbyMetricRoutes: FastifyPluginAsync = async (app) => {
       }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Reading not found" });
+      return notFound(reply, "Reading");
     }
 
     let createdEntryIds: string[] = [];

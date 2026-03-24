@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../lib/asset-access.js";
@@ -8,6 +8,7 @@ import {
   toInventoryItemDetailResponse
 } from "../lib/serializers/index.js";
 import { getSpaceBreadcrumb } from "../lib/spaces.js";
+import { notFound } from "../lib/errors.js";
 
 const scanTagParamsSchema = z.object({
   tag: z.string().trim().min(1).max(120)
@@ -64,7 +65,7 @@ export const scanDetailRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     if (!await requireHouseholdMembership(app.prisma, space.householdId, request.auth.userId, reply)) {
@@ -188,7 +189,7 @@ export const scanDetailRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     if (!await requireHouseholdMembership(app.prisma, item.householdId, request.auth.userId, reply)) {

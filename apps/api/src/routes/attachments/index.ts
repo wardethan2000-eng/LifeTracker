@@ -1,4 +1,4 @@
-import type { Attachment as PrismaAttachment, PrismaClient } from "@prisma/client";
+﻿import type { Attachment as PrismaAttachment, PrismaClient } from "@prisma/client";
 import {
   attachmentListQuerySchema,
   attachmentSchema,
@@ -9,8 +9,10 @@ import type { AttachmentEntityType } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { toAttachmentResponse } from "../../lib/serializers/index.js";
+import { forbidden, notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -97,10 +99,6 @@ const validateEntityOwnership = async (
   }
 };
 
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid(),
-});
-
 const attachmentParamsSchema = z.object({
   householdId: z.string().cuid(),
   attachmentId: z.string().cuid(),
@@ -115,7 +113,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(body.mimeType)) {
@@ -183,14 +181,14 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const attachment = await app.prisma.attachment.findFirst({
       where: { id: attachmentId, householdId, status: "pending", deletedAt: null },
     });
     if (!attachment) {
-      return reply.code(404).send({ message: "Attachment not found." });
+      return notFound(reply, "Attachment");
     }
 
     const headResult = await app.storage.headObject(attachment.storageKey);
@@ -209,18 +207,11 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId: request.auth.userId,
-      action: "attachment.confirmed",
-      entityType: "attachment",
-      entityId: attachment.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("attachment", attachment.id, "attachment.confirmed", householdId, {
         parentEntityType: attachment.entityType,
         parentEntityId: attachment.entityId,
         filename: attachment.originalFilename,
-      },
-    });
+      });
 
     return toAttachmentResponse(updatedAttachment);
   });
@@ -233,7 +224,7 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const where: Record<string, unknown> = { householdId, status: "active", deletedAt: null };
@@ -258,14 +249,14 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const attachment = await app.prisma.attachment.findFirst({
       where: { id: attachmentId, householdId, status: "active", deletedAt: null },
     });
     if (!attachment) {
-      return reply.code(404).send({ message: "Attachment not found." });
+      return notFound(reply, "Attachment");
     }
 
     const url = await app.storage.generateDownloadUrl(attachment.storageKey, attachment.originalFilename);
@@ -280,14 +271,14 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const attachment = await app.prisma.attachment.findFirst({
       where: { id: attachmentId, householdId, status: "active", deletedAt: null },
     });
     if (!attachment) {
-      return reply.code(404).send({ message: "Attachment not found." });
+      return notFound(reply, "Attachment");
     }
 
     const updatedAttachment = await app.prisma.attachment.update({
@@ -311,14 +302,14 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const attachment = await app.prisma.attachment.findFirst({
       where: { id: attachmentId, householdId, deletedAt: null, status: { not: "deleted" } },
     });
     if (!attachment) {
-      return reply.code(404).send({ message: "Attachment not found." });
+      return notFound(reply, "Attachment");
     }
 
     await app.prisma.attachment.update({
@@ -329,18 +320,11 @@ export const attachmentRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId: request.auth.userId,
-      action: "attachment.deleted",
-      entityType: "attachment",
-      entityId: attachment.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("attachment", attachment.id, "attachment.deleted", householdId, {
         parentEntityType: attachment.entityType,
         parentEntityId: attachment.entityId,
         filename: attachment.originalFilename,
-      },
-    });
+      });
 
     return reply.code(204).send();
   });

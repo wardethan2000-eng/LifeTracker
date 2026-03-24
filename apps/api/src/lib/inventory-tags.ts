@@ -1,14 +1,14 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { customAlphabet } from "nanoid";
 import { resolveAppBaseUrl } from "./asset-tags.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 
 const SCAN_TAG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
 
-type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 const buildScanTagGenerator = (length: number) => customAlphabet(SCAN_TAG_ALPHABET, length);
 
-export const generateInventoryItemScanTag = async (prisma: PrismaLike): Promise<string> => {
+export const generateInventoryItemScanTag = async (prisma: PrismaExecutor): Promise<string> => {
   for (const length of [10, 12, 14, 16]) {
     const createCandidate = buildScanTagGenerator(length);
 
@@ -28,7 +28,7 @@ export const generateInventoryItemScanTag = async (prisma: PrismaLike): Promise<
   throw new Error("Unable to generate a unique scan tag for the inventory item.");
 };
 
-export const ensureInventoryItemScanTag = async (prisma: PrismaLike, inventoryItemId: string): Promise<string> => {
+export const ensureInventoryItemScanTag = async (prisma: PrismaExecutor, inventoryItemId: string): Promise<string> => {
   const item = await prisma.inventoryItem.findUnique({
     where: { id: inventoryItemId },
     select: { id: true, scanTag: true }

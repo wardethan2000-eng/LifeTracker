@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   completeMaintenanceScheduleSchema,
   createOffsetPaginationQuerySchema,
@@ -25,13 +25,12 @@ import {
   toMaintenanceScheduleResponse,
   updateScheduleDueState
 } from "../../lib/schedule-state.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger, logActivity } from "../../lib/activity-log.js";
 import { buildOffsetPage } from "../../lib/pagination.js";
 import { syncLogToSearchIndex, syncScheduleToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { assetParamsSchema } from "../../lib/schemas.js";
 
 const scheduleParamsSchema = assetParamsSchema.extend({
   scheduleId: z.string().cuid()
@@ -70,7 +69,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const scheduleQuery = {
@@ -122,14 +121,14 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const metricId = resolveScheduleMetricId(input.triggerConfig, input.metricId);
     const metric = await loadMetric(app.prisma, asset.id, metricId);
 
     if (metricId && !metric) {
-      return reply.code(400).send({ message: "Referenced metric does not belong to this asset." });
+      return badRequest(reply, "Referenced metric does not belong to this asset.");
     }
 
     const recalculated = recalculateScheduleFields({
@@ -172,7 +171,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!membership) {
-        return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+        return badRequest(reply, "Assigned user is not a member of this household.");
       }
 
       data.assignedToId = input.assignedToId;
@@ -231,7 +230,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedule = await app.prisma.maintenanceSchedule.findFirst({
@@ -256,7 +255,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     return toMaintenanceScheduleResponse(schedule);
@@ -268,7 +267,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const existing = await app.prisma.maintenanceSchedule.findFirst({
@@ -301,7 +300,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
@@ -361,7 +360,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!result.schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     await Promise.all([
@@ -394,7 +393,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const existing = await app.prisma.maintenanceSchedule.findFirst({
@@ -413,7 +412,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     const triggerConfig = input.triggerConfig ?? maintenanceTriggerSchema.parse(existing.triggerConfig);
@@ -426,7 +425,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const metric = await loadMetric(app.prisma, asset.id, metricId);
 
     if (metricId && !metric) {
-      return reply.code(400).send({ message: "Referenced metric does not belong to this asset." });
+      return badRequest(reply, "Referenced metric does not belong to this asset.");
     }
 
     const lastCompletedAt = input.lastCompletedAt !== undefined
@@ -489,7 +488,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
         });
 
         if (!membership) {
-          return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+          return badRequest(reply, "Assigned user is not a member of this household.");
         }
       }
 
@@ -497,19 +496,12 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (input.assignedToId !== undefined && input.assignedToId !== existing.assignedToId) {
-      await logActivity(app.prisma, {
-        householdId: asset.householdId,
-        userId: request.auth.userId,
-        action: "schedule.assigned",
-        entityType: "schedule",
-        entityId: existing.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("schedule", existing.id, "schedule.assigned", asset.householdId, {
           name: existing.name,
           assetId: asset.id,
           previousAssignedToId: existing.assignedToId,
           newAssignedToId: input.assignedToId
-        }
-      });
+        });
     }
 
     await app.prisma.maintenanceSchedule.update({
@@ -520,7 +512,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const schedule = await updateScheduleDueState(app.prisma, existing.id);
 
     if (!schedule) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     await enqueueNotificationScan({ householdId: asset.householdId });
@@ -535,7 +527,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const existing = await app.prisma.maintenanceSchedule.findFirst({
@@ -547,12 +539,12 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Maintenance schedule not found." });
+      return notFound(reply, "Maintenance schedule");
     }
 
     await app.prisma.maintenanceSchedule.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date(), isActive: false }
+      data: { ...softDeleteData(), isActive: false }
     });
 
     await Promise.all([

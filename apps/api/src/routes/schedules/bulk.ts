@@ -1,11 +1,10 @@
-import {
+﻿import {
   bulkCompleteSchedulesSchema,
   bulkPauseSchedulesSchema,
   bulkSnoozeSchedulesSchema,
   maintenanceTriggerSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
@@ -13,10 +12,8 @@ import { enqueueNotificationScan } from "../../lib/queues.js";
 import { syncScheduleCompletionFromLogs } from "../../lib/maintenance-logs.js";
 import { recalculateScheduleFields } from "../../lib/schedule-state.js";
 import { syncScheduleToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 type FailedItem = {
   scheduleId: string;
@@ -33,7 +30,7 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const schedules = await app.prisma.maintenanceSchedule.findMany({
@@ -115,7 +112,7 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const schedules = await app.prisma.maintenanceSchedule.findMany({
@@ -212,7 +209,7 @@ export const scheduleBulkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const schedules = await app.prisma.maintenanceSchedule.findMany({

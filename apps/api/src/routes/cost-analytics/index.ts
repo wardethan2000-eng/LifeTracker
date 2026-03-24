@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import { maintenanceTriggerSchema } from "@lifekeeper/types";
 import { average } from "../../lib/analytics-helpers.js";
 import {
@@ -21,14 +21,8 @@ import {
   toHouseholdCostOverviewResponse,
   toServiceProviderSpendResponse
 } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { assetParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
 
 const dashboardQuerySchema = z.object({
   periodMonths: z.coerce.number().int().min(1).max(60).default(12)
@@ -498,7 +492,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     return buildHouseholdCostDashboard(app.prisma, params.householdId, query.periodMonths);
@@ -510,7 +504,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     return buildHouseholdServiceProviderSpend(app.prisma, params.householdId);
@@ -522,7 +516,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const [dashboard, serviceProviderSpend, forecast] = await Promise.all([
@@ -544,7 +538,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     return buildHouseholdCostForecast(app.prisma, params.householdId);
@@ -555,7 +549,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const logs = await app.prisma.maintenanceLog.findMany({
@@ -638,7 +632,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const [metrics, entries, logs] = await Promise.all([
@@ -710,7 +704,7 @@ export const costAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const schedules = await app.prisma.maintenanceSchedule.findMany({

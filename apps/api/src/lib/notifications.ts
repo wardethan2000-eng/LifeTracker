@@ -16,8 +16,8 @@ import { addDays } from "@lifekeeper/utils";
 import { toNotificationResponse } from "./serializers/index.js";
 import { sendEmail } from "./adapters/email-adapter.js";
 import { sendPush } from "./adapters/push-adapter.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 type NotificationPhase = "upcoming" | "due_soon" | "due" | "overdue";
 

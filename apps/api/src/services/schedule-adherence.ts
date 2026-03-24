@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, TriggerType } from "@prisma/client";
+import type { Prisma, TriggerType } from "@prisma/client";
 import {
   completionCycleRecordSchema,
   maintenanceTriggerSchema,
@@ -6,8 +6,8 @@ import {
   type MaintenanceTrigger
 } from "@lifekeeper/types";
 import { MS_PER_DAY, addDays, calculateNextDue, calculateUsageRate } from "@lifekeeper/utils";
+import type { PrismaExecutor } from "../lib/prisma-types.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 type ScheduleWithContext = {
   id: string;

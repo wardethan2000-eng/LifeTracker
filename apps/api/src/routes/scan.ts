@@ -1,7 +1,8 @@
-import { scanResolutionResponseSchema, scanSpaceSummarySchema } from "@lifekeeper/types";
+﻿import { scanResolutionResponseSchema, scanSpaceSummarySchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getSpaceBreadcrumb } from "../lib/spaces.js";
+import { notFound } from "../lib/errors.js";
 
 const scanResolveQuerySchema = z.object({
   tag: z.string().trim().min(1).max(120)
@@ -102,7 +103,7 @@ export const scanRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!space) {
-      return reply.code(404).send({ message: "Space not found." });
+      return notFound(reply, "Space");
     }
 
     const breadcrumb = await getSpaceBreadcrumb(app.prisma, space.id);

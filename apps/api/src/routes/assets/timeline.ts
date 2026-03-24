@@ -1,12 +1,9 @@
-import { assetTimelineQuerySchema, conditionEntrySchema } from "@lifekeeper/types";
+﻿import { assetTimelineQuerySchema, conditionEntrySchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { assertMembership, getAccessibleAsset } from "../../lib/asset-access.js";
 import { toEntryBackedTimelineItem, toTimelineItem } from "../../lib/serializers/index.js";
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { assetParamsSchema } from "../../lib/schemas.js";
 
 const asRecord = (value: unknown): Record<string, unknown> => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -47,13 +44,13 @@ export const timelineRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     try {
       await assertMembership(app.prisma, asset.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const maintenanceLogsPromise = includesSource(query.sourceType, "maintenance_log")

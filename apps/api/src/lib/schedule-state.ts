@@ -1,4 +1,4 @@
-import type { MaintenanceSchedule, Prisma, PrismaClient, UsageMetric } from "@prisma/client";
+import type { MaintenanceSchedule, Prisma, UsageMetric } from "@prisma/client";
 import {
   maintenanceScheduleSchema,
   notificationConfigSchema,
@@ -6,8 +6,8 @@ import {
   type MaintenanceTrigger
 } from "@lifekeeper/types";
 import { calculateNextDue, calculateScheduleStatus } from "@lifekeeper/utils";
+import type { PrismaExecutor } from "./prisma-types.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 const getMetricIdFromTrigger = (trigger: MaintenanceTrigger): string | undefined => {
   if (trigger.type === "usage" || trigger.type === "compound") {

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
@@ -11,6 +11,7 @@ import {
 } from "../../lib/serializers/index.js";
 import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
 import type { CompletionCycleRecord } from "@lifekeeper/types";
+import { forbidden, notFound } from "../../lib/errors.js";
 
 const MAX_YEAR_OVER_YEAR_COMPARISON_YEARS = 5;
 
@@ -128,7 +129,7 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const assets = await app.prisma.asset.findMany({
@@ -304,7 +305,7 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     if (query.assetId) {
@@ -318,7 +319,7 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!asset) {
-        return reply.code(404).send({ message: "Asset not found." });
+        return notFound(reply, "Asset");
       }
     }
 
@@ -413,7 +414,7 @@ export const comparativeAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const defaultEnd = new Date();

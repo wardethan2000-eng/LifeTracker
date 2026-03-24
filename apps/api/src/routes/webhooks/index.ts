@@ -1,4 +1,4 @@
-import {
+﻿import {
   createWebhookEndpointSchema,
   domainEventSchema,
   updateWebhookEndpointSchema,
@@ -9,10 +9,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { dispatchPendingWebhookDeliveries } from "../../lib/domain-events.js";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const webhookParamsSchema = householdParamsSchema.extend({
   webhookId: z.string().cuid()
@@ -94,7 +93,7 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Webhook endpoint not found." });
+      return notFound(reply, "Webhook endpoint");
     }
 
     const endpoint = await app.prisma.webhookEndpoint.update({
@@ -129,12 +128,12 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Webhook endpoint not found." });
+      return notFound(reply, "Webhook endpoint");
     }
 
     await app.prisma.webhookEndpoint.update({
       where: { id: existing.id },
-      data: { deletedAt: new Date(), isActive: false }
+      data: { ...softDeleteData(), isActive: false }
     });
 
     return reply.code(204).send();

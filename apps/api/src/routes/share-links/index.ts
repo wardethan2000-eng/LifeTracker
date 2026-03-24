@@ -1,14 +1,12 @@
-import { createShareLinkSchema } from "@lifekeeper/types";
+﻿import { createShareLinkSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { toShareLinkResponse } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const deleteShareLinkParamsSchema = householdParamsSchema.extend({
   shareLinkId: z.string().cuid()
@@ -26,7 +24,7 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const asset = await app.prisma.asset.findFirst({
@@ -37,7 +35,7 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const shareLink = await app.prisma.shareLink.create({
@@ -53,17 +51,10 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "share_link.created",
-      entityType: "share_link",
-      entityId: shareLink.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("share_link", shareLink.id, "share_link.created", params.householdId, {
         assetId: asset.id,
         label: shareLink.label
-      }
-    });
+      });
 
     return reply.code(201).send(toShareLinkResponse(shareLink));
   });
@@ -75,7 +66,7 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const shareLinks = await app.prisma.shareLink.findMany({
@@ -97,7 +88,7 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.shareLink.findFirst({
@@ -108,7 +99,7 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Share link not found." });
+      return notFound(reply, "Share link");
     }
 
     const shareLink = await app.prisma.shareLink.update({
@@ -120,17 +111,10 @@ export const shareLinkRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "share_link.revoked",
-      entityType: "share_link",
-      entityId: shareLink.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("share_link", shareLink.id, "share_link.revoked", params.householdId, {
         assetId: shareLink.assetId,
         label: shareLink.label
-      }
-    });
+      });
 
     return toShareLinkResponse(shareLink);
   });

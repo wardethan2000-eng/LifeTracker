@@ -1,4 +1,4 @@
-import {
+﻿import {
   createInventoryTransactionCorrectionSchema,
   createInventoryTransactionSchema,
   inventoryTransactionCorrectionResultSchema,
@@ -9,7 +9,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
   createInventoryTransactionCorrection,
@@ -25,6 +25,7 @@ import {
   toInventoryTransactionResponse,
   toInventoryTransactionWithItemResponse
 } from "../../lib/serializers/index.js";
+import { notFound } from "../../lib/errors.js";
 
 const inventoryTransactionParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -125,7 +126,7 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
     const existing = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
 
     if (!existing) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     try {
@@ -172,19 +173,12 @@ export const householdInventoryTransactionRoutes: FastifyPluginAsync = async (ap
 
       const referenceLinks = await resolveInventoryTransactionReferenceLinks(app.prisma, params.householdId, [result.transaction]);
 
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "inventory.transaction.corrected",
-        entityType: "inventory_transaction",
-        entityId: result.transaction.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_transaction", result.transaction.id, "inventory.transaction.corrected", params.householdId, {
           correctedTransactionId: params.transactionId,
           inventoryItemId: result.item.id,
           correctionQuantity: result.transaction.quantity,
           replacementQuantity: input.replacementQuantity
-        }
-      });
+        });
 
       return reply.code(201).send(inventoryTransactionCorrectionResultSchema.parse({
         transaction: toInventoryTransactionResponse(

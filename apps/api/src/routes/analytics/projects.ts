@@ -1,4 +1,4 @@
-import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@lifekeeper/utils";
+﻿import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@lifekeeper/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
@@ -10,6 +10,7 @@ import {
   toProjectTaskVelocityPayloadResponse,
   toProjectTimelinePayloadResponse
 } from "../../lib/serializers/index.js";
+import { forbidden, notFound } from "../../lib/errors.js";
 
 const activeProjectStatuses = ["planning", "active", "on_hold"] as const;
 const allProjectStatuses = ["planning", "active", "on_hold", "completed", "cancelled"] as const;
@@ -78,7 +79,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const projects = await app.prisma.project.findMany({
@@ -94,7 +95,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (query.projectId && projects.length === 0) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const projectIds = projects.map((project) => project.id);
@@ -209,7 +210,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const project = await app.prisma.project.findFirst({
@@ -237,7 +238,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const datedExpenses = project.expenses
@@ -295,7 +296,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     if (query.projectId) {
@@ -309,7 +310,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!project) {
-        return reply.code(404).send({ message: "Project not found." });
+        return notFound(reply, "Project");
       }
     }
 
@@ -384,7 +385,7 @@ export const projectAnalyticsRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, query.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const projects = await app.prisma.project.findMany({

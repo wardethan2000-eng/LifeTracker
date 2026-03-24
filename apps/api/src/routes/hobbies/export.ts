@@ -3,10 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { csvValue } from "../../lib/csv.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const importHobbyItemSchema = z.object({
   name: z.string().min(1).max(120),

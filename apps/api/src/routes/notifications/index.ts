@@ -1,4 +1,4 @@
-import {
+﻿import {
   notificationPreferencesSchema,
   updateNotificationPreferencesSchema
 } from "@lifekeeper/types";
@@ -12,10 +12,9 @@ import {
   toNotificationResponse,
   toUserProfileResponse
 } from "../../lib/serializers/index.js";
+import { forbidden, notFound } from "../../lib/errors.js";
 
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const notificationParamsSchema = z.object({
   notificationId: z.string().cuid()
@@ -48,7 +47,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     let cursorFilter = {};
@@ -151,7 +150,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!notification) {
-      return reply.code(404).send({ message: "Notification not found." });
+      return notFound(reply, "Notification");
     }
 
     const updated = await app.prisma.notification.update({
@@ -175,7 +174,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!notification) {
-      return reply.code(404).send({ message: "Notification not found." });
+      return notFound(reply, "Notification");
     }
 
     const updated = await app.prisma.notification.update({
@@ -195,7 +194,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!user) {
-      return reply.code(404).send({ message: "Current user not found." });
+      return notFound(reply, "Current user");
     }
 
     return notificationPreferencesSchema.parse(parseNotificationPreferences(user.notificationPreferences));
@@ -208,7 +207,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!user) {
-      return reply.code(404).send({ message: "Current user not found." });
+      return notFound(reply, "Current user");
     }
 
     const current = parseNotificationPreferences(user.notificationPreferences);
@@ -238,7 +237,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, input.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const job = await enqueueNotificationScan({ householdId: input.householdId });
@@ -259,7 +258,7 @@ export const notificationRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!notification) {
-      return reply.code(404).send({ message: "Notification not found." });
+      return notFound(reply, "Notification");
     }
 
     const job = await enqueueNotificationDelivery({ notificationId: notification.id });

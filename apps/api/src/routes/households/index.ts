@@ -1,4 +1,4 @@
-import {
+﻿import {
   addHouseholdMemberSchema,
   createHouseholdSchema,
   householdMemberSchema,
@@ -11,11 +11,9 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from "fastify"
 import { z } from "zod";
 import { assertMembership, assertOwner, getMembership } from "../../lib/asset-access.js";
 import { toUserProfileResponse } from "../../lib/serializers/index.js";
-import { logActivity } from "../../lib/activity-log.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { createActivityLogger } from "../../lib/activity-log.js";
+import { forbidden, notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const memberParamsSchema = householdParamsSchema.extend({
   memberId: z.string().cuid()
@@ -97,7 +95,7 @@ const ensureHouseholdMember = async (app: FastifyInstance, householdId: string, 
     await assertMembership(app.prisma, householdId, userId);
     return true;
   } catch {
-    await reply.code(403).send({ message: "You do not have access to this household." });
+    await forbidden(reply);
     return false;
   }
 };
@@ -177,7 +175,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     const membership = await getMembership(app.prisma, params.householdId, request.auth.userId);
 
     if (!membership) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const household = await app.prisma.household.findUnique({
@@ -190,7 +188,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!household) {
-      return reply.code(404).send({ message: "Household not found." });
+      return notFound(reply, "Household");
     }
 
     return toHouseholdSummary(household, membership.role);
@@ -214,7 +212,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Household not found." });
+      return notFound(reply, "Household");
     }
 
     if (input.timezone !== undefined) {
@@ -276,7 +274,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!household) {
-      return reply.code(404).send({ message: "Household not found." });
+      return notFound(reply, "Household");
     }
 
     const user = await app.prisma.user.findFirst({
@@ -288,7 +286,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!user) {
-      return reply.code(404).send({ message: "User not found." });
+      return notFound(reply, "User");
     }
 
     const existingMembership = await app.prisma.householdMember.findUnique({
@@ -316,14 +314,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "member.added",
-      entityType: "household",
-      entityId: params.householdId,
-      metadata: { addedUserId: user.id, role: input.role }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("household", params.householdId, "member.added", params.householdId, { addedUserId: user.id, role: input.role });
 
     return reply.code(201).send(toHouseholdMember(membership));
   });
@@ -347,7 +338,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Household member not found." });
+      return notFound(reply, "Household member");
     }
 
     try {
@@ -390,7 +381,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Household member not found." });
+      return notFound(reply, "Household member");
     }
 
     try {
@@ -401,14 +392,7 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
         });
       });
 
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "member.removed",
-        entityType: "household",
-        entityId: params.householdId,
-        metadata: { removedUserId: existing.userId }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("household", params.householdId, "member.removed", params.householdId, { removedUserId: existing.userId });
 
       return reply.code(204).send();
     } catch (error) {

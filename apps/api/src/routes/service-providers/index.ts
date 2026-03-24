@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   createServiceProviderSchema,
   updateServiceProviderSchema
@@ -7,12 +7,10 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { toServiceProviderResponse } from "../../lib/serializers/index.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { syncServiceProviderToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden, notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const providerParamsSchema = householdParamsSchema.extend({
   providerId: z.string().cuid()
@@ -30,7 +28,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const provider = await app.prisma.serviceProvider.create({
@@ -47,14 +45,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "service_provider.created",
-      entityType: "service_provider",
-      entityId: provider.id,
-      metadata: { name: provider.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("service_provider", provider.id, "service_provider.created", params.householdId, { name: provider.name });
 
     void syncServiceProviderToSearchIndex(app.prisma, provider.id).catch(console.error);
 
@@ -68,7 +59,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const where: Prisma.ServiceProviderWhereInput = {
@@ -90,7 +81,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const provider = await app.prisma.serviceProvider.findFirst({
@@ -98,7 +89,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!provider) {
-      return reply.code(404).send({ message: "Service provider not found." });
+      return notFound(reply, "Service provider");
     }
 
     return toServiceProviderResponse(provider);
@@ -111,7 +102,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.serviceProvider.findFirst({
@@ -119,7 +110,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Service provider not found." });
+      return notFound(reply, "Service provider");
     }
 
     const data: Prisma.ServiceProviderUncheckedUpdateInput = {};
@@ -149,7 +140,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const existing = await app.prisma.serviceProvider.findFirst({
@@ -157,7 +148,7 @@ export const serviceProviderRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Service provider not found." });
+      return notFound(reply, "Service provider");
     }
 
     // Prisma onDelete: SetNull handles clearing serviceProviderId on related logs

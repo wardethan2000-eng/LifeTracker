@@ -1,7 +1,4 @@
-import type {
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
   type CreateInventoryTransactionCorrectionInput,
   type CreateMaintenanceLogPartInput,
@@ -17,6 +14,7 @@ import {
   calculateInventoryTotalValue,
   isInventoryLowStock
 } from "@lifekeeper/utils";
+import type { PrismaExecutor } from "./prisma-types.js";
 
 export {
   calculateInventoryDeficit,
@@ -24,7 +22,6 @@ export {
   isInventoryLowStock
 };
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 type InventoryTransactionWriteInput = CreateInventoryTransactionInput & {
   correctionOfTransactionId?: string | null;

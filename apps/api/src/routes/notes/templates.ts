@@ -1,4 +1,4 @@
-import {
+﻿import {
   createNoteTemplateSchema,
   noteTemplateSchema,
   updateNoteTemplateSchema,
@@ -6,12 +6,11 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { parseTags } from "../../lib/prisma-json.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const templateParamsSchema = householdParamsSchema.extend({
   templateId: z.string().cuid()
@@ -76,7 +75,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       where: { id: templateId, householdId, deletedAt: null }
     });
     if (!template) {
-      return reply.code(404).send({ message: "Template not found" });
+      return notFound(reply, "Template");
     }
 
     return toTemplateResponse(template);
@@ -104,14 +103,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "note_template_created",
-      entityType: "note_template",
-      entityId: template.id,
-      metadata: { name: template.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("note_template", template.id, "note_template_created", householdId, { name: template.name });
 
     reply.code(201);
     return toTemplateResponse(template);
@@ -128,7 +120,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       where: { id: templateId, householdId, deletedAt: null }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Template not found" });
+      return notFound(reply, "Template");
     }
     if (existing.isBuiltIn) {
       return reply.code(403).send({ message: "Built-in templates cannot be modified" });
@@ -148,14 +140,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       data
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "note_template_updated",
-      entityType: "note_template",
-      entityId: template.id,
-      metadata: { name: template.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("note_template", template.id, "note_template_updated", householdId, { name: template.name });
 
     return toTemplateResponse(template);
   });
@@ -170,7 +155,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       where: { id: templateId, householdId, deletedAt: null }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Template not found" });
+      return notFound(reply, "Template");
     }
     if (existing.isBuiltIn) {
       return reply.code(403).send({ message: "Built-in templates cannot be deleted" });
@@ -178,17 +163,10 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
 
     await app.prisma.noteTemplate.update({
       where: { id: templateId },
-      data: { deletedAt: new Date() }
+      data: softDeleteData()
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "note_template_deleted",
-      entityType: "note_template",
-      entityId: templateId,
-      metadata: { name: existing.name }
-    });
+        await createActivityLogger(app.prisma, userId).log("note_template", templateId, "note_template_deleted", householdId, { name: existing.name });
 
     return { success: true };
   });

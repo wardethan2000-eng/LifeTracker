@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   assetPartsConsumptionSchema,
   householdInventoryAnalyticsSchema,
@@ -32,10 +32,9 @@ import {
   toInventoryTurnoverResponse,
   toPartCommonalityResponse
 } from "../../lib/serializers/index.js";
+import { notFound } from "../../lib/errors.js";
 
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const inventoryItemParamsSchema = householdParamsSchema.extend({
   inventoryItemId: z.string().cuid()
@@ -287,7 +286,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
     ]);
 
     if (!item) {
-      return reply.code(404).send({ message: "Inventory item not found." });
+      return notFound(reply, "Inventory item");
     }
 
     const totalConsumed = transactions.reduce((sum, transaction) => transaction.quantity < 0 ? sum + Math.abs(transaction.quantity) : sum, 0);

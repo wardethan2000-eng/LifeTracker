@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { PrismaExecutor } from "../../lib/prisma-types.js";
+﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createQuickRestockSchema,
   updateInventoryPurchaseLineSchema
@@ -6,7 +7,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
   calculateInventoryDeficit,
@@ -18,10 +19,8 @@ import {
   toInventoryPurchaseResponse,
   toInventoryShoppingListResponse
 } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const purchaseLineParamsSchema = householdParamsSchema.extend({
   purchaseId: z.string().cuid(),
@@ -45,7 +44,7 @@ const purchaseInclude = {
   }
 } satisfies Prisma.InventoryPurchaseInclude;
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
+
 type InventoryPurchaseWithLines = Prisma.InventoryPurchaseGetPayload<{ include: typeof purchaseInclude }>;
 
 const activePurchaseStatuses = ["draft", "ordered"] as const;
@@ -221,14 +220,7 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
     });
 
     for (const purchaseId of createdPurchaseIds) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "inventory.purchase.generated",
-        entityType: "inventory_purchase",
-        entityId: purchaseId,
-        metadata: { source: "reorder" }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_purchase", purchaseId, "inventory.purchase.generated", params.householdId, { source: "reorder" });
     }
 
     const purchases = await listActivePurchases(app.prisma, params.householdId);
@@ -278,7 +270,7 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Purchase line not found." });
+      return notFound(reply, "Purchase line");
     }
 
     const nextStatus = input.status ?? existing.status;
@@ -401,45 +393,24 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
     });
 
     if (nextStatus === "ordered") {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "inventory.purchase_line.ordered",
-        entityType: "inventory_purchase",
-        entityId: updatedPurchase.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_purchase", updatedPurchase.id, "inventory.purchase_line.ordered", params.householdId, {
           inventoryItemId: existing.inventoryItemId,
           itemName: existing.inventoryItem.name
-        }
-      });
+        });
     }
 
     if (nextStatus === "received") {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "inventory.purchase_line.received",
-        entityType: "inventory_purchase",
-        entityId: updatedPurchase.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("inventory_purchase", updatedPurchase.id, "inventory.purchase_line.received", params.householdId, {
           inventoryItemId: existing.inventoryItemId,
           itemName: existing.inventoryItem.name
-        }
-      });
+        });
 
       if (linkedSupplyResult?.becameProcured) {
-        await logActivity(app.prisma, {
-          householdId: params.householdId,
-          userId: request.auth.userId,
-          action: "project.supply.procured",
-          entityType: "project_phase_supply",
-          entityId: linkedSupplyResult.id,
-          metadata: {
+                await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", linkedSupplyResult.id, "project.supply.procured", params.householdId, {
             supplyName: linkedSupplyResult.name,
             phaseName: linkedSupplyResult.phaseName,
             source: "inventory_purchase"
-          }
-        });
+          });
       }
     }
 
@@ -520,17 +491,10 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "inventory.quick_restock.created",
-      entityType: "inventory_purchase",
-      entityId: purchase.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("inventory_purchase", purchase.id, "inventory.quick_restock.created", params.householdId, {
         supplierName: purchase.supplierName,
         itemCount: purchase.lines.length
-      }
-    });
+      });
 
     return reply.code(201).send(toInventoryPurchaseResponse(purchase));
   });

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   allocateProjectInventorySchema,
   createProjectBudgetCategorySchema,
@@ -18,7 +18,7 @@ import {
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, requireHouseholdMembership, ForbiddenError } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
   getHouseholdInventoryItem,
@@ -43,14 +43,9 @@ import {
   toProjectTaskResponse
 } from "../../lib/serializers/index.js";
 import { syncProjectToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const projectParamsSchema = householdParamsSchema.extend({
-  projectId: z.string().cuid()
-});
+import { forbidden, notFound, badRequest } from "../../lib/errors.js";
+import { softDeleteData } from "../../lib/soft-delete.js";
+import { projectParamsSchema } from "../../lib/schemas.js";
 
 const phaseParamsSchema = projectParamsSchema.extend({
   phaseId: z.string().cuid()
@@ -162,7 +157,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const phases = await app.prisma.projectPhase.findMany({
@@ -201,7 +196,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const sortOrder = input.sortOrder ?? await getNextSortOrder(() => app.prisma.projectPhase.aggregate({
@@ -248,14 +243,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.phase.created",
-      entityType: "project_phase",
-      entityId: phase.id,
-      metadata: { phaseName: phase.name, sortOrder: phase.sortOrder }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_phase", phase.id, "project.phase.created", params.householdId, { phaseName: phase.name, sortOrder: phase.sortOrder });
 
     refreshProjectArtifacts(params.householdId, project.id);
 
@@ -272,7 +260,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const phase = await app.prisma.projectPhase.findFirst({
@@ -281,7 +269,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     return toProjectPhaseDetailResponse(phase);
@@ -294,7 +282,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch (error) {
       if (error instanceof ForbiddenError) {
-        return reply.code(403).send({ message: "You do not have access to this household." });
+        return forbidden(reply);
       }
 
       throw error;
@@ -303,7 +291,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const phases = await app.prisma.projectPhase.findMany({
@@ -326,7 +314,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const data: Prisma.ProjectPhaseUncheckedUpdateInput = {};
@@ -376,14 +364,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (input.status !== undefined && input.status !== phase.status) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.phase.status_changed",
-        entityType: "project_phase",
-        entityId: phase.id,
-        metadata: { phaseName: phase.name, oldStatus: phase.status, newStatus: input.status }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_phase", phase.id, "project.phase.status_changed", params.householdId, { phaseName: phase.name, oldStatus: phase.status, newStatus: input.status });
     }
 
     refreshProjectArtifacts(params.householdId, params.projectId);
@@ -401,7 +382,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     await app.prisma.$transaction(async (tx) => {
@@ -441,14 +422,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       await syncProjectDerivedStatuses(tx, params.projectId);
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.phase.deleted",
-      entityType: "project_phase",
-      entityId: phase.id,
-      metadata: { phaseName: phase.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_phase", phase.id, "project.phase.deleted", params.householdId, { phaseName: phase.name });
 
     refreshProjectArtifacts(params.householdId, params.projectId);
 
@@ -466,7 +440,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const existing = await app.prisma.projectPhase.findMany({
@@ -496,7 +470,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const items = await app.prisma.projectPhaseChecklistItem.findMany({
@@ -518,7 +492,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const sortOrder = input.sortOrder ?? await getNextSortOrder(() => app.prisma.projectPhaseChecklistItem.aggregate({
@@ -553,7 +527,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Phase checklist item not found." });
+      return notFound(reply, "Phase checklist item");
     }
 
     const data: Prisma.ProjectPhaseChecklistItemUncheckedUpdateInput = {};
@@ -589,7 +563,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Phase checklist item not found." });
+      return notFound(reply, "Phase checklist item");
     }
 
     await app.prisma.projectPhaseChecklistItem.delete({ where: { id: item.id } });
@@ -607,7 +581,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
 
     const phase = await getPhase(app, params.projectId, params.phaseId);
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const existing = await app.prisma.projectPhaseChecklistItem.findMany({
@@ -643,7 +617,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!task) {
-      return reply.code(404).send({ message: "Project task not found." });
+      return notFound(reply, "Project task");
     }
 
     const items = await app.prisma.projectTaskChecklistItem.findMany({
@@ -667,7 +641,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!task) {
-      return reply.code(404).send({ message: "Project task not found." });
+      return notFound(reply, "Project task");
     }
 
     const sortOrder = input.sortOrder ?? await getNextSortOrder(() => app.prisma.projectTaskChecklistItem.aggregate({
@@ -702,7 +676,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Task checklist item not found." });
+      return notFound(reply, "Task checklist item");
     }
 
     const data: Prisma.ProjectTaskChecklistItemUncheckedUpdateInput = {};
@@ -736,7 +710,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!item) {
-      return reply.code(404).send({ message: "Task checklist item not found." });
+      return notFound(reply, "Task checklist item");
     }
 
     await app.prisma.projectTaskChecklistItem.delete({ where: { id: item.id } });
@@ -756,7 +730,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       where: { id: params.taskId, deletedAt: null, project: { id: params.projectId, householdId: params.householdId, deletedAt: null } }
     });
     if (!task) {
-      return reply.code(404).send({ message: "Project task not found." });
+      return notFound(reply, "Project task");
     }
 
     const existing = await app.prisma.projectTaskChecklistItem.findMany({
@@ -790,7 +764,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const categories = await app.prisma.projectBudgetCategory.findMany({
@@ -815,7 +789,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const project = await getProject(app, params.householdId, params.projectId);
 
     if (!project) {
-      return reply.code(404).send({ message: "Project not found." });
+      return notFound(reply, "Project");
     }
 
     const category = await app.prisma.projectBudgetCategory.create({
@@ -831,14 +805,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.budget_category.created",
-      entityType: "project_budget_category",
-      entityId: category.id,
-      metadata: { categoryName: category.name, budgetAmount: category.budgetAmount }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_budget_category", category.id, "project.budget_category.created", params.householdId, { categoryName: category.name, budgetAmount: category.budgetAmount });
 
     return reply.code(201).send(toProjectBudgetCategoryResponse(category));
   });
@@ -856,7 +823,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!category) {
-      return reply.code(404).send({ message: "Budget category not found." });
+      return notFound(reply, "Budget category");
     }
 
     const data: Prisma.ProjectBudgetCategoryUncheckedUpdateInput = {};
@@ -888,19 +855,12 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!category) {
-      return reply.code(404).send({ message: "Budget category not found." });
+      return notFound(reply, "Budget category");
     }
 
     await app.prisma.projectBudgetCategory.delete({ where: { id: category.id } });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.budget_category.deleted",
-      entityType: "project_budget_category",
-      entityId: category.id,
-      metadata: { categoryName: category.name }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_budget_category", category.id, "project.budget_category.deleted", params.householdId, { categoryName: category.name });
 
     return reply.code(204).send();
   });
@@ -915,7 +875,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const supplies = await app.prisma.projectPhaseSupply.findMany({
@@ -943,13 +903,13 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     if (input.inventoryItemId) {
       const inventoryItem = await getHouseholdInventoryItem(app.prisma, params.householdId, input.inventoryItemId);
       if (!inventoryItem) {
-        return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+        return badRequest(reply, "Inventory item not found or belongs to a different household.");
       }
     }
 
@@ -995,35 +955,14 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId: params.householdId,
-      userId: request.auth.userId,
-      action: "project.supply.created",
-      entityType: "project_phase_supply",
-      entityId: supply.id,
-      metadata: { supplyName: supply.name, phaseName: phase.name, quantityNeeded: supply.quantityNeeded }
-    });
+        await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", supply.id, "project.supply.created", params.householdId, { supplyName: supply.name, phaseName: phase.name, quantityNeeded: supply.quantityNeeded });
 
     if (supply.isProcured) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.supply.procured",
-        entityType: "project_phase_supply",
-        entityId: supply.id,
-        metadata: { supplyName: supply.name, phaseName: phase.name, actualUnitCost: supply.actualUnitCost }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", supply.id, "project.supply.procured", params.householdId, { supplyName: supply.name, phaseName: phase.name, actualUnitCost: supply.actualUnitCost });
     }
 
     if (supply.isStaged) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.supply.staged",
-        entityType: "project_phase_supply",
-        entityId: supply.id,
-        metadata: { supplyName: supply.name, phaseName: phase.name }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", supply.id, "project.supply.staged", params.householdId, { supplyName: supply.name, phaseName: phase.name });
     }
 
     refreshProjectArtifacts(params.householdId, params.projectId);
@@ -1042,7 +981,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const supply = await app.prisma.projectPhaseSupply.findFirst({
@@ -1056,13 +995,13 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!supply) {
-      return reply.code(404).send({ message: "Phase supply not found." });
+      return notFound(reply, "Phase supply");
     }
 
     if (input.inventoryItemId !== undefined && input.inventoryItemId !== null) {
       const inventoryItem = await getHouseholdInventoryItem(app.prisma, params.householdId, input.inventoryItemId);
       if (!inventoryItem) {
-        return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+        return badRequest(reply, "Inventory item not found or belongs to a different household.");
       }
     }
 
@@ -1136,25 +1075,11 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (procuredBecameTrue) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.supply.procured",
-        entityType: "project_phase_supply",
-        entityId: updated.id,
-        metadata: { supplyName: updated.name, phaseName: phase.name, actualUnitCost: updated.actualUnitCost }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", updated.id, "project.supply.procured", params.householdId, { supplyName: updated.name, phaseName: phase.name, actualUnitCost: updated.actualUnitCost });
     }
 
     if (stagedBecameTrue) {
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.supply.staged",
-        entityType: "project_phase_supply",
-        entityId: updated.id,
-        metadata: { supplyName: updated.name, phaseName: phase.name }
-      });
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", updated.id, "project.supply.staged", params.householdId, { supplyName: updated.name, phaseName: phase.name });
     }
 
     refreshProjectArtifacts(params.householdId, params.projectId);
@@ -1173,7 +1098,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const existing = await app.prisma.projectPhaseSupply.findMany({
@@ -1216,7 +1141,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!supply) {
-      return reply.code(404).send({ message: "Phase supply not found." });
+      return notFound(reply, "Phase supply");
     }
 
     if (supply.purchaseLines.length > 0) {
@@ -1226,7 +1151,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     await app.prisma.$transaction(async (tx) => {
       await tx.projectPhaseSupply.update({
         where: { id: supply.id },
-        data: { deletedAt: new Date() }
+        data: softDeleteData()
       });
       await syncProjectDerivedStatuses(tx, params.projectId);
     });
@@ -1247,7 +1172,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     const phase = await getPhase(app, params.projectId, params.phaseId);
 
     if (!phase) {
-      return reply.code(404).send({ message: "Project phase not found." });
+      return notFound(reply, "Project phase");
     }
 
     const supply = await app.prisma.projectPhaseSupply.findFirst({
@@ -1260,7 +1185,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!supply) {
-      return reply.code(404).send({ message: "Phase supply not found." });
+      return notFound(reply, "Phase supply");
     }
 
     if (!supply.inventoryItemId || !supply.inventoryItem) {
@@ -1276,7 +1201,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     }
 
     if (supply.inventoryItem.quantityOnHand < input.quantity) {
-      return reply.code(400).send({ message: "Insufficient stock for this allocation." });
+      return badRequest(reply, "Insufficient stock for this allocation.");
     }
 
     try {
@@ -1318,28 +1243,14 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
 
       await syncProjectDerivedStatuses(app.prisma, params.projectId);
 
-      await logActivity(app.prisma, {
-        householdId: params.householdId,
-        userId: request.auth.userId,
-        action: "project.supply.inventory_allocated",
-        entityType: "project_phase_supply",
-        entityId: supply.id,
-        metadata: {
+            await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", supply.id, "project.supply.inventory_allocated", params.householdId, {
           supplyName: supply.name,
           quantityAllocated: input.quantity,
           inventoryItemName: supply.inventoryItem.name
-        }
-      });
+        });
 
       if (!supply.isProcured) {
-        await logActivity(app.prisma, {
-          householdId: params.householdId,
-          userId: request.auth.userId,
-          action: "project.supply.procured",
-          entityType: "project_phase_supply",
-          entityId: supply.id,
-          metadata: { supplyName: supply.name, phaseName: phase.name, actualUnitCost: input.unitCost ?? supply.actualUnitCost }
-        });
+                await createActivityLogger(app.prisma, request.auth.userId).log("project_phase_supply", supply.id, "project.supply.procured", params.householdId, { supplyName: supply.name, phaseName: phase.name, actualUnitCost: input.unitCost ?? supply.actualUnitCost });
       }
 
       refreshProjectArtifacts(params.householdId, params.projectId);

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   createHobbyProjectInputSchema,
   createHobbyProjectInventoryItemInputSchema,
@@ -18,7 +18,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   applyInventoryTransaction,
   getHouseholdInventoryItem,
@@ -39,11 +39,8 @@ import {
   toInventoryItemSummaryResponse,
   toInventoryTransactionResponse,
 } from "../../lib/serializers/index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid(),
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const hobbyProjectParamsSchema = hobbyParamsSchema.extend({
   projectId: z.string().cuid(),
@@ -188,11 +185,11 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const hobby = await getHobby(app.prisma as PrismaClientLike, householdId, hobbyId);
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     if (!await ensureSeriesMatchesHobby(app.prisma as PrismaClientLike, householdId, hobbyId, input.seriesId)) {
-      return reply.code(400).send({ message: "Series must belong to the same hobby." });
+      return badRequest(reply, "Series must belong to the same hobby.");
     }
 
     const project = await app.prisma.hobbyProject.create({
@@ -215,14 +212,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_project_created",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { hobbyProjectId: project.id, hobbyProjectName: project.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_project_created", householdId, { hobbyProjectId: project.id, hobbyProjectName: project.name });
 
     maybeSyncProjectSearch(app.prisma as PrismaClientLike, project.id);
 
@@ -249,7 +239,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const stats = buildProjectStats(project);
@@ -286,11 +276,11 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const existing = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!existing) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     if (input.seriesId !== undefined && !await ensureSeriesMatchesHobby(app.prisma as PrismaClientLike, householdId, hobbyId, input.seriesId)) {
-      return reply.code(400).send({ message: "Series must belong to the same hobby." });
+      return badRequest(reply, "Series must belong to the same hobby.");
     }
 
     const project = await app.prisma.hobbyProject.update({
@@ -311,14 +301,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_project_updated",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { hobbyProjectId: project.id, hobbyProjectName: project.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_project_updated", householdId, { hobbyProjectId: project.id, hobbyProjectName: project.name });
 
     maybeSyncProjectSearch(app.prisma as PrismaClientLike, project.id);
 
@@ -335,19 +318,12 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const existing = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!existing) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     await app.prisma.hobbyProject.delete({ where: { id: existing.id } });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_project_deleted",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { hobbyProjectId: existing.id, hobbyProjectName: existing.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_project_deleted", householdId, { hobbyProjectId: existing.id, hobbyProjectName: existing.name });
 
     maybeSyncProjectDeletion(app.prisma as PrismaClientLike, existing.id);
 
@@ -363,7 +339,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const milestones = await app.prisma.hobbyProjectMilestone.findMany({
@@ -384,7 +360,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const milestoneCount = await app.prisma.hobbyProjectMilestone.count({ where: { hobbyProjectId: project.id } });
@@ -416,14 +392,14 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const existing = await app.prisma.hobbyProjectMilestone.findFirst({
       where: { id: milestoneId, hobbyProjectId: project.id },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Milestone not found." });
+      return notFound(reply, "Milestone");
     }
 
     const milestone = await app.prisma.hobbyProjectMilestone.update({
@@ -454,7 +430,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const milestones = await app.prisma.hobbyProjectMilestone.findMany({
@@ -489,14 +465,14 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const existing = await app.prisma.hobbyProjectMilestone.findFirst({
       where: { id: milestoneId, hobbyProjectId: project.id },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Milestone not found." });
+      return notFound(reply, "Milestone");
     }
 
     await app.prisma.hobbyProjectMilestone.delete({ where: { id: existing.id } });
@@ -515,7 +491,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const logs = await app.prisma.hobbyProjectWorkLog.findMany({
@@ -555,7 +531,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     if (input.milestoneId) {
@@ -564,7 +540,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
         select: { id: true },
       });
       if (!milestone) {
-        return reply.code(400).send({ message: "Milestone not found for this hobby project." });
+        return badRequest(reply, "Milestone not found for this hobby project.");
       }
     }
 
@@ -594,14 +570,14 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const existing = await app.prisma.hobbyProjectWorkLog.findFirst({
       where: { id: workLogId, hobbyProjectId: project.id },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Work log not found." });
+      return notFound(reply, "Work log");
     }
 
     if (input.milestoneId) {
@@ -610,7 +586,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
         select: { id: true },
       });
       if (!milestone) {
-        return reply.code(400).send({ message: "Milestone not found for this hobby project." });
+        return badRequest(reply, "Milestone not found for this hobby project.");
       }
     }
 
@@ -639,14 +615,14 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const existing = await app.prisma.hobbyProjectWorkLog.findFirst({
       where: { id: workLogId, hobbyProjectId: project.id },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Work log not found." });
+      return notFound(reply, "Work log");
     }
 
     await app.prisma.hobbyProjectWorkLog.delete({ where: { id: existing.id } });
@@ -664,7 +640,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const links = await app.prisma.hobbyProjectInventoryItem.findMany({
@@ -686,12 +662,12 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const inventoryItem = await getHouseholdInventoryItem(app.prisma, householdId, input.inventoryItemId);
     if (!inventoryItem) {
-      return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+      return badRequest(reply, "Inventory item not found or belongs to a different household.");
     }
 
     const existing = await app.prisma.hobbyProjectInventoryItem.findUnique({
@@ -763,7 +739,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const existing = await app.prisma.hobbyProjectInventoryItem.findUnique({
@@ -776,7 +752,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
       include: { inventoryItem: true },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Hobby project inventory link not found." });
+      return notFound(reply, "Hobby project inventory link");
     }
 
     const nextQuantityNeeded = input.quantityNeeded ?? existing.quantityNeeded;
@@ -843,7 +819,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
 
     const project = await getHobbyProject(app.prisma as PrismaClientLike, householdId, hobbyId, projectId);
     if (!project) {
-      return reply.code(404).send({ message: "Hobby project not found." });
+      return notFound(reply, "Hobby project");
     }
 
     const existing = await app.prisma.hobbyProjectInventoryItem.findUnique({
@@ -855,7 +831,7 @@ export const hobbyProjectRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Hobby project inventory link not found." });
+      return notFound(reply, "Hobby project inventory link");
     }
 
     await app.prisma.$transaction(async (tx) => {

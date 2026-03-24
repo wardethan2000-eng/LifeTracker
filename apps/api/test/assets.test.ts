@@ -2,7 +2,8 @@ import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/lib/activity-log.js", () => ({
-  logActivity: vi.fn(async () => undefined)
+  logActivity: vi.fn(async () => undefined),
+  createActivityLogger: vi.fn(() => ({ log: vi.fn(async () => undefined) }))
 }));
 
 vi.mock("../src/lib/search-index.js", () => ({

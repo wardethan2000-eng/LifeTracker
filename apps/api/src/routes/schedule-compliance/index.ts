@@ -1,13 +1,11 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import type { FastifyPluginAsync } from "fastify";
 import { startOfUtcMonth, addUtcMonths } from "@lifekeeper/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import { computeScheduleCompliance } from "../../lib/schedule-compliance.js";
 import { toScheduleComplianceDashboardResponse } from "../../lib/serializers/index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const scheduleComplianceQuerySchema = z.object({
   periodMonths: z.coerce.number().int().min(1).max(60).default(12)
@@ -21,7 +19,7 @@ export const scheduleComplianceRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const household = await app.prisma.household.findUnique({

@@ -1,4 +1,4 @@
-import {
+﻿import {
   createHobbyPracticeRoutineInputSchema,
   hobbyPracticeRoutineComplianceQuerySchema,
   hobbyPracticeRoutineListQuerySchema,
@@ -9,7 +9,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { buildCursorPage, cursorWhere } from "../../lib/pagination.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   buildRoutineComplianceSummary,
   buildRoutineSummaryMetrics,
@@ -20,11 +20,8 @@ import {
   toHobbyPracticeRoutineResponse,
   toHobbyPracticeRoutineSummaryResponse,
 } from "../../lib/serializers/index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid(),
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const routineParamsSchema = hobbyParamsSchema.extend({
   routineId: z.string().cuid(),
@@ -89,7 +86,7 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
 
     const hobby = await app.prisma.hobby.findFirst({ where: { id: hobbyId, householdId }, select: { id: true } });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     const routine = await app.prisma.hobbyPracticeRoutine.create({
@@ -107,14 +104,7 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_practice_routine_created",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { routineId: routine.id, routineName: routine.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_practice_routine_created", householdId, { routineId: routine.id, routineName: routine.name });
 
     return reply.code(201).send(toHobbyPracticeRoutineResponse(routine));
   });
@@ -144,7 +134,7 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     if (!routine) {
-      return reply.code(404).send({ message: "Practice routine not found." });
+      return notFound(reply, "Practice routine");
     }
 
     const completedDates = routine.sessions.map((session) => session.completedDate ?? session.createdAt);
@@ -164,7 +154,7 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
       where: { id: routineId, hobbyId, householdId },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Practice routine not found." });
+      return notFound(reply, "Practice routine");
     }
 
     await app.prisma.hobbyPracticeRoutine.update({
@@ -182,14 +172,7 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
 
     const routine = await recalculatePracticeRoutine(app.prisma, existing.id) ?? await app.prisma.hobbyPracticeRoutine.findUniqueOrThrow({ where: { id: existing.id } });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_practice_routine_updated",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { routineId: routine.id, routineName: routine.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_practice_routine_updated", householdId, { routineId: routine.id, routineName: routine.name });
 
     return reply.send(toHobbyPracticeRoutineResponse(routine));
   });
@@ -206,18 +189,11 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
       where: { id: routineId, hobbyId, householdId },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Practice routine not found." });
+      return notFound(reply, "Practice routine");
     }
 
     await app.prisma.hobbyPracticeRoutine.delete({ where: { id: existing.id } });
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_practice_routine_deleted",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { routineId: existing.id, routineName: existing.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_practice_routine_deleted", householdId, { routineId: existing.id, routineName: existing.name });
 
     return reply.code(204).send();
   });
@@ -248,7 +224,7 @@ export const hobbyRoutineRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     if (!routine) {
-      return reply.code(404).send({ message: "Practice routine not found." });
+      return notFound(reply, "Practice routine");
     }
 
     const completedDates = routine.sessions.map((session) => session.completedDate ?? session.createdAt);

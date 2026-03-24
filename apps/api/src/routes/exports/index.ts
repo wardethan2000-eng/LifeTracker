@@ -1,4 +1,4 @@
-import type { Asset, Prisma, PrismaClient } from "@prisma/client";
+﻿import type { Asset, Prisma, PrismaClient } from "@prisma/client";
 import {
   maintenanceTriggerSchema,
   conditionEntrySchema,
@@ -31,14 +31,9 @@ import {
 } from "../../lib/pdf-report.js";
 import { toEntryBackedTimelineItem, toTimelineItem } from "../../lib/serializers/index.js";
 import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
+import { notFound } from "../../lib/errors.js";
 
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { assetParamsSchema, householdParamsSchema } from "../../lib/schemas.js";
 
 const dateRangeQuerySchema = z.object({
   since: z.string().datetime().optional(),
@@ -1220,7 +1215,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const [timelineItems, costSummary] = await Promise.all([
@@ -1259,7 +1254,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const report = await buildComplianceAuditData(app.prisma, asset, range);
@@ -1281,7 +1276,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     let csv = "";

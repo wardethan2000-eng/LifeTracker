@@ -1,4 +1,4 @@
-import {
+﻿import {
   createMaintenanceLogPartSchema,
   updateMaintenanceLogPartSchema
 } from "@lifekeeper/types";
@@ -14,6 +14,7 @@ import {
   toMaintenanceLogPartResponse,
   toMaintenanceLogPartWithInventoryResponse
 } from "../../lib/serializers/index.js";
+import { notFound, badRequest } from "../../lib/errors.js";
 
 const logParamsSchema = z.object({
   assetId: z.string().cuid(),
@@ -31,7 +32,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const log = await app.prisma.maintenanceLog.findFirst({
@@ -40,7 +41,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
+      return notFound(reply, "Maintenance log");
     }
 
     try {
@@ -69,7 +70,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const log = await app.prisma.maintenanceLog.findFirst({
@@ -78,7 +79,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
+      return notFound(reply, "Maintenance log");
     }
 
     const parts = await app.prisma.maintenanceLogPart.findMany({
@@ -95,7 +96,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const log = await app.prisma.maintenanceLog.findFirst({
@@ -104,7 +105,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
+      return notFound(reply, "Maintenance log");
     }
 
     const existing = await app.prisma.maintenanceLogPart.findFirst({
@@ -112,7 +113,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Part not found." });
+      return notFound(reply, "Part");
     }
 
     if (input.inventoryItemId) {
@@ -125,7 +126,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!inventoryItem) {
-        return reply.code(400).send({ message: "Inventory item not found or belongs to a different household." });
+        return badRequest(reply, "Inventory item not found or belongs to a different household.");
       }
     }
 
@@ -238,7 +239,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const log = await app.prisma.maintenanceLog.findFirst({
@@ -247,7 +248,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!log) {
-      return reply.code(404).send({ message: "Maintenance log not found." });
+      return notFound(reply, "Maintenance log");
     }
 
     const part = await app.prisma.maintenanceLogPart.findFirst({
@@ -255,7 +256,7 @@ export const maintenanceLogPartRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!part) {
-      return reply.code(404).send({ message: "Part not found." });
+      return notFound(reply, "Part");
     }
 
     try {

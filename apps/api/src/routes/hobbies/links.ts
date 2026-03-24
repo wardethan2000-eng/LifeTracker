@@ -1,4 +1,4 @@
-import {
+﻿import {
   createHobbyAssetInputSchema,
   createHobbyInventoryItemInputSchema,
   createHobbyProjectLinkInputSchema,
@@ -19,11 +19,8 @@ import {
   syncInventoryItemToSearchIndex,
   syncProjectToSearchIndex
 } from "../../lib/search-index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const hobbyAssetParamsSchema = hobbyParamsSchema.extend({
   hobbyAssetId: z.string().cuid()
@@ -79,7 +76,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const link = await app.prisma.hobbyAsset.create({
@@ -115,7 +112,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyAssetId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Asset link not found" });
+      return notFound(reply, "Asset link");
     }
 
     await app.prisma.hobbyAsset.delete({ where: { id: hobbyAssetId } });
@@ -163,7 +160,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const link = await app.prisma.hobbyInventoryItem.create({
@@ -198,7 +195,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyInventoryItemId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Inventory link not found" });
+      return notFound(reply, "Inventory link");
     }
 
     await app.prisma.hobbyInventoryItem.delete({ where: { id: hobbyInventoryItemId } });
@@ -246,7 +243,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const link = await app.prisma.hobbyProjectLink.create({
@@ -281,7 +278,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyProjectId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Project link not found" });
+      return notFound(reply, "Project link");
     }
 
     await app.prisma.hobbyProjectLink.delete({ where: { id: hobbyProjectId } });
@@ -327,7 +324,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const category = await app.prisma.hobbyInventoryCategory.create({
@@ -354,7 +351,7 @@ export const hobbyLinkRoutes: FastifyPluginAsync = async (app) => {
       where: { id: categoryId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Category not found" });
+      return notFound(reply, "Category");
     }
 
     await app.prisma.hobbyInventoryCategory.delete({ where: { id: categoryId } });

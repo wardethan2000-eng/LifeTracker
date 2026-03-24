@@ -1,11 +1,11 @@
-import type { Prisma, PrismaClient, SpaceType } from "@prisma/client";
+import type { Prisma, SpaceType } from "@prisma/client";
 import { customAlphabet } from "nanoid";
 import { resolveAppBaseUrl } from "./asset-tags.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 
 const SHORT_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const SCAN_TAG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
 
-type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 type SpaceNodeRecord = {
   id: string;
@@ -39,7 +39,7 @@ const sortSpaces = <T extends { sortOrder: number; name: string }>(spaces: T[]):
   return left.name.localeCompare(right.name);
 });
 
-export const generateSpaceScanTag = async (prisma: PrismaLike): Promise<string> => {
+export const generateSpaceScanTag = async (prisma: PrismaExecutor): Promise<string> => {
   for (const length of [10, 12, 14, 16]) {
     const createCandidate = buildScanTagGenerator(length);
 
@@ -59,7 +59,7 @@ export const generateSpaceScanTag = async (prisma: PrismaLike): Promise<string> 
   throw new Error("Unable to generate a unique scan tag for the space.");
 };
 
-export const generateShortCode = async (prisma: PrismaLike, householdId: string): Promise<string> => {
+export const generateShortCode = async (prisma: PrismaExecutor, householdId: string): Promise<string> => {
   for (const length of [4, 5, 6]) {
     const createCandidate = buildCodeGenerator(length);
 
@@ -82,7 +82,7 @@ export const generateShortCode = async (prisma: PrismaLike, householdId: string)
   throw new Error(`Unable to generate a unique short code for household '${householdId}'.`);
 };
 
-export const ensureSpaceScanTag = async (prisma: PrismaLike, spaceId: string): Promise<string> => {
+export const ensureSpaceScanTag = async (prisma: PrismaExecutor, spaceId: string): Promise<string> => {
   const space = await prisma.space.findUnique({
     where: { id: spaceId },
     select: { id: true, scanTag: true }
@@ -111,7 +111,7 @@ export const buildSpaceScanUrl = (scanTag: string): string => new URL(
 ).toString();
 
 export const getSpaceBreadcrumb = async (
-  prisma: PrismaLike,
+  prisma: PrismaExecutor,
   spaceId: string
 ): Promise<Array<{ id: string; name: string; type: SpaceType }>> => {
   const breadcrumb: Array<{ id: string; name: string; type: SpaceType }> = [];
@@ -151,7 +151,7 @@ export const getSpaceBreadcrumb = async (
   return breadcrumb;
 };
 
-export const getSpaceTree = async (prisma: PrismaLike, householdId: string): Promise<SpaceNodeRecord[]> => {
+export const getSpaceTree = async (prisma: PrismaExecutor, householdId: string): Promise<SpaceNodeRecord[]> => {
   const spaces = await prisma.space.findMany({
     where: {
       householdId,

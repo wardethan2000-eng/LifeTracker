@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+﻿import { Prisma } from "@prisma/client";
 import {
   bulkUpdateHobbyCollectionItemStatusInputSchema,
   createHobbyCollectionItemInputSchema,
@@ -21,11 +21,8 @@ import {
   toHobbyCollectionItemSessionResponse,
 } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncHobbyCollectionItemToSearchIndex } from "../../lib/search-index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid(),
-});
+import { notFound, badRequest } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const collectionItemParamsSchema = hobbyParamsSchema.extend({
   collectionItemId: z.string().cuid(),
@@ -75,7 +72,7 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
 
     const hobby = await app.prisma.hobby.findFirst({ where: { id: hobbyId, householdId }, select: { id: true } });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found." });
+      return notFound(reply, "Hobby");
     }
 
     if (input.parentItemId) {
@@ -84,7 +81,7 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
         select: { id: true },
       });
       if (!parent) {
-        return reply.code(400).send({ message: "parentItemId must belong to this hobby." });
+        return badRequest(reply, "parentItemId must belong to this hobby.");
       }
     }
 
@@ -137,7 +134,7 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     if (!item) {
-      return reply.code(404).send({ message: "Collection item not found." });
+      return notFound(reply, "Collection item");
     }
 
     const [sessions, entries, metricReadings] = await Promise.all([
@@ -219,7 +216,7 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
       where: { id: collectionItemId, hobbyId, householdId },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Collection item not found." });
+      return notFound(reply, "Collection item");
     }
 
     const nextParentItemId = input.parentItemId === undefined ? existing.parentItemId : input.parentItemId;
@@ -233,7 +230,7 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
         select: { id: true },
       });
       if (!parent) {
-        return reply.code(400).send({ message: "parentItemId must belong to this hobby." });
+        return badRequest(reply, "parentItemId must belong to this hobby.");
       }
     }
 
@@ -325,7 +322,7 @@ export const hobbyCollectionRoutes: FastifyPluginAsync = async (app) => {
       where: { id: collectionItemId, hobbyId, householdId },
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Collection item not found." });
+      return notFound(reply, "Collection item");
     }
 
     await app.prisma.hobbyCollectionItem.delete({ where: { id: existing.id } });

@@ -4,10 +4,7 @@ import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 const importAssetItemSchema = z.object({
   name: z.string().min(1).max(120),

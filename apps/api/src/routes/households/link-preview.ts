@@ -1,12 +1,9 @@
-import { linkPreviewRequestSchema } from "@lifekeeper/types";
+﻿import { linkPreviewRequestSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { extractLinkPreview, normalizeLinkPreviewUrl } from "../../lib/link-preview.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
+import { forbidden } from "../../lib/errors.js";
+import { householdParamsSchema } from "../../lib/schemas.js";
 
 function detectRetailerFromUrl(value: string): string | null {
   try {
@@ -33,7 +30,7 @@ export const householdLinkPreviewRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const rawBody = typeof request.body === "object" && request.body !== null

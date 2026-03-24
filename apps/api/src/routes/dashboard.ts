@@ -1,15 +1,9 @@
-import type { FastifyPluginAsync } from "fastify";
+﻿import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../lib/asset-access.js";
 import { buildAssetDetail, buildHouseholdDashboard, DashboardNotFoundError, listHouseholdDueWork } from "../lib/dashboard.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
+import { forbidden, notFound } from "../lib/errors.js";
+import { assetParamsSchema, householdParamsSchema } from "../lib/schemas.js";
 
 const dueWorkQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(25),
@@ -33,7 +27,7 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     return await listHouseholdDueWork(app.prisma, params.householdId, request.auth.userId, query);
@@ -46,14 +40,14 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     try {
       return await buildHouseholdDashboard(app.prisma, params.householdId, request.auth.userId, query);
     } catch (error) {
       if (error instanceof DashboardNotFoundError) {
-        return reply.code(404).send({ message: "Household not found." });
+        return notFound(reply, "Household");
       }
 
       throw error;
@@ -66,7 +60,7 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     const detail = await buildAssetDetail(app.prisma, params.assetId, request.auth.userId, query.logLimit);
 
     if (!detail) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     return detail;

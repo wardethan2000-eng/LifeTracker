@@ -1,4 +1,4 @@
-import {
+﻿import {
   createAssetTimelineEntrySchema,
   updateAssetTimelineEntrySchema
 } from "@lifekeeper/types";
@@ -6,14 +6,13 @@ import { ASSET_CATEGORY_PREFIX, buildAssetEntryPayload, parseAssetEntryPayload }
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import { toInputJsonValue, parseTags } from "../../lib/prisma-json.js";
 import { toEntryAsTimelineEntry } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
+import { notFound } from "../../lib/errors.js";
 
-const assetParamsSchema = z.object({
-  assetId: z.string().cuid()
-});
+import { assetParamsSchema } from "../../lib/schemas.js";
 
 const entryParamsSchema = assetParamsSchema.extend({
   entryId: z.string().cuid()
@@ -45,7 +44,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     let cursorWhere = {};
@@ -103,7 +102,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const details = buildAssetEntryPayload({
@@ -131,18 +130,11 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "timeline_entry.created",
-      entityType: "timeline_entry",
-      entityId: entry.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("timeline_entry", entry.id, "timeline_entry.created", asset.householdId, {
         title: entry.title,
         assetId: asset.id,
         assetName: asset.name
-      }
-    });
+      });
 
     void syncEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
 
@@ -154,7 +146,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const entry = await app.prisma.entry.findFirst({
@@ -166,7 +158,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!entry) {
-      return reply.code(404).send({ message: "Timeline entry not found." });
+      return notFound(reply, "Timeline entry");
     }
 
     return toEntryAsTimelineEntry(entry);
@@ -178,7 +170,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const existing = await app.prisma.entry.findFirst({
@@ -190,7 +182,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Timeline entry not found." });
+      return notFound(reply, "Timeline entry");
     }
 
     if (existing.createdById !== request.auth.userId) {
@@ -228,18 +220,11 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    await logActivity(app.prisma, {
-      householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "timeline_entry.updated",
-      entityType: "timeline_entry",
-      entityId: entry.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("timeline_entry", entry.id, "timeline_entry.updated", asset.householdId, {
         title: entry.title,
         assetId: asset.id,
         assetName: asset.name
-      }
-    });
+      });
 
     void syncEntryToSearchIndex(app.prisma, entry.id).catch(console.error);
 
@@ -251,7 +236,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
 
     if (!asset) {
-      return reply.code(404).send({ message: "Asset not found." });
+      return notFound(reply, "Asset");
     }
 
     const existing = await app.prisma.entry.findFirst({
@@ -263,7 +248,7 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!existing) {
-      return reply.code(404).send({ message: "Timeline entry not found." });
+      return notFound(reply, "Timeline entry");
     }
 
     if (existing.createdById !== request.auth.userId) {
@@ -274,18 +259,11 @@ export const timelineEntryRoutes: FastifyPluginAsync = async (app) => {
       where: { id: existing.id }
     });
 
-    await logActivity(app.prisma, {
-      householdId: asset.householdId,
-      userId: request.auth.userId,
-      action: "timeline_entry.deleted",
-      entityType: "timeline_entry",
-      entityId: existing.id,
-      metadata: {
+        await createActivityLogger(app.prisma, request.auth.userId).log("timeline_entry", existing.id, "timeline_entry.deleted", asset.householdId, {
         title: existing.title,
         assetId: asset.id,
         assetName: asset.name
-      }
-    });
+      });
 
     void removeSearchIndexEntry(app.prisma, "entry", existing.id).catch(console.error);
 

@@ -1,10 +1,4 @@
-import type {
-  NotificationChannel,
-  Prisma,
-  PrismaClient,
-  TriggerType,
-  User
-} from "@prisma/client";
+import type { NotificationChannel, Prisma, PrismaClient, TriggerType, User } from "@prisma/client";
 import {
   notificationPreferencesSchema,
   type CompletionCycleRecord,
@@ -13,8 +7,8 @@ import {
 } from "@lifekeeper/types";
 import { MS_PER_DAY, addDays } from "@lifekeeper/utils";
 import { buildCompletionCycleLedger } from "../services/schedule-adherence.js";
+import type { PrismaExecutor } from "./prisma-types.js";
 
-type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 type ComplianceRecipient = {
   userId: string;

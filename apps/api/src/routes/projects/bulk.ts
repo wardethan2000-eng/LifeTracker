@@ -1,23 +1,16 @@
-import {
+﻿import {
   bulkChangeProjectStatusSchema,
   bulkCompleteTasksSchema,
   bulkReassignTasksSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger, logActivity } from "../../lib/activity-log.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
 import { syncProjectDerivedStatuses } from "../../lib/project-status.js";
 import { syncProjectToSearchIndex } from "../../lib/search-index.js";
-
-const householdParamsSchema = z.object({
-  householdId: z.string().cuid()
-});
-
-const projectParamsSchema = householdParamsSchema.extend({
-  projectId: z.string().cuid()
-});
+import { forbidden, badRequest } from "../../lib/errors.js";
+import { householdParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
 type ProjectFailedItem = {
   projectId: string;
@@ -40,7 +33,7 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const projects = await app.prisma.project.findMany({
@@ -108,7 +101,7 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     const tasks = await app.prisma.projectTask.findMany({
@@ -149,14 +142,7 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
 
         succeeded += toComplete.length;
 
-        await logActivity(app.prisma, {
-          householdId: params.householdId,
-          userId: request.auth.userId,
-          action: "project.bulk_tasks_completed",
-          entityType: "project",
-          entityId: params.projectId,
-          metadata: { count: toComplete.length }
-        });
+                await createActivityLogger(app.prisma, request.auth.userId).log("project", params.projectId, "project.bulk_tasks_completed", params.householdId, { count: toComplete.length });
 
         void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
       } catch (err) {
@@ -185,7 +171,7 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
     try {
       await assertMembership(app.prisma, params.householdId, request.auth.userId);
     } catch {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+      return forbidden(reply);
     }
 
     if (input.phaseId) {
@@ -195,7 +181,7 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!phase) {
-        return reply.code(400).send({ message: "Referenced phase not found in this project." });
+        return badRequest(reply, "Referenced phase not found in this project.");
       }
     }
 
@@ -210,7 +196,7 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (!membership) {
-        return reply.code(400).send({ message: "Assigned user is not a member of this household." });
+        return badRequest(reply, "Assigned user is not a member of this household.");
       }
     }
 
@@ -257,18 +243,11 @@ export const projectBulkRoutes: FastifyPluginAsync = async (app) => {
 
         succeeded = tasks.length;
 
-        await logActivity(app.prisma, {
-          householdId: params.householdId,
-          userId: request.auth.userId,
-          action: "project.bulk_tasks_reassigned",
-          entityType: "project",
-          entityId: params.projectId,
-          metadata: {
+                await createActivityLogger(app.prisma, request.auth.userId).log("project", params.projectId, "project.bulk_tasks_reassigned", params.householdId, {
             count: tasks.length,
             phaseId: input.phaseId,
             assignedToId: input.assignedToId
-          }
-        });
+          });
 
         void syncProjectToSearchIndex(app.prisma, params.projectId).catch(console.error);
       } catch (err) {

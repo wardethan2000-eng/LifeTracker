@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+﻿import type { Prisma } from "@prisma/client";
 import {
   createHobbyRecipeInputSchema,
   updateHobbyRecipeInputSchema,
@@ -10,18 +10,15 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
-import { logActivity } from "../../lib/activity-log.js";
+import { createActivityLogger } from "../../lib/activity-log.js";
 import {
   toIngredientResponse,
   toRecipeResponse,
   toRecipeSummaryResponse,
   toStepResponse
 } from "../../lib/serializers/index.js";
-
-const hobbyParamsSchema = z.object({
-  householdId: z.string().cuid(),
-  hobbyId: z.string().cuid()
-});
+import { notFound } from "../../lib/errors.js";
+import { hobbyParamsSchema } from "../../lib/schemas.js";
 
 const recipeParamsSchema = hobbyParamsSchema.extend({
   recipeId: z.string().cuid()
@@ -91,7 +88,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: hobbyId, householdId }
     });
     if (!hobby) {
-      return reply.code(404).send({ message: "Hobby not found" });
+      return notFound(reply, "Hobby");
     }
 
     const result = await app.prisma.$transaction(async (tx) => {
@@ -148,14 +145,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       });
     });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_recipe_created",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { recipeId: result.id, recipeName: result.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_recipe_created", householdId, { recipeId: result.id, recipeName: result.name });
 
     return reply.code(201).send({
       ...toRecipeResponse(result),
@@ -189,7 +179,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!recipe) {
-      return reply.code(404).send({ message: "Recipe not found" });
+      return notFound(reply, "Recipe");
     }
 
     return reply.send({
@@ -217,7 +207,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Recipe not found" });
+      return notFound(reply, "Recipe");
     }
 
     const recipe = await app.prisma.hobbyRecipe.update({
@@ -252,19 +242,12 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Recipe not found" });
+      return notFound(reply, "Recipe");
     }
 
     await app.prisma.hobbyRecipe.delete({ where: { id: recipeId } });
 
-    await logActivity(app.prisma, {
-      householdId,
-      userId,
-      action: "hobby_recipe_deleted",
-      entityType: "hobby",
-      entityId: hobbyId,
-      metadata: { recipeId, recipeName: existing.name },
-    });
+        await createActivityLogger(app.prisma, userId).log("hobby", hobbyId, "hobby_recipe_deleted", householdId, { recipeId, recipeName: existing.name });
 
     return reply.code(204).send();
   });
@@ -283,7 +266,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!recipe) {
-      return reply.code(404).send({ message: "Recipe not found" });
+      return notFound(reply, "Recipe");
     }
 
     const maxSort = await app.prisma.hobbyRecipeIngredient.aggregate({
@@ -321,7 +304,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: ingredientId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Ingredient not found" });
+      return notFound(reply, "Ingredient");
     }
 
     const ingredient = await app.prisma.hobbyRecipeIngredient.update({
@@ -353,7 +336,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: ingredientId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Ingredient not found" });
+      return notFound(reply, "Ingredient");
     }
 
     await app.prisma.hobbyRecipeIngredient.delete({ where: { id: ingredientId } });
@@ -375,7 +358,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!recipe) {
-      return reply.code(404).send({ message: "Recipe not found" });
+      return notFound(reply, "Recipe");
     }
 
     const maxSort = await app.prisma.hobbyRecipeStep.aggregate({
@@ -411,7 +394,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: stepId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Step not found" });
+      return notFound(reply, "Step");
     }
 
     const step = await app.prisma.hobbyRecipeStep.update({
@@ -441,7 +424,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: stepId, recipeId, recipe: { hobbyId, hobby: { householdId } } }
     });
     if (!existing) {
-      return reply.code(404).send({ message: "Step not found" });
+      return notFound(reply, "Step");
     }
 
     await app.prisma.hobbyRecipeStep.delete({ where: { id: stepId } });
@@ -463,7 +446,7 @@ export const hobbyRecipeRoutes: FastifyPluginAsync = async (app) => {
       where: { id: recipeId, hobbyId, hobby: { householdId } }
     });
     if (!recipe) {
-      return reply.code(404).send({ message: "Recipe not found" });
+      return notFound(reply, "Recipe");
     }
 
     await app.prisma.$transaction(
