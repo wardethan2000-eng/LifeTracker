@@ -1,8 +1,10 @@
 import type { JSX } from "react";
 import { ThemeToggle } from "../../../components/theme-toggle";
 import { HouseholdTimezoneEditor } from "../../../components/household-timezone-editor";
-import { ApiError, getMe, getNotificationPreferences } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getMe, getNotificationPreferences } from "../../../lib/api";
 import { NotificationPreferencesForm } from "../../../components/notification-preferences-form";
+import { DisplayPreferencesForm } from "../../../components/display-preferences-form";
+import { DataManagementSection } from "../../../components/data-management-section";
 
 export default async function UserSettingsPage(): Promise<JSX.Element> {
   let householdId: string | null = null;
@@ -19,7 +21,10 @@ export default async function UserSettingsPage(): Promise<JSX.Element> {
     if (!(error instanceof ApiError)) throw error;
   }
 
-  const preferences = await getNotificationPreferences();
+  const [preferences, displayPreferences] = await Promise.all([
+    getNotificationPreferences(),
+    getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" })),
+  ]);
 
   return (
     <>
@@ -63,6 +68,18 @@ export default async function UserSettingsPage(): Promise<JSX.Element> {
         <section className="panel">
           <div className="panel__header">
             <div>
+              <h2>Display</h2>
+              <p className="data-table__secondary">Date format, currency, and list defaults applied across the app.</p>
+            </div>
+          </div>
+          <div className="panel__body--padded">
+            <DisplayPreferencesForm initialPreferences={displayPreferences} />
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <div>
               <h2>Notifications</h2>
               <p className="data-table__secondary">Control how and when you receive notifications.</p>
             </div>
@@ -71,6 +88,20 @@ export default async function UserSettingsPage(): Promise<JSX.Element> {
             <NotificationPreferencesForm initialPreferences={preferences} />
           </div>
         </section>
+
+        {householdId && (
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <h2>Data management</h2>
+                <p className="data-table__secondary">Export your data or permanently delete your account.</p>
+              </div>
+            </div>
+            <div className="panel__body--padded">
+              <DataManagementSection householdId={householdId} />
+            </div>
+          </section>
+        )}
       </div>
     </>
   );

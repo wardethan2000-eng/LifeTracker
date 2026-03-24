@@ -4,6 +4,7 @@ import { DemoteToIdeaButton } from "../../../../../components/demote-to-idea-but
 import { HobbyDangerActions } from "../../../../../components/hobby-danger-actions";
 import {
   ApiError,
+  getDisplayPreferences,
   getHobbyDetail,
   getMe,
 } from "../../../../../lib/api";
@@ -24,6 +25,8 @@ function statusBadgeClass(status: string): string {
 
 export default async function HobbySettingsPage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
 
   try {
     const me = await getMe();
@@ -51,8 +54,8 @@ export default async function HobbySettingsPage({ params }: HobbySectionPageProp
               {hobby.hobbyType ? <div><dt>Hobby Type</dt><dd>{hobby.hobbyType}</dd></div> : null}
               <div><dt>Workflow</dt><dd>{isPipeline ? "Pipeline workflow" : "Simple status"}</dd></div>
               <div><dt>Notes</dt><dd>{hobby.notes ?? "Not set"}</dd></div>
-              <div><dt>Created</dt><dd>{formatDate(hobby.createdAt, "-", household.timezone)}</dd></div>
-              <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt, "-", household.timezone)}</dd></div>
+              <div><dt>Created</dt><dd>{formatDate(hobby.createdAt, "-", household.timezone, prefs.dateFormat)}</dd></div>
+              <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt, "-", household.timezone, prefs.dateFormat)}</dd></div>
             </dl>
             <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "16px" }}>
               {isPipeline

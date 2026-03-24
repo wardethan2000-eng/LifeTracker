@@ -7,6 +7,7 @@ import {
 } from "../../../actions";
 import {
   ApiError,
+  getDisplayPreferences,
   getMe,
   getServiceProvider,
   getServiceProviderSpend
@@ -24,6 +25,7 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
   const { providerId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const householdId = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
 
   try {
     const me = await getMe();
@@ -55,7 +57,7 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
           <div>
             <h1>{provider.name}</h1>
             <p style={{ marginTop: 6 }}>
-              {provider.specialty ?? "General provider"} • Added {formatDateTime(provider.createdAt, "—")}
+              {provider.specialty ?? "General provider"} • Added {formatDateTime(provider.createdAt, "—", undefined, prefs.dateFormat)}
             </p>
           </div>
           <div className="page-header__actions">
@@ -67,7 +69,7 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
           <section className="stats-row">
             <div className="stat-card stat-card--accent">
               <span className="stat-card__label">Total Spend</span>
-              <strong className="stat-card__value">{formatCurrency(spendSummary?.totalCombinedCost ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{formatCurrency(spendSummary?.totalCombinedCost ?? 0, "$0.00", prefs.currencyCode)}</strong>
               <span className="stat-card__sub">Maintenance and project spend combined</span>
             </div>
             <div className="stat-card">
@@ -82,7 +84,7 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
             </div>
             <div className="stat-card stat-card--warning">
               <span className="stat-card__label">Last Used</span>
-              <strong className="stat-card__value">{spendSummary?.lastUsed ? formatDateTime(spendSummary.lastUsed) : "—"}</strong>
+              <strong className="stat-card__value">{spendSummary?.lastUsed ? formatDateTime(spendSummary.lastUsed, undefined, undefined, prefs.dateFormat) : "—"}</strong>
               <span className="stat-card__sub">{totalActivityCount} tracked activity records</span>
             </div>
           </section>
@@ -134,8 +136,8 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
                     </div>
                     <div><dt>Website</dt><dd>{provider.website ? <a href={provider.website} className="text-link" target="_blank" rel="noreferrer">{provider.website}</a> : "Not recorded"}</dd></div>
                     <div><dt>Address</dt><dd>{formatContactValue(provider.address)}</dd></div>
-                    <div><dt>Created</dt><dd>{formatDateTime(provider.createdAt, "—")}</dd></div>
-                    <div><dt>Last Updated</dt><dd>{formatDateTime(provider.updatedAt, "—")}</dd></div>
+                    <div><dt>Created</dt><dd>{formatDateTime(provider.createdAt, "—", undefined, prefs.dateFormat)}</dd></div>
+                    <div><dt>Last Updated</dt><dd>{formatDateTime(provider.updatedAt, "—", undefined, prefs.dateFormat)}</dd></div>
                   </dl>
                 </div>
               </section>
@@ -147,10 +149,10 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
                 <div className="panel__body--padded">
                   {spendSummary ? (
                     <dl className="data-list">
-                      <div><dt>First Used</dt><dd>{spendSummary.firstUsed ? formatDateTime(spendSummary.firstUsed) : "—"}</dd></div>
-                      <div><dt>Last Used</dt><dd>{spendSummary.lastUsed ? formatDateTime(spendSummary.lastUsed) : "—"}</dd></div>
-                      <div><dt>Maintenance Spend</dt><dd>{formatCurrency(spendSummary.totalMaintenanceCost, "$0.00")}</dd></div>
-                      <div><dt>Project Spend</dt><dd>{formatCurrency(spendSummary.totalProjectCost, "$0.00")}</dd></div>
+                      <div><dt>First Used</dt><dd>{spendSummary.firstUsed ? formatDateTime(spendSummary.firstUsed, undefined, undefined, prefs.dateFormat) : "—"}</dd></div>
+                      <div><dt>Last Used</dt><dd>{spendSummary.lastUsed ? formatDateTime(spendSummary.lastUsed, undefined, undefined, prefs.dateFormat) : "—"}</dd></div>
+                      <div><dt>Maintenance Spend</dt><dd>{formatCurrency(spendSummary.totalMaintenanceCost, "$0.00", prefs.currencyCode)}</dd></div>
+                      <div><dt>Project Spend</dt><dd>{formatCurrency(spendSummary.totalProjectCost, "$0.00", prefs.currencyCode)}</dd></div>
                     </dl>
                   ) : (
                     <p className="panel__empty">No maintenance logs or project expenses have been linked to this provider yet.</p>

@@ -14,6 +14,7 @@ import { TimelineFilters } from "./timeline-filters";
 import { TimelineItem } from "./timeline-item";
 import { buildAssetHistoryHref, getSearchParamValue, type AssetHistoryPageSearchParams, type AssetTimelineFeed } from "../app/(dashboard)/assets/[assetId]/shared";
 import { formatCurrency } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 
 type AssetHistoryTabProps = {
   detail: AssetDetailResponse;
@@ -23,6 +24,7 @@ type AssetHistoryTabProps = {
 };
 
 export async function AssetHistoryTab({ detail, assetId, searchParams, historyTimeline }: AssetHistoryTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const sourceType = getSearchParamValue(searchParams.sourceType);
   const category = getSearchParamValue(searchParams.category);
   const search = getSearchParamValue(searchParams.search);
@@ -59,7 +61,7 @@ export async function AssetHistoryTab({ detail, assetId, searchParams, historyTi
         </div>
         <div className="stat-card stat-card--danger">
           <span className="stat-card__label">Total Cost</span>
-          <strong className="stat-card__value">{formatCurrency(totalCost, "$0.00")}</strong>
+          <strong className="stat-card__value">{formatCurrency(totalCost, "$0.00", prefs.currencyCode)}</strong>
           <span className="stat-card__sub">Visible spend across these events</span>
         </div>
       </section>

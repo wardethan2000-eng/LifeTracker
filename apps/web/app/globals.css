@@ -3637,6 +3637,87 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
 }
 
+/* Select-all-pages banner */
+.select-all-pages-banner {
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--ink-light);
+  text-align: center;
+}
+
+.select-all-pages-banner__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.select-all-pages-banner__link:hover {
+  color: var(--accent-dark, var(--accent));
+}
+
+/* Quick Actions customization editor */
+.quick-actions-edit-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 2px;
+}
+
+.quick-actions-edit-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.quick-actions-edit-btn:hover {
+  background: var(--surface-alt);
+  color: var(--ink-light);
+}
+
+.quick-actions-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-actions-editor__hint {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.quick-actions-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.quick-actions-editor__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.quick-actions-editor__footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
   ═══ 28. Studio Panels
   ═══════════════════════════════════════════════════════════════════ */
@@ -14607,4 +14688,22 @@ html[data-ui-density="compact"] .resource-layout__aside {
 .activity-entity-link--deleted {
   text-decoration: line-through;
   opacity: 0.65;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ═══ 60. Display Preferences Form
+   ═══════════════════════════════════════════════════════════════════ */
+
+.display-preferences-preview {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.display-preferences-saved {
+  margin: 8px 0 0 0;
+  font-size: 0.85rem;
+  color: var(--success);
+  font-weight: 500;
 }

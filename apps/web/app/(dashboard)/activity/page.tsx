@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import type { ActivityLog } from "@lifekeeper/types";
 import { HouseholdCsvExportButton } from "../../../components/asset-export-actions";
-import { ApiError, getHouseholdActivity, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdActivity, getMe } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/formatters";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
 import { getEntityLabel, getEntityUrl, getEntityDisplayName } from "../../../lib/entity-url";
@@ -89,6 +89,19 @@ const formatMetadataValue = (value: unknown): string => {
 
 export default async function ActivityPage({ searchParams }: ActivityPageProps): Promise<JSX.Element> {
   const params = searchParams ? await searchParams : {};
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
+  const formatMetadataValueWithPrefs = (value: unknown): string => {
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "string") return isIsoDateTime(value) ? formatDateTime(value, "Not set", undefined, prefs.dateFormat) : value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) return value.map((item) => formatMetadataValueWithPrefs(item)).join(", ");
+    if (typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>);
+      if (entries.length === 0) return "—";
+      return entries.map(([key, nestedValue]) => `${formatMetadataLabel(key)}: ${formatMetadataValueWithPrefs(nestedValue)}`).join("; ");
+    }
+    return String(value);
+  };
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const entityType = typeof params.entityType === "string" && activityEntityOptions.includes(params.entityType as (typeof activityEntityOptions)[number])
     ? params.entityType
@@ -217,7 +230,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
                           <h3>{formatActionLabel(entry.action)}</h3>
                           {renderEntityRef(entry)}
                         </div>
-                        <span className="pill">{formatDateTime(entry.createdAt)}</span>
+                        <span className="pill">{formatDateTime(entry.createdAt, undefined, undefined, prefs.dateFormat)}</span>
                       </div>
                       {entry.metadata ? (
                         <div style={{ display: "grid", gap: "8px" }}>
@@ -226,7 +239,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
                               <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                                 {formatMetadataLabel(key)}
                               </div>
-                              <div style={{ fontSize: "0.88rem" }}>{formatMetadataValue(value)}</div>
+                              <div style={{ fontSize: "0.88rem" }}>{formatMetadataValueWithPrefs(value)}</div>
                             </div>
                           ))}
                         </div>

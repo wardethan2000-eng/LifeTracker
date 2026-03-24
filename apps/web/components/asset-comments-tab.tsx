@@ -1,4 +1,4 @@
-import type { AssetDetailResponse, ThreadedComment } from "@lifekeeper/types";
+import type { AssetDetailResponse, DateFormat, ThreadedComment } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   createCommentAction,
@@ -6,6 +6,7 @@ import {
   updateCommentAction
 } from "../app/actions";
 import { formatDateTime } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 
 type AssetCommentsTabProps = {
   detail: AssetDetailResponse;
@@ -18,17 +19,18 @@ type CommentCardProps = {
   householdId: string;
   comment: ThreadedComment | ThreadedComment["replies"][number];
   allowReplies?: boolean;
+  dateFormat?: DateFormat;
 };
 
-function CommentCard({ assetId, householdId, comment, allowReplies = false }: CommentCardProps): JSX.Element {
+function CommentCard({ assetId, householdId, comment, allowReplies = false, dateFormat = "US" }: CommentCardProps): JSX.Element {
   return (
     <article className="schedule-card">
       <div className="schedule-card__summary">
         <div>
           <h3>{comment.author.displayName ?? "Household member"}</h3>
           <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-            {formatDateTime(comment.createdAt)}
-            {comment.editedAt ? ` • edited ${formatDateTime(comment.editedAt)}` : ""}
+            {formatDateTime(comment.createdAt, undefined, undefined, dateFormat)}
+            {comment.editedAt ? ` • edited ${formatDateTime(comment.editedAt, undefined, undefined, dateFormat)}` : ""}
           </p>
         </div>
       </div>
@@ -70,6 +72,7 @@ function CommentCard({ assetId, householdId, comment, allowReplies = false }: Co
 }
 
 export async function AssetCommentsTab({ detail, assetId, comments }: AssetCommentsTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
 
   return (
     <div style={{ display: "grid", gap: "24px" }}>
@@ -107,6 +110,7 @@ export async function AssetCommentsTab({ detail, assetId, comments }: AssetComme
                     householdId={detail.asset.householdId}
                     comment={comment}
                     allowReplies
+                    dateFormat={prefs.dateFormat}
                   />
                   {comment.replies.length > 0 ? (
                     <div style={{ display: "grid", gap: "12px", marginTop: "18px", paddingLeft: "18px", borderLeft: "2px solid var(--border-color)" }}>
@@ -116,6 +120,7 @@ export async function AssetCommentsTab({ detail, assetId, comments }: AssetComme
                           assetId={assetId}
                           householdId={detail.asset.householdId}
                           comment={reply}
+                          dateFormat={prefs.dateFormat}
                         />
                       ))}
                     </div>

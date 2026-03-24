@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AssetCostPerUnit,
   AssetCostSummary,
   CostForecast
@@ -6,6 +6,7 @@ import type {
 import type { JSX } from "react";
 import { AssetCostCharts } from "./asset-cost-charts";
 import { formatCurrency } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 
 type AssetCostsTabProps = {
   costSummary: AssetCostSummary | null;
@@ -14,6 +15,8 @@ type AssetCostsTabProps = {
 };
 
 export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: AssetCostsTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
+  const fc = (v: number | null | undefined, fb = "$0.00") => fc(v, fb, prefs.currencyCode);
   const totalLogs = costSummary?.costByMonth.reduce((sum, entry) => sum + entry.logCount, 0) ?? 0;
   const normalizedMetrics = costPerUnit?.metrics.filter((metric) => metric.costPerUnit !== null) ?? [];
 
@@ -27,17 +30,17 @@ export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: 
           <section className="stats-row">
             <div className="stat-card stat-card--accent">
               <span className="stat-card__label">Lifetime Cost</span>
-              <strong className="stat-card__value">{formatCurrency(costSummary?.lifetimeCost ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{fc(costSummary?.lifetimeCost ?? 0, "$0.00")}</strong>
               <span className="stat-card__sub">All recorded maintenance spend for this asset</span>
             </div>
             <div className="stat-card">
               <span className="stat-card__label">Year-to-Date Cost</span>
-              <strong className="stat-card__value">{formatCurrency(costSummary?.yearToDateCost ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{fc(costSummary?.yearToDateCost ?? 0, "$0.00")}</strong>
               <span className="stat-card__sub">Current calendar year</span>
             </div>
             <div className="stat-card stat-card--warning">
               <span className="stat-card__label">Rolling 12-Month Average</span>
-              <strong className="stat-card__value">{formatCurrency(costSummary?.rolling12MonthAverage ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{fc(costSummary?.rolling12MonthAverage ?? 0, "$0.00")}</strong>
               <span className="stat-card__sub">Average monthly spend over the last year</span>
             </div>
             <div className="stat-card stat-card--danger">
@@ -64,7 +67,7 @@ export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: 
               {costSummary?.costByYear.length ? costSummary.costByYear.map((entry) => (
                 <tr key={entry.year}>
                   <td>{entry.year}</td>
-                  <td>{formatCurrency(entry.totalCost, "$0.00")}</td>
+                  <td>{fc(entry.totalCost, "$0.00")}</td>
                   <td>{entry.logCount}</td>
                 </tr>
               )) : (
@@ -88,10 +91,10 @@ export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: 
                 <div key={metric.metricId}>
                   <dt>{metric.metricName}</dt>
                   <dd>
-                    <strong>{formatCurrency(metric.costPerUnit, "$0.00")} per {metric.metricUnit}</strong>
+                    <strong>{fc(metric.costPerUnit, "$0.00")} per {metric.metricUnit}</strong>
                     <br />
                     <span style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>
-                      {formatCurrency(metric.totalCost, "$0.00")} across {metric.totalUsage.toFixed(1)} {metric.metricUnit}
+                      {fc(metric.totalCost, "$0.00")} across {metric.totalUsage.toFixed(1)} {metric.metricUnit}
                     </span>
                   </dd>
                 </div>
@@ -119,9 +122,9 @@ export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: 
               {costSummary?.topSchedulesByCost.length ? costSummary.topSchedulesByCost.map((schedule) => (
                 <tr key={schedule.scheduleId}>
                   <td>{schedule.scheduleName}</td>
-                  <td>{formatCurrency(schedule.totalCost, "$0.00")}</td>
+                  <td>{fc(schedule.totalCost, "$0.00")}</td>
                   <td>{schedule.occurrences}</td>
-                  <td>{formatCurrency(schedule.averageCost, "$0.00")}</td>
+                  <td>{fc(schedule.averageCost, "$0.00")}</td>
                 </tr>
               )) : (
                 <tr>
@@ -141,15 +144,15 @@ export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: 
           <section className="stats-row">
             <div className="stat-card stat-card--accent">
               <span className="stat-card__label">Projected 3-Month</span>
-              <strong className="stat-card__value">{formatCurrency(costForecast?.total3m ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{fc(costForecast?.total3m ?? 0, "$0.00")}</strong>
             </div>
             <div className="stat-card stat-card--warning">
               <span className="stat-card__label">Projected 6-Month</span>
-              <strong className="stat-card__value">{formatCurrency(costForecast?.total6m ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{fc(costForecast?.total6m ?? 0, "$0.00")}</strong>
             </div>
             <div className="stat-card stat-card--danger">
               <span className="stat-card__label">Projected 12-Month</span>
-              <strong className="stat-card__value">{formatCurrency(costForecast?.total12m ?? 0, "$0.00")}</strong>
+              <strong className="stat-card__value">{fc(costForecast?.total12m ?? 0, "$0.00")}</strong>
             </div>
           </section>
 
@@ -168,10 +171,10 @@ export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: 
                 {costForecast.schedules.map((schedule) => (
                   <tr key={schedule.scheduleId}>
                     <td>{schedule.scheduleName}</td>
-                    <td>{formatCurrency(schedule.costPerOccurrence, "No estimate")}</td>
-                    <td>{schedule.occurrences3m} x {formatCurrency(schedule.cost3m, "$0.00")}</td>
-                    <td>{schedule.occurrences6m} x {formatCurrency(schedule.cost6m, "$0.00")}</td>
-                    <td>{schedule.occurrences12m} x {formatCurrency(schedule.cost12m, "$0.00")}</td>
+                    <td>{fc(schedule.costPerOccurrence, "No estimate")}</td>
+                    <td>{schedule.occurrences3m} x {fc(schedule.cost3m, "$0.00")}</td>
+                    <td>{schedule.occurrences6m} x {fc(schedule.cost6m, "$0.00")}</td>
+                    <td>{schedule.occurrences12m} x {fc(schedule.cost12m, "$0.00")}</td>
                   </tr>
                 ))}
               </tbody>

@@ -8,9 +8,9 @@ import { useCallback, useMemo, useState } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";
 import {
   formatCategoryLabel,
-  formatDate,
   formatVisibilityLabel,
 } from "../lib/formatters";
+import { useDisplayPreferences } from "./display-preferences-context";
 import { AssetBulkActions } from "./asset-bulk-actions";
 import { BulkActionBar } from "./bulk-action-bar";
 import { ClickToEdit } from "./click-to-edit";
@@ -21,6 +21,8 @@ import { updateAssetFieldAction } from "../app/actions";
 type AssetListWorkspaceProps = {
   householdId: string;
   assets: Asset[];
+  totalAssets: number;
+  includeArchived: boolean;
 };
 
 const CATEGORY_OPTIONS = assetCategoryValues.map((v) => ({
@@ -33,9 +35,12 @@ const VISIBILITY_OPTIONS = assetVisibilityValues.map((v) => ({
   label: formatVisibilityLabel(v as AssetVisibility),
 }));
 
-export function AssetListWorkspace({ householdId, assets }: AssetListWorkspaceProps): JSX.Element {
+export function AssetListWorkspace({ householdId, assets, totalAssets, includeArchived }: AssetListWorkspaceProps): JSX.Element {
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
   const { pushToast } = useToast();
+  const { formatDate } = useDisplayPreferences();
+
+  const [selectAllPages, setSelectAllPages] = useState(false);
 
   // Optimistic field overrides: { [assetId]: { field: value } }
   const [optimistic, setOptimistic] = useState<Record<string, Partial<Asset>>>({});
@@ -48,6 +53,12 @@ export function AssetListWorkspace({ householdId, assets }: AssetListWorkspacePr
   );
 
   const allSelected = assets.length > 0 && selectedCount === assets.length;
+  const hasMorePages = totalAssets > assets.length;
+
+  const handleClearSelection = (): void => {
+    setSelectAllPages(false);
+    clearSelection();
+  };
 
   const handleSave = useCallback(
     async (assetId: string, field: keyof Asset, value: string) => {
@@ -100,11 +111,32 @@ export function AssetListWorkspace({ householdId, assets }: AssetListWorkspacePr
           householdId={householdId}
           selectedItems={selectedItems}
           allItems={assets}
-          onBulkComplete={clearSelection}
+          selectAllPages={selectAllPages}
+          totalAssets={totalAssets}
+          includeArchived={includeArchived}
+          onBulkComplete={handleClearSelection}
         />
       </div>
 
-      <BulkActionBar selectedCount={selectedCount} onClearSelection={clearSelection} />
+      <BulkActionBar
+        selectedCount={selectedCount}
+        selectAllPages={selectAllPages}
+        totalAssets={totalAssets}
+        onClearSelection={handleClearSelection}
+      />
+
+      {allSelected && hasMorePages && !selectAllPages ? (
+        <div className="select-all-pages-banner">
+          All {assets.length} assets on this page are selected.{" "}
+          <button
+            type="button"
+            className="select-all-pages-banner__link"
+            onClick={() => setSelectAllPages(true)}
+          >
+            Select all {totalAssets} assets
+          </button>
+        </div>
+      ) : null}
 
       <table className="data-table">
         <thead>
@@ -114,7 +146,10 @@ export function AssetListWorkspace({ householdId, assets }: AssetListWorkspacePr
                 type="checkbox"
                 aria-label="Select all assets"
                 checked={allSelected}
-                onChange={(e) => toggleGroup(assets.map((a) => a.id), e.target.checked)}
+                onChange={(e) => {
+                  if (!e.target.checked) setSelectAllPages(false);
+                  toggleGroup(assets.map((a) => a.id), e.target.checked);
+                }}
               />
             </th>
             <th>Asset</th>
@@ -210,11 +245,3 @@ export function AssetListWorkspace({ householdId, assets }: AssetListWorkspacePr
   );
 }
 
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}

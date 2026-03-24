@@ -15,6 +15,7 @@ import {
   formatDate,
   formatDateTime
 } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 import {
   getCorrelationStrengthLabel,
   getDivergencePillClass,
@@ -33,6 +34,7 @@ type AssetMetricsTabProps = {
 const METRIC_ANALYTICS_LOOKBACK_DAYS = 365;
 
 export async function AssetMetricsTab({ detail, assetId, metricInsights, metricCorrelations }: AssetMetricsTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
 
   return (
     <div style={{ display: "grid", gap: "24px" }}>
@@ -82,7 +84,7 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                   <div>
                     <h2>{metric.name}</h2>
                     <p style={{ margin: "6px 0 0 0", color: "var(--ink-muted)" }}>
-                      {metric.currentValue} {metric.unit} • Last recorded {formatDateTime(metric.lastRecordedAt, "never")}
+                      {metric.currentValue} {metric.unit} • Last recorded {formatDateTime(metric.lastRecordedAt, "never", undefined, prefs.dateFormat)}
                     </p>
                   </div>
                   <form action={deleteMetricAction}>
@@ -153,7 +155,7 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                                       </p>
                                     </div>
                                     <span className="pill">
-                                      {projection.projectedDate ? formatDate(projection.projectedDate) : projection.humanLabel}
+                                      {projection.projectedDate ? formatDate(projection.projectedDate, undefined, undefined, prefs.dateFormat) : projection.humanLabel}
                                     </span>
                                   </div>
                                 </article>
@@ -174,7 +176,7 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                                     <div>
                                       <h3>{projection.value.toFixed(1)} {metric.unit}</h3>
                                     </div>
-                                    <span className="pill">{formatDate(projection.date)}</span>
+                                    <span className="pill">{formatDate(projection.date, undefined, undefined, prefs.dateFormat)}</span>
                                   </div>
                                 </article>
                               ))}
@@ -202,7 +204,7 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                                     {entry.notes ? ` • ${entry.notes}` : ""}
                                   </p>
                                 </div>
-                                <span className="pill">{formatDateTime(entry.recordedAt)}</span>
+                                <span className="pill">{formatDateTime(entry.recordedAt, undefined, undefined, prefs.dateFormat)}</span>
                               </div>
                             </article>
                           ))}
@@ -232,7 +234,7 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                           <tbody>
                             {insight.rateAnalytics.buckets.map((bucket) => (
                               <tr key={bucket.bucketStart}>
-                                <td>{formatDate(bucket.bucketStart)} - {formatDate(bucket.bucketEnd)}</td>
+                                <td>{formatDate(bucket.bucketStart, undefined, undefined, prefs.dateFormat)} - {formatDate(bucket.bucketEnd, undefined, undefined, prefs.dateFormat)}</td>
                                 <td>{bucket.deltaValue.toFixed(1)}</td>
                                 <td>{bucket.rate.toFixed(2)}</td>
                                 <td>
@@ -262,7 +264,7 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                           metricUnit={metric.unit}
                         />
                         <p>
-                          Average cost: {formatCurrency(insight.costNormalization.averageCostPerUnit)} per {metric.unit} across {insight.costNormalization.totalUsage.toFixed(0)} {metric.unit} of tracked usage
+                          Average cost: {formatCurrency(insight.costNormalization.averageCostPerUnit, undefined, prefs.currencyCode)} per {metric.unit} across {insight.costNormalization.totalUsage.toFixed(0)} {metric.unit} of tracked usage
                         </p>
                         <table className="data-table">
                           <thead>
@@ -277,11 +279,11 @@ export async function AssetMetricsTab({ detail, assetId, metricInsights, metricC
                           <tbody>
                             {insight.costNormalization.entries.map((entry) => (
                               <tr key={`${entry.completedAt}-${entry.logTitle}`}>
-                                <td>{formatDate(entry.completedAt)}</td>
+                                <td>{formatDate(entry.completedAt, undefined, undefined, prefs.dateFormat)}</td>
                                 <td>{entry.logTitle}</td>
                                 <td>{entry.incrementalUsage.toFixed(1)}</td>
-                                <td>{formatCurrency(entry.cost)}</td>
-                                <td>{formatCurrency(entry.costPerUnit)}</td>
+                                <td>{formatCurrency(entry.cost, undefined, prefs.currencyCode)}</td>
+                                <td>{formatCurrency(entry.costPerUnit, undefined, prefs.currencyCode)}</td>
                               </tr>
                             ))}
                           </tbody>

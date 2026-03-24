@@ -66,7 +66,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
               <h2>{t("listTitle", { count: assetPage.total })}</h2>
             </div>
             <div className="panel__body">
-              <AssetListWorkspace householdId={household.id} assets={assetPage.items} />
+              <AssetListWorkspace householdId={household.id} assets={assetPage.items} totalAssets={assetPage.total} includeArchived={includeArchived} />
             </div>
           </section>
 

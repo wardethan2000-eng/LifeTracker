@@ -13,12 +13,11 @@ import { ScheduleForm } from "./schedule-form";
 import { ScheduleInventoryLinks } from "./schedule-inventory-links";
 import { SchedulePartsReadiness } from "./schedule-parts-readiness";
 import {
-  formatCurrency,
-  formatDateTime,
   formatDueLabel,
   formatScheduleStatus,
   formatTriggerSummary
 } from "../lib/formatters";
+import { useDisplayPreferences } from "./display-preferences-context";
 
 type AssetMaintenanceSectionsProps = {
   detail: AssetDetailResponse;
@@ -29,7 +28,11 @@ type AssetMaintenanceSectionsProps = {
   createLogAction: (formData: FormData) => void | Promise<void>;
 };
 
-const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
+const renderLogSummary = (
+  log: MaintenanceLog,
+  formatDateTime: (v: string | null | undefined, fb?: string) => string,
+  formatCurrency: (v: number | null | undefined, fb?: string) => string
+): JSX.Element => (
   <article key={log.id} id={`maintenance-log-${log.id}`} className="log-card">
     <div>
       <h4>{log.title}</h4>
@@ -71,6 +74,7 @@ export function AssetMaintenanceSections({
   createLogAction
 }: AssetMaintenanceSectionsProps): JSX.Element {
   const overdueCount = detail.schedules.filter((schedule) => schedule.status === "overdue").length;
+  const { formatCurrency, formatDateTime } = useDisplayPreferences();
 
   return (
     <>
@@ -167,7 +171,7 @@ export function AssetMaintenanceSections({
                   <div className="log-list">
                     {filteredLogs.map((log) => (
                       <div key={log.id}>
-                        {renderLogSummary(log)}
+                        {renderLogSummary(log, formatDateTime, formatCurrency)}
                         <AttachmentSection
                           householdId={detail.asset.householdId}
                           entityType="maintenance_log"

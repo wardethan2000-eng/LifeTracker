@@ -683,14 +683,22 @@ export const updateAssetSchema = createAssetSchema.omit({ householdId: true }).p
 
 export const bulkArchiveAssetsSchema = z.object({
   householdId: z.string().cuid(),
-  assetIds: z.array(z.string().cuid()).min(1).max(100)
-});
+  assetIds: z.array(z.string().cuid()).optional(),
+  applyToAll: z.boolean().optional(),
+}).refine(
+  (data) => data.applyToAll === true || (data.assetIds !== undefined && data.assetIds.length >= 1),
+  { message: "Either applyToAll must be true or assetIds must have at least one item." }
+);
 
 export const bulkReassignCategorySchema = z.object({
   householdId: z.string().cuid(),
-  assetIds: z.array(z.string().cuid()).min(1).max(100),
-  category: assetCategorySchema
-});
+  assetIds: z.array(z.string().cuid()).optional(),
+  applyToAll: z.boolean().optional(),
+  category: assetCategorySchema,
+}).refine(
+  (data) => data.applyToAll === true || (data.assetIds !== undefined && data.assetIds.length >= 1),
+  { message: "Either applyToAll must be true or assetIds must have at least one item." }
+);
 
 export const bulkFailedItemSchema = z.object({
   id: z.string().optional(),
@@ -5716,7 +5724,7 @@ export type LayoutItem = z.infer<typeof layoutItemSchema>;
 export const saveLayoutPreferenceSchema = z.object({
   entityType: z.string().max(50),
   entityId: z.string().max(50).optional().nullable(),
-  layoutJson: z.array(layoutItemSchema),
+  layoutJson: z.array(z.record(z.string(), z.unknown())),
 });
 export type SaveLayoutPreferenceInput = z.infer<typeof saveLayoutPreferenceSchema>;
 
@@ -5724,11 +5732,14 @@ export const layoutPreferenceSchema = z.object({
   id: z.string(),
   entityType: z.string(),
   entityId: z.string().nullable(),
-  layoutJson: z.array(layoutItemSchema),
+  layoutJson: z.array(z.record(z.string(), z.unknown())),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type LayoutPreference = z.infer<typeof layoutPreferenceSchema>;
+
+export const quickActionItemSchema = z.object({ i: z.string() });
+export type QuickActionItem = z.infer<typeof quickActionItemSchema>;
 
 export const createDashboardPinSchema = z.object({
   entityType: z.enum(["asset", "project", "hobby"]),

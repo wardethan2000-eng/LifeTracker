@@ -1,12 +1,13 @@
 import type { JSX, ReactNode } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { getMe } from "../../lib/api";
+import { getDisplayPreferences, getMe } from "../../lib/api";
 import { SearchCommandPaletteLazy } from "../../components/search-command-palette-lazy";
 import { RoutePrefetcher } from "../../components/route-prefetcher";
 import { RealtimeStatusIndicator } from "../../components/realtime-status-indicator";
 import { SidebarNav, type SidebarNavItem } from "../../components/sidebar-nav";
 import { TimezoneProvider } from "../../lib/timezone-context";
+import { DisplayPreferencesProvider } from "../../components/display-preferences-context";
 
 const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
@@ -40,6 +41,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   let userRole = "Member";
   let fallbackHouseholdId: string | null = null;
   let householdTimezone = "America/New_York";
+
+  const [displayPreferences] = await Promise.allSettled([getDisplayPreferences()]);
+  const resolvedDisplayPreferences = displayPreferences.status === "fulfilled" ? displayPreferences.value : { pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" };
 
   try {
     const me = await getMe();
@@ -92,8 +96,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           </div>
         </div>
         <TimezoneProvider timezone={householdTimezone}>
-          {children}
-        </TimezoneProvider>
+            <DisplayPreferencesProvider initialPreferences={resolvedDisplayPreferences}>
+              {children}
+            </DisplayPreferencesProvider>
+          </TimezoneProvider>
       </div>
     </div>
   );

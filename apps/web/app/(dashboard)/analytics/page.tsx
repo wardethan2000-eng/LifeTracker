@@ -10,6 +10,7 @@ import { InventoryAnalyticsTurnover } from "../../../components/inventory-analyt
 import { AnnualCostReportButton } from "../../../components/report-download-actions";
 import { LkBarChart, LkDonutChart, LkLineChart } from "../../../components/charts";
 import {
+  getDisplayPreferences,
   getHouseholdCostOverview,
   getHouseholdUsageHighlights,
   getMe,
@@ -139,14 +140,15 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     return `/analytics?${query.toString()}`;
   };
 
-  const [costOverview, complianceDashboard, usageHighlights] = await Promise.all([
+  const [costOverview, complianceDashboard, usageHighlights, prefs] = await Promise.all([
     tab === "costs"
       ? getHouseholdCostOverview(household.id).catch(() => ({ dashboard: null, serviceProviderSpend: null, forecast: null }))
       : Promise.resolve({ dashboard: null, serviceProviderSpend: null, forecast: null }),
     tab === "compliance" ? getScheduleComplianceDashboard(household.id, periodMonths).catch(() => null) : Promise.resolve(null),
     tab === "usage"
       ? getHouseholdUsageHighlights(household.id, { limit: 8, assetLimit: 12, lookback: 365, bucketSize: "month" }).catch(() => [])
-      : Promise.resolve([])
+      : Promise.resolve([]),
+    getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }))
   ]);
   const costDashboard = costOverview.dashboard;
   const serviceProviderSpend = costOverview.serviceProviderSpend;
@@ -161,7 +163,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <section className="stats-row">
           <div className="stat-card stat-card--accent">
             <span className="stat-card__label">Total Spend</span>
-            <strong className="stat-card__value">{formatCurrency(costDashboard?.totalSpend ?? 0, "$0.00")}</strong>
+            <strong className="stat-card__value">{formatCurrency(costDashboard?.totalSpend ?? 0, "$0.00", prefs.currencyCode)}</strong>
             <span className="stat-card__sub">Selected household period</span>
           </div>
           <div className="stat-card">
@@ -171,12 +173,12 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </div>
           <div className="stat-card stat-card--warning">
             <span className="stat-card__label">Average per Asset</span>
-            <strong className="stat-card__value">{formatCurrency(averagePerAsset, "$0.00")}</strong>
+            <strong className="stat-card__value">{formatCurrency(averagePerAsset, "$0.00", prefs.currencyCode)}</strong>
             <span className="stat-card__sub">Average spend across active assets</span>
           </div>
           <div className="stat-card stat-card--danger">
             <span className="stat-card__label">Projected 12-Month</span>
-            <strong className="stat-card__value">{formatCurrency(costForecast?.total12m ?? 0, "$0.00")}</strong>
+            <strong className="stat-card__value">{formatCurrency(costForecast?.total12m ?? 0, "$0.00", prefs.currencyCode)}</strong>
             <span className="stat-card__sub">Forecasted scheduled maintenance</span>
           </div>
         </section>
@@ -192,7 +194,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   name: category.categoryLabel,
                   value: category.totalCost
                 }))}
-                centerValue={formatCurrency(costDashboard?.totalSpend ?? 0, "$0.00")}
+                centerValue={formatCurrency(costDashboard?.totalSpend ?? 0, "$0.00", prefs.currencyCode)}
                 centerLabel="Total Spend"
                 emptyMessage="No cost data is available yet."
               />
@@ -558,7 +560,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                       <div className="data-table__secondary">{asset.metricNames.join(", ")}</div>
                     </td>
                     <td>{asset.metricCount}</td>
-                    <td>{formatDate(asset.nextProjectedDue, "—")}</td>
+                    <td>{formatDate(asset.nextProjectedDue, "—", undefined, prefs.dateFormat)}</td>
                     <td>{asset.projectedScheduleCount}</td>
                     <td>{asset.anomalyCount}</td>
                   </tr>
@@ -582,7 +584,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <h1>Analytics</h1>
           <p style={{ marginTop: 6 }}>
             {household.name}
-            {tab === "costs" && costDashboard ? ` • ${formatDate(costDashboard.periodStart)} through ${formatDate(costDashboard.periodEnd)}` : ""}
+            {tab === "costs" && costDashboard ? ` • ${formatDate(costDashboard.periodStart, undefined, undefined, prefs.dateFormat)} through ${formatDate(costDashboard.periodEnd, undefined, undefined, prefs.dateFormat)}` : ""}
           </p>
         </div>
         {tab === "costs" ? (

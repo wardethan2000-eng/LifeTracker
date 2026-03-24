@@ -30,6 +30,9 @@ type AssetBulkActionsProps = {
   householdId: string;
   selectedItems: Asset[];
   allItems: Asset[];
+  selectAllPages?: boolean;
+  totalAssets?: number;
+  includeArchived?: boolean;
   onBulkComplete?: () => void;
 };
 
@@ -61,6 +64,8 @@ export function AssetBulkActions({
   householdId,
   selectedItems,
   allItems,
+  selectAllPages = false,
+  totalAssets,
   onBulkComplete,
 }: AssetBulkActionsProps): JSX.Element {
   const router = useRouter();
@@ -135,7 +140,11 @@ export function AssetBulkActions({
       setErrorMessage(null);
       setArchiveResult(null);
 
-      const result = await bulkArchiveAssets(householdId, selectedItems.map((a) => a.id));
+      const result = await bulkArchiveAssets(
+        householdId,
+        selectedItems.map((a) => a.id),
+        selectAllPages ? { applyToAll: true } : undefined
+      );
       setArchiveResult(result);
       router.refresh();
 
@@ -164,7 +173,12 @@ export function AssetBulkActions({
       setErrorMessage(null);
       setReassignResult(null);
 
-      const result = await bulkReassignAssetCategory(householdId, selectedItems.map((a) => a.id), targetCategory);
+      const result = await bulkReassignAssetCategory(
+        householdId,
+        selectedItems.map((a) => a.id),
+        targetCategory,
+        selectAllPages ? { applyToAll: true } : undefined
+      );
       setReassignResult(result);
       router.refresh();
 
@@ -232,27 +246,29 @@ export function AssetBulkActions({
         <button
           type="button"
           className="button button--secondary button--sm"
-          disabled={selectedItems.length === 0}
+          disabled={selectedItems.length === 0 && !selectAllPages}
           onClick={() => {
             setArchiveOpen(true);
             setArchiveResult(null);
             setErrorMessage(null);
           }}
         >
-          Archive{selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+          {selectAllPages && totalAssets
+            ? `Archive (All ${totalAssets})`
+            : `Archive${selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}`}
         </button>
 
         <button
           type="button"
           className="button button--secondary button--sm"
-          disabled={selectedItems.length === 0}
+          disabled={selectedItems.length === 0 && !selectAllPages}
           onClick={() => {
             setReassignOpen(true);
             setReassignResult(null);
             setErrorMessage(null);
           }}
         >
-          Reassign Category{selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+          Reassign Category{selectedItems.length > 0 && !selectAllPages ? ` (${selectedItems.length})` : selectAllPages && totalAssets ? ` (All ${totalAssets})` : ""}
         </button>
 
         {errorMessage ? (
@@ -266,19 +282,23 @@ export function AssetBulkActions({
           <DialogHeader>
             <DialogTitle>Archive Assets</DialogTitle>
             <DialogDescription>
-              This will soft-delete {selectedItems.length} asset{selectedItems.length === 1 ? "" : "s"}. They can be restored later.
+              {selectAllPages && totalAssets
+                ? `This will archive all ${totalAssets} assets in the household. They can be restored later.`
+                : `This will soft-delete ${selectedItems.length} asset${selectedItems.length === 1 ? "" : "s"}. They can be restored later.`}
             </DialogDescription>
           </DialogHeader>
 
           <div style={{ display: "grid", gap: 12 }}>
-            <ul style={{ margin: 0, paddingLeft: 20, fontSize: "0.875rem", color: "var(--ink-light)" }}>
-              {selectedItems.slice(0, 10).map((asset) => (
-                <li key={asset.id}>{asset.name}{asset.assetTag ? ` (${asset.assetTag})` : ""}</li>
-              ))}
-              {selectedItems.length > 10 ? (
-                <li>…and {selectedItems.length - 10} more</li>
-              ) : null}
-            </ul>
+            {!selectAllPages ? (
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: "0.875rem", color: "var(--ink-light)" }}>
+                {selectedItems.slice(0, 10).map((asset) => (
+                  <li key={asset.id}>{asset.name}{asset.assetTag ? ` (${asset.assetTag})` : ""}</li>
+                ))}
+                {selectedItems.length > 10 ? (
+                  <li>…and {selectedItems.length - 10} more</li>
+                ) : null}
+              </ul>
+            ) : null}
 
             {isArchiving ? (
               <div style={{ display: "grid", gap: 8 }}>
@@ -311,10 +331,10 @@ export function AssetBulkActions({
             <button
               type="button"
               className="button button--danger"
-              disabled={isArchiving || selectedItems.length === 0}
+              disabled={isArchiving || (selectedItems.length === 0 && !selectAllPages)}
               onClick={() => { void handleArchive(); }}
             >
-              {isArchiving ? "Archiving…" : `Archive ${selectedItems.length} Asset${selectedItems.length === 1 ? "" : "s"}`}
+              {isArchiving ? "Archiving…" : selectAllPages && totalAssets ? `Archive All ${totalAssets} Assets` : `Archive ${selectedItems.length} Asset${selectedItems.length === 1 ? "" : "s"}`}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -326,7 +346,9 @@ export function AssetBulkActions({
           <DialogHeader>
             <DialogTitle>Reassign Category</DialogTitle>
             <DialogDescription>
-              Change the category for {selectedItems.length} selected asset{selectedItems.length === 1 ? "" : "s"}.
+              {selectAllPages && totalAssets
+                ? `Change the category for all ${totalAssets} assets in the household.`
+                : `Change the category for ${selectedItems.length} selected asset${selectedItems.length === 1 ? "" : "s"}.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -378,10 +400,10 @@ export function AssetBulkActions({
             <button
               type="button"
               className="button button--primary"
-              disabled={isReassigning || selectedItems.length === 0}
+              disabled={isReassigning || (selectedItems.length === 0 && !selectAllPages)}
               onClick={() => { void handleReassign(); }}
             >
-              {isReassigning ? "Reassigning…" : `Reassign ${selectedItems.length} Asset${selectedItems.length === 1 ? "" : "s"}`}
+              {isReassigning ? "Reassigning…" : selectAllPages && totalAssets ? `Reassign All ${totalAssets} Assets` : `Reassign ${selectedItems.length} Asset${selectedItems.length === 1 ? "" : "s"}`}
             </button>
           </DialogFooter>
         </DialogContent>

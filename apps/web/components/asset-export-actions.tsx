@@ -13,8 +13,8 @@ import {
   getShareLinks,
   revokeShareLink
 } from "../lib/api";
-import { formatDate, formatDateTime } from "../lib/formatters";
 import { InlineError } from "./inline-error";
+import { useDisplayPreferences } from "./display-preferences-context";
 
 type AssetExportActionsProps = {
   assetId: string;
@@ -43,7 +43,7 @@ const toDateBoundaryIso = (value: string | null, boundary: "start" | "end"): str
   return parsed.toISOString();
 };
 
-const getShareLinkStatus = (shareLink: ShareLink): string => {
+const getShareLinkStatus = (shareLink: ShareLink, formatDate: (v: string | null | undefined, fb?: string) => string): string => {
   if (shareLink.isRevoked) {
     return "Revoked";
   }
@@ -68,6 +68,7 @@ const buildDownloadOptions = (since?: string, until?: string): { since?: string;
 
 export function AssetExportActions({ assetId, assetTag, assetName, householdId }: AssetExportActionsProps): JSX.Element {
   const searchParams = useSearchParams();
+  const { formatDate, formatDateTime } = useDisplayPreferences();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingCompliancePdf, setIsExportingCompliancePdf] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
@@ -239,7 +240,7 @@ export function AssetExportActions({ assetId, assetTag, assetName, householdId }
                 <div>
                   <div className="share-link-list__label">{shareLink.label?.trim() || "Untitled"}</div>
                   <div className="share-link-list__meta">
-                    Created {formatDateTime(shareLink.createdAt)} • {shareLink.viewCount} views • {getShareLinkStatus(shareLink)}
+                    Created {formatDateTime(shareLink.createdAt)} • {shareLink.viewCount} views • {getShareLinkStatus(shareLink, formatDate)}
                   </div>
                 </div>
                 <button

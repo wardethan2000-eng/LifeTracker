@@ -11,6 +11,7 @@ import {
   formatScheduleStatus,
   formatTriggerSummary
 } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 import {
   formatTimelineSourceLabel,
   formatTransferTypeLabel,
@@ -27,6 +28,7 @@ type AssetOverviewTabProps = {
 };
 
 export async function AssetOverviewTab({ detail, assetId, transferHistory, overviewTimeline }: AssetOverviewTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const dueNow = detail.schedules.filter((schedule) => schedule.status === "due" || schedule.status === "overdue");
 
   return (
@@ -50,7 +52,7 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
         <div className="stat-card stat-card--danger">
           <span className="stat-card__label">Latest Spend</span>
           <strong className="stat-card__value">
-            {detail.recentLogs[0] ? formatCurrency(detail.recentLogs[0].cost, "$0.00") : "$0.00"}
+            {detail.recentLogs[0] ? formatCurrency(detail.recentLogs[0].cost, "$0.00", prefs.currencyCode) : "$0.00"}
           </strong>
           <span className="stat-card__sub">Most recent labor cost</span>
         </div>
@@ -169,7 +171,7 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
               <div className="log-list">
                 {detail.recentLogs.slice(0, 3).map((log) => (
                   <div key={log.id}>
-                    {renderLogSummary(log)}
+                    {renderLogSummary(log, prefs)}
                     <AttachmentSection
                       householdId={detail.asset.householdId}
                       entityType="maintenance_log"
@@ -210,7 +212,7 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
                     <span style={{ color: "var(--ink-muted)" }}>to</span>
                     <strong>{transfer.toUser.displayName ?? "Unknown user"}</strong>
                     <span className="pill">{formatTransferTypeLabel(transfer.transferType)}</span>
-                    <span className="pill">{formatDateTime(transfer.transferredAt)}</span>
+                    <span className="pill">{formatDateTime(transfer.transferredAt, undefined, undefined, prefs.dateFormat)}</span>
                   </div>
                   <p style={{ margin: 0, color: "var(--ink-muted)" }}>
                     Initiated by {transfer.initiatedBy.displayName ?? "Unknown user"}
@@ -242,9 +244,9 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
                       </span>
                       <strong>{item.title}</strong>
                     </div>
-                    <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{formatDateTime(item.eventDate)}</span>
+                    <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{formatDateTime(item.eventDate, undefined, undefined, prefs.dateFormat)}</span>
                   </div>
-                  {item.cost !== null ? <strong>{formatCurrency(item.cost)}</strong> : null}
+                  {item.cost !== null ? <strong>{formatCurrency(item.cost, undefined, prefs.currencyCode)}</strong> : null}
                 </article>
               ))}
             </div>

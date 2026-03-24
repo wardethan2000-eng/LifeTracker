@@ -1,6 +1,7 @@
 import type {
   AssetMetricCorrelationMatrix,
   AssetTimelineItem,
+  DateFormat,
   MaintenanceLog,
   UsageCostNormalization,
   UsageMetricEntry,
@@ -119,14 +120,14 @@ export const renderMetaRow = (label: string, value: string | null | undefined): 
   </div>
 );
 
-export const renderMoneyMetaRow = (label: string, value: number | null | undefined): JSX.Element => (
+export const renderMoneyMetaRow = (label: string, value: number | null | undefined, currencyCode = "USD"): JSX.Element => (
   <div>
     <dt>{label}</dt>
-    <dd>{value === null || value === undefined ? "Not set" : formatCurrency(value)}</dd>
+    <dd>{value === null || value === undefined ? "Not set" : formatCurrency(value, undefined, currencyCode)}</dd>
   </div>
 );
 
-export const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
+export const renderLogSummary = (log: MaintenanceLog, prefs?: { dateFormat?: DateFormat; currencyCode?: string }): JSX.Element => (
   <article key={log.id} id={`maintenance-log-${log.id}`} className="log-card">
     <div>
       <h4>{log.title}</h4>
@@ -134,9 +135,9 @@ export const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
         {log.notes ?? "No notes recorded."}
       </p>
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
-        <span className="pill">{formatDateTime(log.completedAt)}</span>
-        <span className="pill">Labor {formatCurrency(log.cost, "$0.00")}</span>
-        <span className="pill">Parts {formatCurrency(log.totalPartsCost, "$0.00")}</span>
+        <span className="pill">{formatDateTime(log.completedAt, undefined, undefined, prefs?.dateFormat)}</span>
+        <span className="pill">Labor {formatCurrency(log.cost, "$0.00", prefs?.currencyCode)}</span>
+        <span className="pill">Parts {formatCurrency(log.totalPartsCost, "$0.00", prefs?.currencyCode)}</span>
         {log.serviceProviderId ? <span className="pill">Provider linked</span> : null}
       </div>
     </div>
@@ -149,7 +150,7 @@ export const renderLogSummary = (log: MaintenanceLog): JSX.Element => (
               {part.name}
               {part.partNumber ? ` (${part.partNumber})` : ""}
               {` x${part.quantity}`}
-              {part.unitCost !== null ? ` • ${formatCurrency(part.unitCost)}` : ""}
+              {part.unitCost !== null ? ` • ${formatCurrency(part.unitCost, undefined, prefs?.currencyCode)}` : ""}
             </li>
           ))}
         </ul>
@@ -240,4 +241,4 @@ export const getDivergencePillClass = (trend: string): string => {
   }
 };
 
-export const formatDateRangeLabel = (start: string, end: string): string => `${formatDate(start)} - ${formatDate(end)}`;
+export const formatDateRangeLabel = (start: string, end: string, dateFormat: DateFormat = "US"): string => `${formatDate(start, undefined, undefined, dateFormat)} - ${formatDate(end, undefined, undefined, dateFormat)}`;

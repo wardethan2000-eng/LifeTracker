@@ -4,7 +4,7 @@ import type { AssetDetailResponse, UsageMetricEntry, UsageProjection } from "@li
 import type { JSX } from "react";
 import { Card } from "./card";
 import { SectionFilterBar, SectionFilterChildren, SectionFilterProvider, SectionFilterToggle } from "./section-filter";
-import { formatDate, formatDateTime } from "../lib/formatters";
+import { useDisplayPreferences } from "./display-preferences-context";
 
 type MetricInsight = {
   metricId: string;
@@ -29,6 +29,8 @@ export function AssetMetricList({
   createMetricEntryAction,
   deleteMetricAction
 }: AssetMetricListProps): JSX.Element {
+  const { formatDate, formatDateTime } = useDisplayPreferences();
+
   return (
     <SectionFilterProvider items={metrics} keys={["name", "unit"]} placeholder="Filter metrics by name or unit">
       <Card

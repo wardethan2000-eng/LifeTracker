@@ -5,7 +5,7 @@ import { getDashboardData } from "../../components/dashboard-data";
 import { HomeDashboard } from "../../components/home-dashboard";
 import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
-import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdProjectStatusCounts, getLayoutPreference, getMe } from "../../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdProjectStatusCounts, getLayoutPreference, getMe, getQuickActionsPreference } from "../../lib/api";
 import { OnboardingChecklistClient } from "../../components/onboarding-checklist";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
 
@@ -67,7 +67,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, onboardingPref] = await Promise.all([
+    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, onboardingPref, savedQuickActionIds] = await Promise.all([
       getDashboardData(selectedHousehold.id),
       getDashboardPins().catch(() => []),
       getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
@@ -75,6 +75,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
       getHouseholdHobbies(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
       getHouseholdInventory(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
       getLayoutPreference("onboarding", "dismissed").catch(() => null),
+      getQuickActionsPreference().catch(() => null),
     ]);
 
     const projectCount = projectStatusCounts.reduce((sum, s) => sum + s.count, 0);
@@ -181,6 +182,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             nextDueAssetId={firstDueWork?.assetId ?? null}
             nextDueAssetName={firstDueWork?.assetName ?? null}
             pins={pins}
+            savedQuickActionIds={savedQuickActionIds}
             ideas={recentIdeas.map((idea) => ({
               id: idea.id,
               title: idea.title,

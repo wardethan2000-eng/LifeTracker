@@ -2,6 +2,7 @@ import type {
   AssetCategory,
   AssetOverview,
   AssetVisibility,
+  DateFormat,
   MaintenanceTrigger,
   Notification,
   ScheduleStatus
@@ -9,6 +10,7 @@ import type {
 
 const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
 const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
 const getDateFormatter = (timeZone?: string): Intl.DateTimeFormat => {
   const key = timeZone ?? "__default__";
@@ -42,10 +44,36 @@ const getDateTimeFormatter = (timeZone?: string): Intl.DateTimeFormat => {
   return formatter;
 };
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD"
-});
+const getCurrencyFormatter = (currencyCode = "USD"): Intl.NumberFormat => {
+  let formatter = currencyFormatterCache.get(currencyCode);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode });
+    currencyFormatterCache.set(currencyCode, formatter);
+  }
+  return formatter;
+};
+
+const formatDateISO = (date: Date, timeZone?: string): string => {
+  // Format as YYYY-MM-DD in the given timezone (or local if none).
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    ...(timeZone ? { timeZone } : {})
+  }).formatToParts(date);
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+};
+
+const formatDateTimeISO = (date: Date, timeZone?: string): string => {
+  const isoDate = formatDateISO(date, timeZone);
+  const timeParts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {})
+  }).format(date);
+  return `${isoDate} ${timeParts}`;
+};
 
 const quantityFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2
@@ -75,28 +103,39 @@ const scheduleStatusLabels: Record<ScheduleStatus, string> = {
   upcoming: "Upcoming"
 };
 
-export const formatDate = (value: string | null | undefined, fallback = "Not set", timeZone?: string): string => {
-  if (!value) {
-    return fallback;
-  }
-
-  return getDateFormatter(timeZone).format(new Date(value));
+export const formatDate = (
+  value: string | null | undefined,
+  fallback = "Not set",
+  timeZone?: string,
+  dateFormat: DateFormat = "US"
+): string => {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (dateFormat === "ISO") return formatDateISO(date, timeZone);
+  if (dateFormat === "locale") return date.toLocaleDateString(undefined, timeZone ? { timeZone } : {});
+  return getDateFormatter(timeZone).format(date);
 };
 
-export const formatDateTime = (value: string | null | undefined, fallback = "Not set", timeZone?: string): string => {
-  if (!value) {
-    return fallback;
-  }
-
-  return getDateTimeFormatter(timeZone).format(new Date(value));
+export const formatDateTime = (
+  value: string | null | undefined,
+  fallback = "Not set",
+  timeZone?: string,
+  dateFormat: DateFormat = "US"
+): string => {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (dateFormat === "ISO") return formatDateTimeISO(date, timeZone);
+  if (dateFormat === "locale") return date.toLocaleString(undefined, timeZone ? { timeZone } : {});
+  return getDateTimeFormatter(timeZone).format(date);
 };
 
-export const formatCurrency = (value: number | null | undefined, fallback = "No cost"): string => {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  return currencyFormatter.format(value);
+export const formatCurrency = (
+  value: number | null | undefined,
+  fallback = "No cost",
+  currencyCode = "USD"
+): string => {
+  if (value === null || value === undefined) return fallback;
+  return getCurrencyFormatter(currencyCode).format(value);
 };
 
 export const formatQuantityValue = (value: number): string => {

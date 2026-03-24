@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LayoutItem } from "react-grid-layout";
+import { useState } from "react";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { EntryActionableList } from "./entry-system";
-import { removeDashboardPin } from "../lib/api";
+import { removeDashboardPin, saveQuickActionsPreference } from "../lib/api";
 import type { DashboardPin } from "@lifekeeper/types";
 
 /* LaunchPad actions moved back to <LaunchPad /> rendered outside the grid */
@@ -67,7 +68,22 @@ type HomeDashboardProps = {
   nextDueAssetName: string | null;
   pins: DashboardPin[];
   ideas?: IdeaSummaryItem[];
+  savedQuickActionIds?: string[] | null;
 };
+
+const AVAILABLE_QUICK_ACTIONS: Array<{ id: string; label: string; href: string }> = [
+  { id: "add-asset", label: "+ Add New Asset", href: "/assets/new" },
+  { id: "view-projects", label: "View Projects", href: "/projects" },
+  { id: "maintenance-queue", label: "Maintenance Queue", href: "/maintenance" },
+  { id: "asset-registry", label: "Asset Registry", href: "/assets" },
+  { id: "notifications", label: "Notifications", href: "/notifications" },
+  { id: "add-project", label: "New Project", href: "/projects/new" },
+  { id: "browse-ideas", label: "Browse Ideas", href: "/ideas" },
+  { id: "inventory", label: "Inventory", href: "/inventory" },
+  { id: "add-hobby", label: "Log a Hobby", href: "/hobbies" },
+];
+
+const DEFAULT_QUICK_ACTION_IDS = ["add-asset", "view-projects", "maintenance-queue", "asset-registry", "notifications"];
 
 export function HomeDashboard(props: HomeDashboardProps) {
   const router = useRouter();
@@ -86,7 +102,43 @@ export function HomeDashboard(props: HomeDashboardProps) {
     nextDueAssetName,
     pins,
     ideas = [],
+    savedQuickActionIds,
   } = props;
+
+  const [editingQuickActions, setEditingQuickActions] = useState(false);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [activeQuickActionIds, setActiveQuickActionIds] = useState<string[]>(
+    savedQuickActionIds ?? DEFAULT_QUICK_ACTION_IDS
+  );
+  const [isSavingQuickActions, setIsSavingQuickActions] = useState(false);
+
+  const startEditQuickActions = (): void => {
+    setPendingIds([...activeQuickActionIds]);
+    setEditingQuickActions(true);
+  };
+
+  const cancelEditQuickActions = (): void => {
+    setEditingQuickActions(false);
+    setPendingIds([]);
+  };
+
+  const saveQuickActions = async (): Promise<void> => {
+    setIsSavingQuickActions(true);
+    try {
+      await saveQuickActionsPreference(pendingIds);
+      setActiveQuickActionIds(pendingIds);
+      setEditingQuickActions(false);
+      setPendingIds([]);
+    } finally {
+      setIsSavingQuickActions(false);
+    }
+  };
+
+  const togglePendingAction = (id: string): void => {
+    setPendingIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const handleUnpin = async (pinId: string) => {
     await removeDashboardPin(pinId);
@@ -169,13 +221,59 @@ export function HomeDashboard(props: HomeDashboardProps) {
     {
       key: "quickactions",
       title: "Quick Actions",
-      content: (
+      content: editingQuickActions ? (
+        <div className="quick-actions-editor">
+          <p className="quick-actions-editor__hint">Select which actions appear on your dashboard:</p>
+          <ul className="quick-actions-editor__list">
+            {AVAILABLE_QUICK_ACTIONS.map((action) => (
+              <li key={action.id}>
+                <label className="quick-actions-editor__item">
+                  <input
+                    type="checkbox"
+                    checked={pendingIds.includes(action.id)}
+                    onChange={() => togglePendingAction(action.id)}
+                  />
+                  {action.label}
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="quick-actions-editor__footer">
+            <button
+              type="button"
+              className="button button--ghost button--sm"
+              onClick={cancelEditQuickActions}
+              disabled={isSavingQuickActions}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button button--primary button--sm"
+              onClick={() => { void saveQuickActions(); }}
+              disabled={isSavingQuickActions || pendingIds.length === 0}
+            >
+              {isSavingQuickActions ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : (
         <div className="dashboard-card__list" style={{ gap: 4 }}>
-          <Link href="/assets/new" className="text-link" style={{ padding: "6px 0" }}>+ Add New Asset</Link>
-          <Link href="/projects" className="text-link" style={{ padding: "6px 0" }}>View Projects</Link>
-          <Link href="/maintenance" className="text-link" style={{ padding: "6px 0" }}>Maintenance Queue</Link>
-          <Link href="/assets" className="text-link" style={{ padding: "6px 0" }}>Asset Registry</Link>
-          <Link href="/notifications" className="text-link" style={{ padding: "6px 0" }}>Notifications</Link>
+          <div className="quick-actions-edit-row">
+            <button
+              type="button"
+              className="quick-actions-edit-btn"
+              aria-label="Customize quick actions"
+              onClick={startEditQuickActions}
+            >
+              ✏ Edit
+            </button>
+          </div>
+          {AVAILABLE_QUICK_ACTIONS.filter((a) => activeQuickActionIds.includes(a.id)).map((action) => (
+            <Link key={action.id} href={action.href} className="text-link" style={{ padding: "6px 0" }}>
+              {action.label}
+            </Link>
+          ))}
           {nextDueAssetId ? (
             <Link href={`/assets/${nextDueAssetId}`} className="text-link" style={{ padding: "6px 0" }}>
               Next Due: {nextDueAssetName}

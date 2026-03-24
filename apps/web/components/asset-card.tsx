@@ -1,4 +1,5 @@
 import type { AssetOverview } from "@lifekeeper/types";
+import type { DateFormat } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import {
@@ -11,9 +12,10 @@ import {
 
 type AssetCardProps = {
   asset: AssetOverview;
+  dateFormat?: DateFormat;
 };
 
-export function AssetCard({ asset }: AssetCardProps): JSX.Element {
+export function AssetCard({ asset, dateFormat = "US" }: AssetCardProps): JSX.Element {
   const tone = getAssetTone(asset);
   const subtitle = [asset.asset.manufacturer, asset.asset.model].filter(Boolean).join(" ") || asset.asset.description || "No details yet.";
   const activitySummary = asset.overdueScheduleCount > 0
@@ -21,7 +23,7 @@ export function AssetCard({ asset }: AssetCardProps): JSX.Element {
     : asset.dueScheduleCount > 0
       ? `${asset.dueScheduleCount} ${asset.dueScheduleCount === 1 ? "schedule is" : "schedules are"} due now.`
       : asset.nextDueAt
-        ? `Next scheduled maintenance is ${formatDate(asset.nextDueAt)}.`
+        ? `Next scheduled maintenance is ${formatDate(asset.nextDueAt, undefined, undefined, dateFormat)}.`
         : "No upcoming due date is recorded yet.";
 
   return (
@@ -50,11 +52,11 @@ export function AssetCard({ asset }: AssetCardProps): JSX.Element {
       </td>
 
       <td>
-        <strong>{formatDate(asset.nextDueAt, "No date")}</strong>
+        <strong>{formatDate(asset.nextDueAt, "No date", undefined, dateFormat)}</strong>
       </td>
 
       <td>
-        <strong>{formatDate(asset.lastCompletedAt, "No history")}</strong>
+        <strong>{formatDate(asset.lastCompletedAt, "No history", undefined, dateFormat)}</strong>
       </td>
 
       <td>

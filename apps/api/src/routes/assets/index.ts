@@ -56,14 +56,22 @@ const assetLabelQuerySchema = z.object({
 
 const bulkArchiveBodySchema = z.object({
   householdId: z.string().cuid(),
-  assetIds: z.array(z.string().cuid()).min(1).max(100)
-});
+  assetIds: z.array(z.string().cuid()).optional(),
+  applyToAll: z.boolean().optional(),
+}).refine(
+  (data) => data.applyToAll === true || (data.assetIds !== undefined && data.assetIds.length >= 1),
+  { message: "Either applyToAll must be true or assetIds must have at least one item." }
+);
 
 const bulkReassignCategoryBodySchema = z.object({
   householdId: z.string().cuid(),
-  assetIds: z.array(z.string().cuid()).min(1).max(100),
-  category: assetCategorySchema
-});
+  assetIds: z.array(z.string().cuid()).optional(),
+  applyToAll: z.boolean().optional(),
+  category: assetCategorySchema,
+}).refine(
+  (data) => data.applyToAll === true || (data.assetIds !== undefined && data.assetIds.length >= 1),
+  { message: "Either applyToAll must be true or assetIds must have at least one item." }
+);
 
 const assetExportQuerySchema = z.object({
   householdId: z.string().cuid()
@@ -139,20 +147,37 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
-    const accessible = await app.prisma.asset.findMany({
-      where: {
-        id: { in: input.assetIds },
-        householdId: input.householdId,
-        deletedAt: null,
-        ...personalAssetAccessWhere(request.auth.userId)
-      },
-      select: { id: true, name: true }
-    });
+    let accessible: Array<{ id: string; name: string }>;
+    let failed: Array<{ id: string | undefined; label: string | null; error: string }>;
 
-    const accessibleIds = new Set(accessible.map((a) => a.id));
-    const failed = input.assetIds
-      .filter((id) => !accessibleIds.has(id))
-      .map((id) => ({ id, label: null, error: "Asset not found or not accessible." }));
+    if (input.applyToAll) {
+      accessible = await app.prisma.asset.findMany({
+        where: {
+          householdId: input.householdId,
+          deletedAt: null,
+          isArchived: false,
+          ...personalAssetAccessWhere(request.auth.userId)
+        },
+        select: { id: true, name: true }
+      });
+      failed = [];
+    } else {
+      const assetIds = input.assetIds!;
+      const found = await app.prisma.asset.findMany({
+        where: {
+          id: { in: assetIds },
+          householdId: input.householdId,
+          deletedAt: null,
+          ...personalAssetAccessWhere(request.auth.userId)
+        },
+        select: { id: true, name: true }
+      });
+      const accessibleIds = new Set(found.map((a) => a.id));
+      failed = assetIds
+        .filter((id) => !accessibleIds.has(id))
+        .map((id) => ({ id, label: null, error: "Asset not found or not accessible." }));
+      accessible = found;
+    }
 
     if (accessible.length > 0) {
       await app.prisma.$transaction(async (tx) => {
@@ -162,7 +187,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
         });
       });
 
-            await createActivityLogger(app.prisma, request.auth.userId).log("asset", input.householdId, "asset.bulk_archived", input.householdId, { count: accessible.length, assetIds: accessible.map((a) => a.id) });
+      await createActivityLogger(app.prisma, request.auth.userId).log("asset", input.householdId, "asset.bulk_archived", input.householdId, { count: accessible.length, assetIds: accessible.map((a) => a.id) });
 
       for (const asset of accessible) {
         void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);
@@ -179,20 +204,36 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
-    const accessible = await app.prisma.asset.findMany({
-      where: {
-        id: { in: input.assetIds },
-        householdId: input.householdId,
-        deletedAt: null,
-        ...personalAssetAccessWhere(request.auth.userId)
-      },
-      select: { id: true, name: true }
-    });
+    let accessible: Array<{ id: string; name: string }>;
+    let failed: Array<{ id: string | undefined; label: string | null; error: string }>;
 
-    const accessibleIds = new Set(accessible.map((a) => a.id));
-    const failed = input.assetIds
-      .filter((id) => !accessibleIds.has(id))
-      .map((id) => ({ id, label: null, error: "Asset not found or not accessible." }));
+    if (input.applyToAll) {
+      accessible = await app.prisma.asset.findMany({
+        where: {
+          householdId: input.householdId,
+          deletedAt: null,
+          ...personalAssetAccessWhere(request.auth.userId)
+        },
+        select: { id: true, name: true }
+      });
+      failed = [];
+    } else {
+      const assetIds = input.assetIds!;
+      const found = await app.prisma.asset.findMany({
+        where: {
+          id: { in: assetIds },
+          householdId: input.householdId,
+          deletedAt: null,
+          ...personalAssetAccessWhere(request.auth.userId)
+        },
+        select: { id: true, name: true }
+      });
+      const accessibleIds = new Set(found.map((a) => a.id));
+      failed = assetIds
+        .filter((id) => !accessibleIds.has(id))
+        .map((id) => ({ id, label: null, error: "Asset not found or not accessible." }));
+      accessible = found;
+    }
 
     if (accessible.length > 0) {
       await app.prisma.$transaction(async (tx) => {
@@ -202,7 +243,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
         });
       });
 
-            await createActivityLogger(app.prisma, request.auth.userId).log("asset", input.householdId, "asset.bulk_category_changed", input.householdId, { count: accessible.length, category: input.category, assetIds: accessible.map((a) => a.id) });
+      await createActivityLogger(app.prisma, request.auth.userId).log("asset", input.householdId, "asset.bulk_category_changed", input.householdId, { count: accessible.length, category: input.category, assetIds: accessible.map((a) => a.id) });
 
       for (const asset of accessible) {
         void syncAssetFamilyToSearchIndex(app.prisma, asset.id).catch(console.error);

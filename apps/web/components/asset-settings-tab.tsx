@@ -19,6 +19,7 @@ import {
   formatCategoryLabel,
   formatDateTime
 } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 import { formatTransferTypeLabel } from "../app/(dashboard)/assets/[assetId]/shared";
 
 type AssetSettingsTabProps = {
@@ -40,6 +41,7 @@ export async function AssetSettingsTab({
   householdMembers,
   transferHistory
 }: AssetSettingsTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
   const visiblePresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
   const latestTransfer = transferHistory.items[0] ?? null;
@@ -79,7 +81,7 @@ export async function AssetSettingsTab({
                 <span className="pill">{formatTransferTypeLabel(latestTransfer.transferType)}</span>
               </div>
               <p style={{ margin: "8px 0 0 0", color: "var(--ink-muted)" }}>
-                {formatDateTime(latestTransfer.transferredAt)}
+                {formatDateTime(latestTransfer.transferredAt, undefined, undefined, prefs.dateFormat)}
               </p>
             </div>
           ) : (

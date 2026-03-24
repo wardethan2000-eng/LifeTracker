@@ -9,6 +9,7 @@ import {
   formatDate,
   formatDateTime
 } from "../lib/formatters";
+import { getDisplayPreferences } from "../lib/api";
 import {
   renderMetaRow,
   renderMoneyMetaRow
@@ -22,6 +23,7 @@ type AssetDetailsTabProps = {
 };
 
 export async function AssetDetailsTab({ detail, assetId, libraryPresets, customPresets }: AssetDetailsTabProps): Promise<JSX.Element> {
+  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
   const visibleLibraryPresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
   const visiblePresets = [
@@ -58,7 +60,7 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
         </div>
         <div className="panel__body--padded">
           <dl className="data-list">
-            {renderMoneyMetaRow("Price", detail.asset.purchaseDetails?.price ?? null)}
+            {renderMoneyMetaRow("Price", detail.asset.purchaseDetails?.price ?? null, prefs.currencyCode)}
             {renderMetaRow("Vendor", detail.asset.purchaseDetails?.vendor)}
             {renderMetaRow("Condition", detail.asset.purchaseDetails?.condition ?? null)}
             {renderMetaRow("Financing", detail.asset.purchaseDetails?.financing)}
@@ -76,8 +78,8 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
             {renderMetaRow("Provider", detail.asset.warrantyDetails?.provider)}
             {renderMetaRow("Policy Number", detail.asset.warrantyDetails?.policyNumber)}
             {renderMetaRow("Coverage Type", detail.asset.warrantyDetails?.coverageType)}
-            {renderMetaRow("Start", formatDate(detail.asset.warrantyDetails?.startDate, "Not set"))}
-            {renderMetaRow("End", formatDate(detail.asset.warrantyDetails?.endDate, "Not set"))}
+            {renderMetaRow("Start", formatDate(detail.asset.warrantyDetails?.startDate, "Not set", undefined, prefs.dateFormat))}
+            {renderMetaRow("End", formatDate(detail.asset.warrantyDetails?.endDate, "Not set", undefined, prefs.dateFormat))}
             {renderMetaRow("Notes", detail.asset.warrantyDetails?.notes)}
           </dl>
         </div>
@@ -111,12 +113,12 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
           <dl className="data-list">
             {renderMetaRow("Insurance Provider", detail.asset.insuranceDetails?.provider)}
             {renderMetaRow("Policy Number", detail.asset.insuranceDetails?.policyNumber)}
-            {renderMoneyMetaRow("Coverage Amount", detail.asset.insuranceDetails?.coverageAmount ?? null)}
-            {renderMoneyMetaRow("Deductible", detail.asset.insuranceDetails?.deductible ?? null)}
-            {renderMetaRow("Renewal Date", formatDate(detail.asset.insuranceDetails?.renewalDate, "Not set"))}
+            {renderMoneyMetaRow("Coverage Amount", detail.asset.insuranceDetails?.coverageAmount ?? null, prefs.currencyCode)}
+            {renderMoneyMetaRow("Deductible", detail.asset.insuranceDetails?.deductible ?? null, prefs.currencyCode)}
+            {renderMetaRow("Renewal Date", formatDate(detail.asset.insuranceDetails?.renewalDate, "Not set", undefined, prefs.dateFormat))}
             {renderMetaRow("Disposition Method", detail.asset.dispositionDetails?.method ?? null)}
-            {renderMetaRow("Disposition Date", formatDate(detail.asset.dispositionDetails?.date, "Not set"))}
-            {renderMoneyMetaRow("Sale Price", detail.asset.dispositionDetails?.salePrice ?? null)}
+            {renderMetaRow("Disposition Date", formatDate(detail.asset.dispositionDetails?.date, "Not set", undefined, prefs.dateFormat))}
+            {renderMoneyMetaRow("Sale Price", detail.asset.dispositionDetails?.salePrice ?? null, prefs.currencyCode)}
             {renderMetaRow("Buyer Info", detail.asset.dispositionDetails?.buyerInfo)}
           </dl>
         </div>
@@ -153,7 +155,7 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
                         {entry.notes ?? "No notes recorded."}
                       </p>
                     </div>
-                    <span className="pill">{formatDateTime(entry.assessedAt)}</span>
+                    <span className="pill">{formatDateTime(entry.assessedAt, undefined, undefined, prefs.dateFormat)}</span>
                   </div>
                 </article>
               ))}

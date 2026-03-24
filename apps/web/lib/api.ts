@@ -502,6 +502,7 @@ import {
   layoutPreferenceSchema,
   type LayoutPreference,
   type SaveLayoutPreferenceInput,
+  quickActionItemSchema,
   dashboardPinSchema,
   createDashboardPinSchema,
   type DashboardPin,
@@ -3926,19 +3927,28 @@ export const restoreAsset = async (assetId: string): Promise<Asset> => apiReques
   schema: assetSchema
 });
 
-export const bulkArchiveAssets = async (householdId: string, assetIds: string[]): Promise<BulkAssetOperationResult> =>
+export const bulkArchiveAssets = async (
+  householdId: string,
+  assetIds: string[],
+  opts?: { applyToAll?: boolean }
+): Promise<BulkAssetOperationResult> =>
   apiRequest({
     path: "/v1/assets/bulk/archive",
     method: "POST",
-    body: { householdId, assetIds },
+    body: opts?.applyToAll ? { householdId, applyToAll: true } : { householdId, assetIds },
     schema: bulkAssetOperationResultSchema
   });
 
-export const bulkReassignAssetCategory = async (householdId: string, assetIds: string[], category: AssetCategory): Promise<BulkAssetOperationResult> =>
+export const bulkReassignAssetCategory = async (
+  householdId: string,
+  assetIds: string[],
+  category: AssetCategory,
+  opts?: { applyToAll?: boolean }
+): Promise<BulkAssetOperationResult> =>
   apiRequest({
     path: "/v1/assets/bulk/category",
     method: "POST",
-    body: { householdId, assetIds, category },
+    body: opts?.applyToAll ? { householdId, applyToAll: true, category } : { householdId, assetIds, category },
     schema: bulkAssetOperationResultSchema
   });
 
@@ -6127,6 +6137,23 @@ export const saveLayoutPreference = async (
   body: input,
   schema: layoutPreferenceSchema,
 });
+
+export const getQuickActionsPreference = async (): Promise<string[] | null> => {
+  const pref = await getLayoutPreference("quickactions");
+  if (!pref) return null;
+  return pref.layoutJson.flatMap((item) => {
+    const parsed = quickActionItemSchema.safeParse(item);
+    return parsed.success ? [parsed.data.i] : [];
+  });
+};
+
+export const saveQuickActionsPreference = async (ids: string[]): Promise<void> => {
+  await saveLayoutPreference({
+    entityType: "quickactions",
+    entityId: undefined,
+    layoutJson: ids.map((i) => ({ i })),
+  });
+};
 
 export const getDashboardPins = async (): Promise<DashboardPin[]> =>
   apiRequest({
