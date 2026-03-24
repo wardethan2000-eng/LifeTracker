@@ -16,7 +16,7 @@ import {
   updateAssetSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
-import QRCode from "qrcode";
+import { sendQrCode } from "../../lib/qr.js";
 import { z } from "zod";
 import {
   requireHouseholdMembership,
@@ -349,27 +349,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     const assetTag = asset.assetTag ?? await ensureAssetTag(app.prisma, asset.id);
     const payloadUrl = buildAssetScanUrl(assetTag);
 
-    if (query.format === "svg") {
-      const svg = await QRCode.toString(payloadUrl, {
-        type: "svg",
-        width: query.size,
-        margin: 1
-      });
-
-      return reply
-        .header("content-type", "image/svg+xml; charset=utf-8")
-        .send(svg);
-    }
-
-    const png = await QRCode.toBuffer(payloadUrl, {
-      type: "png",
-      width: query.size,
-      margin: 1
-    });
-
-    return reply
-      .header("content-type", "image/png")
-      .send(png);
+    return sendQrCode(reply, payloadUrl, { format: query.format, size: query.size });
   });
 
   app.get("/v1/assets/:assetId/label/data", async (request, reply) => {
