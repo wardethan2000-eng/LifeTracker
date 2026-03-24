@@ -5,7 +5,7 @@ import { resolveBarcode } from "../lib/barcode-lookup.js";
 
 export const barcodeRoutes: FastifyPluginAsync = async (app) => {
   app.post("/v1/barcode/lookup", async (request, reply) => {
-    if (await enforceRateLimit(reply, {
+    if (await enforceRateLimit(request, reply, {
       scope: "barcode",
       key: buildRateLimitKey(request, request.auth.userId),
       max: 20,

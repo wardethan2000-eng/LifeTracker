@@ -16,6 +16,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";
+import { applyTier } from "../../lib/rate-limit-tiers.js";
 import {
   filterReportCyclesInRange,
   summarizeCycles
@@ -1248,6 +1249,7 @@ const toExportRecords = <T>(rows: T[]): Record<string, unknown>[] => rows.map((r
 
 export const exportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets/:assetId/export/pdf", async (request, reply) => {
+    if (await applyTier(request, reply, "pdf-export")) return reply;
     const params = assetParamsSchema.parse(request.params);
     const query = dateRangeQuerySchema.parse(request.query);
     const range = toOptionalDateRange(query);
@@ -1286,6 +1288,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/assets/:assetId/export/compliance-pdf", async (request, reply) => {
+    if (await applyTier(request, reply, "pdf-export")) return reply;
     const params = assetParamsSchema.parse(request.params);
     const query = dateRangeQuerySchema.parse(request.query);
     const range = toOptionalDateRange(query);
@@ -1308,6 +1311,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/assets/:assetId/export/csv", async (request, reply) => {
+    if (await applyTier(request, reply, "bulk-export")) return reply;
     const params = assetParamsSchema.parse(request.params);
     const query = assetCsvQuerySchema.parse(request.query);
     const asset = await getAccessibleAsset(app.prisma, params.assetId, request.auth.userId);
@@ -1474,6 +1478,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/households/:householdId/export/csv", async (request, reply) => {
+    if (await applyTier(request, reply, "bulk-export")) return reply;
     const params = householdParamsSchema.parse(request.params);
     const query = householdCsvQuerySchema.parse(request.query);
 
@@ -1621,6 +1626,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/households/:householdId/export/annual-cost-pdf", async (request, reply) => {
+    if (await applyTier(request, reply, "pdf-export")) return reply;
     const params = householdParamsSchema.parse(request.params);
     const query = annualCostPdfQuerySchema.parse(request.query);
 
@@ -1640,6 +1646,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/households/:householdId/export/inventory-valuation-pdf", async (request, reply) => {
+    if (await applyTier(request, reply, "pdf-export")) return reply;
     const params = householdParamsSchema.parse(request.params);
 
     if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
@@ -1658,6 +1665,7 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/v1/households/:householdId/export/json", async (request, reply) => {
+    if (await applyTier(request, reply, "bulk-export")) return reply;
     const params = householdParamsSchema.parse(request.params);
 
     if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {

@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { useCallback, useRef, useState, useTransition } from "react";
 import type { IdeaNoteItem } from "@lifekeeper/types";
 import { addIdeaNoteAction, removeIdeaNoteAction } from "../app/actions";
+import { useTimezone } from "../lib/timezone-context";
 import { Card } from "./card";
 
 type IdeaNotesLogProps = {
@@ -12,25 +13,28 @@ type IdeaNotesLogProps = {
   notes: IdeaNoteItem[];
 };
 
-function formatNoteDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export function IdeaNotesLog({ householdId, ideaId, notes }: IdeaNotesLogProps): JSX.Element {
   const [localNotes, setLocalNotes] = useState<IdeaNoteItem[]>(notes);
+  const { timezone } = useTimezone();
+
+  const formatNoteDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: timezone,
+    }).format(date);
+  };
+
   const [text, setText] = useState("");
   const [isPending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);

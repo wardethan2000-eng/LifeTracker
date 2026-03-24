@@ -7,6 +7,7 @@ import { useCallback, useState, useTransition } from "react";
 import type { IdeaPromotionTarget } from "@lifekeeper/types";
 import { promoteIdeaAction, updateIdeaAction } from "../app/actions";
 import { Card } from "./card";
+import { useFormattedDate } from "../lib/formatted-date";
 
 const targetLabels: Record<string, string> = {
   project: "Project",
@@ -67,6 +68,7 @@ export function IdeaPromotionCard({
   demotedFromId,
 }: IdeaPromotionCardProps): JSX.Element {
   const router = useRouter();
+  const { formatDate } = useFormattedDate();
   const [localTarget, setLocalTarget] = useState<IdeaPromotionTarget | null>(promotionTarget);
   const [showPromoteForm, setShowPromoteForm] = useState(false);
   const [promoteName, setPromoteName] = useState(title);
@@ -100,11 +102,7 @@ export function IdeaPromotionCard({
 
   // Already promoted
   if (promotedAt && promotedToType && promotedToId) {
-    const formattedDate = new Date(promotedAt).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    const formattedDate = formatDate(promotedAt);
     return (
       <Card title="Promotion">
         <div style={{ fontSize: "0.85rem" }}>

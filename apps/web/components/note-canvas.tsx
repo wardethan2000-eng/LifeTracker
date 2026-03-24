@@ -10,6 +10,7 @@ import {
 } from "../app/actions";
 import { ConfirmActionForm } from "./confirm-action-form";
 import { RichEditor } from "./rich-editor";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type NoteCanvasProps = {
   householdId: string;
@@ -111,6 +112,7 @@ function NoteCard({
   note: ProjectNote;
   phases: { id: string; name: string }[];
 }) {
+  const { formatDate } = useFormattedDate();
   const [title, setTitle] = useState(note.title);
   const [body, setBody] = useState(note.body);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,11 +153,7 @@ function NoteCard({
     [title, debouncedSave]
   );
 
-  const createdDate = new Date(note.createdAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const createdDate = formatDate(note.createdAt);
 
   return (
     <div className={`note-card${note.isPinned ? " note-card--pinned" : ""}`}>

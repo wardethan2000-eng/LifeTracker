@@ -83,6 +83,8 @@ import { webhookRoutes } from "./routes/webhooks/index.js";
 import { layoutPreferenceRoutes } from "./routes/layout-preferences.js";
 import { dashboardPinRoutes } from "./routes/dashboard-pins.js";
 import { ensureLegacyEntriesMigrated } from "./services/legacy-migration.js";
+import { enforceRateLimit } from "./lib/rate-limit.js";
+import { applyTier } from "./lib/rate-limit-tiers.js";
 
 const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPluginAsync[]) => {
   for (const plugin of plugins) {
@@ -119,16 +121,10 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   presetRoutes,
   serviceProviderRoutes,
   activityLogRoutes,
-  complianceAnalyticsRoutes,
-  comparativeAnalyticsRoutes,
-  hobbyAnalyticsRoutes,
-  projectAnalyticsRoutes,
   commentRoutes,
-  costAnalyticsRoutes,
   entryRoutes,
   exportRoutes,
   invitationRoutes,
-  projectBudgetAnalyticsRoutes,
   webhookRoutes,
   hobbyRoutes,
   hobbySeriesRoutes,
@@ -155,6 +151,17 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   hobbyExportRoutes
 ];
 
+// Analytics routes registered in a dedicated sub-scope so a preHandler hook can apply
+// the heavy-analytics rate limit tier to the entire group without per-route boilerplate.
+const householdAnalyticsRoutePlugins: FastifyPluginAsync[] = [
+  complianceAnalyticsRoutes,
+  comparativeAnalyticsRoutes,
+  hobbyAnalyticsRoutes,
+  projectAnalyticsRoutes,
+  costAnalyticsRoutes,
+  projectBudgetAnalyticsRoutes
+];
+
 const assetRoutePlugins: FastifyPluginAsync[] = [
   assetRoutes,
   assetInventoryRoutes,
@@ -162,7 +169,6 @@ const assetRoutePlugins: FastifyPluginAsync[] = [
   timelineRoutes,
   assetTransferRoutes,
   usageMetricRoutes,
-  usageMetricAnalyticsRoutes,
   scheduleRoutes,
   scheduleBulkRoutes,
   scheduleInventoryRoutes,
@@ -196,6 +202,19 @@ export const buildApp = () => {
   app.register(storagePlugin);
   app.register(errorHandlerPlugin);
   app.register(async (authenticatedApp) => {
+    // Per-user rate limit: every authenticated user gets an individual 200 req/min budget,
+    // on top of the global IP-based limit from securityPlugin.
+    const userRateLimitMax = Math.max(1, parseInt(process.env.USER_RATE_LIMIT_MAX ?? "200", 10) || 200);
+    authenticatedApp.addHook("preHandler", async (request, reply) => {
+      await enforceRateLimit(request, reply, {
+        scope: "user",
+        key: `user:${request.auth.userId}`,
+        max: userRateLimitMax,
+        windowMs: 60_000,
+        message: "Per-user rate limit exceeded. Try again shortly."
+      });
+    });
+
     authenticatedApp.addHook("preHandler", async (request) => {
       const params = request.params as Record<string, string | undefined>;
       const householdId = params.householdId;
@@ -206,9 +225,24 @@ export const buildApp = () => {
     await registerRouteGroup(authenticatedApp, accountRoutePlugins);
     await authenticatedApp.register(async (householdScope) => {
       await registerRouteGroup(householdScope, householdRoutePlugins);
+      // Analytics sub-scope: all analytics routes share the heavy-analytics tier limit
+      // (10 req/min per user) to protect expensive aggregation queries.
+      await householdScope.register(async (analyticsScope) => {
+        analyticsScope.addHook("preHandler", async (request, reply) => {
+          await applyTier(request, reply, "heavy-analytics");
+        });
+        await registerRouteGroup(analyticsScope, householdAnalyticsRoutePlugins);
+      });
     });
     await authenticatedApp.register(async (assetScope) => {
       await registerRouteGroup(assetScope, assetRoutePlugins);
+      // Asset analytics sub-scope: usage metric analytics inherits the same tier.
+      await assetScope.register(async (assetAnalyticsScope) => {
+        assetAnalyticsScope.addHook("preHandler", async (request, reply) => {
+          await applyTier(request, reply, "heavy-analytics");
+        });
+        await assetAnalyticsScope.register(usageMetricAnalyticsRoutes);
+      });
     });
     await authenticatedApp.register(async (projectScope) => {
       await registerRouteGroup(projectScope, projectRoutePlugins);

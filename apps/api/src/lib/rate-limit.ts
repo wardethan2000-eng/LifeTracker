@@ -127,7 +127,7 @@ const setRateLimitHeaders = (reply: FastifyReply, policy: RateLimitPolicy, state
   reply.header("x-ratelimit-reset", Math.ceil(state.resetAt / 1000).toString());
 };
 
-export const enforceRateLimit = async (reply: FastifyReply, policy: RateLimitPolicy): Promise<boolean> => {
+export const enforceRateLimit = async (request: FastifyRequest, reply: FastifyReply, policy: RateLimitPolicy): Promise<boolean> => {
   const state = await evaluateRateLimit(policy);
   setRateLimitHeaders(reply, policy, state);
 
@@ -137,7 +137,23 @@ export const enforceRateLimit = async (reply: FastifyReply, policy: RateLimitPol
 
   const retryAfterSeconds = Math.max(1, Math.ceil((state.resetAt - Date.now()) / 1000));
   reply.header("retry-after", retryAfterSeconds.toString());
-  void reply.code(429).send({ message: policy.message });
+  const auth = request.auth as { userId?: string } | undefined;
+  request.log.warn({
+    event: "rate_limit_exceeded",
+    userId: auth?.userId ?? null,
+    ip: request.ip,
+    scope: policy.scope,
+    limit: policy.max,
+    windowMs: policy.windowMs,
+    path: request.url
+  }, "Rate limit exceeded");
+  void reply.code(429).send({
+    message: policy.message,
+    retryAfter: retryAfterSeconds,
+    scope: policy.scope,
+    limit: policy.max,
+    windowSeconds: Math.ceil(policy.windowMs / 1000)
+  });
   return true;
 };
 

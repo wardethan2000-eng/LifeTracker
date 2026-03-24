@@ -15,6 +15,9 @@ import {
   SectionFilterProvider,
   SectionFilterToggle
 } from "./section-filter";
+import { useFormattedDate } from "../lib/formatted-date";
+import { toHouseholdDateInputValue, fromHouseholdDateInput } from "../lib/date-input-utils";
+import { useTimezone } from "../lib/timezone-context";
 
 type HobbyMetricsManagerProps = {
   householdId: string;
@@ -36,7 +39,11 @@ type ReadingDraft = {
   notes: string;
 };
 
-const todayInputValue = (): string => new Date().toISOString().slice(0, 10);
+const emptyReadingDraft = (timezone = "UTC"): ReadingDraft => ({
+  value: "",
+  readingDate: toHouseholdDateInputValue(new Date().toISOString(), timezone),
+  notes: "",
+});
 
 const emptyMetricDraft = (): MetricDraft => ({
   name: "",
@@ -45,24 +52,14 @@ const emptyMetricDraft = (): MetricDraft => ({
   metricType: "numeric",
 });
 
-const emptyReadingDraft = (): ReadingDraft => ({
-  value: "",
-  readingDate: todayInputValue(),
-  notes: "",
-});
-
-const toIsoDate = (value: string): string => new Date(`${value}T00:00:00.000Z`).toISOString();
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
 export function HobbyMetricsManager({
   householdId,
   hobbyId,
   initialMetrics,
   initialReadingsMap,
 }: HobbyMetricsManagerProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
+  const { timezone } = useTimezone();
   const [metrics, setMetrics] = useState(initialMetrics);
   const [readingsMap, setReadingsMap] = useState(initialReadingsMap);
   const [newMetric, setNewMetric] = useState<MetricDraft>(emptyMetricDraft());
@@ -72,7 +69,7 @@ export function HobbyMetricsManager({
   const [error, setError] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
 
-  const getReadingDraft = (metricId: string): ReadingDraft => readingDrafts[metricId] ?? emptyReadingDraft();
+  const getReadingDraft = (metricId: string): ReadingDraft => readingDrafts[metricId] ?? emptyReadingDraft(timezone);
 
   const handleCreateMetric = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -167,14 +164,14 @@ export function HobbyMetricsManager({
     try {
       const created = await createHobbyMetricReading(householdId, hobbyId, metric.id, {
         value: Number(draft.value),
-        readingDate: toIsoDate(draft.readingDate),
+        readingDate: fromHouseholdDateInput(draft.readingDate, timezone) ?? new Date().toISOString(),
         ...(draft.notes.trim() ? { notes: draft.notes.trim() } : {}),
       });
       setReadingsMap((current) => ({
         ...current,
         [metric.id]: [created, ...(current[metric.id] ?? [])],
       }));
-      setReadingDrafts((current) => ({ ...current, [metric.id]: emptyReadingDraft() }));
+      setReadingDrafts((current) => ({ ...current, [metric.id]: emptyReadingDraft(timezone) }));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to record reading.");
     } finally {

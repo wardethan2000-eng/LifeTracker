@@ -2,6 +2,7 @@ import { searchQuerySchema, searchResponseSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
+import { applyTier } from "../../lib/rate-limit-tiers.js";
 import { querySearchIndex } from "../../lib/search-index.js";
 
 const householdParamsSchema = z.object({
@@ -10,6 +11,7 @@ const householdParamsSchema = z.object({
 
 export const searchRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/search", async (request, reply) => {
+    if (await applyTier(request, reply, "search")) return reply;
     const params = householdParamsSchema.parse(request.params);
     const query = searchQuerySchema.parse(request.query);
 

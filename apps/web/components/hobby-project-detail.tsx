@@ -25,6 +25,9 @@ import {
 } from "../lib/api";
 import { EntryTimeline, EntryTipsSurface } from "./entry-system";
 import { CategoryAccordionList } from "./category-accordion-list";
+import { useFormattedDate } from "../lib/formatted-date";
+import { toHouseholdDateInputValue, fromHouseholdDateInput } from "../lib/date-input-utils";
+import { useTimezone } from "../lib/timezone-context";
 
 type HobbyProjectDetailProps = {
   householdId: string;
@@ -35,15 +38,6 @@ type HobbyProjectDetailProps = {
 };
 
 type MilestoneDraft = Record<string, { name: string; description: string; status: MilestoneStatus; targetDate: string; completedDate: string }>;
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function toDateInputValue(value: string | null | undefined): string {
-  return value ? new Date(value).toISOString().slice(0, 10) : "";
-}
 
 function formatDuration(minutes: number | null | undefined): string {
   if (minutes == null) return "-";
@@ -88,6 +82,8 @@ function statusIcon(status: MilestoneStatus): string {
 }
 
 export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workLogs, availableInventoryItems }: HobbyProjectDetailProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
+  const { timezone } = useTimezone();
   const router = useRouter();
   const [projectState, setProjectState] = useState(project);
   const [materials, setMaterials] = useState(project.inventoryItems);
@@ -98,19 +94,19 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
     description: project.description ?? "",
     status: project.status,
     difficulty: project.difficulty ?? "",
-    startDate: toDateInputValue(project.startDate),
-    targetEndDate: toDateInputValue(project.targetEndDate),
+    startDate: toHouseholdDateInputValue(project.startDate, timezone),
+    targetEndDate: toHouseholdDateInputValue(project.targetEndDate, timezone),
   });
   const [expandedMilestoneId, setExpandedMilestoneId] = useState<string | null>(project.milestones[0]?.id ?? null);
   const [milestoneDrafts, setMilestoneDrafts] = useState<MilestoneDraft>(() => Object.fromEntries(project.milestones.map((milestone) => [milestone.id, {
     name: milestone.name,
     description: milestone.description ?? "",
     status: milestone.status,
-    targetDate: toDateInputValue(milestone.targetDate),
-    completedDate: toDateInputValue(milestone.completedDate),
+    targetDate: toHouseholdDateInputValue(milestone.targetDate, timezone),
+    completedDate: toHouseholdDateInputValue(milestone.completedDate, timezone),
   }])));
   const [newMilestone, setNewMilestone] = useState({ name: "", description: "", targetDate: "" });
-  const [quickLog, setQuickLog] = useState({ date: toDateInputValue(new Date().toISOString()), durationMinutes: "", description: "", milestoneId: "" });
+  const [quickLog, setQuickLog] = useState({ date: toHouseholdDateInputValue(new Date().toISOString(), timezone), durationMinutes: "", description: "", milestoneId: "" });
   const [materialDraft, setMaterialDraft] = useState({ inventoryItemId: "", quantityNeeded: "1", quantityUsed: "0", notes: "" });
   const [consumptionDrafts, setConsumptionDrafts] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
@@ -146,8 +142,8 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
         description: headerDraft.description || null,
         status: headerDraft.status,
         difficulty: headerDraft.difficulty || null,
-        startDate: headerDraft.startDate ? new Date(`${headerDraft.startDate}T00:00:00.000Z`).toISOString() : null,
-        targetEndDate: headerDraft.targetEndDate ? new Date(`${headerDraft.targetEndDate}T00:00:00.000Z`).toISOString() : null,
+        startDate: fromHouseholdDateInput(headerDraft.startDate, timezone),
+        targetEndDate: fromHouseholdDateInput(headerDraft.targetEndDate, timezone),
       });
       setProjectState((current) => ({ ...current, ...updated }));
       setIsEditingHeader(false);
@@ -171,8 +167,8 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
         name: draft.name,
         description: draft.description || null,
         status: draft.status,
-        targetDate: draft.targetDate ? new Date(`${draft.targetDate}T00:00:00.000Z`).toISOString() : null,
-        completedDate: draft.completedDate ? new Date(`${draft.completedDate}T00:00:00.000Z`).toISOString() : null,
+        targetDate: fromHouseholdDateInput(draft.targetDate, timezone),
+        completedDate: fromHouseholdDateInput(draft.completedDate, timezone),
       });
       setProjectState((current) => ({
         ...current,
@@ -197,7 +193,7 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
       const created = await createHobbyProjectMilestone(householdId, hobbyId, projectState.id, {
         name: newMilestone.name.trim(),
         description: newMilestone.description.trim() || undefined,
-        targetDate: newMilestone.targetDate ? new Date(`${newMilestone.targetDate}T00:00:00.000Z`).toISOString() : undefined,
+        targetDate: fromHouseholdDateInput(newMilestone.targetDate, timezone) ?? undefined,
         sortOrder: orderedMilestones.length,
       });
       setProjectState((current) => ({ ...current, milestones: [...current.milestones, created] }));
@@ -207,8 +203,8 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
           name: created.name,
           description: created.description ?? "",
           status: created.status,
-          targetDate: toDateInputValue(created.targetDate),
-          completedDate: toDateInputValue(created.completedDate),
+          targetDate: toHouseholdDateInputValue(created.targetDate, timezone),
+          completedDate: toHouseholdDateInputValue(created.completedDate, timezone),
         },
       }));
       setNewMilestone({ name: "", description: "", targetDate: "" });
@@ -252,7 +248,7 @@ export function HobbyProjectDetailSurface({ householdId, hobbyId, project, workL
     setMessage(null);
     try {
       const created = await createHobbyProjectWorkLog(householdId, hobbyId, projectState.id, {
-        date: new Date(`${quickLog.date}T00:00:00.000Z`).toISOString(),
+        date: fromHouseholdDateInput(quickLog.date, timezone) ?? new Date().toISOString(),
         durationMinutes: quickLog.durationMinutes.trim() ? Number(quickLog.durationMinutes) : undefined,
         description: quickLog.description.trim(),
         ...(quickLog.milestoneId ? { milestoneId: quickLog.milestoneId } : {}),

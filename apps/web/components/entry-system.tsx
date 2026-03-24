@@ -31,6 +31,9 @@ import {
   getSurfacedEntries,
   updateEntry
 } from "../lib/api";
+import { toHouseholdDateTimeInputValue, fromHouseholdDateTimeInput } from "../lib/date-input-utils";
+import { useFormattedDate } from "../lib/formatted-date";
+import { useTimezone } from "../lib/timezone-context";
 
 type EntryEditorProps = {
   householdId: string;
@@ -118,30 +121,6 @@ const flagOptions: Array<{ value: EntryFlag; label: string; tone: "accent" | "wa
 
 const emptyMeasurement = (): EntryMeasurement => ({ name: "", value: 0, unit: "" });
 
-const toLocalDateTimeValue = (value?: string | null): string => {
-  const parsed = value ? new Date(value) : new Date();
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  const offsetMinutes = parsed.getTimezoneOffset();
-  return new Date(parsed.getTime() - offsetMinutes * 60_000).toISOString().slice(0, 16);
-};
-
-const toIsoDateTime = (value: string): string => {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
-};
-
-const formatDateTime = (value: string): string => new Date(value).toLocaleString(undefined, {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit"
-});
-
 const truncate = (value: string, maxLength: number): string => (
   value.length <= maxLength ? value : `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
 );
@@ -155,10 +134,10 @@ const normalizeFlags = (flags: EntryFlag[]): EntryFlag[] => {
   return ordered;
 };
 
-const buildEntryDraft = (entry?: Entry): EntryDraft => ({
+const buildEntryDraft = (entry: Entry | undefined, timezone: string): EntryDraft => ({
   title: entry?.title ?? "",
   body: entry?.body ?? "",
-  entryDate: toLocalDateTimeValue(entry?.entryDate),
+  entryDate: toHouseholdDateTimeInputValue(entry?.entryDate, timezone),
   entryType: entry?.entryType ?? "note",
   flags: normalizeFlags(entry?.flags ?? []),
   tags: entry?.tags ?? [],
@@ -362,7 +341,8 @@ export function EntryEditor({
   submitLabel,
   chrome = "inline"
 }: EntryEditorProps): JSX.Element {
-  const [draft, setDraft] = useState<EntryDraft>(() => buildEntryDraft(initialEntry));
+  const { timezone } = useTimezone();
+  const [draft, setDraft] = useState<EntryDraft>(() => buildEntryDraft(initialEntry, timezone));
   const [tagInput, setTagInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -374,11 +354,11 @@ export function EntryEditor({
   const measurementUnitListId = useId();
 
   useEffect(() => {
-    setDraft(buildEntryDraft(initialEntry));
+    setDraft(buildEntryDraft(initialEntry, timezone));
     setMeasurementsOpen((initialEntry?.entryType ?? "note") === "measurement" || (initialEntry?.measurements.length ?? 0) > 0);
     setTagInput("");
     setError(null);
-  }, [initialEntry]);
+  }, [initialEntry, timezone]);
 
   useEffect(() => {
     if (draft.entryType === "measurement") {
@@ -436,7 +416,7 @@ export function EntryEditor({
       const input = {
         ...(draft.title.trim() ? { title: draft.title.trim() } : { title: null }),
         body: draft.body.trim(),
-        entryDate: toIsoDateTime(draft.entryDate),
+        entryDate: fromHouseholdDateTimeInput(draft.entryDate, timezone) ?? new Date().toISOString(),
         entryType: draft.entryType,
         measurements,
         tags: draft.tags,
@@ -453,7 +433,7 @@ export function EntryEditor({
         onSaved?.(saved, "update");
       } else {
         saved = await createEntry(householdId, { ...input, entityType, entityId });
-        setDraft(buildEntryDraft(undefined));
+        setDraft(buildEntryDraft(undefined, timezone));
         setMeasurementsOpen(draft.entryType === "measurement");
         onSaved?.(saved, "create");
       }
@@ -724,6 +704,7 @@ export function EntryTimeline({
   entryHrefBuilder,
   entryHrefTemplate
 }: EntryTimelineProps): JSX.Element {
+  const { formatDateTime } = useFormattedDate();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1179,6 +1160,7 @@ export function EntryTipsSurface({
   entryHrefTemplate,
   defaultOpen = true
 }: EntryTipsSurfaceProps): JSX.Element {
+  const { formatDateTime } = useFormattedDate();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(defaultOpen);
@@ -1285,6 +1267,7 @@ export function EntryActionableList({
   entryHrefBuilder,
   entryHrefStrategy
 }: EntryActionableListProps): JSX.Element {
+  const { formatDateTime } = useFormattedDate();
   const [groups, setGroups] = useState<ActionableEntryGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

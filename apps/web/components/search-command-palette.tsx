@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHouseholdSpaces, searchHousehold } from "../lib/api";
+import { useTimezone } from "../lib/timezone-context";
 import { getSpaceTypeBadge, getSpaceTypeLabel } from "../lib/spaces";
 
 type SearchCommandPaletteProps = {
@@ -22,7 +23,7 @@ const FILTER_OPTIONS: Array<{ value: SearchFilter; label: string }> = [
 
 const formatEntityType = (group: SearchResultGroup): string => group.label;
 
-const formatDateTime = (value: string | null | undefined): string | null => {
+const formatDateTime = (value: string | null | undefined, timeZone?: string): string | null => {
   if (!value) {
     return null;
   }
@@ -33,11 +34,12 @@ const formatDateTime = (value: string | null | undefined): string | null => {
     return null;
   }
 
-  return date.toLocaleDateString(undefined, {
+  return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
-    year: "numeric"
-  });
+    year: "numeric",
+    timeZone,
+  }).format(date);
 };
 
 const getSearchOptionsForFilter = (filter: SearchFilter): {
@@ -56,7 +58,7 @@ const getSearchOptionsForFilter = (filter: SearchFilter): {
   }
 };
 
-const resultMeta = (result: SearchResult): string[] => {
+const resultMeta = (result: SearchResult, timezone?: string): string[] => {
   const parts: string[] = [];
 
   if (result.entityType === "space") {
@@ -69,7 +71,7 @@ const resultMeta = (result: SearchResult): string[] => {
 
   if (result.entityType === "historical_inventory_item") {
     const removedAt = typeof result.entityMeta?.removedAt === "string"
-      ? formatDateTime(result.entityMeta.removedAt)
+      ? formatDateTime(result.entityMeta.removedAt, timezone)
       : null;
 
     if (removedAt) {
@@ -85,7 +87,7 @@ const resultMeta = (result: SearchResult): string[] => {
 
   if (result.entityType === "log") {
     const completedAt = typeof result.entityMeta?.completedAt === "string"
-      ? formatDateTime(result.entityMeta.completedAt)
+      ? formatDateTime(result.entityMeta.completedAt, timezone)
       : null;
 
     if (completedAt) {
@@ -104,7 +106,7 @@ const resultMeta = (result: SearchResult): string[] => {
   return parts;
 };
 
-const resultSecondaryLine = (result: SearchResult): string | null => {
+const resultSecondaryLine = (result: SearchResult, timezone?: string): string | null => {
   if (result.entityType === "space") {
     const breadcrumb = typeof result.entityMeta?.breadcrumb === "string" ? result.entityMeta.breadcrumb : null;
     return breadcrumb;
@@ -115,7 +117,7 @@ const resultSecondaryLine = (result: SearchResult): string | null => {
       ? result.entityMeta.lastSpaceBreadcrumb
       : null;
     const removedAt = typeof result.entityMeta?.removedAt === "string"
-      ? formatDateTime(result.entityMeta.removedAt)
+      ? formatDateTime(result.entityMeta.removedAt, timezone)
       : null;
 
     if (breadcrumb && removedAt) {
@@ -135,6 +137,7 @@ const resultSecondaryLine = (result: SearchResult): string | null => {
 export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPaletteProps): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { timezone } = useTimezone();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -515,8 +518,8 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                     <div className="search-palette__results">
                       {group.results.map((result, index) => {
                         const absoluteIndex = itemOffset + index;
-                        const metadata = resultMeta(result);
-                        const secondaryLine = resultSecondaryLine(result);
+                        const metadata = resultMeta(result, timezone);
+                        const secondaryLine = resultSecondaryLine(result, timezone);
                         const isActive = absoluteIndex + actionCount === activeIndex;
                         const isHistorical = result.entityType === "historical_inventory_item";
                         const spaceType = typeof result.entityMeta?.type === "string"

@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import type { IdeaCategory, IdeaPriority, IdeaStage, IdeaSummary } from "@lifekeeper/types";
 import { updateIdeaStageAction, deleteIdeaAction } from "../app/actions";
 import { useMultiSelect } from "../lib/use-multi-select";
+import { useFormattedDate } from "../lib/formatted-date";
 import { BulkActionBar } from "./bulk-action-bar";
 import { IdeaBulkActions } from "./idea-bulk-actions";
 
@@ -44,6 +45,7 @@ type IdeaListProps = {
 };
 
 export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [stageFilter, setStageFilter] = useState<IdeaStage | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -408,10 +410,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                         : "-"}
                     </td>
                     <td>
-                      {new Date(idea.createdAt).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {formatDate(idea.createdAt)}
                     </td>
                     <td>
                       <button

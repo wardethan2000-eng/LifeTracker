@@ -7,15 +7,11 @@ import {
   getHobbyDetail,
   getMe,
 } from "../../../../../lib/api";
+import { formatDate } from "../../../../../lib/formatters";
 
 type HobbySectionPageProps = {
   params: Promise<{ hobbyId: string }>;
 };
-
-function formatDate(iso: string | null | undefined, fallback = "-"): string {
-  if (!iso) return fallback;
-  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
 
 function statusBadgeClass(status: string): string {
   switch (status) {
@@ -55,8 +51,8 @@ export default async function HobbySettingsPage({ params }: HobbySectionPageProp
               {hobby.hobbyType ? <div><dt>Hobby Type</dt><dd>{hobby.hobbyType}</dd></div> : null}
               <div><dt>Workflow</dt><dd>{isPipeline ? "Pipeline workflow" : "Simple status"}</dd></div>
               <div><dt>Notes</dt><dd>{hobby.notes ?? "Not set"}</dd></div>
-              <div><dt>Created</dt><dd>{formatDate(hobby.createdAt)}</dd></div>
-              <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt)}</dd></div>
+              <div><dt>Created</dt><dd>{formatDate(hobby.createdAt, "-", household.timezone)}</dd></div>
+              <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt, "-", household.timezone)}</dd></div>
             </dl>
             <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "16px" }}>
               {isPipeline

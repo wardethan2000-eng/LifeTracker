@@ -10,6 +10,7 @@ import type {
 import Link from "next/link";
 import { LkLineChart } from "./charts";
 import { EntryTimeline } from "./entry-system";
+import { useFormattedDate } from "../lib/formatted-date";
 import type { JSX } from "react";
 
 type HobbyPracticeGoalDetailProps = {
@@ -26,11 +27,6 @@ type HobbyPracticeRoutineDetailProps = {
   compliance: HobbyPracticeRoutineComplianceSummary;
   sessions: HobbySessionSummary[];
 };
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
 
 function formatMinutes(value: number | null | undefined): string {
   if (value == null) return "-";
@@ -80,6 +76,7 @@ function routineCells(summary: HobbyPracticeRoutineComplianceSummary): Array<{ d
 }
 
 export function HobbyPracticeGoalDetail({ householdId, hobbyId, goal, sessions, metrics }: HobbyPracticeGoalDetailProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const metricName = goal.metricDefinitionId ? metrics.find((metric) => metric.id === goal.metricDefinitionId)?.name ?? "Linked metric" : null;
   const sessionMap = new Map(sessions.map((session) => [session.id, session]));
   const relatedSessions = goal.progressHistory
@@ -176,6 +173,7 @@ export function HobbyPracticeGoalDetail({ householdId, hobbyId, goal, sessions, 
 }
 
 export function HobbyPracticeRoutineDetail({ hobbyId, routine, compliance, sessions }: HobbyPracticeRoutineDetailProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const relatedSessions = sessions
     .filter((session) => session.routineId === routine.id)
     .sort((left, right) => new Date(right.completedDate ?? right.createdAt).getTime() - new Date(left.completedDate ?? left.createdAt).getTime());

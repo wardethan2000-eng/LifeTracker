@@ -31,6 +31,8 @@ import {
   updateHobbySessionStep,
 } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
+import { toHouseholdDateInputValue, fromHouseholdDateInput } from "../lib/date-input-utils";
+import { useTimezone } from "../lib/timezone-context";
 import { Card } from "./card";
 import { EntryTipsSurface } from "./entry-system";
 import { HobbySessionStageManager } from "./hobby-session-stage-manager";
@@ -63,7 +65,11 @@ type MetricFormState = {
   notes: string;
 };
 
-const todayInputValue = (): string => new Date().toISOString().slice(0, 10);
+const defaultMetricForm = (timezone = "UTC"): MetricFormState => ({
+  value: "",
+  readingDate: toHouseholdDateInputValue(new Date().toISOString(), timezone),
+  notes: "",
+});
 
 const defaultIngredientForm = (): IngredientFormState => ({
   name: "",
@@ -71,12 +77,6 @@ const defaultIngredientForm = (): IngredientFormState => ({
   unit: "",
   unitCost: "",
   inventoryItemId: "",
-  notes: "",
-});
-
-const defaultMetricForm = (): MetricFormState => ({
-  value: "",
-  readingDate: todayInputValue(),
   notes: "",
 });
 
@@ -136,10 +136,6 @@ function formatCurrency(value: number | null | undefined): string {
   }).format(value);
 }
 
-function toIsoDate(value: string): string {
-  return new Date(`${value}T00:00:00.000Z`).toISOString();
-}
-
 function statusBadgeClass(status: string): string {
   switch (status) {
     case "active":
@@ -183,6 +179,7 @@ export function HobbySessionDetail({
   deleteHobbySessionAction,
 }: HobbySessionDetailProps): JSX.Element {
   const { formatDate, formatDateTime } = useFormattedDate();
+  const { timezone } = useTimezone();
   const [sessionState, setSessionState] = useState(session);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingStepIds, setPendingStepIds] = useState<string[]>([]);
@@ -292,7 +289,7 @@ export function HobbySessionDetail({
     ingredient.unitCost == null ? sum : sum + ingredient.quantityUsed * ingredient.unitCost
   ), 0);
 
-  const ensureMetricForm = (metricId: string): MetricFormState => metricForms[metricId] ?? defaultMetricForm();
+  const ensureMetricForm = (metricId: string): MetricFormState => metricForms[metricId] ?? defaultMetricForm(timezone);
 
   const updateSessionSummary = (updated: HobbySession): void => {
     setSessionState((previous) => mergeSessionSummary(previous, updated));
@@ -426,7 +423,7 @@ export function HobbySessionDetail({
     try {
       const created = await createHobbyMetricReading(householdId, hobbyId, metricId, {
         value: Number(form.value),
-        readingDate: toIsoDate(form.readingDate),
+        readingDate: fromHouseholdDateInput(form.readingDate, timezone) ?? new Date().toISOString(),
         sessionId: sessionState.id,
         ...(form.notes ? { notes: form.notes } : {}),
       });
@@ -442,7 +439,7 @@ export function HobbySessionDetail({
       }));
       setMetricForms((previous) => ({
         ...previous,
-        [metricId]: defaultMetricForm(),
+        [metricId]: defaultMetricForm(timezone),
       }));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to add metric reading.");

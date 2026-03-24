@@ -27,6 +27,8 @@ import { AssetProfileWorkbenchCustomFieldsSection } from "./asset-profile-workbe
 import { AssetProfileWorkbenchMaintenanceSchedulesSection } from "./asset-profile-workbench-maintenance-schedules-section";
 import { AssetProfileWorkbenchUsageMetricsSection } from "./asset-profile-workbench-usage-metrics-section";
 import { InlineError } from "./inline-error";
+import { toHouseholdDateTimeInputValue, fromHouseholdDateTimeInput } from "../lib/date-input-utils";
+import { useTimezone } from "../lib/timezone-context";
 
 type AssetProfileWorkbenchProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -815,22 +817,6 @@ const toOptionalIsoString = (value: string): string | undefined => {
   return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
 };
 
-const toLocalDateTimeValue = (value: string | undefined): string => {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.valueOf())) {
-    return "";
-  }
-
-  const pad = (input: number): string => String(input).padStart(2, "0");
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
 const toMetricTemplateDraft = (template: PresetUsageMetricTemplate): MetricTemplateDraft => ({
   ...template,
   enabled: true,
@@ -892,7 +878,9 @@ const formatPresetTriggerSummary = (template: Pick<PresetScheduleTemplate, "trig
     return `Every ${trigger.intervalDays} days or ${trigger.intervalValue.toLocaleString()} ${trigger.metricKey}`;
   }
 
-  return trigger.dueAt ? `One-time on ${toLocalDateTimeValue(trigger.dueAt) || trigger.dueAt}` : "One-time";
+  return trigger.dueAt
+    ? `One-time on ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(trigger.dueAt))}`
+    : "One-time";
 };
 
 const renderFieldValueInput = (
@@ -994,6 +982,9 @@ export function AssetProfileWorkbench({
   customPresets,
   initialAsset
 }: AssetProfileWorkbenchProps): JSX.Element {
+  const { timezone } = useTimezone();
+  const toLocalDateTimeValue = (v: string | undefined) => toHouseholdDateTimeInputValue(v, timezone);
+  const toOptionalIsoStringTz = (v: string): string | undefined => fromHouseholdDateTimeInput(v, timezone) ?? undefined;
   const inputIdPrefix = useId();
   const libraryBlueprints: Blueprint[] = libraryPresets.map((preset) => ({
     id: `library:${preset.key}`,
@@ -1383,7 +1374,7 @@ export function AssetProfileWorkbench({
   );
 
   const metricDraftsJson = JSON.stringify(metricDrafts.map((draft) => {
-    const lastRecordedAt = toOptionalIsoString(draft.lastRecordedAt);
+    const lastRecordedAt = toOptionalIsoStringTz(draft.lastRecordedAt);
 
     return {
       ...toPresetMetricTemplate(draft),
@@ -1393,7 +1384,7 @@ export function AssetProfileWorkbench({
     };
   }));
   const scheduleDraftsJson = JSON.stringify(scheduleDrafts.map((draft) => {
-    const lastCompletedAt = toOptionalIsoString(draft.lastCompletedAt);
+    const lastCompletedAt = toOptionalIsoStringTz(draft.lastCompletedAt);
     const usageValue = draft.usageValue.trim().length > 0 ? Number(draft.usageValue) : undefined;
 
     return {
@@ -1621,7 +1612,7 @@ export function AssetProfileWorkbench({
             getScheduleMetricKey={getScheduleMetricKey}
             createTriggerTemplate={createTriggerTemplate}
             toLocalDateTimeValue={toLocalDateTimeValue}
-            toOptionalIsoString={toOptionalIsoString}
+            toOptionalIsoString={toOptionalIsoStringTz}
             formatPresetTriggerSummary={formatPresetTriggerSummary}
           />
 

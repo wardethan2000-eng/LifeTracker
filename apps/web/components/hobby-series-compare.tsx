@@ -3,6 +3,7 @@
 import type { Entry, HobbySeriesComparison, HobbySessionSummary } from "@lifekeeper/types";
 import Link from "next/link";
 import { useMemo, useState, type JSX } from "react";
+import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbySeriesCompareProps = {
   hobbyId: string;
@@ -11,18 +12,6 @@ type HobbySeriesCompareProps = {
   sessionEntries: Record<string, Entry[]>;
   selectedSessionIds: string[];
 };
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function formatDelta(current: number, baseline: number): string {
   const delta = current - baseline;
@@ -48,6 +37,7 @@ export function HobbySeriesCompare({
   sessionEntries,
   selectedSessionIds,
 }: HobbySeriesCompareProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
   const [showNotes, setShowNotes] = useState(false);
 
   const sessions = useMemo(() => {

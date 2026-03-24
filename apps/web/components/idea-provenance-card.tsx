@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import Link from "next/link";
 import type { IdeaPromotionTarget } from "@lifekeeper/types";
 import { CollapsibleCard } from "./collapsible-card";
+import { useFormattedDate } from "../lib/formatted-date";
 
 const targetLabels: Record<string, string> = {
   project: "Project",
@@ -34,11 +35,8 @@ export function IdeaProvenanceCard({
   promotedToId,
   createdAt,
 }: IdeaProvenanceCardProps): JSX.Element {
-  const createdDate = new Date(createdAt).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const { formatDate } = useFormattedDate();
+  const createdDate = formatDate(createdAt);
 
   const parts: string[] = [];
   if (demotedFromType && demotedFromId) parts.push(`Demoted from ${targetLabels[demotedFromType]}`);
@@ -47,7 +45,7 @@ export function IdeaProvenanceCard({
   const summary = parts.join(" · ");
 
   const promotedDate = promotedAt
-    ? new Date(promotedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    ? formatDate(promotedAt)
     : null;
 
   return (

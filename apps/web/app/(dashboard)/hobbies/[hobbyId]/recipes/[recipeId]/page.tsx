@@ -6,6 +6,7 @@ import {
 } from "../../../../../actions";
 import { HobbyRecipeDeleteButton } from "../../../../../../components/hobby-recipe-delete-button";
 import { ApiError, getHobbyDetail, getHobbyRecipe, getMe } from "../../../../../../lib/api";
+import { formatDate } from "../../../../../../lib/formatters";
 
 type HobbyRecipeDetailPageProps = {
   params: Promise<{ hobbyId: string; recipeId: string }>;
@@ -14,12 +15,6 @@ type HobbyRecipeDetailPageProps = {
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: "currency",
   currency: "USD",
-});
-
-const formatDate = (iso: string): string => new Date(iso).toLocaleDateString(undefined, {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
 });
 
 const formatCustomFieldLabel = (key: string): string => key
@@ -204,8 +199,8 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
                 <div className="panel__body--padded">
                   <dl className="data-list">
                     <div><dt>Source</dt><dd><span className="pill">{recipe.sourceType}</span></dd></div>
-                    <div><dt>Created</dt><dd>{formatDate(recipe.createdAt)}</dd></div>
-                    <div><dt>Updated</dt><dd>{formatDate(recipe.updatedAt)}</dd></div>
+                    <div><dt>Created</dt><dd>{formatDate(recipe.createdAt, "-", household.timezone)}</dd></div>
+                    <div><dt>Updated</dt><dd>{formatDate(recipe.updatedAt, "-", household.timezone)}</dd></div>
                     <div><dt>Sessions</dt><dd>Used in {recipe.sessionCount} sessions</dd></div>
                     <div><dt>Status</dt><dd>{recipe.isArchived ? "Archived" : "Active"}</dd></div>
                   </dl>

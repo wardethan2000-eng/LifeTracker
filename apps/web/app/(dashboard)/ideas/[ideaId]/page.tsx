@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { ApiError, getIdea, getMe } from "../../../../lib/api";
+import { ApiError, getIdea, getMe } from "../../../../lib/api";\nimport { formatDate } from "../../../../lib/formatters";
 import { IdeaDescriptionCard } from "../../../../components/idea-description-card";
 import { IdeaNotesLog } from "../../../../components/idea-notes-log";
 import { IdeaLinksCard } from "../../../../components/idea-links-card";
@@ -58,11 +58,7 @@ export default async function IdeaDetailPage({ params }: IdeaDetailPageProps): P
 
     const idea = await getIdea(household.id, ideaId);
 
-    const createdDate = new Date(idea.createdAt).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    const createdDate = formatDate(idea.createdAt, "-", household.timezone);
 
     return (
       <>

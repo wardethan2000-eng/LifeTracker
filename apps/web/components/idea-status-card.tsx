@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import { useCallback, useState, useTransition } from "react";
 import type { IdeaCategory, IdeaPriority, IdeaStage } from "@lifekeeper/types";
 import { updateIdeaAction, updateIdeaStageAction } from "../app/actions";
+import { useTimezone } from "../lib/timezone-context";
 import { Card } from "./card";
 
 const stageLabels: Record<IdeaStage, string> = {
@@ -50,24 +51,6 @@ type IdeaStatusCardProps = {
   updatedAt: string;
 };
 
-function formatRelativeDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export function IdeaStatusCard({
   householdId,
   ideaId,
@@ -77,6 +60,27 @@ export function IdeaStatusCard({
   createdAt,
   updatedAt,
 }: IdeaStatusCardProps): JSX.Element {
+  const { timezone } = useTimezone();
+
+  const formatRelativeDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: timezone,
+    }).format(date);
+  };
+
   const [localStage, setLocalStage] = useState<IdeaStage>(stage);
   const [localPriority, setLocalPriority] = useState<IdeaPriority>(priority);
   const [localCategory, setLocalCategory] = useState<IdeaCategory | null>(category);

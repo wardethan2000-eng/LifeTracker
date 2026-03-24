@@ -10,6 +10,9 @@ import { useMemo, useState, type FormEvent, type JSX } from "react";
 import { createHobbyMetricReading, updateHobbyCollectionItem } from "../lib/api";
 import { LkLineChart } from "./charts";
 import { EntryTimeline } from "./entry-system";
+import { useFormattedDate } from "../lib/formatted-date";
+import { toHouseholdDateInputValue, fromHouseholdDateInput } from "../lib/date-input-utils";
+import { useTimezone } from "../lib/timezone-context";
 
 type HobbyCollectionItemDetailProps = {
   householdId: string;
@@ -17,15 +20,6 @@ type HobbyCollectionItemDetailProps = {
   item: HobbyCollectionItemDetail;
   metrics: HobbyMetricDefinition[];
 };
-
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function toDateInputValue(value: string | null | undefined): string {
-  return value ? new Date(value).toISOString().slice(0, 10) : "";
-}
 
 function inferCustomFieldValue(value: string): unknown {
   const trimmed = value.trim();
@@ -42,19 +36,21 @@ function inferCustomFieldValue(value: string): unknown {
 }
 
 export function HobbyCollectionItemDetailSurface({ householdId, hobbyId, item, metrics }: HobbyCollectionItemDetailProps): JSX.Element {
+  const { formatDate } = useFormattedDate();
+  const { timezone } = useTimezone();
   const router = useRouter();
   const [itemState, setItemState] = useState(item);
   const [headerDraft, setHeaderDraft] = useState({
     name: item.name,
     status: item.status,
     location: item.location ?? "",
-    acquiredDate: toDateInputValue(item.acquiredDate),
+    acquiredDate: toHouseholdDateInputValue(item.acquiredDate, timezone),
     coverImageUrl: item.coverImageUrl ?? "",
     quantity: String(item.quantity),
   });
   const [customFieldRows, setCustomFieldRows] = useState<Array<{ key: string; value: string }>>(() => Object.entries(item.customFields).map(([key, value]) => ({ key, value: typeof value === "string" ? value : JSON.stringify(value) })));
   const [newField, setNewField] = useState({ key: "", value: "" });
-  const [metricDraft, setMetricDraft] = useState({ metricId: metrics[0]?.id ?? "", sessionId: item.sessionHistory[0]?.id ?? "", value: "", readingDate: toDateInputValue(new Date().toISOString()), notes: "" });
+  const [metricDraft, setMetricDraft] = useState({ metricId: metrics[0]?.id ?? "", sessionId: item.sessionHistory[0]?.id ?? "", value: "", readingDate: toHouseholdDateInputValue(new Date().toISOString(), timezone), notes: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,7 +76,7 @@ export function HobbyCollectionItemDetailSurface({ householdId, hobbyId, item, m
         name: headerDraft.name,
         status: headerDraft.status,
         location: headerDraft.location || null,
-        acquiredDate: headerDraft.acquiredDate ? new Date(`${headerDraft.acquiredDate}T00:00:00.000Z`).toISOString() : null,
+        acquiredDate: fromHouseholdDateInput(headerDraft.acquiredDate, timezone),
         coverImageUrl: headerDraft.coverImageUrl || null,
         quantity: Number(headerDraft.quantity || 0),
         customFields,
@@ -111,7 +107,7 @@ export function HobbyCollectionItemDetailSurface({ householdId, hobbyId, item, m
       const created = await createHobbyMetricReading(householdId, hobbyId, metricDraft.metricId, {
         ...(metricDraft.sessionId ? { sessionId: metricDraft.sessionId } : {}),
         value: Number(metricDraft.value),
-        readingDate: new Date(`${metricDraft.readingDate}T00:00:00.000Z`).toISOString(),
+        readingDate: fromHouseholdDateInput(metricDraft.readingDate, timezone) ?? new Date().toISOString(),
         notes: metricDraft.notes.trim() || undefined,
       });
       const metric = metrics.find((entry) => entry.id === metricDraft.metricId);
