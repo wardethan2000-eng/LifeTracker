@@ -13,6 +13,8 @@ import {
   type NotificationPreferences
 } from "@lifekeeper/types";
 import { toNotificationResponse } from "./serializers/index.js";
+import { sendEmail } from "./adapters/email-adapter.js";
+import { sendPush } from "./adapters/push-adapter.js";
 
 type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
@@ -837,23 +839,59 @@ export const scanAndCreateNotifications = async (
   };
 };
 
-type DeliveryMode = "log" | "noop";
+type DeliveryMode = "log" | "noop" | "live";
 
 const getDeliveryMode = (): DeliveryMode => (process.env.NOTIFICATION_DELIVERY_MODE as DeliveryMode | undefined) ?? "log";
 
-const deliverToAdapter = async (notification: ReturnType<typeof toNotificationResponse>, mode: DeliveryMode): Promise<void> => {
+const deliverToAdapter = async (
+  notification: ReturnType<typeof toNotificationResponse>,
+  mode: DeliveryMode,
+  recipientEmail?: string
+): Promise<void> => {
   if (mode === "noop") {
     return;
   }
 
-  console.info("[notification-delivery]", JSON.stringify({
-    channel: notification.channel,
-    type: notification.type,
-    userId: notification.userId,
-    title: notification.title,
-    body: notification.body,
-    payload: notification.payload
-  }));
+  if (mode === "log") {
+    console.info("[notification-delivery]", JSON.stringify({
+      channel: notification.channel,
+      type: notification.type,
+      userId: notification.userId,
+      title: notification.title,
+      body: notification.body,
+      payload: notification.payload
+    }));
+    return;
+  }
+
+  // mode === "live"
+  switch (notification.channel) {
+    case "email": {
+      if (!recipientEmail) {
+        throw new Error(`Cannot deliver email notification ${notification.id}: user has no email address.`);
+      }
+      await sendEmail({
+        to: recipientEmail,
+        subject: notification.title,
+        text: notification.body
+      });
+      break;
+    }
+    case "push": {
+      await sendPush({
+        userId: notification.userId,
+        title: notification.title,
+        body: notification.body,
+        type: notification.type,
+        payload: notification.payload
+      });
+      break;
+    }
+    case "digest": {
+      // Digest notifications are batched and delivered by processDigestBatch — no individual delivery.
+      break;
+    }
+  }
 };
 
 export const deliverPendingNotification = async (
@@ -861,7 +899,8 @@ export const deliverPendingNotification = async (
   notificationId: string
 ): Promise<{ status: NotificationStatus; delivered: boolean }> => {
   const notification = await prisma.notification.findUnique({
-    where: { id: notificationId }
+    where: { id: notificationId },
+    include: { user: { select: { email: true } } }
   });
 
   if (!notification) {
@@ -872,8 +911,14 @@ export const deliverPendingNotification = async (
     return { status: notification.status, delivered: false };
   }
 
+  const mode = getDeliveryMode();
+
   try {
-    await deliverToAdapter(toNotificationResponse(notification), getDeliveryMode());
+    await deliverToAdapter(
+      toNotificationResponse(notification),
+      mode,
+      notification.user?.email ?? undefined
+    );
     await prisma.notification.update({
       where: { id: notification.id },
       data: {

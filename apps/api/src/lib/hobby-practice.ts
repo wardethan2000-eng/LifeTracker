@@ -1,4 +1,5 @@
 import { Prisma, type HobbyPracticeGoal, type HobbyPracticeRoutine, type PrismaClient } from "@prisma/client";
+import { addDays, addUtcMonths, startOfUtcDay, startOfUtcMonth, startOfUtcWeek } from "@lifekeeper/utils";
 
 type PracticePrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -55,29 +56,6 @@ const autoTrackedGoalStatuses: Array<HobbyPracticeGoal["status"]> = ["active", "
 
 const toIso = (value: Date): string => value.toISOString();
 
-const startOfDay = (value: Date): Date => {
-  const date = new Date(value);
-  date.setUTCHours(0, 0, 0, 0);
-  return date;
-};
-
-const addDays = (value: Date, days: number): Date => {
-  const date = new Date(value);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
-};
-
-const startOfWeek = (value: Date): Date => {
-  const date = startOfDay(value);
-  const day = date.getUTCDay();
-  const offset = day === 0 ? -6 : 1 - day;
-  return addDays(date, offset);
-};
-
-const startOfMonth = (value: Date): Date => new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
-
-const addMonths = (value: Date, months: number): Date => new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + months, 1));
-
 const roundRatio = (value: number): number => Math.round(value * 100) / 100;
 
 const toProgressPercentage = (currentValue: number, targetValue: number): number => {
@@ -104,14 +82,14 @@ const isWithinGoalWindow = (goal: Pick<HobbyPracticeGoal, "startDate" | "targetD
 
 const getFrequencyAnchor = (routine: Pick<HobbyPracticeRoutine, "targetFrequency" | "createdAt">): Date => {
   if (routine.targetFrequency === "daily") {
-    return startOfDay(routine.createdAt);
+    return startOfUtcDay(routine.createdAt);
   }
 
   if (routine.targetFrequency === "monthly") {
-    return startOfMonth(routine.createdAt);
+    return startOfUtcMonth(routine.createdAt);
   }
 
-  return startOfWeek(routine.createdAt);
+  return startOfUtcWeek(routine.createdAt);
 };
 
 const getPeriodStart = (
@@ -119,19 +97,19 @@ const getPeriodStart = (
   value: Date
 ): Date => {
   if (routine.targetFrequency === "daily") {
-    return startOfDay(value);
+    return startOfUtcDay(value);
   }
 
   if (routine.targetFrequency === "weekly") {
-    return startOfWeek(value);
+    return startOfUtcWeek(value);
   }
 
   if (routine.targetFrequency === "monthly") {
-    return startOfMonth(value);
+    return startOfUtcMonth(value);
   }
 
   const anchor = getFrequencyAnchor(routine);
-  const weeksSinceAnchor = Math.floor((startOfWeek(value).getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24 * 7));
+  const weeksSinceAnchor = Math.floor((startOfUtcWeek(value).getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24 * 7));
   const alignedWeeks = weeksSinceAnchor >= 0 ? weeksSinceAnchor - (weeksSinceAnchor % 2) : weeksSinceAnchor - ((weeksSinceAnchor % 2 + 2) % 2);
   return addDays(anchor, alignedWeeks * 7);
 };
@@ -148,7 +126,7 @@ const getNextPeriodStart = (
     case "biweekly":
       return addDays(periodStart, 14);
     case "monthly":
-      return addMonths(periodStart, 1);
+      return addUtcMonths(periodStart, 1);
   }
 };
 

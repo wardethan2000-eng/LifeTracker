@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { toMonthKey } from "@lifekeeper/utils";
 
 type TransactionWithDate = {
   quantity: number;
@@ -12,8 +13,6 @@ type TransactionWithCost = TransactionWithDate & {
 type InventoryAnalyticsPrisma = PrismaClient | Prisma.TransactionClient;
 
 const AVERAGE_DAYS_PER_MONTH = 30.4375;
-
-const toMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 
 export const computeAverageConsumptionPerMonth = (transactions: TransactionWithDate[]): number | null => {
   const consumeTransactions = transactions

@@ -11,7 +11,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
-import { toInputJsonValue } from "../../lib/prisma-json.js";
+import { toInputJsonValue, parseTags } from "../../lib/prisma-json.js";
 import { toEntryAsHobbyLog } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
 
@@ -28,11 +28,6 @@ const listLogsQuerySchema = z.object({
   sessionId: z.string().cuid().optional(),
   logType: z.string().optional()
 });
-
-const parseTags = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-  return value.filter((t): t is string => typeof t === "string");
-};
 
 const getHobby = (
   app: { prisma: { hobby: { findFirst: Function } } },

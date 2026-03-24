@@ -9,6 +9,7 @@ import {
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { MS_PER_DAY, toMonthKey } from "@lifekeeper/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import {
   classifyReorderUrgency,
@@ -40,8 +41,6 @@ const inventoryItemParamsSchema = householdParamsSchema.extend({
   inventoryItemId: z.string().cuid()
 });
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
 const urgencyOrder: Record<"critical" | "soon" | "planned" | "healthy", number> = {
   critical: 0,
   soon: 1,
@@ -55,8 +54,6 @@ const velocityOrder: Record<"stale" | "slow" | "moderate" | "fast", number> = {
   moderate: 2,
   fast: 3
 };
-
-const toMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 
 const getLastMonths = (months: number): string[] => {
   const now = new Date();
@@ -84,7 +81,7 @@ const daysSince = (date: Date | null): number | null => {
     return null;
   }
 
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / DAY_IN_MS));
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / MS_PER_DAY));
 };
 
 const daysUntil = (date: Date | null): number | null => {
@@ -92,7 +89,7 @@ const daysUntil = (date: Date | null): number | null => {
     return null;
   }
 
-  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / DAY_IN_MS));
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / MS_PER_DAY));
 };
 
 const normalizePartKey = (name: string, partNumber: string | null): string => {
@@ -690,7 +687,7 @@ export const householdInventoryAnalyticsRoutes: FastifyPluginAsync = async (app)
       topParts: Array.from(asset.topPartsMap.values())
         .map((part) => {
           const sortedDates = part.dates.slice().sort((left, right) => left.getTime() - right.getTime());
-          const intervals = sortedDates.slice(1).map((date, index) => (date.getTime() - sortedDates[index]!.getTime()) / DAY_IN_MS);
+          const intervals = sortedDates.slice(1).map((date, index) => (date.getTime() - sortedDates[index]!.getTime()) / MS_PER_DAY);
 
           return {
             partName: part.partName,

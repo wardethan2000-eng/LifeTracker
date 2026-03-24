@@ -16,12 +16,15 @@ export interface NotificationDeliveryJobData {
 export const notificationScanQueueName = "notification-scan";
 export const complianceScanQueueName = "compliance-scan";
 export const notificationDeliveryQueueName = "notification-delivery";
+export const digestBatchQueueName = "digest-batch";
 export const recurringNotificationScanSchedulerId = "recurring-notification-scan";
 export const recurringComplianceScanSchedulerId = "recurring-compliance-scan";
+export const recurringDigestBatchSchedulerId = "recurring-digest-batch";
 
 let notificationScanQueue: Queue<NotificationScanJobData> | undefined;
 let complianceScanQueue: Queue<ComplianceScanJobData> | undefined;
 let notificationDeliveryQueue: Queue<NotificationDeliveryJobData> | undefined;
+let digestBatchQueue: Queue | undefined;
 
 const createNotificationScanQueue = () => new Queue<NotificationScanJobData>(notificationScanQueueName, {
   connection: getRedisConnectionOptions()
@@ -32,6 +35,10 @@ const createComplianceScanQueue = () => new Queue<ComplianceScanJobData>(complia
 });
 
 const createNotificationDeliveryQueue = () => new Queue<NotificationDeliveryJobData>(notificationDeliveryQueueName, {
+  connection: getRedisConnectionOptions()
+});
+
+const createDigestBatchQueue = () => new Queue(digestBatchQueueName, {
   connection: getRedisConnectionOptions()
 });
 
@@ -46,6 +53,8 @@ const parseBoolean = (value: string | undefined, fallback: boolean): boolean => 
 const getNotificationScanCron = (): string => process.env.NOTIFICATION_SCAN_CRON ?? "0 * * * *";
 
 const getComplianceScanCron = (): string => process.env.COMPLIANCE_SCAN_CRON ?? "15 * * * *";
+
+const getDigestBatchCron = (): string => process.env.DIGEST_BATCH_CRON ?? "0 8 * * *";
 
 const areRecurringJobsEnabled = (): boolean => parseBoolean(process.env.ENABLE_RECURRING_JOBS, true);
 
@@ -71,6 +80,14 @@ export const getNotificationDeliveryQueue = (): Queue<NotificationDeliveryJobDat
   }
 
   return notificationDeliveryQueue;
+};
+
+export const getDigestBatchQueue = (): Queue => {
+  if (!digestBatchQueue) {
+    digestBatchQueue = createDigestBatchQueue();
+  }
+
+  return digestBatchQueue;
 };
 
 export const enqueueNotificationScan = async (data: NotificationScanJobData = {}) => {
@@ -124,6 +141,18 @@ export const registerRecurringJobSchedulers = async (): Promise<void> => {
       { pattern: getComplianceScanCron() },
       {
         name: "scan",
+        data: {},
+        opts: {
+          removeOnComplete: 50,
+          removeOnFail: 50
+        }
+      }
+    ),
+    getDigestBatchQueue().upsertJobScheduler(
+      recurringDigestBatchSchedulerId,
+      { pattern: getDigestBatchCron() },
+      {
+        name: "batch",
         data: {},
         opts: {
           removeOnComplete: 50,

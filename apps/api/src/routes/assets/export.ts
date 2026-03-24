@@ -2,6 +2,7 @@ import { assetCategorySchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 
 const householdParamsSchema = z.object({
@@ -20,18 +21,6 @@ const importAssetItemSchema = z.object({
 const importAssetsSchema = z.object({
   items: z.array(importAssetItemSchema).min(1).max(500)
 });
-
-const csvEscape = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-};
-
-const csvValue = (value: string | number | boolean | null | undefined): string => {
-  if (value === null || value === undefined) return "";
-  return csvEscape(String(value));
-};
 
 export const assetExportRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/assets/export

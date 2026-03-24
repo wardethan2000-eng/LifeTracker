@@ -3,8 +3,10 @@ import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import { scanComplianceNotifications } from "../lib/compliance-monitor.js";
 import { deliverPendingNotification, scanAndCreateNotifications } from "../lib/notifications.js";
+import { processDigestBatch } from "../lib/digest.js";
 import {
   complianceScanQueueName,
+  digestBatchQueueName,
   enqueueNotificationDelivery,
   registerRecurringJobSchedulers,
   notificationDeliveryQueueName,
@@ -43,11 +45,17 @@ const deliveryWorker = new Worker<NotificationDeliveryJobData>(notificationDeliv
   concurrency: 5
 });
 
+const digestWorker = new Worker(digestBatchQueueName, async () => processDigestBatch(prisma), {
+  connection,
+  concurrency: 1
+});
+
 const shutdown = async () => {
   await Promise.all([
     scanWorker.close(),
     complianceWorker.close(),
-    deliveryWorker.close()
+    deliveryWorker.close(),
+    digestWorker.close()
   ]);
   await prisma.$disconnect();
 };

@@ -7,6 +7,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { parseTags } from "../../lib/prisma-json.js";
 
 const householdParamsSchema = z.object({
   householdId: z.string().cuid()
@@ -16,13 +17,8 @@ const templateParamsSchema = householdParamsSchema.extend({
   templateId: z.string().cuid()
 });
 
-const parseTags = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value as string[];
-  return [];
-};
-
 const parseFlags = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value as string[];
+  if (Array.isArray(value)) return value.filter((t): t is string => typeof t === "string");
   return [];
 };
 

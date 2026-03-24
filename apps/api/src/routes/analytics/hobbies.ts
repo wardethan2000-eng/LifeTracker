@@ -2,6 +2,7 @@ import type { HobbyPracticeRoutineFrequency } from "@prisma/client";
 import { hobbyPracticeGoalStatusSchema } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { addDays, MS_PER_DAY, startOfUtcDay, startOfUtcMonth, startOfUtcWeek, toMonthKey, addUtcMonths } from "@lifekeeper/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import { buildPracticeGoalProgressHistory } from "../../lib/hobby-practice.js";
 import {
@@ -36,37 +37,10 @@ const goalProgressQuerySchema = householdScopedQuerySchema.extend({
   status: hobbyPracticeGoalStatusSchema.default("active")
 });
 
-const dayMs = 1000 * 60 * 60 * 24;
-
-const startOfUtcDay = (value: Date): Date => new Date(Date.UTC(
-  value.getUTCFullYear(),
-  value.getUTCMonth(),
-  value.getUTCDate()
-));
-
-const startOfUtcMonth = (value: Date): Date => new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
-
-const addUtcDays = (value: Date, days: number): Date => {
-  const next = new Date(value);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-};
-
-const addUtcMonths = (value: Date, months: number): Date => new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + months, 1));
-
-const startOfUtcWeek = (value: Date): Date => {
-  const day = startOfUtcDay(value);
-  const weekday = day.getUTCDay();
-  const offset = weekday === 0 ? -6 : 1 - weekday;
-  return addUtcDays(day, offset);
-};
-
 const roundNumber = (value: number, precision = 2): number => {
   const factor = 10 ** precision;
   return Math.round(value * factor) / factor;
 };
-
-const toMonthKey = (value: Date): string => `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}`;
 
 const toDateKey = (value: Date): string => value.toISOString().slice(0, 10);
 
@@ -94,12 +68,12 @@ const getRoutinePeriodStart = (
 
   const anchor = startOfUtcWeek(routine.createdAt);
   const current = startOfUtcWeek(value);
-  const weeksSinceAnchor = Math.floor((current.getTime() - anchor.getTime()) / (dayMs * 7));
+  const weeksSinceAnchor = Math.floor((current.getTime() - anchor.getTime()) / (MS_PER_DAY * 7));
   const alignedWeeks = weeksSinceAnchor >= 0
     ? weeksSinceAnchor - (weeksSinceAnchor % 2)
     : weeksSinceAnchor - ((weeksSinceAnchor % 2 + 2) % 2);
 
-  return addUtcDays(anchor, alignedWeeks * 7);
+  return addDays(anchor, alignedWeeks * 7);
 };
 
 const getNextRoutinePeriodStart = (
@@ -108,11 +82,11 @@ const getNextRoutinePeriodStart = (
 ): Date => {
   switch (routine.targetFrequency) {
     case "daily":
-      return addUtcDays(periodStart, 1);
+      return addDays(periodStart, 1);
     case "weekly":
-      return addUtcDays(periodStart, 7);
+      return addDays(periodStart, 7);
     case "biweekly":
-      return addUtcDays(periodStart, 14);
+      return addDays(periodStart, 14);
     case "monthly":
       return addUtcMonths(periodStart, 1);
   }
@@ -124,11 +98,11 @@ const getPreviousRoutinePeriodStart = (
 ): Date => {
   switch (routine.targetFrequency) {
     case "daily":
-      return addUtcDays(periodStart, -1);
+      return addDays(periodStart, -1);
     case "weekly":
-      return addUtcDays(periodStart, -7);
+      return addDays(periodStart, -7);
     case "biweekly":
-      return addUtcDays(periodStart, -14);
+      return addDays(periodStart, -14);
     case "monthly":
       return addUtcMonths(periodStart, -1);
   }
@@ -158,7 +132,7 @@ const buildRecentRoutinePeriods = (
 
     return {
       periodStart: toDateKey(period.start),
-      periodEnd: toDateKey(addUtcDays(period.endExclusive, -1)),
+      periodEnd: toDateKey(addDays(period.endExclusive, -1)),
       sessionsCompleted,
       target: routine.targetSessionsPerPeriod,
       met: sessionsCompleted >= routine.targetSessionsPerPeriod
@@ -184,7 +158,7 @@ const getProjectedCompletionDate = (
   }
 
   const now = startOfUtcDay(referenceDate);
-  const windowStart = addUtcDays(now, -30);
+  const windowStart = addDays(now, -30);
   const recentPoints = progressHistory.filter((point) => {
     const date = new Date(point.date);
     return date >= windowStart && date <= now;
@@ -203,7 +177,7 @@ const getProjectedCompletionDate = (
 
   const firstDate = new Date(first.date);
   const lastDate = new Date(last.date);
-  const elapsedDays = (lastDate.getTime() - firstDate.getTime()) / dayMs;
+  const elapsedDays = (lastDate.getTime() - firstDate.getTime()) / MS_PER_DAY;
 
   if (elapsedDays <= 0) {
     return null;
@@ -222,7 +196,7 @@ const getProjectedCompletionDate = (
 
   const remaining = targetValue - last.value;
   const projectedDays = Math.ceil(remaining / dailyRate);
-  return toDateKey(addUtcDays(lastDate, projectedDays));
+  return toDateKey(addDays(lastDate, projectedDays));
 };
 
 export const hobbyAnalyticsRoutes: FastifyPluginAsync = async (app) => {
@@ -448,7 +422,7 @@ export const hobbyAnalyticsRoutes: FastifyPluginAsync = async (app) => {
         percentComplete: toPercentComplete(currentValue, goal.targetValue),
         startDate: goal.startDate?.toISOString() ?? null,
         targetDate: goal.targetDate?.toISOString() ?? null,
-        daysRemaining: goal.targetDate ? Math.ceil((startOfUtcDay(goal.targetDate).getTime() - today.getTime()) / dayMs) : null,
+        daysRemaining: goal.targetDate ? Math.ceil((startOfUtcDay(goal.targetDate).getTime() - today.getTime()) / MS_PER_DAY) : null,
         projectedCompletionDate,
         onTrack,
         progressHistory

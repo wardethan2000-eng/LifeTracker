@@ -13,6 +13,7 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { csvValue } from "../../lib/csv.js";
 import { emitDomainEvent } from "../../lib/domain-events.js";
 import { buildInventoryItemScanUrl, ensureInventoryItemScanTag } from "../../lib/inventory-tags.js";
 import {
@@ -114,22 +115,6 @@ const importInventoryResultSchema = z.object({
   })),
   createdItems: z.array(inventoryItemSummarySchema)
 });
-
-const csvEscape = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-
-  return value;
-};
-
-const csvValue = (value: string | number | null | undefined): string => {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return csvEscape(String(value));
-};
 
 type InventoryRevisionValue = string | number | boolean | null;
 

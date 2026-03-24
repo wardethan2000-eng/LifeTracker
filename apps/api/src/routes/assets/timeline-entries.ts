@@ -7,7 +7,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
-import { toInputJsonValue } from "../../lib/prisma-json.js";
+import { toInputJsonValue, parseTags } from "../../lib/prisma-json.js";
 import { toEntryAsTimelineEntry } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
 
@@ -26,11 +26,6 @@ const listTimelineEntriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().cuid().optional()
 });
-
-const parseTags = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-  return value.filter((t): t is string => typeof t === "string");
-};
 
 const parseMeasurements = (value: unknown): Array<{ name: string; value: number; unit: string }> => {
   if (!Array.isArray(value)) return [];

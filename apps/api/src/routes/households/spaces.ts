@@ -23,6 +23,7 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
+import { csvValue } from "../../lib/csv.js";
 import { createBatchLabelPdf, createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
 import { removeSearchIndexEntry, syncSpaceToSearchIndex } from "../../lib/search-index.js";
 import { recordSpaceScanLog } from "../../lib/space-scan-log.js";
@@ -140,22 +141,6 @@ const spaceHistoryQuerySchema = z.object({
 });
 
 const SPACE_HISTORY_MERGE_WINDOW_MS = 5 * 60 * 1000;
-
-const csvEscape = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-
-  return value;
-};
-
-const csvValue = (value: string | number | null | undefined): string => {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return csvEscape(String(value));
-};
 
 const normalizeSpaceName = (value: string): string => value.trim().toLowerCase();
 const normalizeSpaceShortCode = (value: string): string => value.trim().toUpperCase();

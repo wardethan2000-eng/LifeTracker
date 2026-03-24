@@ -11,7 +11,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
-import { toInputJsonValue } from "../../lib/prisma-json.js";
+import { toInputJsonValue, parseTags } from "../../lib/prisma-json.js";
 import { toEntryAsProjectNote } from "../../lib/serializers/index.js";
 import { removeSearchIndexEntry, syncEntryToSearchIndex } from "../../lib/search-index.js";
 
@@ -32,11 +32,6 @@ const noteListQuerySchema = z.object({
   phaseId: z.string().cuid().optional(),
   pinned: z.enum(["true", "false"]).optional()
 });
-
-const parseTags = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-  return value.filter((t): t is string => typeof t === "string");
-};
 
 const getProject = (app: FastifyInstance, householdId: string, projectId: string) => app.prisma.project.findFirst({
   where: { id: projectId, householdId, deletedAt: null },

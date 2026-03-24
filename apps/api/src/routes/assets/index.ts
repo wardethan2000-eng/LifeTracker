@@ -28,6 +28,7 @@ import {
   buildAssetScanUrl,
   ensureAssetTag
 } from "../../lib/asset-tags.js";
+import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 import { toAssetResponse } from "../../lib/serializers/index.js";
 import { logActivity } from "../../lib/activity-log.js";
@@ -65,18 +66,6 @@ const bulkReassignCategoryBodySchema = z.object({
 const assetExportQuerySchema = z.object({
   householdId: z.string().cuid()
 });
-
-const csvEscape = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-};
-
-const csvCell = (value: string | number | null | undefined): string => {
-  if (value === null || value === undefined) return "";
-  return csvEscape(String(value));
-};
 
 export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/assets", async (request, reply) => {
@@ -260,14 +249,14 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       const locationStr = [location.propertyName, location.room].filter(Boolean).join(", ");
 
       return [
-        csvCell(asset.assetTag ?? `LK-${asset.id.slice(-8).toUpperCase()}`),
-        csvCell(asset.name),
-        csvCell(asset.category),
-        csvCell(asset.visibility),
-        csvCell(asset.purchaseDate?.toISOString().split("T")[0] ?? null),
-        csvCell(typeof purchase.price === "number" ? purchase.price : null),
-        csvCell(typeof warranty.endDate === "string" ? warranty.endDate.split("T")[0] : null),
-        csvCell(locationStr || null)
+        csvValue(asset.assetTag ?? `LK-${asset.id.slice(-8).toUpperCase()}`),
+        csvValue(asset.name),
+        csvValue(asset.category),
+        csvValue(asset.visibility),
+        csvValue(asset.purchaseDate?.toISOString().split("T")[0] ?? null),
+        csvValue(typeof purchase.price === "number" ? purchase.price : null),
+        csvValue(typeof warranty.endDate === "string" ? warranty.endDate.split("T")[0] : null),
+        csvValue(locationStr || null)
       ].join(",");
     });
 

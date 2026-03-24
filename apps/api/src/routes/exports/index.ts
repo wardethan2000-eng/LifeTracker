@@ -16,6 +16,8 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";
+import { buildCsv } from "../../lib/csv.js";
+import { formatCurrency, formatPercent, formatTimelineSourceLabel } from "../../lib/formatters.js";
 import { applyTier } from "../../lib/rate-limit-tiers.js";
 import {
   filterReportCyclesInRange,
@@ -77,36 +79,7 @@ const sanitizeFileSegment = (value: string): string => value
   .replace(/^-+|-+$/g, "")
   .slice(0, 80) || "asset";
 
-const formatTimelineSourceLabel = (sourceType: AssetTimelineItem["sourceType"]): string => {
-  switch (sourceType) {
-    case "maintenance_log":
-      return "Maintenance Log";
-    case "timeline_entry":
-      return "Manual Entry";
-    case "project_event":
-      return "Project Event";
-    case "inventory_transaction":
-      return "Inventory Transaction";
-    case "schedule_change":
-      return "Schedule Change";
-    case "comment":
-      return "Comment";
-    case "condition_assessment":
-      return "Condition Assessment";
-    case "usage_reading":
-      return "Usage Reading";
-    default:
-      return "Activity";
-  }
-};
-
 const formatCsvDate = (value: string | Date): string => new Date(value).toISOString();
-
-const formatCurrency = (value: number | null | undefined): string => typeof value === "number"
-  ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-  : "";
-
-const formatPercent = (value: number): string => `${value.toFixed(1)}%`;
 
 const formatMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 
@@ -179,15 +152,6 @@ const matchesDateRange = (isoDate: string, since?: string, until?: string): bool
 
   return true;
 };
-
-const escapeCsvCell = (value: string): string => /[",\n]/.test(value)
-  ? `"${value.replace(/"/g, '""')}"`
-  : value;
-
-export const buildCsv = (headers: string[], rows: string[][]): string => [
-  headers.map(escapeCsvCell).join(","),
-  ...rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
-].join("\n");
 
 const extractEntityName = (metadata: Record<string, unknown>, fallback: string): string => {
   const candidates = [

@@ -125,7 +125,7 @@ const yearInTimezone = (date: Date, timezone: string): number => {
   return Number(parts.find((p) => p.type === "year")?.value ?? date.getUTCFullYear());
 };
 
-const addDays = (date: Date, days: number): Date => {
+export const addDays = (date: Date, days: number): Date => {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
   return next;
@@ -774,10 +774,10 @@ export const computeScheduleForecast = (schedules: Array<{
   };
 };
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const MS_PER_WEEK = 7 * MS_PER_DAY;
+export const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const MS_PER_WEEK = 7 * MS_PER_DAY;
 
-const startOfUtcDay = (date: Date): Date => new Date(Date.UTC(
+export const startOfUtcDay = (date: Date): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth(),
   date.getUTCDate()
@@ -793,7 +793,7 @@ const endOfUtcDay = (date: Date): Date => new Date(Date.UTC(
   999
 ));
 
-const startOfUtcWeek = (date: Date): Date => {
+export const startOfUtcWeek = (date: Date): Date => {
   const start = startOfUtcDay(date);
   const day = start.getUTCDay();
   const offset = day === 0 ? -6 : 1 - day;
@@ -801,7 +801,7 @@ const startOfUtcWeek = (date: Date): Date => {
   return start;
 };
 
-const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
+export const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth(),
   1
@@ -821,6 +821,31 @@ const differenceInDays = (start: Date, end: Date): number => Math.max(
   1,
   Math.round((startOfUtcDay(end).getTime() - startOfUtcDay(start).getTime()) / MS_PER_DAY) + 1
 );
+
+export const toMonthKey = (date: Date): string =>
+  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+
+export const addUtcMonths = (date: Date, months: number): Date => new Date(Date.UTC(
+  date.getUTCFullYear(),
+  date.getUTCMonth() + months,
+  1,
+  0,
+  0,
+  0,
+  0
+));
+
+export const getMonthRange = (start: Date, end: Date): string[] => {
+  if (start > end) return [];
+  const months: string[] = [];
+  let cursor = startOfUtcMonth(start);
+  const endMonth = startOfUtcMonth(end);
+  while (cursor <= endMonth) {
+    months.push(toMonthKey(cursor));
+    cursor = addUtcMonths(cursor, 1);
+  }
+  return months;
+};
 
 const calculateMean = (values: number[]): number => {
   if (values.length === 0) {

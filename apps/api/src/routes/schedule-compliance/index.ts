@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { FastifyPluginAsync } from "fastify";
+import { startOfUtcMonth, addUtcMonths } from "@lifekeeper/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import { computeScheduleCompliance } from "../../lib/schedule-compliance.js";
 import { toScheduleComplianceDashboardResponse } from "../../lib/serializers/index.js";
@@ -11,18 +12,6 @@ const householdParamsSchema = z.object({
 const scheduleComplianceQuerySchema = z.object({
   periodMonths: z.coerce.number().int().min(1).max(60).default(12)
 });
-
-const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-
-const addUtcMonths = (date: Date, months: number): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth() + months,
-  date.getUTCDate(),
-  date.getUTCHours(),
-  date.getUTCMinutes(),
-  date.getUTCSeconds(),
-  date.getUTCMilliseconds()
-));
 
 export const scheduleComplianceRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/schedule-compliance", async (request, reply) => {

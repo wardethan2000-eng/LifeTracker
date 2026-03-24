@@ -1,7 +1,8 @@
 import type { JSX } from "react";
 import { ThemeToggle } from "../../../components/theme-toggle";
 import { HouseholdTimezoneEditor } from "../../../components/household-timezone-editor";
-import { ApiError, getMe } from "../../../lib/api";
+import { ApiError, getMe, getNotificationPreferences } from "../../../lib/api";
+import { NotificationPreferencesForm } from "../../../components/notification-preferences-form";
 
 export default async function UserSettingsPage(): Promise<JSX.Element> {
   let householdId: string | null = null;
@@ -17,6 +18,8 @@ export default async function UserSettingsPage(): Promise<JSX.Element> {
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
   }
+
+  const preferences = await getNotificationPreferences();
 
   return (
     <>
@@ -56,6 +59,18 @@ export default async function UserSettingsPage(): Promise<JSX.Element> {
             </div>
           </section>
         )}
+
+        <section className="panel">
+          <div className="panel__header">
+            <div>
+              <h2>Notifications</h2>
+              <p className="data-table__secondary">Control how and when you receive notifications.</p>
+            </div>
+          </div>
+          <div className="panel__body--padded">
+            <NotificationPreferencesForm initialPreferences={preferences} />
+          </div>
+        </section>
       </div>
     </>
   );

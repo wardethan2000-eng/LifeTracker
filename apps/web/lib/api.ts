@@ -521,6 +521,10 @@ import {
   type BulkHobbySessionOperationResult,
   bulkIdeaOperationResultSchema,
   type BulkIdeaOperationResult,
+  notificationPreferencesSchema,
+  updateNotificationPreferencesSchema,
+  type NotificationPreferences,
+  type UpdateNotificationPreferencesInput,
 } from "@lifekeeper/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -4025,6 +4029,20 @@ export const markNotificationUnread = async (notificationId: string): Promise<No
   method: "PATCH",
   schema: notificationSchema
 });
+
+export const getNotificationPreferences = cache(async (): Promise<NotificationPreferences> => apiRequest({
+  path: "/v1/me/notification-preferences",
+  schema: notificationPreferencesSchema,
+  revalidate: 60
+}));
+
+export const updateNotificationPreferences = async (input: UpdateNotificationPreferencesInput): Promise<void> => {
+  await apiRequest({
+    path: "/v1/me/notification-preferences",
+    method: "PATCH",
+    body: input
+  });
+};
 
 export const enqueueNotificationScan = async (householdId: string): Promise<void> => {
   await apiRequest({

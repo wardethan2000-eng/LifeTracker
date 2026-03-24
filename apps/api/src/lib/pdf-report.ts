@@ -5,6 +5,7 @@ import type {
   ComplianceAuditPdfInput,
   InventoryValuationPdfInput
 } from "@lifekeeper/types";
+import { formatCurrency, formatDate, formatPercent, formatTimelineSourceLabel } from "./formatters.js";
 
 type AssetHistoryPdfInput = {
   asset: {
@@ -26,12 +27,6 @@ type AssetHistoryPdfInput = {
   dateRangeEnd?: Date | null;
 };
 
-const formatDate = (value: string | Date): string => new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric"
-}).format(value instanceof Date ? value : new Date(value));
-
 const formatDateTime = (value: Date): string => new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -40,39 +35,9 @@ const formatDateTime = (value: Date): string => new Intl.DateTimeFormat("en-US",
   minute: "2-digit"
 }).format(value);
 
-const formatCurrency = (value: number): string => new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD"
-}).format(value);
-
-const formatPercent = (value: number): string => `${value.toFixed(1)}%`;
-
 const formatNumber = (value: number): string => new Intl.NumberFormat("en-US", {
   maximumFractionDigits: value % 1 === 0 ? 0 : 2
 }).format(value);
-
-const formatTimelineSourceLabel = (sourceType: AssetTimelineItem["sourceType"]): string => {
-  switch (sourceType) {
-    case "maintenance_log":
-      return "Maintenance Log";
-    case "timeline_entry":
-      return "Manual Entry";
-    case "project_event":
-      return "Project Event";
-    case "inventory_transaction":
-      return "Inventory Transaction";
-    case "schedule_change":
-      return "Schedule Change";
-    case "comment":
-      return "Comment";
-    case "condition_assessment":
-      return "Condition Assessment";
-    case "usage_reading":
-      return "Usage Reading";
-    default:
-      return "Activity";
-  }
-};
 
 const truncate = (value: string, maxLength: number): string => value.length > maxLength
   ? `${value.slice(0, maxLength).trimEnd()}...`

@@ -2,6 +2,7 @@ import { ideaCategorySchema, ideaPrioritySchema, ideaStageSchema } from "@lifeke
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { checkMembership } from "../../lib/asset-access.js";
+import { csvValue } from "../../lib/csv.js";
 import { toInputJsonValue } from "../../lib/prisma-json.js";
 
 const householdParamsSchema = z.object({
@@ -19,18 +20,6 @@ const importIdeaItemSchema = z.object({
 const importIdeasSchema = z.object({
   items: z.array(importIdeaItemSchema).min(1).max(500)
 });
-
-const csvEscape = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-};
-
-const csvValue = (value: string | null | undefined): string => {
-  if (value === null || value === undefined) return "";
-  return csvEscape(value);
-};
 
 export const ideaExportRoutes: FastifyPluginAsync = async (app) => {
   // GET /v1/households/:householdId/ideas/export

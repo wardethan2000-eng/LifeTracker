@@ -79,6 +79,7 @@ import type {
   UpdateIdeaInput,
   PromoteIdeaInput,
   DemoteToIdeaInput,
+  UpdateNotificationPreferencesInput,
 } from "@lifekeeper/types";
 import {
   assetCustomFieldsSchema,
@@ -227,6 +228,7 @@ import {
   updateIdeaStage,
   promoteIdea,
   demoteToIdea,
+  updateNotificationPreferences,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
@@ -1596,6 +1598,11 @@ export async function transferAssetAction(formData: FormData): Promise<void> {
 export async function markNotificationReadAction(formData: FormData): Promise<void> {
   await markNotificationRead(getRequiredString(formData, "notificationId"));
   revalidatePath("/notifications");
+}
+
+export async function updateNotificationPreferencesAction(input: UpdateNotificationPreferencesInput): Promise<void> {
+  await updateNotificationPreferences(input);
+  revalidatePath("/settings");
 }
 
 export async function markNotificationsReadAction(formData: FormData): Promise<void> {

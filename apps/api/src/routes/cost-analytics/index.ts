@@ -4,7 +4,10 @@ import {
   aggregateCostsByPeriod,
   calculateUsageRate,
   computeLogTotalCost,
-  computeScheduleForecast
+  computeScheduleForecast,
+  MS_PER_DAY,
+  startOfUtcMonth,
+  addUtcMonths
 } from "@lifekeeper/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -30,8 +33,6 @@ const dashboardQuerySchema = z.object({
   periodMonths: z.coerce.number().int().min(1).max(60).default(12)
 });
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 const categoryLabels: Record<string, string> = {
   vehicle: "Vehicle",
   home: "Home",
@@ -46,18 +47,6 @@ const categoryLabels: Record<string, string> = {
 };
 
 const categoryLabel = (category: string): string => categoryLabels[category] ?? category;
-
-const startOfUtcMonth = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-
-const addUtcMonths = (date: Date, months: number): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth() + months,
-  date.getUTCDate(),
-  date.getUTCHours(),
-  date.getUTCMinutes(),
-  date.getUTCSeconds(),
-  date.getUTCMilliseconds()
-));
 
 const average = (values: number[]): number | null => values.length > 0
   ? values.reduce((sum, value) => sum + value, 0) / values.length
