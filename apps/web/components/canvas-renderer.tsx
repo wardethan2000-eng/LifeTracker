@@ -11,6 +11,7 @@ import type {
   UpdateCanvasSettingsInput,
 } from "@lifekeeper/types";
 import type { JSX } from "react";
+import CanvasObjectPicker, { type CanvasObjectPlacement } from "./canvas-object-picker";
 import {
   useCallback,
   useEffect,
@@ -35,7 +36,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text" | "image";
+type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text" | "image" | "object";
 
 type DragState =
   | { type: "none" }
@@ -196,9 +197,14 @@ export function CanvasRenderer({
   const [resolvedBgUrl, setResolvedBgUrl] = useState<string | null>(null);
   const [bgImageDims, setBgImageDims] = useState<{ w: number; h: number } | null>(null);
   const [bgUploading, setBgUploading] = useState(false);
+  const [bgUploadError, setBgUploadError] = useState<string | null>(null);
   // Map from nodeId -> resolved download URL for image object nodes
   const [nodeImageUrls, setNodeImageUrls] = useState<Map<string, string>>(new Map());
   const [imgObjUploading, setImgObjUploading] = useState(false);
+  const [imgObjUploadError, setImgObjUploadError] = useState<string | null>(null);
+
+  // Object picker panel visibility
+  const [objectPickerOpen, setObjectPickerOpen] = useState(false);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<IdeaCanvasNode[]>([]);
@@ -812,7 +818,7 @@ export function CanvasRenderer({
     void resolveBackgroundUrl(settings.backgroundImageUrl);
     // Resolve any image object node URLs
     for (const n of initialCanvas.nodes) {
-      if (n.objectType === "image" && n.imageUrl) {
+      if ((n.objectType === "image" || n.objectType === "object") && n.imageUrl) {
         void (async () => {
           if (!n.imageUrl) return;
           if (n.imageUrl.startsWith("attachment:")) {
@@ -832,6 +838,7 @@ export function CanvasRenderer({
 
   const handleBgImageUpload = useCallback(async (file: File) => {
     setBgUploading(true);
+    setBgUploadError(null);
     try {
       // Read natural dimensions from the local file
       const localUrl = URL.createObjectURL(file);
@@ -852,7 +859,8 @@ export function CanvasRenderer({
       });
 
       // Step 2: PUT the file directly to storage
-      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const putRes = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status}). Check that storage is running.`);
 
       // Step 3: confirm upload
       await confirmAttachmentUpload(householdId, attachment.id);
@@ -870,6 +878,8 @@ export function CanvasRenderer({
       setResolvedBgUrl(downloadUrl);
       setBgImageDims(dims);
       fitViewportToImage(dims.w, dims.h);
+    } catch (err) {
+      setBgUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setBgUploading(false);
     }
@@ -887,6 +897,7 @@ export function CanvasRenderer({
 
   const handleImageObjectUpload = useCallback(async (file: File) => {
     setImgObjUploading(true);
+    setImgObjUploadError(null);
     try {
       // Determine image dimensions from file
       const localUrl = URL.createObjectURL(file);
@@ -905,7 +916,8 @@ export function CanvasRenderer({
         mimeType: file.type,
         fileSize: file.size,
       });
-      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const putRes = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status}). Check that storage is running.`);
       await confirmAttachmentUpload(householdId, attachment.id);
       const { url: downloadUrl } = await getAttachmentDownloadUrl(householdId, attachment.id);
 
@@ -937,9 +949,64 @@ export function CanvasRenderer({
       pushHistory(newNodes, edges);
       setSelectedIds(new Set([node.id]));
       setActiveTool("select");
+    } catch (err) {
+      setImgObjUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setImgObjUploading(false);
     }
+  }, [householdId, canvasId, zoom, panX, panY, nodes, edges, maybeSnap, pushHistory]);
+
+  // ─── Place object from library / preset ───────────────────────────────────
+
+  const handlePlaceObject = useCallback(async (placement: CanvasObjectPlacement) => {
+    setObjectPickerOpen(false);
+    setActiveTool("select");
+
+    const svg = svgRef.current;
+    const rect = svg?.getBoundingClientRect();
+    const viewCX = rect ? rect.width / 2 / zoom - panX : 300;
+    const viewCY = rect ? rect.height / 2 / zoom - panY : 200;
+
+    let imageUrl: string;
+    let resolvedUrl: string;
+    let defaultWidth: number;
+    let defaultHeight: number;
+    let maskJson: string | undefined;
+
+    if (placement.source === "preset") {
+      const { preset } = placement;
+      imageUrl = preset.svgPath;
+      resolvedUrl = preset.svgPath;
+      defaultWidth = preset.defaultWidth;
+      defaultHeight = preset.defaultHeight;
+    } else {
+      const { object, resolvedUrl: ru } = placement;
+      imageUrl = object.attachmentId ? `attachment:${object.attachmentId}` : ru;
+      resolvedUrl = ru;
+      defaultWidth = 160;
+      defaultHeight = 160;
+      maskJson = object.maskData ?? undefined;
+    }
+
+    const x = maybeSnap(viewCX - defaultWidth / 2);
+    const y = maybeSnap(viewCY - defaultHeight / 2);
+
+    const node = await createCanvasNode(householdId, canvasId, {
+      label: placement.source === "preset" ? placement.preset.label : placement.object.name,
+      x, y,
+      width: defaultWidth,
+      height: defaultHeight,
+      objectType: "object",
+      imageUrl,
+      maskJson,
+      strokeWidth: 0,
+    });
+
+    setNodeImageUrls((prev) => new Map(prev).set(node.id, resolvedUrl));
+    const newNodes = [...nodes, node];
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+    setSelectedIds(new Set([node.id]));
   }, [householdId, canvasId, zoom, panX, panY, nodes, edges, maybeSnap, pushHistory]);
 
   // ─── Copy / Paste ─────────────────────────────────────────────────────────
@@ -1162,6 +1229,69 @@ export function CanvasRenderer({
               style={{ cursor }} {...nodeEvents} />
           )}
           {/* Selection outline */}
+          {isSelected ? (
+            <rect x={node.x} y={node.y} width={node.width} height={node.height}
+              fill="none" stroke="var(--accent)" strokeWidth={2}
+              pointerEvents="none" />
+          ) : null}
+          {isSelected && renderResizeHandles(node)}
+        </g>
+      );
+    }
+
+    if (node.objectType === "object") {
+      const imgUrl = nodeImageUrls.get(node.id);
+      // Parse maskJson to build a clip path if present
+      let clipId: string | null = null;
+      let clipPathEl: JSX.Element | null = null;
+      if (node.maskJson) {
+        try {
+          const mask = JSON.parse(node.maskJson) as
+            | { type: "crop"; x: number; y: number; w: number; h: number }
+            | { type: "polygon"; points: { x: number; y: number }[] };
+          clipId = `clip-${node.id}`;
+          if (mask.type === "crop") {
+            const cx = node.x + mask.x * node.width;
+            const cy = node.y + mask.y * node.height;
+            const cw = mask.w * node.width;
+            const ch = mask.h * node.height;
+            clipPathEl = (
+              <defs key={`defs-${node.id}`}>
+                <clipPath id={clipId}>
+                  <rect x={cx} y={cy} width={cw} height={ch} />
+                </clipPath>
+              </defs>
+            );
+          } else if (mask.type === "polygon") {
+            const pts = mask.points
+              .map((p) => `${node.x + p.x * node.width},${node.y + p.y * node.height}`)
+              .join(" ");
+            clipPathEl = (
+              <defs key={`defs-${node.id}`}>
+                <clipPath id={clipId}>
+                  <polygon points={pts} />
+                </clipPath>
+              </defs>
+            );
+          }
+        } catch {
+          clipId = null;
+        }
+      }
+      return (
+        <g key={node.id}>
+          {clipPathEl}
+          {imgUrl ? (
+            <image href={imgUrl}
+              x={node.x} y={node.y} width={node.width} height={node.height}
+              preserveAspectRatio="xMidYMid meet"
+              clipPath={clipId ? `url(#${clipId})` : undefined}
+              style={{ cursor }} {...nodeEvents} />
+          ) : (
+            <rect x={node.x} y={node.y} width={node.width} height={node.height}
+              fill="#f0f4f8" stroke={stroke} strokeWidth={sw}
+              style={{ cursor }} {...nodeEvents} />
+          )}
           {isSelected ? (
             <rect x={node.x} y={node.y} width={node.width} height={node.height}
               fill="none" stroke="var(--accent)" strokeWidth={2}
@@ -1412,6 +1542,9 @@ export function CanvasRenderer({
                       }} />
                   </label>
                   <span className="idea-canvas__bg-image-hint">PNG, JPG, WebP up to 50 MB</span>
+                  {bgUploadError ? (
+                    <span className="idea-canvas__upload-error" title={bgUploadError}>⚠️ {bgUploadError}</span>
+                  ) : null}
                 </>
               )}
             </div>
@@ -1538,6 +1671,20 @@ export function CanvasRenderer({
               e.target.value = "";
             }} />
         </label>
+        {imgObjUploadError ? (
+          <span className="idea-canvas__upload-error idea-canvas__upload-error--toolbar"
+            title={imgObjUploadError}
+            onClick={() => setImgObjUploadError(null)}>
+            ⚠️ {imgObjUploadError}
+          </span>
+        ) : null}
+        {/* Object library button */}
+        <button type="button"
+          className={`idea-canvas__tool-btn${activeTool === "object" || objectPickerOpen ? " idea-canvas__tool-btn--active" : ""}`}
+          title="Place object from library"
+          onClick={() => { setActiveTool("object"); setObjectPickerOpen((v) => !v); }}>
+          🧩 Object
+        </button>
         <div className="idea-canvas__toolbar-divider" />
         {/* Connect (only when a flowchart node selected) */}
         {allFlowchartSelected ? (
@@ -1809,7 +1956,7 @@ export function CanvasRenderer({
       {/* Hints */}
       {drag.type === "edge" ? (
         <div className="idea-canvas__hint">Click a target node to connect, or press Esc to cancel.</div>
-      ) : activeTool !== "select" && activeTool !== "pan" ? (
+      ) : activeTool !== "select" && activeTool !== "pan" && activeTool !== "object" ? (
         <div className="idea-canvas__hint">
           {activeTool === "node" ? "Click to place a flowchart node."
             : activeTool === "line" ? "Click and drag to draw a line."
@@ -1818,6 +1965,15 @@ export function CanvasRenderer({
           {" "}Press Esc to cancel.
         </div>
       ) : null}
+
+      {/* Object Picker overlay */}
+      {objectPickerOpen && (
+        <CanvasObjectPicker
+          householdId={householdId}
+          onPlace={(placement) => { void handlePlaceObject(placement); }}
+          onClose={() => { setObjectPickerOpen(false); setActiveTool("select"); }}
+        />
+      )}
     </div>
   );
 }

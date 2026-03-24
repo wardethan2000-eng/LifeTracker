@@ -101,6 +101,13 @@ const validateEntityOwnership = async (
       });
       return canvas !== null;
     }
+    case "canvas_object": {
+      const canvasObj = await prisma.canvasObject.findFirst({
+        where: { id: entityId, householdId, deletedAt: null },
+        select: { id: true },
+      });
+      return canvasObj !== null;
+    }
     default:
       return false;
   }

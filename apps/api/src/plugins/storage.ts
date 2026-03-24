@@ -7,6 +7,7 @@ import {
   HeadObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
+  PutBucketCorsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -60,6 +61,28 @@ export const storagePlugin = fp(async (app) => {
     } catch (createErr) {
       app.log.warn({ err: createErr }, `Could not create bucket "${config.bucket}". Storage operations will fail if it does not exist.`);
     }
+  }
+
+  // Configure CORS so the browser can PUT files directly to the bucket via presigned URLs.
+  try {
+    const corsOrigins = process.env.S3_CORS_ALLOWED_ORIGINS
+      ? process.env.S3_CORS_ALLOWED_ORIGINS.split(",").map(o => o.trim())
+      : ["*"];
+    await client.send(new PutBucketCorsCommand({
+      Bucket: config.bucket,
+      CORSConfiguration: {
+        CORSRules: [{
+          AllowedOrigins: corsOrigins,
+          AllowedMethods: ["GET", "PUT", "HEAD"],
+          AllowedHeaders: ["*"],
+          ExposeHeaders: ["ETag"],
+          MaxAgeSeconds: 3600,
+        }],
+      },
+    }));
+    app.log.info(`CORS configured for bucket "${config.bucket}".`);
+  } catch (corsErr) {
+    app.log.warn({ err: corsErr }, `Could not configure CORS for bucket "${config.bucket}". Browser uploads may fail due to CORS restrictions.`);
   }
 
   const storage: StorageService = {

@@ -500,6 +500,11 @@ import {
   type BatchUpdateCanvasNodesInput,
   type CreateCanvasEdgeInput,
   type UpdateCanvasEdgeInput,
+  canvasObjectSchema,
+  createCanvasObjectSchema,
+  type CanvasObject,
+  type CreateCanvasObjectInput,
+  type UpdateCanvasObjectInput,
   layoutPreferenceSchema,
   type LayoutPreference,
   type SaveLayoutPreferenceInput,
@@ -6125,6 +6130,60 @@ export const updateCanvasSettings = async (
   body: input,
   schema: ideaCanvasSchema,
 });
+
+// ─── Canvas Object Library ──────────────────────────────────────────────────
+
+export const fetchCanvasObjects = async (
+  householdId: string,
+  category?: string
+): Promise<CanvasObject[]> => {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  const query = params.toString();
+  return apiRequest({
+    path: `/v1/households/${householdId}/canvas-objects${query ? `?${query}` : ""}`,
+    schema: canvasObjectSchema.array(),
+  });
+};
+
+export const fetchCanvasObject = async (
+  householdId: string,
+  objectId: string
+): Promise<CanvasObject> => apiRequest({
+  path: `/v1/households/${householdId}/canvas-objects/${objectId}`,
+  schema: canvasObjectSchema,
+});
+
+export const createCanvasObject = async (
+  householdId: string,
+  input: CreateCanvasObjectInput
+): Promise<CanvasObject> => apiRequest({
+  path: `/v1/households/${householdId}/canvas-objects`,
+  method: "POST",
+  body: input,
+  schema: canvasObjectSchema,
+});
+
+export const updateCanvasObject = async (
+  householdId: string,
+  objectId: string,
+  input: UpdateCanvasObjectInput
+): Promise<CanvasObject> => apiRequest({
+  path: `/v1/households/${householdId}/canvas-objects/${objectId}`,
+  method: "PATCH",
+  body: input,
+  schema: canvasObjectSchema,
+});
+
+export const deleteCanvasObject = async (
+  householdId: string,
+  objectId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/canvas-objects/${objectId}`,
+    method: "DELETE",
+  });
+};
 
 // ─── Layout Preferences ───
 

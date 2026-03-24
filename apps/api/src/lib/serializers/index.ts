@@ -1,5 +1,6 @@
 export * from "./assets.js";
 export * from "./attachments.js";
+export * from "./canvas-objects.js";
 export * from "./comments.js";
 export * from "./compliance-analytics.js";
 export * from "./comparative-analytics.js";

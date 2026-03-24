@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 65" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- body (taller SUV profile) -->
+  <rect x="5" y="22" width="100" height="28" rx="4" fill="#c0ccd8" stroke="#4a6080"/>
+  <!-- cabin/roof extends further -->
+  <path d="M18 22 L24 6 L86 6 L92 22 Z" fill="#a8bcd0" stroke="#4a6080"/>
+  <!-- windows -->
+  <path d="M26 8 L22 20 L50 20 L50 8 Z" fill="#d8eeff" stroke="#6090b0" stroke-width="1.5"/>
+  <path d="M54 8 L54 20 L78 20 L74 8 Z" fill="#d8eeff" stroke="#6090b0" stroke-width="1.5"/>
+  <!-- rear window -->
+  <rect x="82" y="10" width="8" height="10" rx="2" fill="#d8eeff" stroke="#6090b0" stroke-width="1.5"/>
+  <!-- wheels -->
+  <circle cx="28" cy="50" r="10" fill="#334" stroke="#334"/>
+  <circle cx="28" cy="50" r="5.5" fill="#778" stroke="#556"/>
+  <circle cx="82" cy="50" r="10" fill="#334" stroke="#334"/>
+  <circle cx="82" cy="50" r="5.5" fill="#778" stroke="#556"/>
+  <!-- headlights -->
+  <rect x="100" y="30" width="5" height="8" rx="2" fill="#ffe080" stroke="#c0a000" stroke-width="1"/>
+  <rect x="5" y="30" width="5" height="8" rx="2" fill="#ff8888" stroke="#c04040" stroke-width="1"/>
+</svg>

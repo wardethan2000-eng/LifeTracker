@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- roof flat/slight pitch -->
+  <path d="M5 32 L60 8 L115 32 Z" fill="#a09080" stroke="#706050"/>
+  <!-- walls -->
+  <rect x="5" y="32" width="110" height="55" fill="#c8c0b0" stroke="#908070"/>
+  <!-- garage door - large -->
+  <rect x="20" y="38" width="75" height="46" rx="3" fill="#b8b0a0" stroke="#808070" stroke-width="2"/>
+  <!-- horizontal door panel lines -->
+  <line x1="22" y1="53" x2="93" y2="53" stroke="#909080" stroke-width="1.5"/>
+  <line x1="22" y1="65" x2="93" y2="65" stroke="#909080" stroke-width="1.5"/>
+  <line x1="22" y1="77" x2="93" y2="77" stroke="#909080" stroke-width="1.5"/>
+  <!-- door handle strip -->
+  <rect x="52" y="80" width="12" height="3" rx="1.5" fill="#808070"/>
+  <!-- side window -->
+  <rect x="100" y="42" width="12" height="10" rx="2" fill="#b0c8d8" stroke="#7090b0" stroke-width="1.5"/>
+</svg>

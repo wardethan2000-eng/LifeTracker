@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- body -->
+  <rect x="5" y="28" width="90" height="22" rx="4" fill="#c8d8e8" stroke="#4a6080"/>
+  <!-- cabin -->
+  <path d="M25 28 L32 10 L68 10 L75 28 Z" fill="#a8c0d8" stroke="#4a6080"/>
+  <!-- windows -->
+  <path d="M34 12 L30 26 L48 26 L48 12 Z" fill="#d8eeff" stroke="#6090b0" stroke-width="1.5"/>
+  <path d="M52 12 L52 26 L70 26 L66 12 Z" fill="#d8eeff" stroke="#6090b0" stroke-width="1.5"/>
+  <!-- wheels -->
+  <circle cx="25" cy="50" r="9" fill="#334" stroke="#334" stroke-width="1"/>
+  <circle cx="25" cy="50" r="5" fill="#778" stroke="#556" stroke-width="1"/>
+  <circle cx="75" cy="50" r="9" fill="#334" stroke="#334" stroke-width="1"/>
+  <circle cx="75" cy="50" r="5" fill="#778" stroke="#556" stroke-width="1"/>
+  <!-- headlights -->
+  <rect x="90" y="32" width="5" height="7" rx="2" fill="#ffe080" stroke="#c0a000" stroke-width="1"/>
+  <rect x="5" y="32" width="5" height="7" rx="2" fill="#ff8888" stroke="#c04040" stroke-width="1"/>
+</svg>

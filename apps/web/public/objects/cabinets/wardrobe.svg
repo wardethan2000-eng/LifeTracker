@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 120" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- body -->
+  <rect x="6" y="5" width="78" height="110" rx="4" fill="#d8d0c0" stroke="#808070"/>
+  <!-- double doors -->
+  <line x1="45" y1="8" x2="45" y2="110" stroke="#a09880" stroke-width="1.5"/>
+  <!-- door hinges -->
+  <rect x="9" y="28" width="5" height="8" rx="1" fill="#c0b888" stroke="#908070" stroke-width="1"/>
+  <rect x="9" y="70" width="5" height="8" rx="1" fill="#c0b888" stroke="#908070" stroke-width="1"/>
+  <rect x="76" y="28" width="5" height="8" rx="1" fill="#c0b888" stroke="#908070" stroke-width="1"/>
+  <rect x="76" y="70" width="5" height="8" rx="1" fill="#c0b888" stroke="#908070" stroke-width="1"/>
+  <!-- handles -->
+  <rect x="37" y="54" width="4" height="12" rx="2" fill="#b0a880" stroke="#908060"/>
+  <rect x="49" y="54" width="4" height="12" rx="2" fill="#b0a880" stroke="#908060"/>
+  <!-- top shelf bar -->
+  <line x1="9" y1="35" x2="82" y2="35" stroke="#c0b090" stroke-width="1.5" stroke-dasharray="4 3"/>
+</svg>

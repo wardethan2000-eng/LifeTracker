@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- frame / body -->
+  <path d="M12 38 L12 28 L30 28 L38 22 L55 22 L62 28 L85 28 L88 38 Z" fill="#b8c0d0" stroke="#4a6080"/>
+  <!-- seat/tank area -->
+  <rect x="36" y="15" width="22" height="14" rx="6" fill="#8090a8" stroke="#4a6080"/>
+  <!-- rider hump/seat -->
+  <ellipse cx="52" cy="22" rx="12" ry="6" fill="#6878a0" stroke="#4a6080"/>
+  <!-- front fork -->
+  <line x1="82" y1="28" x2="86" y2="44" stroke="#4a6080" stroke-width="3"/>
+  <!-- rear swingarm -->
+  <line x1="18" y1="34" x2="14" y2="44" stroke="#4a6080" stroke-width="3"/>
+  <!-- handlebars -->
+  <path d="M70 20 L78 16 M70 20 L78 24" stroke="#4a6080" stroke-width="2"/>
+  <!-- wheels -->
+  <circle cx="14" cy="46" r="12" fill="#223" stroke="#334" stroke-width="2"/>
+  <circle cx="14" cy="46" r="6" fill="#667" stroke="#556"/>
+  <circle cx="86" cy="46" r="12" fill="#223" stroke="#334" stroke-width="2"/>
+  <circle cx="86" cy="46" r="6" fill="#667" stroke="#556"/>
+</svg>

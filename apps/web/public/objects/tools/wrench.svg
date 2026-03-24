@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- handle -->
+  <rect x="46" y="40" width="8" height="56" rx="4" fill="#c0b080" stroke="#8a7030"/>
+  <!-- wrench head top -->
+  <path d="M30 18 Q22 8 30 5 Q42 2 44 12 L56 12 Q58 2 70 5 Q78 8 70 18 L62 30 L38 30 Z" fill="#808898" stroke="#606070" stroke-width="2"/>
+  <!-- wrench opening slot -->
+  <path d="M42 12 L50 22 L58 12" fill="#505868" stroke="none"/>
+</svg>

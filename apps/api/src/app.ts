@@ -73,6 +73,7 @@ import { ideaCanvasRoutes } from "./routes/canvases/index.js";
 import { ideaRoutes } from "./routes/ideas/index.js";
 import { ideaBulkRoutes } from "./routes/ideas/bulk.js";
 import { ideaExportRoutes } from "./routes/ideas/export.js";
+import { canvasObjectRoutes } from "./routes/canvas-objects/index.js";
 import { assetExportRoutes } from "./routes/assets/export.js";
 import { projectExportRoutes } from "./routes/projects/export.js";
 import { scheduleExportRoutes } from "./routes/schedules/export.js";
@@ -145,6 +146,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   ideaBulkRoutes,
   ideaExportRoutes,
   ideaRoutes,
+  canvasObjectRoutes,
   assetExportRoutes,
   projectExportRoutes,
   scheduleExportRoutes,

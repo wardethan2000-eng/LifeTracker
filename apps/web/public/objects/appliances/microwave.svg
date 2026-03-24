@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 70" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- body -->
+  <rect x="5" y="8" width="80" height="58" rx="5" fill="#d8d0c0" stroke="#908070"/>
+  <!-- door window -->
+  <rect x="10" y="14" width="48" height="40" rx="4" fill="#b8c8d8" stroke="#7080a0" stroke-width="2"/>
+  <!-- door handle -->
+  <rect x="58" y="30" width="5" height="14" rx="2" fill="#c0b090" stroke="#908060"/>
+  <!-- control panel right -->
+  <rect x="66" y="14" width="16" height="40" rx="3" fill="#c8c0b0" stroke="#a09880" stroke-width="1.5"/>
+  <!-- buttons -->
+  <circle cx="74" cy="26" r="5" fill="#e0d8c0" stroke="#a09880"/>
+  <circle cx="74" cy="40" r="5" fill="#e0d8c0" stroke="#a09880"/>
+  <circle cx="74" cy="52" r="3" fill="#d0c8a8" stroke="#a09880"/>
+  <!-- plate interior lines -->
+  <rect x="14" y="18" width="40" height="32" rx="3" fill="#c8d8e8" stroke="none"/>
+  <line x1="14" y1="34" x2="54" y2="34" stroke="#a0b8c8" stroke-width="1"/>
+</svg>

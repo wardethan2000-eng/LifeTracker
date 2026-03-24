@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 65" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- body -->
+  <rect x="5" y="25" width="110" height="28" rx="3" fill="#b8c8d8" stroke="#4a6080"/>
+  <!-- cab -->
+  <path d="M72 25 L78 8 L110 8 L115 25 Z" fill="#a0b8d0" stroke="#4a6080"/>
+  <!-- cab window -->
+  <path d="M80 10 L76 23 L108 23 L112 10 Z" fill="#d8eeff" stroke="#6090b0" stroke-width="1.5"/>
+  <!-- cargo bed details -->
+  <line x1="30" y1="27" x2="30" y2="50" stroke="#4a6080" stroke-width="1.5"/>
+  <line x1="55" y1="27" x2="55" y2="50" stroke="#4a6080" stroke-width="1.5"/>
+  <!-- wheels -->
+  <circle cx="28" cy="53" r="10" fill="#334" stroke="#334"/>
+  <circle cx="28" cy="53" r="5.5" fill="#778" stroke="#556"/>
+  <circle cx="92" cy="53" r="10" fill="#334" stroke="#334"/>
+  <circle cx="92" cy="53" r="5.5" fill="#778" stroke="#556"/>
+  <!-- headlight -->
+  <rect x="111" y="30" width="5" height="7" rx="2" fill="#ffe080" stroke="#c0a000" stroke-width="1"/>
+</svg>

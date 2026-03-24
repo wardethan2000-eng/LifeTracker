@@ -3868,6 +3868,7 @@ export const attachmentEntityTypeValues = [
   "inventory_item",
   "idea",
   "canvas",
+  "canvas_object",
 ] as const;
 
 export const attachmentEntityTypeSchema = z.enum(attachmentEntityTypeValues);
@@ -5580,7 +5581,7 @@ export const canvasEdgeStyleSchema = z.enum([
 export type CanvasEdgeStyle = z.infer<typeof canvasEdgeStyleSchema>;
 
 export const canvasObjectTypeSchema = z.enum([
-  "flowchart", "rect", "circle", "line", "text", "image"
+  "flowchart", "rect", "circle", "line", "text", "image", "object"
 ]);
 export type CanvasObjectType = z.infer<typeof canvasObjectTypeSchema>;
 
@@ -5608,6 +5609,7 @@ export const ideaCanvasNodeSchema = z.object({
   rotation: z.number(),
   sortOrder: z.number(),
   imageUrl: z.string().nullable().optional(),
+  maskJson: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -5756,6 +5758,53 @@ export const updateCanvasEdgeSchema = z.object({
   style: canvasEdgeStyleSchema.optional(),
 });
 export type UpdateCanvasEdgeInput = z.infer<typeof updateCanvasEdgeSchema>;
+
+// ─── Canvas Object Library ────────────────────────────────────────────────────
+
+export const canvasObjectCategoryValues = [
+  "vehicle", "furniture", "cabinet", "appliance", "structure",
+  "tool", "person", "electronics", "custom",
+] as const;
+export const canvasObjectCategorySchema = z.enum(canvasObjectCategoryValues);
+export type CanvasObjectCategory = z.infer<typeof canvasObjectCategorySchema>;
+
+export const canvasObjectImageSourceValues = ["preset", "uploaded"] as const;
+export const canvasObjectImageSourceSchema = z.enum(canvasObjectImageSourceValues);
+export type CanvasObjectImageSource = z.infer<typeof canvasObjectImageSourceSchema>;
+
+export const canvasObjectSchema = z.object({
+  id: z.string(),
+  householdId: z.string(),
+  name: z.string(),
+  category: canvasObjectCategorySchema,
+  imageSource: canvasObjectImageSourceSchema,
+  presetKey: z.string().nullable(),
+  attachmentId: z.string().nullable(),
+  maskData: z.string().nullable(),
+  deletedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type CanvasObject = z.infer<typeof canvasObjectSchema>;
+
+export const createCanvasObjectSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  category: canvasObjectCategorySchema,
+  imageSource: canvasObjectImageSourceSchema,
+  presetKey: z.string().max(200).optional().nullable(),
+  attachmentId: z.string().max(30).optional().nullable(),
+  maskData: z.string().optional().nullable(),
+});
+export type CreateCanvasObjectInput = z.infer<typeof createCanvasObjectSchema>;
+
+export const updateCanvasObjectSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  category: canvasObjectCategorySchema.optional(),
+  imageSource: canvasObjectImageSourceSchema.optional(),
+  maskData: z.string().optional().nullable(),
+  attachmentId: z.string().max(30).optional().nullable(),
+});
+export type UpdateCanvasObjectInput = z.infer<typeof updateCanvasObjectSchema>;
 
 // ─── Layout Preferences ───
 

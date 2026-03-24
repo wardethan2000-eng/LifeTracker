@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 80" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- TV screen body -->
+  <rect x="5" y="8" width="80" height="52" rx="5" fill="#1c1c24" stroke="#303040" stroke-width="2"/>
+  <!-- screen area -->
+  <rect x="10" y="13" width="70" height="42" rx="3" fill="#2030a0" stroke="none"/>
+  <!-- screen shine -->
+  <path d="M14 16 L30 16 L22 28 Z" fill="#ffffff" fill-opacity="0.08"/>
+  <!-- stand base -->
+  <rect x="28" y="60" width="34" height="6" rx="3" fill="#2a2a38" stroke="#303040"/>
+  <!-- stand pole -->
+  <rect x="40" y="56" width="10" height="8" rx="2" fill="#2a2a38" stroke="#303040"/>
+  <!-- power indicator -->
+  <circle cx="78" cy="56" r="2.5" fill="#40e040"/>
+</svg>

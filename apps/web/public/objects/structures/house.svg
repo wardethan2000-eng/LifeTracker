@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 100" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- roof -->
+  <path d="M5 42 L55 8 L105 42 Z" fill="#c08060" stroke="#8a5030"/>
+  <!-- walls -->
+  <rect x="15" y="42" width="80" height="52" fill="#e8dcc8" stroke="#a08060"/>
+  <!-- door -->
+  <rect x="42" y="66" width="22" height="28" rx="2" fill="#c8a870" stroke="#8a6040"/>
+  <circle cx="62" cy="82" r="2.5" fill="#a08040"/>
+  <!-- windows -->
+  <rect x="20" y="52" width="16" height="14" rx="2" fill="#b0d0e8" stroke="#7090b0" stroke-width="1.5"/>
+  <line x1="28" y1="52" x2="28" y2="66" stroke="#7090b0" stroke-width="1"/>
+  <line x1="20" y1="59" x2="36" y2="59" stroke="#7090b0" stroke-width="1"/>
+  <rect x="74" y="52" width="16" height="14" rx="2" fill="#b0d0e8" stroke="#7090b0" stroke-width="1.5"/>
+  <line x1="82" y1="52" x2="82" y2="66" stroke="#7090b0" stroke-width="1"/>
+  <line x1="74" y1="59" x2="90" y2="59" stroke="#7090b0" stroke-width="1"/>
+  <!-- chimney -->
+  <rect x="70" y="12" width="12" height="20" rx="2" fill="#b07858" stroke="#8a5030"/>
+</svg>

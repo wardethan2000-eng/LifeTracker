@@ -197,6 +197,8 @@ enum AttachmentEntityType {
   project_task
   inventory_item
   idea
+  canvas
+  canvas_object
 }
 
 // Distinguishes stock that gets consumed from durable gear.
@@ -419,6 +421,7 @@ model Household {
   ideas            Idea[]
   domainEvents     DomainEvent[]
   webhookEndpoints WebhookEndpoint[]
+  canvasObjects    CanvasObject[]
 
   @@index([createdById])
 }
@@ -2354,6 +2357,7 @@ model IdeaCanvasNode {
   shape       CanvasNodeShape @default(rectangle)
   objectType  String          @default("flowchart") @db.VarChar(20)
   imageUrl    String?         @db.VarChar(1000)
+  maskJson    String?         @db.Text
   rotation    Float           @default(0)
   sortOrder   Int             @default(0)
   createdAt   DateTime        @default(now())
@@ -2412,4 +2416,29 @@ model DashboardPin {
 
   @@unique([userId, entityType, entityId])
   @@index([userId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CANVAS OBJECTS                                                 ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A reusable household-scoped object (floor plan element, vehicle, furniture, etc.)
+// that can be placed on any IdeaCanvas as a positioned node.
+model CanvasObject {
+  id           String    @id @default(cuid())
+  householdId  String
+  name         String    @db.VarChar(200)
+  category     String    @db.VarChar(50)
+  imageSource  String    @db.VarChar(20)   // "preset" | "uploaded"
+  presetKey    String?   @db.VarChar(200)  // Relative path to bundled SVG, e.g. "/objects/vehicles/car.svg"
+  attachmentId String?   @db.VarChar(30)   // FK to Attachment record (not Prisma relation—avoids cross-schema coupling)
+  maskData     String?   @db.Text          // JSON: polygon clip path data in normalized 0–1 coords
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  household    Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([householdId, category])
+  @@index([householdId, deletedAt])
 }
