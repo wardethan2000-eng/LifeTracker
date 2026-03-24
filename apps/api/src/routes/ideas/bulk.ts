@@ -26,8 +26,8 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkMoveIdeasSchema.parse({ ...body, householdId });
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const ideas = await app.prisma.idea.findMany({
@@ -83,8 +83,8 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkArchiveIdeasSchema.parse({ ...body, householdId });
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const ideas = await app.prisma.idea.findMany({
@@ -141,8 +141,8 @@ export const ideaBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkSetIdeaPrioritySchema.parse({ ...body, householdId });
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const ideas = await app.prisma.idea.findMany({

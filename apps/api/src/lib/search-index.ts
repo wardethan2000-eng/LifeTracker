@@ -277,6 +277,20 @@ const syncSearchIndexPayloads = async (
   await Promise.all(validPayloads.map((payload) => upsertSearchIndexEntry(prisma, payload)));
 };
 
+const syncEntityToSearchIndex = async (
+  prisma: SearchPrisma,
+  entityType: SearchEntityType,
+  entityId: string,
+  buildPayloads: (prisma: SearchPrisma, id: string) => Promise<SearchPayload[] | null>
+): Promise<void> => {
+  const payloads = await buildPayloads(prisma, entityId);
+  if (!payloads) {
+    await deleteSearchIndexEntry(prisma, entityType, entityId);
+    return;
+  }
+  await syncSearchIndexPayloads(prisma, entityType, entityId, payloads);
+};
+
 const buildTsQuery = (query: string): string | null => {
   const terms = Array.from(query.toLowerCase().matchAll(/[\p{L}\p{N}]+/gu), (match) => match[0]).filter(Boolean);
 
@@ -727,760 +741,732 @@ export const querySearchIndex = async (
   return mapRowsToGroups(options.q, [...currentRows, ...historicalRows]);
 };
 
-export const syncSpaceToSearchIndex = async (prisma: SearchPrisma, spaceId: string): Promise<void> => {
-  const space = await prisma.space.findUnique({
-    where: { id: spaceId },
-    select: {
-      id: true,
-      householdId: true,
-      name: true,
-      shortCode: true,
-      type: true,
-      description: true,
-      notes: true,
-      deletedAt: true,
-      parent: {
-        select: {
-          name: true
-        }
-      }
-    }
-  });
-
-  if (!space || space.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "space", spaceId);
-    return;
-  }
-
-  const breadcrumb = await getSpaceBreadcrumb(prisma, space.id);
-  const breadcrumbText = breadcrumb.map((segment) => segment.name).join(" > ");
-
-  await syncSearchIndexPayloads(prisma, "space", space.id, [{
-    householdId: space.householdId,
-    entityType: "space",
-    entityId: space.id,
-    title: space.name,
-    subtitle: space.shortCode,
-    body: joinText(space.description, space.notes, space.type, breadcrumbText),
-    entityUrl: `/inventory/spaces/${space.id}?householdId=${space.householdId}`,
-    entityMeta: {
-      type: space.type,
-      shortCode: space.shortCode,
-      parentSpaceName: space.parent?.name ?? null,
-      breadcrumb: breadcrumbText
-    }
-  }]);
-};
-
-export const syncAssetToSearchIndex = async (prisma: SearchPrisma, assetId: string): Promise<void> => {
-  const asset = await prisma.asset.findUnique({
-    where: { id: assetId },
-    select: {
-      id: true,
-      householdId: true,
-      name: true,
-      manufacturer: true,
-      model: true,
-      serialNumber: true,
-      assetTag: true,
-      description: true,
-      customFields: true,
-      deletedAt: true,
-      isArchived: true,
-      category: true,
-      hobbyLinks: {
-        select: {
-          hobby: {
-            select: {
-              name: true,
-              hobbyType: true
-            }
-          },
-          role: true,
-          notes: true
-        }
-      }
-    }
-  });
-
-  if (!asset || asset.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "asset", assetId);
-    return;
-  }
-
-  const customFieldText = flattenSearchValues(asset.customFields).join(" ");
-  const hobbyText = asset.hobbyLinks.flatMap((link) => [
-    link.hobby.name,
-    link.hobby.hobbyType,
-    link.role,
-    link.notes
-  ]).filter(Boolean).join(" ");
-
-  await syncSearchIndexPayloads(prisma, "asset", asset.id, [{
-    householdId: asset.householdId,
-    entityType: "asset",
-    entityId: asset.id,
-    title: asset.name,
-    subtitle: joinText(asset.manufacturer, asset.model),
-    body: joinText(asset.description, asset.serialNumber, asset.assetTag, customFieldText, hobbyText),
-    entityUrl: `/assets/${asset.id}`,
-    entityMeta: {
-      category: asset.category,
-      isArchived: asset.isArchived
-    }
-  }]);
-};
-
-export const syncScheduleToSearchIndex = async (prisma: SearchPrisma, scheduleId: string): Promise<void> => {
-  const schedule = await prisma.maintenanceSchedule.findUnique({
-    where: { id: scheduleId },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      nextDueAt: true,
-      isActive: true,
-      deletedAt: true,
-      asset: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true,
-          deletedAt: true
-        }
-      }
-    }
-  });
-
-  if (!schedule || schedule.deletedAt || schedule.asset.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "schedule", scheduleId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "schedule", schedule.id, [{
-    householdId: schedule.asset.householdId,
-    entityType: "schedule",
-    entityId: schedule.id,
-    parentEntityId: schedule.asset.id,
-    parentEntityName: schedule.asset.name,
-    title: schedule.name,
-    body: schedule.description,
-    entityUrl: `/assets/${schedule.asset.id}?tab=maintenance`,
-    entityMeta: {
-      nextDueAt: schedule.nextDueAt?.toISOString() ?? null,
-      isActive: schedule.isActive
-    }
-  }]);
-};
-
-export const syncLogToSearchIndex = async (prisma: SearchPrisma, logId: string): Promise<void> => {
-  const log = await prisma.maintenanceLog.findUnique({
-    where: { id: logId },
-    select: {
-      id: true,
-      title: true,
-      notes: true,
-      completedAt: true,
-      deletedAt: true,
-      asset: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true,
-          deletedAt: true
-        }
-      }
-    }
-  });
-
-  if (!log || log.deletedAt || log.asset.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "log", logId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "log", log.id, [{
-    householdId: log.asset.householdId,
-    entityType: "log",
-    entityId: log.id,
-    parentEntityId: log.asset.id,
-    parentEntityName: log.asset.name,
-    title: log.title,
-    subtitle: log.completedAt.toISOString(),
-    body: log.notes,
-    entityUrl: `/assets/${log.asset.id}?tab=maintenance`,
-    entityMeta: {
-      completedAt: log.completedAt.toISOString()
-    }
-  }]);
-};
-
-export const syncProjectToSearchIndex = async (prisma: SearchPrisma, projectId: string): Promise<void> => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, deletedAt: null },
-    select: {
-      id: true,
-      householdId: true,
-      name: true,
-      description: true,
-      status: true,
-      deletedAt: true,
-      parentProjectId: true,
-      parentProject: {
-        select: { name: true }
-      },
-      phases: {
-        where: { deletedAt: null },
-        select: {
-          name: true,
-          description: true,
-          status: true,
-          supplies: {
-            where: { deletedAt: null },
-            select: {
-              name: true,
-              description: true,
-              supplier: true,
-              notes: true
-            }
+export const syncSpaceToSearchIndex = (prisma: SearchPrisma, spaceId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "space", spaceId, async (p, id) => {
+    const space = await p.space.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        name: true,
+        shortCode: true,
+        type: true,
+        description: true,
+        notes: true,
+        deletedAt: true,
+        parent: {
+          select: {
+            name: true
           }
         }
-      },
-      tasks: {
-        where: { deletedAt: null },
-        select: {
-          title: true,
-          description: true,
-          status: true,
-          taskType: true
-        }
-      },
-      expenses: {
-        where: { deletedAt: null },
-        select: {
-          description: true,
-          category: true,
-          notes: true
-        }
-      },
-      hobbyLinks: {
-        select: {
-          hobby: {
-            select: {
-              name: true,
-              hobbyType: true,
-              status: true
-            }
-          },
-          notes: true
-        }
-      }
-    }
-  });
-
-  if (!project || project.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "project", projectId);
-    return;
-  }
-
-  const phaseText = project.phases.flatMap((phase) => [
-    phase.name,
-    phase.description,
-    phase.status,
-    ...phase.supplies.flatMap((supply) => [supply.name, supply.description, supply.supplier, supply.notes])
-  ]).filter(Boolean).join(" ");
-  const taskText = project.tasks.flatMap((task) => [task.title, task.description, task.status, task.taskType]).filter(Boolean).join(" ");
-  const expenseText = project.expenses.flatMap((expense) => [expense.description, expense.category, expense.notes]).filter(Boolean).join(" ");
-  const hobbyText = project.hobbyLinks.flatMap((link) => [
-    link.hobby.name,
-    link.hobby.hobbyType,
-    link.hobby.status,
-    link.notes
-  ]).filter(Boolean).join(" ");
-
-  await syncSearchIndexPayloads(prisma, "project", project.id, [{
-    householdId: project.householdId,
-    entityType: "project",
-    entityId: project.id,
-    parentEntityId: project.parentProjectId ?? null,
-    parentEntityName: project.parentProject?.name ?? null,
-    title: project.name,
-    subtitle: project.status,
-    body: joinText(project.description, phaseText, taskText, expenseText, hobbyText),
-    entityUrl: `/projects/${project.id}?householdId=${project.householdId}`,
-    entityMeta: {
-      status: project.status
-    }
-  }]);
-};
-
-export const syncServiceProviderToSearchIndex = async (prisma: SearchPrisma, providerId: string): Promise<void> => {
-  const provider = await prisma.serviceProvider.findUnique({
-    where: { id: providerId },
-    select: {
-      id: true,
-      householdId: true,
-      name: true,
-      specialty: true,
-      email: true,
-      phone: true,
-      address: true,
-      notes: true
-    }
-  });
-
-  if (!provider) {
-    await deleteSearchIndexEntry(prisma, "service_provider", providerId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "service_provider", provider.id, [{
-    householdId: provider.householdId,
-    entityType: "service_provider",
-    entityId: provider.id,
-    title: provider.name,
-    subtitle: provider.specialty,
-    body: joinText(provider.email, provider.phone, provider.address, provider.notes),
-    entityUrl: `/service-providers?householdId=${provider.householdId}&highlight=${provider.id}`,
-    entityMeta: {
-      specialty: provider.specialty,
-      email: provider.email,
-      phone: provider.phone
-    }
-  }]);
-};
-
-export const syncInventoryItemToSearchIndex = async (prisma: SearchPrisma, itemId: string): Promise<void> => {
-  const item = await prisma.inventoryItem.findUnique({
-    where: { id: itemId },
-    select: {
-      id: true,
-      householdId: true,
-      name: true,
-      partNumber: true,
-      description: true,
-      manufacturer: true,
-      category: true,
-      quantityOnHand: true,
-      unit: true,
-      deletedAt: true,
-      hobbyLinks: {
-        select: {
-          hobby: {
-            select: {
-              name: true,
-              hobbyType: true
-            }
-          },
-          notes: true
-        }
-      }
-    }
-  });
-
-  if (!item || item.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "inventory_item", itemId);
-    return;
-  }
-
-  const hobbyText = item.hobbyLinks.flatMap((link) => [
-    link.hobby.name,
-    link.hobby.hobbyType,
-    link.notes
-  ]).filter(Boolean).join(" ");
-
-  await syncSearchIndexPayloads(prisma, "inventory_item", item.id, [{
-    householdId: item.householdId,
-    entityType: "inventory_item",
-    entityId: item.id,
-    title: item.name,
-    subtitle: joinText(item.manufacturer, item.partNumber),
-    body: joinText(item.description, item.partNumber, item.manufacturer, item.category, hobbyText),
-    entityUrl: `/inventory?householdId=${item.householdId}&highlight=${item.id}`,
-    entityMeta: {
-      category: item.category,
-      quantityOnHand: item.quantityOnHand,
-      unit: item.unit
-    }
-  }]);
-};
-
-export const syncCommentToSearchIndex = async (prisma: SearchPrisma, commentId: string): Promise<void> => {
-  const comment = await prisma.comment.findUnique({
-    where: { id: commentId },
-    select: {
-      id: true,
-      householdId: true,
-      entityType: true,
-      entityId: true,
-      body: true,
-      deletedAt: true,
-      updatedAt: true,
-      asset: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true,
-          deletedAt: true
-        }
-      },
-      project: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true,
-          deletedAt: true
-        }
-      },
-      hobby: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true
-        }
-      },
-      inventoryItem: {
-        select: {
-          id: true,
-          name: true,
-          householdId: true,
-          deletedAt: true
-        }
-      }
-    }
-  });
-
-  if (!comment || comment.deletedAt) {
-    await deleteSearchIndexEntry(prisma, "comment", commentId);
-    return;
-  }
-
-  const target = (() => {
-    switch (comment.entityType) {
-      case "asset":
-        if (!comment.asset || comment.asset.deletedAt) {
-          return null;
-        }
-
-        const asset = comment.asset;
-
-        return {
-          householdId: asset.householdId,
-          parentEntityId: asset.id,
-          parentEntityName: asset.name,
-          entityUrl: `/assets/${asset.id}?tab=comments`
-        };
-      case "project":
-        if (!comment.project || comment.project.deletedAt) {
-          return null;
-        }
-
-        const project = comment.project;
-
-        return {
-          householdId: project.householdId,
-          parentEntityId: project.id,
-          parentEntityName: project.name,
-          entityUrl: `/projects/${project.id}?householdId=${project.householdId}`
-        };
-      case "hobby":
-        if (!comment.hobby) {
-          return null;
-        }
-
-        const hobby = comment.hobby;
-
-        return {
-          householdId: hobby.householdId,
-          parentEntityId: hobby.id,
-          parentEntityName: hobby.name,
-          entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`
-        };
-      case "inventory_item":
-        if (!comment.inventoryItem || comment.inventoryItem.deletedAt) {
-          return null;
-        }
-
-        const inventoryItem = comment.inventoryItem;
-
-        return {
-          householdId: inventoryItem.householdId,
-          parentEntityId: inventoryItem.id,
-          parentEntityName: inventoryItem.name,
-          entityUrl: `/inventory?householdId=${inventoryItem.householdId}&highlight=${inventoryItem.id}`
-        };
-      default:
-        return null;
-    }
-  })();
-
-  if (!target) {
-    await deleteSearchIndexEntry(prisma, "comment", commentId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "comment", comment.id, [{
-    householdId: target.householdId,
-    entityType: "comment",
-    entityId: comment.id,
-    parentEntityId: target.parentEntityId,
-    parentEntityName: target.parentEntityName,
-    title: excerptComment(comment.body),
-    body: comment.body,
-    entityUrl: target.entityUrl,
-    entityMeta: {
-      entityType: comment.entityType,
-      updatedAt: comment.updatedAt.toISOString()
-    }
-  }]);
-};
-
-export const syncEntryToSearchIndex = async (prisma: SearchPrisma, entryId: string): Promise<void> => {
-  const entry = await prisma.entry.findUnique({
-    where: { id: entryId },
-    select: {
-      id: true,
-      householdId: true,
-      title: true,
-      body: true,
-      entityType: true,
-      entityId: true,
-      entryType: true,
-      tags: true,
-      measurements: true,
-      flags: {
-        select: { flag: true },
-        orderBy: [{ createdAt: "asc" }, { flag: "asc" }]
-      }
-    }
-  });
-
-  if (!entry) {
-    await deleteSearchIndexEntry(prisma, "entry", entryId);
-    return;
-  }
-
-  const target = await validateEntryTarget(prisma, entry.householdId, entry.entityType, entry.entityId);
-
-  if (target.status !== "ok") {
-    await deleteSearchIndexEntry(prisma, "entry", entryId);
-    return;
-  }
-
-  const measurements = Array.isArray(entry.measurements)
-    ? entry.measurements
-    : [];
-  const measurementText = measurements
-    .flatMap((measurement) => {
-      if (!measurement || typeof measurement !== "object" || Array.isArray(measurement)) {
-        return [];
-      }
-
-      const value = measurement as Record<string, unknown>;
-      return [value.name, value.value, value.unit].flatMap(flattenSearchValues);
-    })
-    .join(" ");
-  const flags = entry.flags.map((flag) => flag.flag);
-  const tags = Array.isArray(entry.tags) ? entry.tags.flatMap(flattenSearchValues) : [];
-
-  await syncSearchIndexPayloads(prisma, "entry", entry.id, [{
-    householdId: entry.householdId,
-    entityType: "entry",
-    entityId: entry.id,
-    parentEntityId: target.context.entityId,
-    parentEntityName: target.context.label,
-    title: excerptEntryTitle(entry.title, entry.body),
-    subtitle: entry.entryType,
-    body: joinText(entry.body, measurementText, tags.join(" ")),
-    entityUrl: target.context.entityUrl,
-    entityMeta: {
-      entryType: entry.entryType,
-      flags,
-      tags,
-      parentEntityType: target.context.entityType,
-      parentEntityId: target.context.entityId
-    }
-  }]);
-};
-
-export const syncInvitationToSearchIndex = async (prisma: SearchPrisma, invitationId: string): Promise<void> => {
-  const invitation = await prisma.householdInvitation.findUnique({
-    where: { id: invitationId },
-    select: {
-      id: true,
-      householdId: true,
-      email: true,
-      status: true,
-      expiresAt: true,
-      acceptedAt: true,
-      household: {
-        select: {
-          name: true
-        }
-      },
-      invitedBy: {
-        select: {
-          displayName: true
-        }
-      },
-      acceptedBy: {
-        select: {
-          displayName: true
-        }
-      }
-    }
-  });
-
-  if (!invitation) {
-    await deleteSearchIndexEntry(prisma, "invitation", invitationId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "invitation", invitation.id, [{
-    householdId: invitation.householdId,
-    entityType: "invitation",
-    entityId: invitation.id,
-    title: invitation.email,
-    subtitle: invitation.status,
-    body: joinText(
-      invitation.household.name,
-      invitation.invitedBy.displayName ? `Invited by ${invitation.invitedBy.displayName}` : null,
-      invitation.acceptedBy?.displayName ? `Accepted by ${invitation.acceptedBy.displayName}` : null,
-      `Expires ${invitation.expiresAt.toISOString()}`,
-      invitation.acceptedAt ? `Accepted ${invitation.acceptedAt.toISOString()}` : null
-    ),
-    entityUrl: `/invitations?householdId=${invitation.householdId}`,
-    entityMeta: {
-      status: invitation.status,
-      expiresAt: invitation.expiresAt.toISOString(),
-      acceptedAt: invitation.acceptedAt?.toISOString() ?? null
-    }
-  }]);
-};
-
-export const syncAssetTransferToSearchIndex = async (prisma: SearchPrisma, transferId: string): Promise<void> => {
-  const transfer = await prisma.assetTransfer.findUnique({
-    where: { id: transferId },
-    select: {
-      id: true,
-      transferType: true,
-      reason: true,
-      notes: true,
-      transferredAt: true,
-      fromHouseholdId: true,
-      toHouseholdId: true,
-      fromUserId: true,
-      toUserId: true,
-      initiatedById: true,
-      asset: {
-        select: {
-          id: true,
-          name: true
-        }
-      },
-      fromHousehold: {
-        select: {
-          id: true,
-          name: true
-        }
-      },
-      toHousehold: {
-        select: {
-          id: true,
-          name: true
-        }
-      },
-      fromUser: {
-        select: {
-          id: true,
-          displayName: true
-        }
-      },
-      toUser: {
-        select: {
-          id: true,
-          displayName: true
-        }
-      },
-      initiatedBy: {
-        select: {
-          id: true,
-          displayName: true
-        }
-      }
-    }
-  });
-
-  if (!transfer) {
-    await deleteSearchIndexEntry(prisma, "asset_transfer", transferId);
-    return;
-  }
-
-  const body = joinText(
-    transfer.reason,
-    transfer.notes,
-    transfer.fromUser.displayName ? `From user ${transfer.fromUser.displayName}` : null,
-    transfer.toUser.displayName ? `To user ${transfer.toUser.displayName}` : null,
-    `From household ${transfer.fromHousehold.name}`,
-    transfer.toHousehold?.name ? `To household ${transfer.toHousehold.name}` : null,
-    transfer.initiatedBy.displayName ? `Initiated by ${transfer.initiatedBy.displayName}` : null
-  );
-
-  const payloads: SearchPayload[] = [
-    {
-      householdId: transfer.fromHouseholdId,
-      entityType: "asset_transfer",
-      entityId: transfer.id,
-      parentEntityId: transfer.asset.id,
-      parentEntityName: transfer.asset.name,
-      title: formatTransferTitle(transfer.asset.name, transfer.transferType),
-      subtitle: formatTransferSubtitle(
-        transfer.fromUser.displayName,
-        transfer.toUser.displayName,
-        transfer.toHousehold?.name ?? null
-      ),
-      body,
-      entityUrl: `/activity?householdId=${transfer.fromHouseholdId}`,
-      entityMeta: {
-        transferType: transfer.transferType,
-        transferredAt: transfer.transferredAt.toISOString(),
-        fromHouseholdId: transfer.fromHouseholdId,
-        toHouseholdId: transfer.toHouseholdId,
-        fromUserId: transfer.fromUserId,
-        toUserId: transfer.toUserId,
-        initiatedById: transfer.initiatedById
-      }
-    }
-  ];
-
-  if (transfer.toHouseholdId && transfer.toHouseholdId !== transfer.fromHouseholdId) {
-    payloads.push({
-      householdId: transfer.toHouseholdId,
-      entityType: "asset_transfer",
-      entityId: transfer.id,
-      parentEntityId: transfer.asset.id,
-      parentEntityName: transfer.asset.name,
-      title: formatTransferTitle(transfer.asset.name, transfer.transferType),
-      subtitle: formatTransferSubtitle(
-        transfer.fromUser.displayName,
-        transfer.toUser.displayName,
-        transfer.toHousehold?.name ?? null
-      ),
-      body,
-      entityUrl: `/activity?householdId=${transfer.toHouseholdId}`,
-      entityMeta: {
-        transferType: transfer.transferType,
-        transferredAt: transfer.transferredAt.toISOString(),
-        fromHouseholdId: transfer.fromHouseholdId,
-        toHouseholdId: transfer.toHouseholdId,
-        fromUserId: transfer.fromUserId,
-        toUserId: transfer.toUserId,
-        initiatedById: transfer.initiatedById
       }
     });
-  }
 
-  await syncSearchIndexPayloads(prisma, "asset_transfer", transfer.id, payloads);
-};
+    if (!space || space.deletedAt) return null;
+
+    const breadcrumb = await getSpaceBreadcrumb(p, space.id);
+    const breadcrumbText = breadcrumb.map((segment) => segment.name).join(" > ");
+
+    return [{
+      householdId: space.householdId,
+      entityType: "space",
+      entityId: space.id,
+      title: space.name,
+      subtitle: space.shortCode,
+      body: joinText(space.description, space.notes, space.type, breadcrumbText),
+      entityUrl: `/inventory/spaces/${space.id}?householdId=${space.householdId}`,
+      entityMeta: {
+        type: space.type,
+        shortCode: space.shortCode,
+        parentSpaceName: space.parent?.name ?? null,
+        breadcrumb: breadcrumbText
+      }
+    }];
+  });
+
+export const syncAssetToSearchIndex = (prisma: SearchPrisma, assetId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "asset", assetId, async (p, id) => {
+    const asset = await p.asset.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        name: true,
+        manufacturer: true,
+        model: true,
+        serialNumber: true,
+        assetTag: true,
+        description: true,
+        customFields: true,
+        deletedAt: true,
+        isArchived: true,
+        category: true,
+        hobbyLinks: {
+          select: {
+            hobby: {
+              select: {
+                name: true,
+                hobbyType: true
+              }
+            },
+            role: true,
+            notes: true
+          }
+        }
+      }
+    });
+
+    if (!asset || asset.deletedAt) return null;
+
+    const customFieldText = flattenSearchValues(asset.customFields).join(" ");
+    const hobbyText = asset.hobbyLinks.flatMap((link) => [
+      link.hobby.name,
+      link.hobby.hobbyType,
+      link.role,
+      link.notes
+    ]).filter(Boolean).join(" ");
+
+    return [{
+      householdId: asset.householdId,
+      entityType: "asset",
+      entityId: asset.id,
+      title: asset.name,
+      subtitle: joinText(asset.manufacturer, asset.model),
+      body: joinText(asset.description, asset.serialNumber, asset.assetTag, customFieldText, hobbyText),
+      entityUrl: `/assets/${asset.id}`,
+      entityMeta: {
+        category: asset.category,
+        isArchived: asset.isArchived
+      }
+    }];
+  });
+
+export const syncScheduleToSearchIndex = (prisma: SearchPrisma, scheduleId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "schedule", scheduleId, async (p, id) => {
+    const schedule = await p.maintenanceSchedule.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        nextDueAt: true,
+        isActive: true,
+        deletedAt: true,
+        asset: {
+          select: {
+            id: true,
+            name: true,
+            householdId: true,
+            deletedAt: true
+          }
+        }
+      }
+    });
+
+    if (!schedule || schedule.deletedAt || schedule.asset.deletedAt) return null;
+
+    return [{
+      householdId: schedule.asset.householdId,
+      entityType: "schedule",
+      entityId: schedule.id,
+      parentEntityId: schedule.asset.id,
+      parentEntityName: schedule.asset.name,
+      title: schedule.name,
+      body: schedule.description,
+      entityUrl: `/assets/${schedule.asset.id}?tab=maintenance`,
+      entityMeta: {
+        nextDueAt: schedule.nextDueAt?.toISOString() ?? null,
+        isActive: schedule.isActive
+      }
+    }];
+  });
+
+export const syncLogToSearchIndex = (prisma: SearchPrisma, logId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "log", logId, async (p, id) => {
+    const log = await p.maintenanceLog.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        notes: true,
+        completedAt: true,
+        deletedAt: true,
+        asset: {
+          select: {
+            id: true,
+            name: true,
+            householdId: true,
+            deletedAt: true
+          }
+        }
+      }
+    });
+
+    if (!log || log.deletedAt || log.asset.deletedAt) return null;
+
+    return [{
+      householdId: log.asset.householdId,
+      entityType: "log",
+      entityId: log.id,
+      parentEntityId: log.asset.id,
+      parentEntityName: log.asset.name,
+      title: log.title,
+      subtitle: log.completedAt.toISOString(),
+      body: log.notes,
+      entityUrl: `/assets/${log.asset.id}?tab=maintenance`,
+      entityMeta: {
+        completedAt: log.completedAt.toISOString()
+      }
+    }];
+  });
+
+export const syncProjectToSearchIndex = (prisma: SearchPrisma, projectId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "project", projectId, async (p, id) => {
+    const project = await p.project.findUnique({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        householdId: true,
+        name: true,
+        description: true,
+        status: true,
+        deletedAt: true,
+        parentProjectId: true,
+        parentProject: {
+          select: { name: true }
+        },
+        phases: {
+          where: { deletedAt: null },
+          select: {
+            name: true,
+            description: true,
+            status: true,
+            supplies: {
+              where: { deletedAt: null },
+              select: {
+                name: true,
+                description: true,
+                supplier: true,
+                notes: true
+              }
+            }
+          }
+        },
+        tasks: {
+          where: { deletedAt: null },
+          select: {
+            title: true,
+            description: true,
+            status: true,
+            taskType: true
+          }
+        },
+        expenses: {
+          where: { deletedAt: null },
+          select: {
+            description: true,
+            category: true,
+            notes: true
+          }
+        },
+        hobbyLinks: {
+          select: {
+            hobby: {
+              select: {
+                name: true,
+                hobbyType: true,
+                status: true
+              }
+            },
+            notes: true
+          }
+        }
+      }
+    });
+
+    if (!project || project.deletedAt) return null;
+
+    const phaseText = project.phases.flatMap((phase) => [
+      phase.name,
+      phase.description,
+      phase.status,
+      ...phase.supplies.flatMap((supply) => [supply.name, supply.description, supply.supplier, supply.notes])
+    ]).filter(Boolean).join(" ");
+    const taskText = project.tasks.flatMap((task) => [task.title, task.description, task.status, task.taskType]).filter(Boolean).join(" ");
+    const expenseText = project.expenses.flatMap((expense) => [expense.description, expense.category, expense.notes]).filter(Boolean).join(" ");
+    const hobbyText = project.hobbyLinks.flatMap((link) => [
+      link.hobby.name,
+      link.hobby.hobbyType,
+      link.hobby.status,
+      link.notes
+    ]).filter(Boolean).join(" ");
+
+    return [{
+      householdId: project.householdId,
+      entityType: "project",
+      entityId: project.id,
+      parentEntityId: project.parentProjectId ?? null,
+      parentEntityName: project.parentProject?.name ?? null,
+      title: project.name,
+      subtitle: project.status,
+      body: joinText(project.description, phaseText, taskText, expenseText, hobbyText),
+      entityUrl: `/projects/${project.id}?householdId=${project.householdId}`,
+      entityMeta: {
+        status: project.status
+      }
+    }];
+  });
+
+export const syncServiceProviderToSearchIndex = (prisma: SearchPrisma, providerId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "service_provider", providerId, async (p, id) => {
+    const provider = await p.serviceProvider.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        name: true,
+        specialty: true,
+        email: true,
+        phone: true,
+        address: true,
+        notes: true
+      }
+    });
+
+    if (!provider) return null;
+
+    return [{
+      householdId: provider.householdId,
+      entityType: "service_provider",
+      entityId: provider.id,
+      title: provider.name,
+      subtitle: provider.specialty,
+      body: joinText(provider.email, provider.phone, provider.address, provider.notes),
+      entityUrl: `/service-providers?householdId=${provider.householdId}&highlight=${provider.id}`,
+      entityMeta: {
+        specialty: provider.specialty,
+        email: provider.email,
+        phone: provider.phone
+      }
+    }];
+  });
+
+export const syncInventoryItemToSearchIndex = (prisma: SearchPrisma, itemId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "inventory_item", itemId, async (p, id) => {
+    const item = await p.inventoryItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        name: true,
+        partNumber: true,
+        description: true,
+        manufacturer: true,
+        category: true,
+        quantityOnHand: true,
+        unit: true,
+        deletedAt: true,
+        hobbyLinks: {
+          select: {
+            hobby: {
+              select: {
+                name: true,
+                hobbyType: true
+              }
+            },
+            notes: true
+          }
+        }
+      }
+    });
+
+    if (!item || item.deletedAt) return null;
+
+    const hobbyText = item.hobbyLinks.flatMap((link) => [
+      link.hobby.name,
+      link.hobby.hobbyType,
+      link.notes
+    ]).filter(Boolean).join(" ");
+
+    return [{
+      householdId: item.householdId,
+      entityType: "inventory_item",
+      entityId: item.id,
+      title: item.name,
+      subtitle: joinText(item.manufacturer, item.partNumber),
+      body: joinText(item.description, item.partNumber, item.manufacturer, item.category, hobbyText),
+      entityUrl: `/inventory?householdId=${item.householdId}&highlight=${item.id}`,
+      entityMeta: {
+        category: item.category,
+        quantityOnHand: item.quantityOnHand,
+        unit: item.unit
+      }
+    }];
+  });
+
+export const syncCommentToSearchIndex = (prisma: SearchPrisma, commentId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "comment", commentId, async (p, id) => {
+    const comment = await p.comment.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        entityType: true,
+        entityId: true,
+        body: true,
+        deletedAt: true,
+        updatedAt: true,
+        asset: {
+          select: {
+            id: true,
+            name: true,
+            householdId: true,
+            deletedAt: true
+          }
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            householdId: true,
+            deletedAt: true
+          }
+        },
+        hobby: {
+          select: {
+            id: true,
+            name: true,
+            householdId: true
+          }
+        },
+        inventoryItem: {
+          select: {
+            id: true,
+            name: true,
+            householdId: true,
+            deletedAt: true
+          }
+        }
+      }
+    });
+
+    if (!comment || comment.deletedAt) return null;
+
+    const target = (() => {
+      switch (comment.entityType) {
+        case "asset":
+          if (!comment.asset || comment.asset.deletedAt) {
+            return null;
+          }
+
+          const asset = comment.asset;
+
+          return {
+            householdId: asset.householdId,
+            parentEntityId: asset.id,
+            parentEntityName: asset.name,
+            entityUrl: `/assets/${asset.id}?tab=comments`
+          };
+        case "project":
+          if (!comment.project || comment.project.deletedAt) {
+            return null;
+          }
+
+          const project = comment.project;
+
+          return {
+            householdId: project.householdId,
+            parentEntityId: project.id,
+            parentEntityName: project.name,
+            entityUrl: `/projects/${project.id}?householdId=${project.householdId}`
+          };
+        case "hobby":
+          if (!comment.hobby) {
+            return null;
+          }
+
+          const hobby = comment.hobby;
+
+          return {
+            householdId: hobby.householdId,
+            parentEntityId: hobby.id,
+            parentEntityName: hobby.name,
+            entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`
+          };
+        case "inventory_item":
+          if (!comment.inventoryItem || comment.inventoryItem.deletedAt) {
+            return null;
+          }
+
+          const inventoryItem = comment.inventoryItem;
+
+          return {
+            householdId: inventoryItem.householdId,
+            parentEntityId: inventoryItem.id,
+            parentEntityName: inventoryItem.name,
+            entityUrl: `/inventory?householdId=${inventoryItem.householdId}&highlight=${inventoryItem.id}`
+          };
+        default:
+          return null;
+      }
+    })();
+
+    if (!target) return null;
+
+    return [{
+      householdId: target.householdId,
+      entityType: "comment",
+      entityId: comment.id,
+      parentEntityId: target.parentEntityId,
+      parentEntityName: target.parentEntityName,
+      title: excerptComment(comment.body),
+      body: comment.body,
+      entityUrl: target.entityUrl,
+      entityMeta: {
+        entityType: comment.entityType,
+        updatedAt: comment.updatedAt.toISOString()
+      }
+    }];
+  });
+
+export const syncEntryToSearchIndex = (prisma: SearchPrisma, entryId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "entry", entryId, async (p, id) => {
+    const entry = await p.entry.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        title: true,
+        body: true,
+        entityType: true,
+        entityId: true,
+        entryType: true,
+        tags: true,
+        measurements: true,
+        flags: {
+          select: { flag: true },
+          orderBy: [{ createdAt: "asc" }, { flag: "asc" }]
+        }
+      }
+    });
+
+    if (!entry) return null;
+
+    const target = await validateEntryTarget(p, entry.householdId, entry.entityType, entry.entityId);
+
+    if (target.status !== "ok") return null;
+
+    const measurements = Array.isArray(entry.measurements)
+      ? entry.measurements
+      : [];
+    const measurementText = measurements
+      .flatMap((measurement) => {
+        if (!measurement || typeof measurement !== "object" || Array.isArray(measurement)) {
+          return [];
+        }
+
+        const value = measurement as Record<string, unknown>;
+        return [value.name, value.value, value.unit].flatMap(flattenSearchValues);
+      })
+      .join(" ");
+    const flags = entry.flags.map((flag) => flag.flag);
+    const tags = Array.isArray(entry.tags) ? entry.tags.flatMap(flattenSearchValues) : [];
+
+    return [{
+      householdId: entry.householdId,
+      entityType: "entry",
+      entityId: entry.id,
+      parentEntityId: target.context.entityId,
+      parentEntityName: target.context.label,
+      title: excerptEntryTitle(entry.title, entry.body),
+      subtitle: entry.entryType,
+      body: joinText(entry.body, measurementText, tags.join(" ")),
+      entityUrl: target.context.entityUrl,
+      entityMeta: {
+        entryType: entry.entryType,
+        flags,
+        tags,
+        parentEntityType: target.context.entityType,
+        parentEntityId: target.context.entityId
+      }
+    }];
+  });
+
+export const syncInvitationToSearchIndex = (prisma: SearchPrisma, invitationId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "invitation", invitationId, async (p, id) => {
+    const invitation = await p.householdInvitation.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        email: true,
+        status: true,
+        expiresAt: true,
+        acceptedAt: true,
+        household: {
+          select: {
+            name: true
+          }
+        },
+        invitedBy: {
+          select: {
+            displayName: true
+          }
+        },
+        acceptedBy: {
+          select: {
+            displayName: true
+          }
+        }
+      }
+    });
+
+    if (!invitation) return null;
+
+    return [{
+      householdId: invitation.householdId,
+      entityType: "invitation",
+      entityId: invitation.id,
+      title: invitation.email,
+      subtitle: invitation.status,
+      body: joinText(
+        invitation.household.name,
+        invitation.invitedBy.displayName ? `Invited by ${invitation.invitedBy.displayName}` : null,
+        invitation.acceptedBy?.displayName ? `Accepted by ${invitation.acceptedBy.displayName}` : null,
+        `Expires ${invitation.expiresAt.toISOString()}`,
+        invitation.acceptedAt ? `Accepted ${invitation.acceptedAt.toISOString()}` : null
+      ),
+      entityUrl: `/invitations?householdId=${invitation.householdId}`,
+      entityMeta: {
+        status: invitation.status,
+        expiresAt: invitation.expiresAt.toISOString(),
+        acceptedAt: invitation.acceptedAt?.toISOString() ?? null
+      }
+    }];
+  });
+
+export const syncAssetTransferToSearchIndex = (prisma: SearchPrisma, transferId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "asset_transfer", transferId, async (p, id) => {
+    const transfer = await p.assetTransfer.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        transferType: true,
+        reason: true,
+        notes: true,
+        transferredAt: true,
+        fromHouseholdId: true,
+        toHouseholdId: true,
+        fromUserId: true,
+        toUserId: true,
+        initiatedById: true,
+        asset: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        fromHousehold: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        toHousehold: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        fromUser: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        },
+        toUser: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        },
+        initiatedBy: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        }
+      }
+    });
+
+    if (!transfer) return null;
+
+    const body = joinText(
+      transfer.reason,
+      transfer.notes,
+      transfer.fromUser.displayName ? `From user ${transfer.fromUser.displayName}` : null,
+      transfer.toUser.displayName ? `To user ${transfer.toUser.displayName}` : null,
+      `From household ${transfer.fromHousehold.name}`,
+      transfer.toHousehold?.name ? `To household ${transfer.toHousehold.name}` : null,
+      transfer.initiatedBy.displayName ? `Initiated by ${transfer.initiatedBy.displayName}` : null
+    );
+
+    const payloads: SearchPayload[] = [
+      {
+        householdId: transfer.fromHouseholdId,
+        entityType: "asset_transfer",
+        entityId: transfer.id,
+        parentEntityId: transfer.asset.id,
+        parentEntityName: transfer.asset.name,
+        title: formatTransferTitle(transfer.asset.name, transfer.transferType),
+        subtitle: formatTransferSubtitle(
+          transfer.fromUser.displayName,
+          transfer.toUser.displayName,
+          transfer.toHousehold?.name ?? null
+        ),
+        body,
+        entityUrl: `/activity?householdId=${transfer.fromHouseholdId}`,
+        entityMeta: {
+          transferType: transfer.transferType,
+          transferredAt: transfer.transferredAt.toISOString(),
+          fromHouseholdId: transfer.fromHouseholdId,
+          toHouseholdId: transfer.toHouseholdId,
+          fromUserId: transfer.fromUserId,
+          toUserId: transfer.toUserId,
+          initiatedById: transfer.initiatedById
+        }
+      }
+    ];
+
+    if (transfer.toHouseholdId && transfer.toHouseholdId !== transfer.fromHouseholdId) {
+      payloads.push({
+        householdId: transfer.toHouseholdId,
+        entityType: "asset_transfer",
+        entityId: transfer.id,
+        parentEntityId: transfer.asset.id,
+        parentEntityName: transfer.asset.name,
+        title: formatTransferTitle(transfer.asset.name, transfer.transferType),
+        subtitle: formatTransferSubtitle(
+          transfer.fromUser.displayName,
+          transfer.toUser.displayName,
+          transfer.toHousehold?.name ?? null
+        ),
+        body,
+        entityUrl: `/activity?householdId=${transfer.toHouseholdId}`,
+        entityMeta: {
+          transferType: transfer.transferType,
+          transferredAt: transfer.transferredAt.toISOString(),
+          fromHouseholdId: transfer.fromHouseholdId,
+          toHouseholdId: transfer.toHouseholdId,
+          fromUserId: transfer.fromUserId,
+          toUserId: transfer.toUserId,
+          initiatedById: transfer.initiatedById
+        }
+      });
+    }
+
+    return payloads;
+  });
 
 export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId: string): Promise<void> => {
   const asset = await prisma.asset.findUnique({
@@ -1508,377 +1494,367 @@ export const syncAssetFamilyToSearchIndex = async (prisma: SearchPrisma, assetId
   ]);
 };
 
-export const syncHobbyToSearchIndex = async (prisma: SearchPrisma, hobbyId: string): Promise<void> => {
-  const hobby = await prisma.hobby.findUnique({
-    where: { id: hobbyId },
-    select: {
-      id: true,
-      householdId: true,
-      name: true,
-      description: true,
-      activityMode: true,
-      hobbyType: true,
-      status: true,
-      notes: true,
-      customFields: true,
-      assetLinks: {
-        select: {
-          asset: {
-            select: {
-              name: true,
-              category: true
-            }
-          },
-          role: true,
-          notes: true
-        }
-      },
-      inventoryLinks: {
-        select: {
-          inventoryItem: {
-            select: {
-              name: true,
-              category: true,
-              manufacturer: true
-            }
-          },
-          notes: true
-        }
-      },
-      projectLinks: {
-        select: {
-          project: {
-            select: {
-              name: true,
-              status: true
-            }
-          },
-          notes: true
+export const syncHobbyToSearchIndex = (prisma: SearchPrisma, hobbyId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "hobby", hobbyId, async (p, id) => {
+    const hobby = await p.hobby.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        name: true,
+        description: true,
+        activityMode: true,
+        hobbyType: true,
+        status: true,
+        notes: true,
+        customFields: true,
+        assetLinks: {
+          select: {
+            asset: {
+              select: {
+                name: true,
+                category: true
+              }
+            },
+            role: true,
+            notes: true
+          }
+        },
+        inventoryLinks: {
+          select: {
+            inventoryItem: {
+              select: {
+                name: true,
+                category: true,
+                manufacturer: true
+              }
+            },
+            notes: true
+          }
+        },
+        projectLinks: {
+          select: {
+            project: {
+              select: {
+                name: true,
+                status: true
+              }
+            },
+            notes: true
+          }
         }
       }
-    }
+    });
+
+    if (!hobby) return null;
+
+    const customFieldText = flattenSearchValues(hobby.customFields).join(" ");
+    const assetText = hobby.assetLinks.flatMap((link) => [
+      link.asset.name,
+      link.asset.category,
+      link.role,
+      link.notes
+    ]).filter(Boolean).join(" ");
+    const inventoryText = hobby.inventoryLinks.flatMap((link) => [
+      link.inventoryItem.name,
+      link.inventoryItem.category,
+      link.inventoryItem.manufacturer,
+      link.notes
+    ]).filter(Boolean).join(" ");
+    const projectText = hobby.projectLinks.flatMap((link) => [
+      link.project.name,
+      link.project.status,
+      link.notes
+    ]).filter(Boolean).join(" ");
+
+    return [{
+      householdId: hobby.householdId,
+      entityType: "hobby",
+      entityId: hobby.id,
+      title: hobby.name,
+      subtitle: hobby.hobbyType ?? hobby.activityMode,
+      body: joinText(hobby.description, hobby.hobbyType, hobby.activityMode, hobby.notes, customFieldText, assetText, inventoryText, projectText),
+      entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`,
+      entityMeta: {
+        status: hobby.status,
+        hobbyType: hobby.hobbyType,
+        activityMode: hobby.activityMode
+      }
+    }];
   });
 
-  if (!hobby) {
-    await deleteSearchIndexEntry(prisma, "hobby", hobbyId);
-    return;
-  }
+export const syncIdeaToSearchIndex = (prisma: SearchPrisma, ideaId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "idea", ideaId, async (p, id) => {
+    const idea = await p.idea.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        title: true,
+        description: true,
+        stage: true,
+        priority: true,
+        category: true,
+      }
+    });
 
-  const customFieldText = flattenSearchValues(hobby.customFields).join(" ");
-  const assetText = hobby.assetLinks.flatMap((link) => [
-    link.asset.name,
-    link.asset.category,
-    link.role,
-    link.notes
-  ]).filter(Boolean).join(" ");
-  const inventoryText = hobby.inventoryLinks.flatMap((link) => [
-    link.inventoryItem.name,
-    link.inventoryItem.category,
-    link.inventoryItem.manufacturer,
-    link.notes
-  ]).filter(Boolean).join(" ");
-  const projectText = hobby.projectLinks.flatMap((link) => [
-    link.project.name,
-    link.project.status,
-    link.notes
-  ]).filter(Boolean).join(" ");
+    if (!idea) return null;
 
-  await syncSearchIndexPayloads(prisma, "hobby", hobby.id, [{
-    householdId: hobby.householdId,
-    entityType: "hobby",
-    entityId: hobby.id,
-    title: hobby.name,
-    subtitle: hobby.hobbyType ?? hobby.activityMode,
-    body: joinText(hobby.description, hobby.hobbyType, hobby.activityMode, hobby.notes, customFieldText, assetText, inventoryText, projectText),
-    entityUrl: `/hobbies/${hobby.id}?householdId=${hobby.householdId}`,
-    entityMeta: {
-      status: hobby.status,
-      hobbyType: hobby.hobbyType,
-      activityMode: hobby.activityMode
-    }
-  }]);
-};
-
-export const syncIdeaToSearchIndex = async (prisma: SearchPrisma, ideaId: string): Promise<void> => {
-  const idea = await prisma.idea.findUnique({
-    where: { id: ideaId },
-    select: {
-      id: true,
-      householdId: true,
-      title: true,
-      description: true,
-      stage: true,
-      priority: true,
-      category: true,
-    }
+    return [{
+      householdId: idea.householdId,
+      entityType: "idea",
+      entityId: idea.id,
+      title: idea.title,
+      subtitle: idea.category ?? idea.stage,
+      body: joinText(idea.description, idea.stage, idea.priority, idea.category),
+      entityUrl: `/ideas/${idea.id}?householdId=${idea.householdId}`,
+      entityMeta: {
+        stage: idea.stage,
+        priority: idea.priority,
+        category: idea.category
+      }
+    }];
   });
 
-  if (!idea) {
-    await deleteSearchIndexEntry(prisma, "idea", ideaId);
-    return;
-  }
-
-  await syncSearchIndexPayloads(prisma, "idea", idea.id, [{
-    householdId: idea.householdId,
-    entityType: "idea",
-    entityId: idea.id,
-    title: idea.title,
-    subtitle: idea.category ?? idea.stage,
-    body: joinText(idea.description, idea.stage, idea.priority, idea.category),
-    entityUrl: `/ideas/${idea.id}?householdId=${idea.householdId}`,
-    entityMeta: {
-      stage: idea.stage,
-      priority: idea.priority,
-      category: idea.category
-    }
-  }]);
-};
-
-export const syncHobbyProjectToSearchIndex = async (prisma: SearchPrisma, hobbyProjectId: string): Promise<void> => {
-  const project = await prisma.hobbyProject.findUnique({
-    where: { id: hobbyProjectId },
-    select: {
-      id: true,
-      householdId: true,
-      hobbyId: true,
-      name: true,
-      description: true,
-      status: true,
-      difficulty: true,
-      notes: true,
-      tags: true,
-      hobby: {
-        select: {
-          name: true,
-          hobbyType: true,
-        }
-      },
-      milestones: {
-        select: {
-          name: true,
-          description: true,
-          notes: true,
-          status: true,
-        }
-      },
-      workLogs: {
-        select: {
-          description: true,
-          notes: true,
-        }
-      },
-      inventoryItems: {
-        select: {
-          notes: true,
-          inventoryItem: {
-            select: {
-              name: true,
-              category: true,
-              manufacturer: true,
+export const syncHobbyProjectToSearchIndex = (prisma: SearchPrisma, hobbyProjectId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "hobby_project", hobbyProjectId, async (p, id) => {
+    const project = await p.hobbyProject.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        householdId: true,
+        hobbyId: true,
+        name: true,
+        description: true,
+        status: true,
+        difficulty: true,
+        notes: true,
+        tags: true,
+        hobby: {
+          select: {
+            name: true,
+            hobbyType: true,
+          }
+        },
+        milestones: {
+          select: {
+            name: true,
+            description: true,
+            notes: true,
+            status: true,
+          }
+        },
+        workLogs: {
+          select: {
+            description: true,
+            notes: true,
+          }
+        },
+        inventoryItems: {
+          select: {
+            notes: true,
+            inventoryItem: {
+              select: {
+                name: true,
+                category: true,
+                manufacturer: true,
+              }
             }
           }
         }
       }
-    }
+    });
+
+    if (!project) return null;
+
+    const tagText = Array.isArray(project.tags) ? project.tags.flatMap(flattenSearchValues).join(" ") : "";
+    const milestoneText = project.milestones.flatMap((milestone) => [
+      milestone.name,
+      milestone.description,
+      milestone.notes,
+      milestone.status,
+    ]).filter(Boolean).join(" ");
+    const workLogText = project.workLogs.flatMap((workLog) => [workLog.description, workLog.notes]).filter(Boolean).join(" ");
+    const inventoryText = project.inventoryItems.flatMap((link) => [
+      link.inventoryItem.name,
+      link.inventoryItem.category,
+      link.inventoryItem.manufacturer,
+      link.notes,
+    ]).filter(Boolean).join(" ");
+
+    return [{
+      householdId: project.householdId,
+      entityType: "hobby_project",
+      entityId: project.id,
+      parentEntityId: project.hobbyId,
+      parentEntityName: project.hobby.name,
+      title: project.name,
+      subtitle: joinText(project.hobby.name, project.status),
+      body: joinText(
+        project.description,
+        project.notes,
+        project.difficulty,
+        project.hobby.hobbyType,
+        tagText,
+        milestoneText,
+        workLogText,
+        inventoryText
+      ),
+      entityUrl: `/hobbies/${project.hobbyId}?householdId=${project.householdId}&projectId=${project.id}`,
+      entityMeta: {
+        status: project.status,
+        hobbyId: project.hobbyId,
+        difficulty: project.difficulty,
+      }
+    }];
   });
 
-  if (!project) {
-    await deleteSearchIndexEntry(prisma, "hobby_project", hobbyProjectId);
-    return;
-  }
-
-  const tagText = Array.isArray(project.tags) ? project.tags.flatMap(flattenSearchValues).join(" ") : "";
-  const milestoneText = project.milestones.flatMap((milestone) => [
-    milestone.name,
-    milestone.description,
-    milestone.notes,
-    milestone.status,
-  ]).filter(Boolean).join(" ");
-  const workLogText = project.workLogs.flatMap((workLog) => [workLog.description, workLog.notes]).filter(Boolean).join(" ");
-  const inventoryText = project.inventoryItems.flatMap((link) => [
-    link.inventoryItem.name,
-    link.inventoryItem.category,
-    link.inventoryItem.manufacturer,
-    link.notes,
-  ]).filter(Boolean).join(" ");
-
-  await syncSearchIndexPayloads(prisma, "hobby_project", project.id, [{
-    householdId: project.householdId,
-    entityType: "hobby_project",
-    entityId: project.id,
-    parentEntityId: project.hobbyId,
-    parentEntityName: project.hobby.name,
-    title: project.name,
-    subtitle: joinText(project.hobby.name, project.status),
-    body: joinText(
-      project.description,
-      project.notes,
-      project.difficulty,
-      project.hobby.hobbyType,
-      tagText,
-      milestoneText,
-      workLogText,
-      inventoryText
-    ),
-    entityUrl: `/hobbies/${project.hobbyId}?householdId=${project.householdId}&projectId=${project.id}`,
-    entityMeta: {
-      status: project.status,
-      hobbyId: project.hobbyId,
-      difficulty: project.difficulty,
-    }
-  }]);
-};
-
-export const syncHobbySeriesToSearchIndex = async (prisma: SearchPrisma, seriesId: string): Promise<void> => {
-  const series = await prisma.hobbySeries.findUnique({
-    where: { id: seriesId },
-    select: {
-      id: true,
-      hobbyId: true,
-      householdId: true,
-      name: true,
-      description: true,
-      status: true,
-      batchCount: true,
-      tags: true,
-      notes: true,
-      coverImageUrl: true,
-      hobby: {
-        select: {
-          name: true,
-          activityMode: true,
-          hobbyType: true
-        }
-      },
-      bestBatchSession: {
-        select: { name: true }
-      },
-      sessions: {
-        select: {
-          name: true,
-          recipe: { select: { name: true } }
+export const syncHobbySeriesToSearchIndex = (prisma: SearchPrisma, seriesId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "hobby_series", seriesId, async (p, id) => {
+    const series = await p.hobbySeries.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        hobbyId: true,
+        householdId: true,
+        name: true,
+        description: true,
+        status: true,
+        batchCount: true,
+        tags: true,
+        notes: true,
+        coverImageUrl: true,
+        hobby: {
+          select: {
+            name: true,
+            activityMode: true,
+            hobbyType: true
+          }
+        },
+        bestBatchSession: {
+          select: { name: true }
+        },
+        sessions: {
+          select: {
+            name: true,
+            recipe: { select: { name: true } }
+          }
         }
       }
-    }
+    });
+
+    if (!series) return null;
+
+    const tagText = Array.isArray(series.tags) ? series.tags.flatMap(flattenSearchValues).join(" ") : "";
+    const sessionText = series.sessions.flatMap((session) => [session.name, session.recipe?.name]).filter(Boolean).join(" ");
+
+    return [{
+      householdId: series.householdId,
+      entityType: "hobby_series",
+      entityId: series.id,
+      parentEntityId: series.hobbyId,
+      parentEntityName: series.hobby.name,
+      title: series.name,
+      subtitle: series.bestBatchSession?.name ?? series.status,
+      body: joinText(
+        series.description,
+        series.notes,
+        series.hobby.name,
+        series.hobby.activityMode,
+        series.hobby.hobbyType,
+        tagText,
+        sessionText
+      ),
+      entityUrl: `/hobbies/${series.hobbyId}?householdId=${series.householdId}&seriesId=${series.id}`,
+      entityMeta: {
+        status: series.status,
+        batchCount: series.batchCount,
+        hobbyId: series.hobbyId,
+        hobbyName: series.hobby.name,
+        coverImageUrl: series.coverImageUrl
+      }
+    }];
   });
 
-  if (!series) {
-    await deleteSearchIndexEntry(prisma, "hobby_series", seriesId);
-    return;
-  }
+export const syncHobbyCollectionItemToSearchIndex = (prisma: SearchPrisma, itemId: string): Promise<void> =>
+  syncEntityToSearchIndex(prisma, "hobby_collection_item", itemId, async (p, id) => {
+    const item = await p.hobbyCollectionItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        hobbyId: true,
+        householdId: true,
+        name: true,
+        description: true,
+        status: true,
+        location: true,
+        customFields: true,
+        quantity: true,
+        tags: true,
+        notes: true,
+        parentItemId: true,
+        hobby: {
+          select: {
+            name: true,
+            hobbyType: true,
+          },
+        },
+        parentItem: {
+          select: {
+            name: true,
+          },
+        },
+        childItems: {
+          select: {
+            name: true,
+          },
+        },
+        sessions: {
+          select: {
+            name: true,
+            notes: true,
+          },
+        },
+      },
+    });
 
-  const tagText = Array.isArray(series.tags) ? series.tags.flatMap(flattenSearchValues).join(" ") : "";
-  const sessionText = series.sessions.flatMap((session) => [session.name, session.recipe?.name]).filter(Boolean).join(" ");
+    if (!item) return null;
 
-  await syncSearchIndexPayloads(prisma, "hobby_series", series.id, [{
-    householdId: series.householdId,
-    entityType: "hobby_series",
-    entityId: series.id,
-    parentEntityId: series.hobbyId,
-    parentEntityName: series.hobby.name,
-    title: series.name,
-    subtitle: series.bestBatchSession?.name ?? series.status,
-    body: joinText(
-      series.description,
-      series.notes,
-      series.hobby.name,
-      series.hobby.activityMode,
-      series.hobby.hobbyType,
-      tagText,
-      sessionText
-    ),
-    entityUrl: `/hobbies/${series.hobbyId}?householdId=${series.householdId}&seriesId=${series.id}`,
-    entityMeta: {
-      status: series.status,
-      batchCount: series.batchCount,
-      hobbyId: series.hobbyId,
-      hobbyName: series.hobby.name,
-      coverImageUrl: series.coverImageUrl
-    }
-  }]);
-};
+    const tagText = Array.isArray(item.tags) ? item.tags.flatMap(flattenSearchValues).join(" ") : "";
+    const customFieldText = flattenSearchValues(item.customFields).join(" ");
+    const childText = item.childItems.map((child) => child.name).join(" ");
+    const sessionText = item.sessions.flatMap((session) => [session.name, session.notes]).filter(Boolean).join(" ");
 
-export const syncHobbyCollectionItemToSearchIndex = async (prisma: SearchPrisma, itemId: string): Promise<void> => {
-  const item = await prisma.hobbyCollectionItem.findUnique({
-    where: { id: itemId },
-    select: {
-      id: true,
-      hobbyId: true,
-      householdId: true,
-      name: true,
-      description: true,
-      status: true,
-      location: true,
-      customFields: true,
-      quantity: true,
-      tags: true,
-      notes: true,
-      parentItemId: true,
-      hobby: {
-        select: {
-          name: true,
-          hobbyType: true,
-        },
+    return [{
+      householdId: item.householdId,
+      entityType: "hobby_collection_item",
+      entityId: item.id,
+      parentEntityId: item.hobbyId,
+      parentEntityName: item.hobby.name,
+      title: item.name,
+      subtitle: joinText(item.hobby.name, item.location, item.status),
+      body: joinText(
+        item.description,
+        item.notes,
+        item.hobby.hobbyType,
+        item.location,
+        item.parentItem?.name,
+        tagText,
+        customFieldText,
+        childText,
+        sessionText,
+        String(item.quantity)
+      ),
+      entityUrl: `/hobbies/${item.hobbyId}?householdId=${item.householdId}&collectionItemId=${item.id}`,
+      entityMeta: {
+        status: item.status,
+        hobbyId: item.hobbyId,
+        location: item.location,
+        quantity: item.quantity,
+        parentItemId: item.parentItemId,
       },
-      parentItem: {
-        select: {
-          name: true,
-        },
-      },
-      childItems: {
-        select: {
-          name: true,
-        },
-      },
-      sessions: {
-        select: {
-          name: true,
-          notes: true,
-        },
-      },
-    },
+    }];
   });
-
-  if (!item) {
-    await deleteSearchIndexEntry(prisma, "hobby_collection_item", itemId);
-    return;
-  }
-
-  const tagText = Array.isArray(item.tags) ? item.tags.flatMap(flattenSearchValues).join(" ") : "";
-  const customFieldText = flattenSearchValues(item.customFields).join(" ");
-  const childText = item.childItems.map((child) => child.name).join(" ");
-  const sessionText = item.sessions.flatMap((session) => [session.name, session.notes]).filter(Boolean).join(" ");
-
-  await syncSearchIndexPayloads(prisma, "hobby_collection_item", item.id, [{
-    householdId: item.householdId,
-    entityType: "hobby_collection_item",
-    entityId: item.id,
-    parentEntityId: item.hobbyId,
-    parentEntityName: item.hobby.name,
-    title: item.name,
-    subtitle: joinText(item.hobby.name, item.location, item.status),
-    body: joinText(
-      item.description,
-      item.notes,
-      item.hobby.hobbyType,
-      item.location,
-      item.parentItem?.name,
-      tagText,
-      customFieldText,
-      childText,
-      sessionText,
-      String(item.quantity)
-    ),
-    entityUrl: `/hobbies/${item.hobbyId}?householdId=${item.householdId}&collectionItemId=${item.id}`,
-    entityMeta: {
-      status: item.status,
-      hobbyId: item.hobbyId,
-      location: item.location,
-      quantity: item.quantity,
-      parentItemId: item.parentItemId,
-    },
-  }]);
-};
 
 export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: string): Promise<void> => {
   await prisma.$executeRaw`

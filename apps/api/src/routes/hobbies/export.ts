@@ -26,8 +26,8 @@ export const hobbyExportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/hobbies/export", async (request, reply) => {
     const { householdId } = householdParamsSchema.parse(request.params);
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const hobbies = await app.prisma.hobby.findMany({
@@ -91,8 +91,8 @@ export const hobbyExportRoutes: FastifyPluginAsync = async (app) => {
     const { householdId } = householdParamsSchema.parse(request.params);
     const input = importHobbiesSchema.parse(request.body);
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const createdItems: Array<{ id: string; name: string; status: string }> = [];

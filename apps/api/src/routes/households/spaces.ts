@@ -21,7 +21,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { requireHouseholdMembership } from "../../lib/asset-access.js";
+import { checkMembership, requireHouseholdMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";
 import { csvValue } from "../../lib/csv.js";
 import { createBatchLabelPdf, createSingleLabelPdf } from "../../lib/qr-label-pdf.js";
@@ -292,7 +292,7 @@ const ensureMembership = async (
   prisma: Prisma.TransactionClient | PrismaClient,
   householdId: string,
   userId: string
-): Promise<boolean> => requireHouseholdMembership(prisma, householdId, userId);
+): Promise<boolean> => checkMembership(prisma, householdId, userId);
 
 const getSpaceOrNull = async (
   prisma: Prisma.TransactionClient | PrismaClient,

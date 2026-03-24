@@ -61,8 +61,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const query = listIdeasQuerySchema.parse(request.query);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const where: Prisma.IdeaWhereInput = {
@@ -97,8 +97,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = createIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const materials: IdeaMaterialItem[] = (input.materials ?? []).map((m) => ({
@@ -147,8 +147,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId } = ideaParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const idea = await app.prisma.idea.findFirst({
@@ -168,8 +168,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = updateIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -213,8 +213,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId } = ideaParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -250,8 +250,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = addIdeaNoteSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -292,8 +292,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId, noteId } = noteParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -323,8 +323,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = addIdeaLinkSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -366,8 +366,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { householdId, ideaId, linkId } = linkParamsSchema.parse(request.params);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -397,8 +397,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const { stage } = z.object({ stage: ideaStageSchema }).parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -432,8 +432,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = promoteIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const existing = await app.prisma.idea.findFirst({
@@ -547,8 +547,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     }).parse(request.query);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     const idea = await app.prisma.idea.findFirst({
@@ -572,8 +572,8 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
     const input = demoteToIdeaSchema.parse(request.body);
     const userId = request.auth.userId;
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, userId, reply)) {
+      return;
     }
 
     let sourceName: string;

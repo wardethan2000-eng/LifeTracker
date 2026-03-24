@@ -27,8 +27,8 @@ export const assetExportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/assets/export", async (request, reply) => {
     const { householdId } = householdParamsSchema.parse(request.params);
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const assets = await app.prisma.asset.findMany({
@@ -71,8 +71,8 @@ export const assetExportRoutes: FastifyPluginAsync = async (app) => {
     const { householdId } = householdParamsSchema.parse(request.params);
     const input = importAssetsSchema.parse(request.body);
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const createdItems: Array<{ id: string; name: string; category: string }> = [];

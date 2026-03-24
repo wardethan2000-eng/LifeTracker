@@ -28,8 +28,8 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkLogHobbySessionsSchema.parse({ ...body, householdId, hobbyId });
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const hobby = await app.prisma.hobby.findFirst({
@@ -100,8 +100,8 @@ export const hobbySessionBulkRoutes: FastifyPluginAsync = async (app) => {
     const body = request.body as Record<string, unknown>;
     const input = bulkArchiveHobbySessionsSchema.parse({ ...body, householdId, hobbyId });
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const sessions = await app.prisma.hobbySession.findMany({

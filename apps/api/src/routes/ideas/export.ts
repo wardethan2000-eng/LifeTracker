@@ -26,8 +26,8 @@ export const ideaExportRoutes: FastifyPluginAsync = async (app) => {
   app.get("/v1/households/:householdId/ideas/export", async (request, reply) => {
     const { householdId } = householdParamsSchema.parse(request.params);
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const ideas = await app.prisma.idea.findMany({
@@ -68,8 +68,8 @@ export const ideaExportRoutes: FastifyPluginAsync = async (app) => {
     const { householdId } = householdParamsSchema.parse(request.params);
     const input = importIdeasSchema.parse(request.body);
 
-    if (!(await requireHouseholdMembership(app.prisma, householdId, request.auth.userId))) {
-      return reply.code(403).send({ message: "You do not have access to this household." });
+    if (!await requireHouseholdMembership(app.prisma, householdId, request.auth.userId, reply)) {
+      return;
     }
 
     const createdItems: Array<{ id: string; title: string; stage: string }> = [];
