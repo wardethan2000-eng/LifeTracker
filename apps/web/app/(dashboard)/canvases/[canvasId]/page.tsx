@@ -20,7 +20,7 @@ export default async function CanvasPage({ params, searchParams }: CanvasPagePro
 
     const [canvas, notesResponse] = await Promise.all([
       getCanvas(household.id, canvasId),
-      getEntries(household.id, { entityType: "notebook", entityId: household.id, limit: 200 }),
+      getEntries(household.id, { entityType: "notebook", entityId: household.id, limit: 100 }),
     ]);
 
     return (

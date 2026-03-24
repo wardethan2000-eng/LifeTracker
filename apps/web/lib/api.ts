@@ -494,6 +494,7 @@ import {
   type IdeaCanvasEdge,
   type CreateIdeaCanvasInput,
   type UpdateIdeaCanvasInput,
+  type UpdateCanvasSettingsInput,
   type CreateCanvasNodeInput,
   type UpdateCanvasNodeInput,
   type BatchUpdateCanvasNodesInput,
@@ -6113,6 +6114,17 @@ export const deleteCanvasEdge = async (
     method: "DELETE",
   });
 };
+
+export const updateCanvasSettings = async (
+  householdId: string,
+  canvasId: string,
+  input: UpdateCanvasSettingsInput
+): Promise<IdeaCanvas> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/settings`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasSchema,
+});
 
 // ─── Layout Preferences ───
 

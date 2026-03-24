@@ -1,15 +1,7 @@
-"use client";
+// This file is intentionally empty — it was a build artifact from the canvas-renderer rewrite.
+// It can be safely deleted.
+export {};
 
-import type {
-  CanvasEdgeStyle,
-  CanvasNodeShape,
-  CanvasObjectType,
-  IdeaCanvas,
-  IdeaCanvasEdge,
-  IdeaCanvasNode,
-  Entry,
-  UpdateCanvasSettingsInput,
-} from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
   useCallback,
@@ -20,13 +12,10 @@ import {
 } from "react";
 import {
   batchUpdateCanvasNodes,
-  confirmAttachmentUpload,
   createCanvasEdge,
   createCanvasNode,
   deleteCanvasEdge,
   deleteCanvasNode,
-  getAttachmentDownloadUrl,
-  requestAttachmentUpload,
   updateCanvas,
   updateCanvasEdge,
   updateCanvasNode,
@@ -35,7 +24,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text" | "image";
+type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text";
 
 type DragState =
   | { type: "none" }
@@ -192,13 +181,6 @@ export function CanvasRenderer({
     snapToGrid: initialCanvas.snapToGrid,
     gridSize: initialCanvas.gridSize,
   });
-  // Resolved presigned download URL for the background image (re-fetched on mount/change)
-  const [resolvedBgUrl, setResolvedBgUrl] = useState<string | null>(null);
-  const [bgImageDims, setBgImageDims] = useState<{ w: number; h: number } | null>(null);
-  const [bgUploading, setBgUploading] = useState(false);
-  // Map from nodeId -> resolved download URL for image object nodes
-  const [nodeImageUrls, setNodeImageUrls] = useState<Map<string, string>>(new Map());
-  const [imgObjUploading, setImgObjUploading] = useState(false);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<IdeaCanvasNode[]>([]);
@@ -337,15 +319,12 @@ export function CanvasRenderer({
     setContextMenu(null);
     const cp = screenToCanvas(e.clientX, e.clientY);
 
-    if (activeTool === "pan") {
+    if (activeTool === "pan" || (activeTool === "select" && e.altKey)) {
       setDrag({ type: "pan", startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
     } else if (activeTool === "select") {
-      if (e.shiftKey) {
-        // Shift+drag on empty canvas → rubber-band select
-        setDrag({ type: "rubber", startCX: cp.x, startCY: cp.y, currentCX: cp.x, currentCY: cp.y });
-      } else {
-        // Plain drag on empty canvas → pan
-        setDrag({ type: "pan", startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
+      // Start rubber-band
+      setDrag({ type: "rubber", startCX: cp.x, startCY: cp.y, currentCX: cp.x, currentCY: cp.y });
+      if (!e.shiftKey) {
         setSelectedIds(new Set());
         setSelectedEdgeId(null);
       }
@@ -484,7 +463,7 @@ export function CanvasRenderer({
           label: "",
           x: maybeSnap(startCX), y: maybeSnap(startCY),
           x2: maybeSnap(currentCX), y2: maybeSnap(currentCY),
-          width: 1, height: 1,
+          width: 0, height: 0,
           objectType: "line",
           strokeWidth: 2,
         };
@@ -531,25 +510,13 @@ export function CanvasRenderer({
 
   const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
-    // Scroll wheel and two-finger swipe both zoom toward the cursor position
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const mouseScreenX = e.clientX - rect.left;
-    const mouseScreenY = e.clientY - rect.top;
-    // Canvas-space point under mouse — stays fixed after zoom
-    const canvasX = mouseScreenX / zoom - panX;
-    const canvasY = mouseScreenY / zoom - panY;
-    const clampedDelta = Math.max(-50, Math.min(50, e.deltaY));
-    const factor = Math.exp(-clampedDelta * 0.008);
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
-    const newPanX = mouseScreenX / newZoom - canvasX;
-    const newPanY = mouseScreenY / newZoom - canvasY;
-    setZoom(newZoom);
-    setPanX(newPanX);
-    setPanY(newPanY);
-    scheduleViewportSync(newZoom, newPanX, newPanY);
-  }, [zoom, panX, panY, scheduleViewportSync]);
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    setZoom((prev) => {
+      const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev + delta));
+      scheduleViewportSync(next, panX, panY);
+      return next;
+    });
+  }, [panX, panY, scheduleViewportSync]);
 
   // ─── Node interactions ───────────────────────────────────────────────────
 
@@ -765,183 +732,6 @@ export function CanvasRenderer({
     setShowSettings(false);
   }, [householdId, canvasId]);
 
-  // Fit viewport so the background image fills the SVG area
-  const fitViewportToImage = useCallback((imgW: number, imgH: number) => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const padding = 48;
-    const newZoom = Math.min(
-      (rect.width - padding * 2) / imgW,
-      (rect.height - padding * 2) / imgH,
-      2,
-    );
-    const newPanX = (rect.width / newZoom - imgW) / 2;
-    const newPanY = (rect.height / newZoom - imgH) / 2;
-    setZoom(newZoom);
-    setPanX(newPanX);
-    setPanY(newPanY);
-    scheduleViewportSync(newZoom, newPanX, newPanY);
-  }, [scheduleViewportSync]);
-
-  // Load image dimensions from a URL into state
-  const loadImageDims = useCallback((url: string) => {
-    const img = new Image();
-    img.onload = () => setBgImageDims({ w: img.naturalWidth, h: img.naturalHeight });
-    img.src = url;
-  }, []);
-
-  // Resolve the stored background image URL (may be an attachment reference)
-  const resolveBackgroundUrl = useCallback(async (raw: string | null | undefined) => {
-    if (!raw) { setResolvedBgUrl(null); return; }
-    if (raw.startsWith("attachment:")) {
-      const attachmentId = raw.slice("attachment:".length);
-      try {
-        const { url } = await getAttachmentDownloadUrl(householdId, attachmentId);
-        setResolvedBgUrl(url);
-        loadImageDims(url);
-      } catch { setResolvedBgUrl(null); }
-    } else {
-      setResolvedBgUrl(raw);
-      loadImageDims(raw);
-    }
-  }, [householdId, loadImageDims]);
-
-  // On mount, resolve whatever is stored
-  useEffect(() => {
-    void resolveBackgroundUrl(settings.backgroundImageUrl);
-    // Resolve any image object node URLs
-    for (const n of initialCanvas.nodes) {
-      if (n.objectType === "image" && n.imageUrl) {
-        void (async () => {
-          if (!n.imageUrl) return;
-          if (n.imageUrl.startsWith("attachment:")) {
-            const id = n.imageUrl.slice("attachment:".length);
-            try {
-              const { url } = await getAttachmentDownloadUrl(householdId, id);
-              setNodeImageUrls((prev) => new Map(prev).set(n.id, url));
-            } catch { /* leave blank */ }
-          } else {
-            setNodeImageUrls((prev) => new Map(prev).set(n.id, n.imageUrl!));
-          }
-        })();
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleBgImageUpload = useCallback(async (file: File) => {
-    setBgUploading(true);
-    try {
-      // Read natural dimensions from the local file
-      const localUrl = URL.createObjectURL(file);
-      const dims = await new Promise<{ w: number; h: number }>((resolve) => {
-        const img = new Image();
-        img.onload = () => { resolve({ w: img.naturalWidth, h: img.naturalHeight }); URL.revokeObjectURL(localUrl); };
-        img.onerror = () => { resolve({ w: 1920, h: 1080 }); URL.revokeObjectURL(localUrl); };
-        img.src = localUrl;
-      });
-
-      // Step 1: request presigned upload URL
-      const { attachment, uploadUrl } = await requestAttachmentUpload(householdId, {
-        entityType: "canvas",
-        entityId: canvasId,
-        filename: file.name,
-        mimeType: file.type,
-        fileSize: file.size,
-      });
-
-      // Step 2: PUT the file directly to storage
-      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-
-      // Step 3: confirm upload
-      await confirmAttachmentUpload(householdId, attachment.id);
-
-      // Step 4: get a fresh download URL
-      const { url: downloadUrl } = await getAttachmentDownloadUrl(householdId, attachment.id);
-
-      // Step 5: save — store attachment reference so we can refresh the URL on reload
-      const newSettings: UpdateCanvasSettingsInput = {
-        ...settings,
-        backgroundImageUrl: `attachment:${attachment.id}`,
-      };
-      await updateCanvasSettings(householdId, canvasId, newSettings);
-      setSettings(newSettings);
-      setResolvedBgUrl(downloadUrl);
-      setBgImageDims(dims);
-      fitViewportToImage(dims.w, dims.h);
-    } finally {
-      setBgUploading(false);
-    }
-  }, [householdId, canvasId, settings, fitViewportToImage]);
-
-  const handleRemoveBgImage = useCallback(async () => {
-    const newSettings: UpdateCanvasSettingsInput = { ...settings, backgroundImageUrl: null };
-    await updateCanvasSettings(householdId, canvasId, newSettings);
-    setSettings(newSettings);
-    setResolvedBgUrl(null);
-    setBgImageDims(null);
-  }, [householdId, canvasId, settings]);
-
-  // ─── Image object upload ──────────────────────────────────────────────────
-
-  const handleImageObjectUpload = useCallback(async (file: File) => {
-    setImgObjUploading(true);
-    try {
-      // Determine image dimensions from file
-      const localUrl = URL.createObjectURL(file);
-      const dims = await new Promise<{ w: number; h: number }>((resolve) => {
-        const img = new Image();
-        img.onload = () => { resolve({ w: img.naturalWidth, h: img.naturalHeight }); URL.revokeObjectURL(localUrl); };
-        img.onerror = () => { resolve({ w: 200, h: 200 }); URL.revokeObjectURL(localUrl); };
-        img.src = localUrl;
-      });
-
-      // Upload via attachment system
-      const { attachment, uploadUrl } = await requestAttachmentUpload(householdId, {
-        entityType: "canvas",
-        entityId: canvasId,
-        filename: file.name,
-        mimeType: file.type,
-        fileSize: file.size,
-      });
-      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      await confirmAttachmentUpload(householdId, attachment.id);
-      const { url: downloadUrl } = await getAttachmentDownloadUrl(householdId, attachment.id);
-
-      // Place image node centered in current viewport
-      const svg = svgRef.current;
-      const rect = svg?.getBoundingClientRect();
-      const viewCX = rect ? rect.width / 2 / zoom - panX : 200;
-      const viewCY = rect ? rect.height / 2 / zoom - panY : 200;
-
-      // Scale to fit within 600px max while preserving aspect ratio
-      const maxDim = 600;
-      const scale = Math.min(1, maxDim / Math.max(dims.w, dims.h));
-      const w = Math.round(dims.w * scale);
-      const h = Math.round(dims.h * scale);
-      const x = maybeSnap(viewCX - w / 2);
-      const y = maybeSnap(viewCY - h / 2);
-
-      const node = await createCanvasNode(householdId, canvasId, {
-        label: file.name.replace(/\.[^.]+$/, ""),
-        x, y, width: w, height: h,
-        objectType: "image",
-        imageUrl: `attachment:${attachment.id}`,
-        strokeWidth: 1,
-      });
-
-      setNodeImageUrls((prev) => new Map(prev).set(node.id, downloadUrl));
-      const newNodes = [...nodes, node];
-      setNodes(newNodes);
-      pushHistory(newNodes, edges);
-      setSelectedIds(new Set([node.id]));
-      setActiveTool("select");
-    } finally {
-      setImgObjUploading(false);
-    }
-  }, [householdId, canvasId, zoom, panX, panY, nodes, edges, maybeSnap, pushHistory]);
-
   // ─── Copy / Paste ─────────────────────────────────────────────────────────
 
   const handleCopy = useCallback(() => {
@@ -1046,44 +836,22 @@ export function CanvasRenderer({
   const selectedEdge = selectedEdgeId ? edges.find((e) => e.id === selectedEdgeId) : undefined;
   const allFlowchartSelected = singleSelected?.objectType === "flowchart";
 
-  // Grid lines — always visible, adaptive to zoom so screen spacing stays ~60px
+  // Grid lines
   const gridLines = useMemo(() => {
-    // When snap-to-grid is on, use the snap size; otherwise pick a nice power-of-10 step
-    let step: number;
-    if (settings.snapToGrid && settings.gridSize) {
-      step = settings.gridSize;
-    } else {
-      const rawTarget = 60 / zoom;
-      const exp = Math.floor(Math.log10(Math.max(rawTarget, 0.001)));
-      const base = Math.pow(10, exp);
-      const r = rawTarget / base;
-      if (r < 1.5) step = base;
-      else if (r < 3.5) step = base * 2;
-      else if (r < 7.5) step = base * 5;
-      else step = base * 10;
-    }
-    const majorStep = step * 5;
-    // Visible canvas bounds (generous viewport estimate)
-    const halfW = 1800 / zoom;
-    const halfH = 1200 / zoom;
-    const cx = -panX;
-    const cy = -panY;
-    const xStart = Math.floor((cx - halfW) / step) * step;
-    const xEnd = Math.ceil((cx + halfW) / step) * step;
-    const yStart = Math.floor((cy - halfH) / step) * step;
-    const yEnd = Math.ceil((cy + halfH) / step) * step;
-    const minor: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    const major: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    for (let x = xStart; x <= xEnd; x += step) {
-      const isMajor = Math.abs(Math.round(x / majorStep) * majorStep - x) < step * 0.001;
-      (isMajor ? major : minor).push({ x1: x, y1: yStart, x2: x, y2: yEnd });
-    }
-    for (let y = yStart; y <= yEnd; y += step) {
-      const isMajor = Math.abs(Math.round(y / majorStep) * majorStep - y) < step * 0.001;
-      (isMajor ? major : minor).push({ x1: xStart, y1: y, x2: xEnd, y2: y });
+    if (!settings.snapToGrid || !settings.gridSize) return { minor: [], major: [] };
+    const gs = settings.gridSize;
+    const range = 5000;
+    const minor: { x1: number; y1: number; x2: number; y2: number; horiz: boolean }[] = [];
+    const major: { x1: number; y1: number; x2: number; y2: number; horiz: boolean }[] = [];
+    for (let i = -Math.ceil(range / gs); i <= Math.ceil(range / gs); i++) {
+      const pos = i * gs;
+      const isMajor = i % 5 === 0;
+      const arr = isMajor ? major : minor;
+      arr.push({ x1: pos, y1: -range, x2: pos, y2: range, horiz: false });
+      arr.push({ x1: -range, y1: pos, x2: range, y2: pos, horiz: true });
     }
     return { minor, major };
-  }, [zoom, panX, panY, settings.snapToGrid, settings.gridSize]);
+  }, [settings.snapToGrid, settings.gridSize]);
 
   // ─── Render helpers ───────────────────────────────────────────────────────
 
@@ -1135,9 +903,9 @@ export function CanvasRenderer({
     const isEditing = node.id === editingNodeId;
     const linkedEntry = node.entryId ? entryMap.get(node.entryId) : undefined;
     const selStroke = "var(--accent)";
-    const defaultStroke = node.strokeColor ?? "#475569";
+    const defaultStroke = node.strokeColor ?? "var(--border)";
     const stroke = isSelected ? selStroke : defaultStroke;
-    const sw = isSelected ? 2.5 : (node.strokeWidth ?? 1.5);
+    const sw = isSelected ? 2.5 : (node.strokeWidth ?? 1);
     const cursor = drag.type === "edge" ? "crosshair" : "grab";
 
     const nodeEvents = {
@@ -1146,31 +914,6 @@ export function CanvasRenderer({
       onDoubleClick: () => handleNodeDoubleClick(node.id),
       onContextMenu: (e: React.MouseEvent) => handleNodeContextMenu(e, node.id),
     };
-
-    if (node.objectType === "image") {
-      const imgUrl = nodeImageUrls.get(node.id);
-      return (
-        <g key={node.id}>
-          {imgUrl ? (
-            <image href={imgUrl}
-              x={node.x} y={node.y} width={node.width} height={node.height}
-              preserveAspectRatio="xMidYMid meet"
-              style={{ cursor }} {...nodeEvents} />
-          ) : (
-            <rect x={node.x} y={node.y} width={node.width} height={node.height}
-              fill="#f0f4f8" stroke={stroke} strokeWidth={sw}
-              style={{ cursor }} {...nodeEvents} />
-          )}
-          {/* Selection outline */}
-          {isSelected ? (
-            <rect x={node.x} y={node.y} width={node.width} height={node.height}
-              fill="none" stroke="var(--accent)" strokeWidth={2}
-              pointerEvents="none" />
-          ) : null}
-          {isSelected && renderResizeHandles(node)}
-        </g>
-      );
-    }
 
     if (node.objectType === "line") {
       return (
@@ -1262,7 +1005,7 @@ export function CanvasRenderer({
 
     // flowchart (and default)
     const r = getShapeRadius(node.shape as CanvasNodeShape);
-    const fillColor = node.fillColor ?? node.color ?? "#f8fafc";
+    const fillColor = node.fillColor ?? node.color ?? "var(--surface)";
 
     return (
       <g key={node.id}>
@@ -1386,35 +1129,11 @@ export function CanvasRenderer({
               value={local.gridSize ?? 24}
               onChange={(e) => setLocal((p) => ({ ...p, gridSize: parseInt(e.target.value) || 24 }))} />
           </div>
-          <div className="idea-canvas__settings-row idea-canvas__settings-row--full">
-            <label>Background Image</label>
-            <div className="idea-canvas__bg-image-controls">
-              {resolvedBgUrl ? (
-                <>
-                  <span className="idea-canvas__bg-image-name">
-                    {bgImageDims ? `${bgImageDims.w} × ${bgImageDims.h} px` : "Uploaded"}
-                  </span>
-                  <button type="button" className="button button--ghost button--small"
-                    onClick={async () => { await handleRemoveBgImage(); }}>Remove</button>
-                  <button type="button" className="button button--ghost button--small"
-                    onClick={() => { if (bgImageDims) fitViewportToImage(bgImageDims.w, bgImageDims.h); }}>Fit View</button>
-                </>
-              ) : (
-                <>
-                  <label className={`button button--ghost button--small idea-canvas__upload-btn${bgUploading ? " idea-canvas__upload-btn--loading" : ""}`}>
-                    {bgUploading ? "Uploading…" : "Upload Image"}
-                    <input type="file" accept="image/*" style={{ display: "none" }}
-                      disabled={bgUploading}
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (f) await handleBgImageUpload(f);
-                        e.target.value = "";
-                      }} />
-                  </label>
-                  <span className="idea-canvas__bg-image-hint">PNG, JPG, WebP up to 50 MB</span>
-                </>
-              )}
-            </div>
+          <div className="idea-canvas__settings-row">
+            <label>Background Image URL</label>
+            <input type="url" value={local.backgroundImageUrl ?? ""}
+              onChange={(e) => setLocal((p) => ({ ...p, backgroundImageUrl: e.target.value || null }))}
+              placeholder="https://..." />
           </div>
         </div>
         <div className="idea-canvas__settings-footer">
@@ -1526,19 +1245,6 @@ export function CanvasRenderer({
           </button>
         </div>
         <div className="idea-canvas__toolbar-divider" />
-        {/* Image object upload */}
-        <label className={`idea-canvas__tool-btn idea-canvas__upload-btn${imgObjUploading ? " idea-canvas__upload-btn--loading" : ""}`}
-          title="Add image object">
-          {imgObjUploading ? "Uploading…" : "🖼 Image"}
-          <input type="file" accept="image/*" style={{ display: "none" }}
-            disabled={imgObjUploading}
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (f) await handleImageObjectUpload(f);
-              e.target.value = "";
-            }} />
-        </label>
-        <div className="idea-canvas__toolbar-divider" />
         {/* Connect (only when a flowchart node selected) */}
         {allFlowchartSelected ? (
           <button type="button" className="idea-canvas__tool-btn" onClick={handleStartEdge} title="Draw edge">
@@ -1644,24 +1350,24 @@ export function CanvasRenderer({
           {/* Background */}
           <rect className="canvas-bg" x={-50000} y={-50000} width={100000} height={100000} fill="transparent" />
 
-          {/* Grid — always rendered, scales with canvas */}
-          {gridLines.minor.map((l, i) => (
+          {/* Grid */}
+          {settings.snapToGrid && gridLines.minor.map((l, i) => (
             <line key={`gm${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-              stroke="#b8c4ce" strokeWidth={0.5 / zoom}
+              stroke="var(--border)" strokeWidth={0.5} opacity={0.4}
               className="canvas-grid-line" pointerEvents="none" />
           ))}
-          {gridLines.major.map((l, i) => (
+          {settings.snapToGrid && gridLines.major.map((l, i) => (
             <line key={`gM${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-              stroke="#6e8098" strokeWidth={1 / zoom}
+              stroke="var(--border)" strokeWidth={1} opacity={0.7}
               className="canvas-grid-line" pointerEvents="none" />
           ))}
 
-          {/* Background image — rendered at canvas origin with natural pixel dimensions */}
-          {resolvedBgUrl ? (
-            <image href={resolvedBgUrl}
-              x={0} y={0}
-              width={bgImageDims?.w ?? 1920} height={bgImageDims?.h ?? 1080}
-              opacity={0.5} pointerEvents="none" preserveAspectRatio="none" />
+          {/* Background image */}
+          {settings.backgroundImageUrl ? (
+            <image href={settings.backgroundImageUrl}
+              x={-panX} y={-panY}
+              width={50000} height={50000}
+              opacity={0.35} pointerEvents="none" preserveAspectRatio="xMinYMin meet" />
           ) : null}
 
           {/* Scale labels */}

@@ -9,6 +9,7 @@
   ideaCanvasSummarySchema,
   updateCanvasEdgeSchema,
   updateCanvasNodeSchema,
+  updateCanvasSettingsSchema,
   updateIdeaCanvasSchema,
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
@@ -29,7 +30,13 @@ const canvasInclude = {
   edges: { orderBy: { createdAt: "asc" } },
 } satisfies Prisma.IdeaCanvasInclude;
 
-function serializeNode(n: { id: string; canvasId: string; entryId: string | null; label: string; body: string | null; x: number; y: number; width: number; height: number; color: string | null; shape: string; sortOrder: number; createdAt: Date; updatedAt: Date }) {
+function serializeNode(n: {
+  id: string; canvasId: string; entryId: string | null; label: string; body: string | null;
+  x: number; y: number; x2: number; y2: number; width: number; height: number;
+  color: string | null; strokeColor: string | null; fillColor: string | null; strokeWidth: number;
+  shape: string; objectType: string; rotation: number; sortOrder: number; imageUrl: string | null;
+  createdAt: Date; updatedAt: Date;
+}) {
   return ideaCanvasNodeSchema.parse({
     ...n,
     createdAt: n.createdAt.toISOString(),
@@ -47,9 +54,17 @@ function serializeEdge(e: { id: string; canvasId: string; sourceNodeId: string; 
 
 type CanvasWithRelations = {
   id: string; householdId: string; name: string; entityType: string | null; entityId: string | null;
-  zoom: number; panX: number; panY: number; createdById: string; createdAt: Date; updatedAt: Date;
-  deletedAt?: Date | null;
-  nodes: Array<{ id: string; canvasId: string; entryId: string | null; label: string; body: string | null; x: number; y: number; width: number; height: number; color: string | null; shape: string; sortOrder: number; createdAt: Date; updatedAt: Date }>;
+  zoom: number; panX: number; panY: number;
+  physicalWidth: number | null; physicalHeight: number | null; physicalUnit: string | null;
+  backgroundImageUrl: string | null; snapToGrid: boolean; gridSize: number;
+  createdById: string; createdAt: Date; updatedAt: Date; deletedAt?: Date | null;
+  nodes: Array<{
+    id: string; canvasId: string; entryId: string | null; label: string; body: string | null;
+    x: number; y: number; x2: number; y2: number; width: number; height: number;
+    color: string | null; strokeColor: string | null; fillColor: string | null; strokeWidth: number;
+    shape: string; objectType: string; rotation: number; sortOrder: number; imageUrl: string | null;
+    createdAt: Date; updatedAt: Date;
+  }>;
   edges: Array<{ id: string; canvasId: string; sourceNodeId: string; targetNodeId: string; label: string | null; style: string; createdAt: Date; updatedAt: Date }>;
 };
 
@@ -190,6 +205,35 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     return;
   });
 
+  // PATCH /v1/households/:householdId/canvases/:canvasId/settings — update physical dimensions, snap, background
+  app.patch("/v1/households/:householdId/canvases/:canvasId/settings", async (request, reply) => {
+    const { householdId, canvasId } = canvasParams.parse(request.params);
+    const userId = request.auth.userId;
+    await assertMembership(app.prisma, householdId, userId);
+    const input = updateCanvasSettingsSchema.parse(request.body);
+
+    const existing = await app.prisma.ideaCanvas.findFirst({
+      where: { id: canvasId, householdId, deletedAt: null },
+    });
+    if (!existing) return notFound(reply, "Canvas");
+
+    const data: Record<string, unknown> = {};
+    if (input.physicalWidth !== undefined) data.physicalWidth = input.physicalWidth;
+    if (input.physicalHeight !== undefined) data.physicalHeight = input.physicalHeight;
+    if (input.physicalUnit !== undefined) data.physicalUnit = input.physicalUnit;
+    if (input.backgroundImageUrl !== undefined) data.backgroundImageUrl = input.backgroundImageUrl;
+    if (input.snapToGrid !== undefined) data.snapToGrid = input.snapToGrid;
+    if (input.gridSize !== undefined) data.gridSize = input.gridSize;
+
+    const canvas = await app.prisma.ideaCanvas.update({
+      where: { id: canvasId },
+      data,
+      include: canvasInclude,
+    });
+
+    return serializeCanvas(canvas as unknown as CanvasWithRelations);
+  });
+
   // ─── Node CRUD ─────────────────────────────────────────────────────────────
 
   // POST /v1/households/:householdId/canvases/:canvasId/nodes
@@ -211,11 +255,19 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         ...(input.entryId ? { entry: { connect: { id: input.entryId } } } : {}),
         x: input.x ?? 0,
         y: input.y ?? 0,
+        x2: input.x2 ?? 0,
+        y2: input.y2 ?? 0,
         width: input.width ?? 160,
         height: input.height ?? 80,
         color: input.color ?? null,
+        strokeColor: input.strokeColor ?? null,
+        fillColor: input.fillColor ?? null,
+        strokeWidth: input.strokeWidth ?? 1,
         shape: input.shape ?? "rectangle",
+        objectType: input.objectType ?? "flowchart",
+        rotation: input.rotation ?? 0,
         sortOrder: input.sortOrder ?? 0,
+        imageUrl: input.imageUrl ?? null,
       },
     });
 
@@ -240,11 +292,19 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.entryId !== undefined) data.entryId = input.entryId;
     if (input.x !== undefined) data.x = input.x;
     if (input.y !== undefined) data.y = input.y;
+    if (input.x2 !== undefined) data.x2 = input.x2;
+    if (input.y2 !== undefined) data.y2 = input.y2;
     if (input.width !== undefined) data.width = input.width;
     if (input.height !== undefined) data.height = input.height;
     if (input.color !== undefined) data.color = input.color;
+    if (input.strokeColor !== undefined) data.strokeColor = input.strokeColor;
+    if (input.fillColor !== undefined) data.fillColor = input.fillColor;
+    if (input.strokeWidth !== undefined) data.strokeWidth = input.strokeWidth;
     if (input.shape !== undefined) data.shape = input.shape;
+    if (input.objectType !== undefined) data.objectType = input.objectType;
+    if (input.rotation !== undefined) data.rotation = input.rotation;
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
+    if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
 
     const updated = await app.prisma.ideaCanvasNode.update({
       where: { id: nodeId },
@@ -286,6 +346,8 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         const data: Record<string, unknown> = {};
         if (n.x !== undefined) data.x = n.x;
         if (n.y !== undefined) data.y = n.y;
+        if (n.x2 !== undefined) data.x2 = n.x2;
+        if (n.y2 !== undefined) data.y2 = n.y2;
         if (n.width !== undefined) data.width = n.width;
         if (n.height !== undefined) data.height = n.height;
         return app.prisma.ideaCanvasNode.updateMany({
@@ -317,13 +379,20 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     });
     if (!canvas) return notFound(reply, "Canvas");
 
-    // Verify source and target nodes belong to this canvas
+    if (input.sourceNodeId === input.targetNodeId) {
+      return reply.code(400).send({ message: "Self-loops are not allowed" });
+    }
+
+    // Verify source and target nodes belong to this canvas and are flowchart nodes
     const [sourceNode, targetNode] = await Promise.all([
       app.prisma.ideaCanvasNode.findFirst({ where: { id: input.sourceNodeId, canvasId } }),
       app.prisma.ideaCanvasNode.findFirst({ where: { id: input.targetNodeId, canvasId } }),
     ]);
     if (!sourceNode || !targetNode) {
       return reply.code(400).send({ message: "Source and target nodes must belong to the same canvas" });
+    }
+    if (sourceNode.objectType !== "flowchart" || targetNode.objectType !== "flowchart") {
+      return reply.code(400).send({ message: "Edges can only connect flowchart nodes" });
     }
 
     const edge = await app.prisma.ideaCanvasEdge.create({

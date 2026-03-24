@@ -3,7 +3,7 @@
 import type { IdeaCanvasSummary } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createCanvas, deleteCanvas, getCanvases } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
 
@@ -17,6 +17,41 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
   const [canvases, setCanvases] = useState<IdeaCanvasSummary[]>(initialCanvases);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [loading, setLoading] = useState(initialCanvases.length === 0);
+
+  const refreshCanvases = useCallback(async () => {
+    setLoading(true);
+    try {
+      const updated = await getCanvases(householdId);
+      setCanvases(updated);
+    } finally {
+      setLoading(false);
+    }
+  }, [householdId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const updated = await getCanvases(householdId);
+        if (!cancelled) {
+          setCanvases(updated);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [householdId]);
 
   const handleCreate = useCallback(async () => {
     const name = newName.trim();
@@ -24,19 +59,18 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
     setCreating(true);
     try {
       await createCanvas(householdId, { name });
-      const updated = await getCanvases(householdId);
-      setCanvases(updated);
+      await refreshCanvases();
       setNewName("");
     } finally {
       setCreating(false);
     }
-  }, [householdId, newName]);
+  }, [householdId, newName, refreshCanvases]);
 
   const handleDelete = useCallback(async (canvasId: string) => {
     if (!confirm("Delete this canvas?")) return;
     await deleteCanvas(householdId, canvasId);
-    setCanvases((prev) => prev.filter((c) => c.id !== canvasId));
-  }, [householdId]);
+    await refreshCanvases();
+  }, [householdId, refreshCanvases]);
 
   return (
     <div className="canvas-list">
@@ -62,7 +96,11 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
         </button>
       </div>
 
-      {canvases.length === 0 ? (
+      {loading && canvases.length === 0 ? (
+        <div className="canvas-list__empty">
+          <p>Loading canvases…</p>
+        </div>
+      ) : canvases.length === 0 ? (
         <div className="canvas-list__empty">
           <p>No canvases yet. Create one to start mapping your ideas.</p>
         </div>
