@@ -6,6 +6,7 @@ import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
+import { AttachmentSection } from "./attachment-section";
 import type { ProjectPhaseProgress } from "@lifekeeper/types";
 import { useFormattedDate } from "../lib/formatted-date";
 
@@ -199,6 +200,19 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
       footerLink: { label: "Open journal →", href: `${base}/entries${qs}` },
     },
     {
+      key: "attachments",
+      title: "Photos & Documents",
+      content: (
+        <AttachmentSection
+          householdId={householdId}
+          entityType="project"
+          entityId={projectId}
+          compact
+          label=""
+        />
+      ),
+    },
+    {
       key: "assets",
       title: `Linked Assets (${linkedAssetCount})`,
       content: topAssets.length > 0 ? (
@@ -238,6 +252,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     { i: "journal", x: 2, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
     { i: "notepad", x: 0, y: 6, w: 2, h: 4, minW: 1, minH: 3 },
     { i: "assets", x: 2, y: 6, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "attachments", x: 2, y: 9, w: 2, h: 4, minW: 1, minH: 3 },
   ];
 
   if (subProjectCount > 0) {

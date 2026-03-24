@@ -43,6 +43,14 @@ export function AttachmentSection({
     setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
   }, []);
 
+  const handleUpdate = useCallback((attachment: Attachment) => {
+    setAttachments((prev) => prev.map((a) => (a.id === attachment.id ? attachment : a)));
+  }, []);
+
+  const handleReorder = useCallback((reorderedAttachments: Attachment[]) => {
+    setAttachments(reorderedAttachments);
+  }, []);
+
   if (!loaded) {
     return (
       <div className="attachment-section">
@@ -64,6 +72,8 @@ export function AttachmentSection({
         householdId={householdId}
         attachments={attachments}
         onDelete={handleDelete}
+        onUpdate={handleUpdate}
+        onReorder={handleReorder}
         compact={compact}
         readonly={readonly}
       />

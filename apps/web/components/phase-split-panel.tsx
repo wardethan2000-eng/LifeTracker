@@ -943,6 +943,15 @@ function PhaseExpensesSubtab({
                       cancelClassName="button button--ghost button--sm"
                     />
                   </div>
+                  <div style={{ marginTop: 12 }}>
+                    <AttachmentSection
+                      householdId={householdId}
+                      entityType="project_expense"
+                      entityId={expense.id}
+                      compact
+                      label="Receipts &amp; Documentation"
+                    />
+                  </div>
                 </div>
               )}
             </div>

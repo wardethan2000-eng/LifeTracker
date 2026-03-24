@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useCallback, useState, useTransition } from "react";
 import type { Idea, IdeaCategory, IdeaPriority, IdeaPromotionTarget, IdeaStage } from "@lifekeeper/types";
 import { createIdeaAction, updateIdeaAction } from "../app/actions";
+import { AttachmentSection } from "./attachment-section";
 
 type MaterialDraft = {
   name: string;
@@ -326,6 +327,21 @@ export function IdeaWorkbench({ householdId, idea }: IdeaWorkbenchProps): JSX.El
             )}
           </div>
         </section>
+        {isEditMode && idea && (
+          <section className="card">
+            <div className="card__header">
+              <h2>Photos &amp; Documents</h2>
+            </div>
+            <div className="card__body">
+              <AttachmentSection
+                householdId={householdId}
+                entityType="idea"
+                entityId={idea.id}
+                label=""
+              />
+            </div>
+          </section>
+        )}
       </div>
 
       <div className="workbench-layout__aside">

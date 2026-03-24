@@ -7116,6 +7116,131 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-size: 0.82rem;
 }
 
+.attachment-gallery__item--dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.attachment-gallery__item--drag-target {
+  box-shadow: 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-alt));
+}
+
+.attachment-gallery__item[draggable="true"] {
+  cursor: grab;
+}
+
+.attachment-gallery__caption-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* Editable caption area in lightbox */
+.attachment-lightbox__caption--editable {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80vw;
+  text-align: center;
+}
+
+.attachment-lightbox__caption-text {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.attachment-lightbox__caption-text:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.attachment-lightbox__caption-edit-hint {
+  opacity: 0.6;
+  font-size: 0.75rem;
+}
+
+.attachment-lightbox__caption-placeholder {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.attachment-lightbox__caption-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+}
+
+.attachment-lightbox__caption-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.attachment-lightbox__caption-input:focus {
+  border-color: var(--accent);
+}
+
+.attachment-lightbox__caption-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.attachment-lightbox__caption-save {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.attachment-lightbox__caption-save:hover {
+  opacity: 0.85;
+}
+
+.attachment-lightbox__caption-cancel {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.attachment-lightbox__caption-cancel:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 @keyframes attachment-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
