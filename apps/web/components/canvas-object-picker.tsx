@@ -144,7 +144,10 @@ export default function CanvasObjectPicker({
       <div className="canvas-obj-picker__backdrop" onClick={onClose} />
       <div className="canvas-obj-picker">
         <div className="canvas-obj-picker__header">
-          <span className="canvas-obj-picker__title">Object Library</span>
+          <div>
+            <span className="canvas-obj-picker__title">Object Library</span>
+            <span className="canvas-obj-picker__subtitle">Click an object to place it on the canvas</span>
+          </div>
           <button
             type="button"
             className="canvas-obj-picker__close"
@@ -204,6 +207,7 @@ export default function CanvasObjectPicker({
                           ) : (
                             <span className="canvas-obj-picker__item-placeholder">?</span>
                           )}
+                          <span className="canvas-obj-picker__place-label">Place</span>
                         </button>
                         <div className="canvas-obj-picker__item-label">{obj.name}</div>
                         <div className="canvas-obj-picker__item-actions">
@@ -257,6 +261,7 @@ export default function CanvasObjectPicker({
                       title={`Place "${preset.label}"`}
                     >
                       <img src={preset.svgPath} alt={preset.label} />
+                      <span className="canvas-obj-picker__place-label">Place</span>
                     </button>
                     <div className="canvas-obj-picker__item-label">{preset.label}</div>
                   </div>

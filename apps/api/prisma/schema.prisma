@@ -2260,6 +2260,12 @@ model HobbyMetricReading {
 // A dated journal entry for a Hobby, optionally attached to a particular session.
 // ─── Idea Canvas ─────────────────────────────────────────────────────────────
 
+enum CanvasMode {
+  diagram
+  floorplan
+  freehand
+}
+
 enum CanvasNodeShape {
   rectangle
   rounded
@@ -2324,6 +2330,8 @@ model IdeaCanvas {
   backgroundImageUrl String?          @db.VarChar(1000)
   snapToGrid        Boolean           @default(false)
   gridSize          Int               @default(24)
+  canvasMode        CanvasMode        @default(diagram)
+  showDimensions    Boolean           @default(true)
   createdById       String
   deletedAt         DateTime?
   createdAt         DateTime          @default(now())
@@ -2355,17 +2363,26 @@ model IdeaCanvasNode {
   fillColor   String?         @db.VarChar(30)
   strokeWidth Int             @default(1)
   shape       CanvasNodeShape @default(rectangle)
-  objectType  String          @default("flowchart") @db.VarChar(20)
-  imageUrl    String?         @db.VarChar(1000)
-  maskJson    String?         @db.Text
-  rotation    Float           @default(0)
-  sortOrder   Int             @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  canvas      IdeaCanvas      @relation(fields: [canvasId], references: [id], onDelete: Cascade)
-  entry       Entry?          @relation(fields: [entryId], references: [id], onDelete: SetNull)
-  outEdges    IdeaCanvasEdge[] @relation("EdgeSource")
-  inEdges     IdeaCanvasEdge[] @relation("EdgeTarget")
+  objectType     String          @default("flowchart") @db.VarChar(20)
+  imageUrl       String?         @db.VarChar(1000)
+  maskJson       String?         @db.Text
+  rotation       Float           @default(0)
+  sortOrder      Int             @default(0)
+  // Floorplan fields
+  wallThickness  Float           @default(6)
+  wallAngle      Float?
+  physicalLength Float?
+  parentNodeId   String?
+  pointAx        Float?
+  pointAy        Float?
+  pointBx        Float?
+  pointBy        Float?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  canvas         IdeaCanvas      @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  entry          Entry?          @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  outEdges       IdeaCanvasEdge[] @relation("EdgeSource")
+  inEdges        IdeaCanvasEdge[] @relation("EdgeTarget")
 
   @@index([canvasId])
   @@index([entryId])

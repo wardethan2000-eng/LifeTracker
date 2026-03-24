@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { JSX } from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IdeaQuickCapture } from "./idea-quick-capture";
 
 export type SidebarNavItem = {
@@ -58,6 +58,24 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
   const pathname = usePathname();
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const quickAddRef = useRef<HTMLButtonElement>(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Restore collapse state from localStorage and sync to <html> data attribute
+  useEffect(() => {
+    const stored = localStorage.getItem("sidebar-collapsed");
+    const isCollapsed = stored === "true";
+    setCollapsed(isCollapsed);
+    document.documentElement.dataset.sidebarCollapsed = String(isCollapsed);
+  }, []);
+
+  const toggleCollapse = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      document.documentElement.dataset.sidebarCollapsed = String(next);
+      localStorage.setItem("sidebar-collapsed", String(next));
+      return next;
+    });
+  }, []);
 
   const handleCloseCapture = useCallback(() => {
     setShowQuickCapture(false);
@@ -65,6 +83,17 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
 
   return (
     <div className="sidebar__nav">
+      {/* Collapse / expand toggle */}
+      <button
+        type="button"
+        className="sidebar__collapse-btn"
+        onClick={toggleCollapse}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        <span className="sidebar__collapse-icon">{collapsed ? "»" : "«"}</span>
+        <span className="sidebar__collapse-label">Collapse</span>
+      </button>
       <div className="sidebar__section-label">Main</div>
       {navItems.map((item) => {
         const isAssetsCreatePath = pathname === "/assets/new" || pathname.startsWith("/assets/new/");
@@ -85,7 +114,7 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
                 className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
               >
                 <NavIcon icon={item.icon} />
-                {item.label}
+                <span className="sidebar__link-label">{item.label}</span>
               </Link>
               <button
                 ref={quickAddRef}
@@ -116,7 +145,7 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
             className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
           >
             <NavIcon icon={item.icon} />
-            {item.label}
+            <span className="sidebar__link-label">{item.label}</span>
           </Link>
         );
       })}

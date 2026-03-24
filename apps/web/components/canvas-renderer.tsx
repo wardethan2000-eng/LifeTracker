@@ -2,6 +2,7 @@
 
 import type {
   CanvasEdgeStyle,
+  CanvasMode,
   CanvasNodeShape,
   CanvasObjectType,
   IdeaCanvas,
@@ -11,6 +12,7 @@ import type {
   UpdateCanvasSettingsInput,
 } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { createPortal } from "react-dom";
 import CanvasObjectPicker, { type CanvasObjectPlacement } from "./canvas-object-picker";
 import {
   useCallback,
@@ -36,7 +38,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text" | "image" | "object";
+type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text" | "image" | "object" | "wall" | "measure";
 
 type DragState =
   | { type: "none" }
@@ -45,7 +47,9 @@ type DragState =
   | { type: "edge"; sourceNodeId: string; mouseX: number; mouseY: number }
   | { type: "rubber"; startCX: number; startCY: number; currentCX: number; currentCY: number }
   | { type: "draw"; tool: "rect" | "circle" | "line" | "text"; startCX: number; startCY: number; currentCX: number; currentCY: number }
-  | { type: "resize"; nodeId: string; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startX2: number; startY2: number; startMouseCX: number; startMouseCY: number };
+  | { type: "resize"; nodeId: string; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startX2: number; startY2: number; startMouseCX: number; startMouseCY: number }
+  | { type: "wall"; startCX: number; startCY: number; endCX: number; endCY: number; shiftKey: boolean }
+  | { type: "measure"; startCX: number; startCY: number; endCX: number; endCY: number };
 
 type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "line-start" | "line-end";
 
@@ -158,6 +162,23 @@ function snapToGrid(val: number, gridSize: number): number {
   return Math.round(val / gridSize) * gridSize;
 }
 
+// Snap (dx, dy) to nearest allowed wall angle.
+// Default: 0°/90°. With shiftKey: also 45°.
+function snapWallAngle(dx: number, dy: number, shiftKey: boolean): { dx: number; dy: number } {
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return { dx: 0, dy: 0 };
+  const angle = Math.atan2(dy, dx);
+  const step = shiftKey ? Math.PI / 4 : Math.PI / 2;
+  const snapped = Math.round(angle / step) * step;
+  return { dx: Math.round(Math.cos(snapped) * len), dy: Math.round(Math.sin(snapped) * len) };
+}
+
+// Format a physical distance as a string with unit.
+function fmtPhysical(px: number, pxPerUnit: number, unit: string): string {
+  const v = px / pxPerUnit;
+  return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)} ${unit}`;
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function CanvasRenderer({
@@ -185,6 +206,12 @@ export function CanvasRenderer({
   const [canvasName, setCanvasName] = useState(initialCanvas.name);
   const [editingName, setEditingName] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const canvasMode: CanvasMode = (initialCanvas.canvasMode as CanvasMode) ?? "diagram";
+  const [showDimensions, setShowDimensions] = useState(initialCanvas.showDimensions ?? true);
+  // Wall chain: last completed wall endpoint (for chain drawing)
+  const wallChainStartRef = useRef<{ cx: number; cy: number } | null>(null);
+  // Cursor physical coord readout
+  const [cursorPhysical, setCursorPhysical] = useState<{ x: number; y: number } | null>(null);
   const [settings, setSettings] = useState<UpdateCanvasSettingsInput>({
     physicalWidth: initialCanvas.physicalWidth,
     physicalHeight: initialCanvas.physicalHeight,
@@ -192,6 +219,7 @@ export function CanvasRenderer({
     backgroundImageUrl: initialCanvas.backgroundImageUrl,
     snapToGrid: initialCanvas.snapToGrid,
     gridSize: initialCanvas.gridSize,
+    showDimensions: initialCanvas.showDimensions ?? true,
   });
   // Resolved presigned download URL for the background image (re-fetched on mount/change)
   const [resolvedBgUrl, setResolvedBgUrl] = useState<string | null>(null);
@@ -223,6 +251,12 @@ export function CanvasRenderer({
     for (const n of nodes) m.set(n.id, n);
     return m;
   }, [nodes]);
+
+  // pixels per physical unit: 1 grid square = 1 unit
+  const pixelsPerUnit = useMemo(() => {
+    if (!settings.physicalUnit || !settings.gridSize) return null;
+    return settings.gridSize;
+  }, [settings.physicalUnit, settings.gridSize]);
 
   const entryMap = useMemo(() => {
     const m = new Map<string, Entry>();
@@ -374,10 +408,23 @@ export function CanvasRenderer({
       });
     } else if (activeTool === "rect" || activeTool === "circle" || activeTool === "line" || activeTool === "text") {
       setDrag({ type: "draw", tool: activeTool, startCX: cp.x, startCY: cp.y, currentCX: cp.x, currentCY: cp.y });
+    } else if (activeTool === "wall") {
+      // If we are continuing a wall chain, start from the last endpoint
+      const chain = wallChainStartRef.current;
+      const startCX = chain ? chain.cx : maybeSnap(cp.x);
+      const startCY = chain ? chain.cy : maybeSnap(cp.y);
+      setDrag({ type: "wall", startCX, startCY, endCX: startCX, endCY: startCY, shiftKey: e.shiftKey });
+    } else if (activeTool === "measure") {
+      setDrag({ type: "measure", startCX: maybeSnap(cp.x), startCY: maybeSnap(cp.y), endCX: maybeSnap(cp.x), endCY: maybeSnap(cp.y) });
     }
-  }, [activeTool, panX, panY, screenToCanvas, maybeSnap, householdId, canvasId, nodes, edges, pushHistory]);
+  }, [activeTool, panX, panY, screenToCanvas, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, wallChainStartRef]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    // Update physical cursor readout
+    if (pixelsPerUnit) {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      setCursorPhysical({ x: cp.x / pixelsPerUnit, y: cp.y / pixelsPerUnit });
+    }
     if (drag.type === "pan") {
       const dx = (e.clientX - drag.startX) / zoom;
       const dy = (e.clientY - drag.startY) / zoom;
@@ -438,8 +485,17 @@ export function CanvasRenderer({
       newW = Math.max(MIN_SIZE, maybeSnap(newW)); newH = Math.max(MIN_SIZE, maybeSnap(newH));
 
       setNodes((prev) => prev.map((n) => n.id === drag.nodeId ? { ...n, x: newX, y: newY, width: newW, height: newH } : n));
+    } else if (drag.type === "wall") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const rawDx = cp.x - drag.startCX;
+      const rawDy = cp.y - drag.startCY;
+      const snapped = snapWallAngle(rawDx, rawDy, e.shiftKey);
+      setDrag({ ...drag, endCX: drag.startCX + snapped.dx, endCY: drag.startCY + snapped.dy, shiftKey: e.shiftKey });
+    } else if (drag.type === "measure") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      setDrag({ ...drag, endCX: cp.x, endCY: cp.y });
     }
-  }, [drag, zoom, screenToCanvas, maybeSnap]);
+  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit]);
 
   const handleMouseUp = useCallback(async () => {
     if (drag.type === "pan") {
@@ -530,6 +586,56 @@ export function CanvasRenderer({
         pendingNodeUpdates.current.set(drag.nodeId, update);
         pushHistory(nodes, edges);
         scheduleSyncPositions();
+      }
+    } else if (drag.type === "wall") {
+      const { startCX, startCY, endCX, endCY } = drag;
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len >= 4) {
+        // Snap wall angle
+        const snapped = snapWallAngle(dx, dy, drag.shiftKey);
+        const ex = maybeSnap(startCX + snapped.dx);
+        const ey = maybeSnap(startCY + snapped.dy);
+        const angle = Math.atan2(snapped.dy, snapped.dx) * (180 / Math.PI);
+        const node = await createCanvasNode(householdId, canvasId, {
+          label: "",
+          x: maybeSnap(startCX), y: maybeSnap(startCY),
+          x2: ex, y2: ey,
+          width: 1, height: 1,
+          objectType: "wall",
+          strokeWidth: 6,
+          strokeColor: "#374151",
+          wallAngle: angle,
+        });
+        const newNodes = [...nodes, node];
+        setNodes(newNodes);
+        pushHistory(newNodes, edges);
+        setSelectedIds(new Set([node.id]));
+        // Continue chain from this wall's endpoint
+        wallChainStartRef.current = { cx: ex, cy: ey };
+      }
+    } else if (drag.type === "measure") {
+      const { startCX, startCY, endCX, endCY } = drag;
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      if (Math.sqrt(dx * dx + dy * dy) >= 4) {
+        const node = await createCanvasNode(householdId, canvasId, {
+          label: "",
+          x: startCX, y: startCY,
+          x2: endCX, y2: endCY,
+          width: 1, height: 1,
+          objectType: "dimension",
+          strokeColor: "#6366f1",
+          strokeWidth: 1,
+          pointAx: startCX, pointAy: startCY,
+          pointBx: endCX, pointBy: endCY,
+        });
+        const newNodes = [...nodes, node];
+        setNodes(newNodes);
+        pushHistory(newNodes, edges);
+        setSelectedIds(new Set([node.id]));
+        setActiveTool("select");
       }
     }
     setDrag({ type: "none" });
@@ -768,6 +874,7 @@ export function CanvasRenderer({
   const handleSaveSettings = useCallback(async (patch: UpdateCanvasSettingsInput) => {
     await updateCanvasSettings(householdId, canvasId, patch);
     setSettings((prev) => ({ ...prev, ...patch }));
+    if (patch.showDimensions !== undefined) setShowDimensions(patch.showDimensions);
     setShowSettings(false);
   }, [householdId, canvasId]);
 
@@ -1098,6 +1205,7 @@ export function CanvasRenderer({
         setActiveTool("select");
         setEditingNodeId(null);
         setEditingEdgeId(null);
+        wallChainStartRef.current = null; // cancel wall chain
       } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setSelectedIds(new Set(nodes.map((n) => n.id)));
@@ -1302,16 +1410,122 @@ export function CanvasRenderer({
       );
     }
 
-    if (node.objectType === "line") {
+    if (node.objectType === "line" || node.objectType === "wall") {
+      const isWall = node.objectType === "wall";
+      const wallSW = isWall ? ((node.strokeWidth ?? 6) * (isSelected ? 1.3 : 1)) : sw;
+      const wallStroke = isWall ? (isSelected ? selStroke : (node.strokeColor ?? "#374151")) : stroke;
+      // Physical length label for walls
+      const wallLenLabel = (isWall && pixelsPerUnit && settings.physicalUnit) ? (() => {
+        const dx = node.x2 - node.x;
+        const dy = node.y2 - node.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const mx = (node.x + node.x2) / 2;
+        const my = (node.y + node.y2) / 2;
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        const label = fmtPhysical(len, pixelsPerUnit, settings.physicalUnit!);
+        return (
+          <text
+            x={mx} y={my - 6}
+            textAnchor="middle" fontSize={11 / zoom} fill="var(--ink)"
+            transform={`rotate(${Math.abs(angle) > 90 ? angle + 180 : angle}, ${mx}, ${my})`}
+            pointerEvents="none" style={{ userSelect: "none" }}>
+            {label}
+          </text>
+        );
+      })() : null;
       return (
         <g key={node.id}>
           {/* Wide hit area */}
           <line x1={node.x} y1={node.y} x2={node.x2} y2={node.y2}
-            stroke="transparent" strokeWidth={12} style={{ cursor }}
+            stroke="transparent" strokeWidth={Math.max(wallSW * 2, 12)} style={{ cursor }}
             {...nodeEvents} />
           <line x1={node.x} y1={node.y} x2={node.x2} y2={node.y2}
-            stroke={stroke} strokeWidth={sw}
+            stroke={wallStroke} strokeWidth={wallSW} strokeLinecap="round"
             pointerEvents="none" />
+          {wallLenLabel}
+          {isSelected && renderResizeHandles(node)}
+        </g>
+      );
+    }
+
+    if (node.objectType === "dimension") {
+      const ax = node.pointAx ?? node.x;
+      const ay = node.pointAy ?? node.y;
+      const bx = node.pointBx ?? node.x2;
+      const by = node.pointBy ?? node.y2;
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const mx = (ax + bx) / 2;
+      const my = (ay + by) / 2;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const displayAngle = Math.abs(angle) > 90 ? angle + 180 : angle;
+      const label = pixelsPerUnit && settings.physicalUnit
+        ? fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)
+        : `${Math.round(len)}px`;
+      // Perpendicular offset for the label
+      const perpX = -dy / len * 10;
+      const perpY = dx / len * 10;
+      // Arrow tick marks
+      const tickLen = 6 / zoom;
+      const nx = -dy / len, ny = dx / len;
+      return (
+        <g key={node.id}>
+          {/* Main dim line */}
+          <line x1={ax} y1={ay} x2={bx} y2={by}
+            stroke={isSelected ? selStroke : "#6366f1"} strokeWidth={1.5 / zoom}
+            strokeDasharray={`${4 / zoom},${2 / zoom}`}
+            style={{ cursor: "pointer" }} {...nodeEvents} />
+          {/* End ticks */}
+          <line x1={ax + nx * tickLen} y1={ay + ny * tickLen} x2={ax - nx * tickLen} y2={ay - ny * tickLen}
+            stroke={isSelected ? selStroke : "#6366f1"} strokeWidth={1.5 / zoom} pointerEvents="none" />
+          <line x1={bx + nx * tickLen} y1={by + ny * tickLen} x2={bx - nx * tickLen} y2={by - ny * tickLen}
+            stroke={isSelected ? selStroke : "#6366f1"} strokeWidth={1.5 / zoom} pointerEvents="none" />
+          {/* Label */}
+          <text x={mx + perpX / zoom} y={my + perpY / zoom}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize={11 / zoom} fill="#6366f1"
+            transform={`rotate(${displayAngle}, ${mx + perpX / zoom}, ${my + perpY / zoom})`}
+            pointerEvents="none" style={{ userSelect: "none" }}>
+            {label}
+          </text>
+          {isSelected && (
+            <>
+              <circle cx={ax} cy={ay} r={4 / zoom} fill={selStroke} pointerEvents="none" />
+              <circle cx={bx} cy={by} r={4 / zoom} fill={selStroke} pointerEvents="none" />
+            </>
+          )}
+        </g>
+      );
+    }
+
+    if (node.objectType === "room") {
+      // Room polygon stored in maskJson as { type: "polygon", points: {x,y}[] }
+      let pts = "";
+      if (node.maskJson) {
+        try {
+          const mask = JSON.parse(node.maskJson) as { type: string; points: { x: number; y: number }[] };
+          if (mask.type === "polygon") pts = mask.points.map((p) => `${p.x},${p.y}`).join(" ");
+        } catch { /* no-op */ }
+      }
+      if (!pts) pts = `${node.x},${node.y} ${node.x + node.width},${node.y} ${node.x + node.width},${node.y + node.height} ${node.x},${node.y + node.height}`;
+      const cx = node.x + node.width / 2;
+      const cy = node.y + node.height / 2;
+      return (
+        <g key={node.id}>
+          <polygon points={pts}
+            fill={node.fillColor ?? "rgba(99,102,241,0.07)"}
+            stroke={isSelected ? selStroke : (node.strokeColor ?? "#6366f1")}
+            strokeWidth={isSelected ? 2 / zoom : 1 / zoom}
+            strokeDasharray={`${4 / zoom},${2 / zoom}`}
+            style={{ cursor }} {...nodeEvents} />
+          {node.label ? (
+            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+              fontSize={13 / zoom} fill="var(--ink)"
+              pointerEvents="none" style={{ userSelect: "none" }}>
+              {node.label}
+            </text>
+          ) : null}
           {isSelected && renderResizeHandles(node)}
         </g>
       );
@@ -1439,6 +1653,45 @@ export function CanvasRenderer({
   // ─── Draw preview ─────────────────────────────────────────────────────────
 
   const renderDrawPreview = () => {
+    if (drag.type === "wall") {
+      const { startCX, startCY, endCX, endCY } = drag;
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      return (
+        <g>
+          <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
+            stroke="#374151" strokeWidth={6} strokeLinecap="round"
+            strokeDasharray="8,4" pointerEvents="none" />
+          {len > 4 && pixelsPerUnit && settings.physicalUnit ? (
+            <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - 8}
+              textAnchor="middle" fontSize={11 / zoom} fill="#374151" pointerEvents="none">
+              {fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)}
+            </text>
+          ) : null}
+        </g>
+      );
+    }
+    if (drag.type === "measure") {
+      const { startCX, startCY, endCX, endCY } = drag;
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      return (
+        <g>
+          <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
+            stroke="#6366f1" strokeWidth={1.5 / zoom} strokeDasharray={`${4 / zoom},${2 / zoom}`}
+            pointerEvents="none" />
+          {len > 4 && pixelsPerUnit && settings.physicalUnit ? (
+            <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - 8 / zoom}
+              textAnchor="middle" fontSize={11 / zoom} fill="#6366f1" pointerEvents="none">
+              {fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)}
+            </text>
+          ) : null}
+          <circle cx={startCX} cy={startCY} r={3 / zoom} fill="#6366f1" pointerEvents="none" />
+        </g>
+      );
+    }
     if (drag.type !== "draw") return null;
     const { tool, startCX, startCY, currentCX, currentCY } = drag;
     if (tool === "line") {
@@ -1469,6 +1722,158 @@ export function CanvasRenderer({
     if (w < 2 && h < 2) return null;
     return <rect x={x} y={y} width={w} height={h}
       fill="rgba(99,102,241,0.1)" stroke="var(--accent)" strokeWidth={1} strokeDasharray="4,2" pointerEvents="none" />;
+  };
+
+  // ─── Auto parallel-wall dimension overlay (computed, not stored) ──────────
+
+  const renderParallelWallDimensions = () => {
+    if (!showDimensions || !pixelsPerUnit || !settings.physicalUnit) return null;
+    const walls = nodes.filter((n) => n.objectType === "wall");
+    if (walls.length < 2) return null;
+    const els: JSX.Element[] = [];
+    const ANGLE_THRESH = 8; // degrees
+    const OFFSET = 20 / zoom;
+    const ARROWLEN = 5 / zoom;
+    const FONTSIZE = 10 / zoom;
+
+    for (let i = 0; i < walls.length; i++) {
+      for (let j = i + 1; j < walls.length; j++) {
+        const a = walls[i];
+        const b = walls[j];
+        const angA = (a.wallAngle ?? Math.atan2(a.y2 - a.y, a.x2 - a.x) * (180 / Math.PI));
+        const angB = (b.wallAngle ?? Math.atan2(b.y2 - b.y, b.x2 - b.x) * (180 / Math.PI));
+        let diff = Math.abs(angA - angB) % 180;
+        if (diff > 90) diff = 180 - diff;
+        if (diff > ANGLE_THRESH) continue; // not parallel
+
+        // Compute perpendicular distance between parallel wall midpoints
+        const midAx = (a.x + a.x2) / 2;
+        const midAy = (a.y + a.y2) / 2;
+        const midBx = (b.x + b.x2) / 2;
+        const midBy = (b.y + b.y2) / 2;
+        const wallAngleRad = angA * (Math.PI / 180);
+        const wallDirX = Math.cos(wallAngleRad);
+        const wallDirY = Math.sin(wallAngleRad);
+        // perpendicular component of (midB - midA)
+        const perpDist = Math.abs((midBx - midAx) * (-wallDirY) + (midBy - midAy) * wallDirX);
+        if (perpDist < 4) continue; // overlapping
+
+        const perpNx = -wallDirY;
+        const perpNy = wallDirX;
+        // sign so dimension line goes from A toward B
+        const sign = (midBx - midAx) * perpNx + (midBy - midAy) * perpNy >= 0 ? 1 : -1;
+        const lx1 = midAx + sign * perpNx * OFFSET;
+        const ly1 = midAy + sign * perpNy * OFFSET;
+        const lx2 = midAx + sign * perpNx * (OFFSET + perpDist);
+        const ly2 = midAy + sign * perpNy * (OFFSET + perpDist);
+        const mlx = (lx1 + lx2) / 2;
+        const mly = (ly1 + ly2) / 2;
+        const label = fmtPhysical(perpDist, pixelsPerUnit, settings.physicalUnit!);
+        const displayAngle = angA === 0 ? 90 : (Math.abs(angA) < 45 ? 90 : 0);
+
+        els.push(
+          <g key={`pdim-${i}-${j}`} pointerEvents="none">
+            <line x1={lx1} y1={ly1} x2={lx2} y2={ly2}
+              stroke="#0ea5e9" strokeWidth={1 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`} />
+            {/* arrowheads */}
+            <line x1={lx1 + wallDirX * ARROWLEN} y1={ly1 + wallDirY * ARROWLEN}
+              x2={lx1 - wallDirX * ARROWLEN} y2={ly1 - wallDirY * ARROWLEN}
+              stroke="#0ea5e9" strokeWidth={1 / zoom} />
+            <line x1={lx2 + wallDirX * ARROWLEN} y1={ly2 + wallDirY * ARROWLEN}
+              x2={lx2 - wallDirX * ARROWLEN} y2={ly2 - wallDirY * ARROWLEN}
+              stroke="#0ea5e9" strokeWidth={1 / zoom} />
+            <text x={mlx} y={mly - FONTSIZE * 0.7}
+              textAnchor="middle" fontSize={FONTSIZE} fill="#0ea5e9"
+              transform={`rotate(${displayAngle}, ${mlx}, ${mly})`}
+              style={{ userSelect: "none" }}>
+              {label}
+            </text>
+          </g>
+        );
+      }
+    }
+    return <>{els}</>;
+  };
+
+  // ─── Ruler overlay (viewport-fixed, outside transform group) ─────────────
+
+  const renderRuler = () => {
+    if (!pixelsPerUnit || !settings.physicalUnit) return null;
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const svgW = rect.width;
+    const svgH = rect.height;
+    const rulerSize = 20;
+
+    // Decide a nice tick spacing in physical units
+    const minTickScreenPx = 40;
+    const rawUnitStep = minTickScreenPx / (zoom * pixelsPerUnit);
+    const exp = Math.floor(Math.log10(Math.max(rawUnitStep, 0.0001)));
+    const base = Math.pow(10, exp);
+    let unitStep = base;
+    if (rawUnitStep / base > 5) unitStep = base * 10;
+    else if (rawUnitStep / base > 2) unitStep = base * 5;
+    else if (rawUnitStep / base > 1) unitStep = base * 2;
+
+    const hTicks: JSX.Element[] = [];
+    const vTicks: JSX.Element[] = [];
+
+    // Compute visible canvas range
+    const canvasLeft = -panX;
+    const canvasTop = -panY;
+    const canvasRight = canvasLeft + svgW / zoom;
+    const canvasBottom = canvasTop + svgH / zoom;
+
+    const firstX = Math.floor(canvasLeft / pixelsPerUnit / unitStep) * unitStep;
+    const firstY = Math.floor(canvasTop / pixelsPerUnit / unitStep) * unitStep;
+
+    for (let u = firstX; u * pixelsPerUnit < canvasRight; u += unitStep) {
+      const screenX = (u * pixelsPerUnit + panX) * zoom;
+      if (screenX < rulerSize || screenX > svgW) continue;
+      const isMajor = Math.round(u / (unitStep * 5)) * (unitStep * 5) === Math.round(u * 1000) / 1000;
+      hTicks.push(
+        <g key={`hx${u}`}>
+          <line x1={screenX} y1={isMajor ? 0 : rulerSize / 2} x2={screenX} y2={rulerSize}
+            stroke="var(--ink)" strokeWidth={isMajor ? 1 : 0.5} />
+          {isMajor ? (
+            <text x={screenX + 2} y={rulerSize - 4} fontSize={8} fill="var(--ink)">{u}{settings.physicalUnit}</text>
+          ) : null}
+        </g>
+      );
+    }
+
+    for (let u = firstY; u * pixelsPerUnit < canvasBottom; u += unitStep) {
+      const screenY = (u * pixelsPerUnit + panY) * zoom;
+      if (screenY < rulerSize || screenY > svgH) continue;
+      const isMajor = Math.round(u / (unitStep * 5)) * (unitStep * 5) === Math.round(u * 1000) / 1000;
+      vTicks.push(
+        <g key={`vy${u}`}>
+          <line x1={isMajor ? 0 : rulerSize / 2} y1={screenY} x2={rulerSize} y2={screenY}
+            stroke="var(--ink)" strokeWidth={isMajor ? 1 : 0.5} />
+          {isMajor ? (
+            <text x={rulerSize - 2} y={screenY - 3} fontSize={8} fill="var(--ink)"
+              transform={`rotate(-90 ${rulerSize - 2} ${screenY - 3})`}>{u}</text>
+          ) : null}
+        </g>
+      );
+    }
+
+    return (
+      <g className="canvas-ruler" pointerEvents="none">
+        {/* Horizontal ruler */}
+        <rect x={rulerSize} y={0} width={svgW - rulerSize} height={rulerSize}
+          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5} />
+        {hTicks}
+        {/* Vertical ruler */}
+        <rect x={0} y={rulerSize} width={rulerSize} height={svgH - rulerSize}
+          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5} />
+        {vTicks}
+        {/* Corner box */}
+        <rect x={0} y={0} width={rulerSize} height={rulerSize}
+          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5} />
+      </g>
+    );
   };
 
   // ─── Settings panel ───────────────────────────────────────────────────────
@@ -1516,6 +1921,18 @@ export function CanvasRenderer({
               value={local.gridSize ?? 24}
               onChange={(e) => setLocal((p) => ({ ...p, gridSize: parseInt(e.target.value) || 24 }))} />
           </div>
+          {local.physicalUnit ? (
+            <>
+              <div className="idea-canvas__settings-row">
+                <label>Show Dimensions</label>
+                <input type="checkbox" checked={!!local.showDimensions}
+                  onChange={(e) => setLocal((p) => ({ ...p, showDimensions: e.target.checked }))} />
+              </div>
+              <div className="idea-canvas__settings-row idea-canvas__settings-row--info">
+                <span>Scale: 1 grid square = 1 {local.physicalUnit}</span>
+              </div>
+            </>
+          ) : null}
           <div className="idea-canvas__settings-row idea-canvas__settings-row--full">
             <label>Background Image</label>
             <div className="idea-canvas__bg-image-controls">
@@ -1587,7 +2004,8 @@ export function CanvasRenderer({
 
   const svgCursor = drag.type === "pan" ? "grabbing"
     : activeTool === "pan" ? "grab"
-    : drag.type === "edge" || activeTool === "rect" || activeTool === "circle" || activeTool === "line" || activeTool === "text" || activeTool === "node" ? "crosshair"
+    : drag.type === "edge" || drag.type === "wall" || drag.type === "measure"
+      || ["rect", "circle", "line", "text", "node", "wall", "measure"].includes(activeTool) ? "crosshair"
     : "default";
 
   return (
@@ -1630,54 +2048,64 @@ export function CanvasRenderer({
           </button>
         </div>
         <div className="idea-canvas__toolbar-divider" />
-        {/* Shape tools */}
-        <div className="idea-canvas__tool-group">
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "node" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("node")} title="Add flowchart node">
-            ☐ Node
-          </button>
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "rect" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("rect")} title="Draw rectangle">
-            ▭ Rect
-          </button>
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "circle" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("circle")} title="Draw circle/ellipse">
-            ◯ Circle
-          </button>
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "line" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("line")} title="Draw line">
-            ╱ Line
-          </button>
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "text" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("text")} title="Add text">
-            T Text
-          </button>
-        </div>
-        <div className="idea-canvas__toolbar-divider" />
-        {/* Image object upload */}
-        <label className={`idea-canvas__tool-btn idea-canvas__upload-btn${imgObjUploading ? " idea-canvas__upload-btn--loading" : ""}`}
-          title="Add image object">
-          {imgObjUploading ? "Uploading…" : "🖼 Image"}
-          <input type="file" accept="image/*" style={{ display: "none" }}
-            disabled={imgObjUploading}
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (f) await handleImageObjectUpload(f);
-              e.target.value = "";
-            }} />
-        </label>
-        {imgObjUploadError ? (
-          <span className="idea-canvas__upload-error idea-canvas__upload-error--toolbar"
-            title={imgObjUploadError}
-            onClick={() => setImgObjUploadError(null)}>
-            ⚠️ {imgObjUploadError}
-          </span>
+        {/* Shape tools — diagram mode */}
+        {canvasMode !== "floorplan" ? (
+          <div className="idea-canvas__tool-group">
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "node" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("node")} title="Add flowchart node">
+              ☐ Node
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "rect" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("rect")} title="Draw rectangle">
+              ▭ Rect
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "circle" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("circle")} title="Draw circle/ellipse">
+              ◯ Circle
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "line" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("line")} title="Draw line">
+              ╱ Line
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "text" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("text")} title="Add text">
+              T Text
+            </button>
+          </div>
         ) : null}
+        {/* Floorplan tools */}
+        {canvasMode === "floorplan" ? (
+          <div className="idea-canvas__tool-group">
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "wall" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => { setActiveTool("wall"); }}
+              title="Draw wall (chain drawing, Enter to finish, Esc to cancel)">
+              ⊟ Wall
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "measure" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("measure")}
+              title="Add manual dimension annotation">
+              ↔ Measure
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "text" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("text")} title="Add text label">
+              T Label
+            </button>
+            <button type="button"
+              className={`idea-canvas__tool-btn${activeTool === "rect" ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={() => setActiveTool("rect")} title="Draw room/space rectangle">
+              ▭ Room
+            </button>
+          </div>
+        ) : null}
+        <div className="idea-canvas__toolbar-divider" />
         {/* Object library button */}
         <button type="button"
           className={`idea-canvas__tool-btn${activeTool === "object" || objectPickerOpen ? " idea-canvas__tool-btn--active" : ""}`}
@@ -1873,9 +2301,15 @@ export function CanvasRenderer({
           {/* Draw preview */}
           {renderDrawPreview()}
 
+          {/* Auto parallel-wall dimension overlay */}
+          {renderParallelWallDimensions()}
+
           {/* Rubber band */}
           {renderRubberBand()}
         </g>
+
+        {/* Ruler strips — outside zoom group, fixed to viewport */}
+        {renderRuler()}
       </svg>
 
       {/* Settings panel */}
@@ -1958,22 +2392,38 @@ export function CanvasRenderer({
         <div className="idea-canvas__hint">Click a target node to connect, or press Esc to cancel.</div>
       ) : activeTool !== "select" && activeTool !== "pan" && activeTool !== "object" ? (
         <div className="idea-canvas__hint">
-          {activeTool === "node" ? "Click to place a flowchart node."
-            : activeTool === "line" ? "Click and drag to draw a line."
-            : activeTool === "text" ? "Click to place a text box."
-            : `Click and drag to draw a ${activeTool}.`}
-          {" "}Press Esc to cancel.
+          {activeTool === "wall"
+            ? (wallChainStartRef.current
+                ? "Click to continue wall chain. Enter to finish chain. Esc to cancel. Hold Shift for 45° angles."
+                : "Click where the wall starts.")
+            : activeTool === "measure"
+              ? "Click and drag to add a dimension annotation."
+              : activeTool === "node" ? "Click to place a flowchart node."
+              : activeTool === "line" ? "Click and drag to draw a line."
+              : activeTool === "text" ? "Click to place a text box."
+              : `Click and drag to draw a ${activeTool}.`}
+          {activeTool !== "wall" ? " Press Esc to cancel." : ""}
         </div>
       ) : null}
 
-      {/* Object Picker overlay */}
-      {objectPickerOpen && (
+      {/* Physical cursor position status bar */}
+      {cursorPhysical && settings.physicalUnit ? (
+        <div className="idea-canvas__status-bar">
+          {cursorPhysical.x.toFixed(1)} {settings.physicalUnit},{" "}
+          {cursorPhysical.y.toFixed(1)} {settings.physicalUnit}
+          {wallChainStartRef.current ? "  ·  Wall chain active — Esc to cancel" : ""}
+        </div>
+      ) : null}
+
+      {/* Object Picker overlay — portalled to body to avoid overflow/stacking constraints */}
+      {objectPickerOpen && typeof document !== "undefined" ? createPortal(
         <CanvasObjectPicker
           householdId={householdId}
           onPlace={(placement) => { void handlePlaceObject(placement); }}
           onClose={() => { setObjectPickerOpen(false); setActiveTool("select"); }}
-        />
-      )}
+        />,
+        document.body
+      ) : null}
     </div>
   );
 }

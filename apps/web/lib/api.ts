@@ -6002,6 +6002,15 @@ export const getCanvases = async (
   schema: z.array(ideaCanvasSummarySchema),
 });
 
+export const getCanvasesByEntity = async (
+  householdId: string,
+  entityType: string,
+  entityId: string
+): Promise<IdeaCanvasSummary[]> => apiRequest({
+  path: `/v1/households/${householdId}/canvases?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}`,
+  schema: z.array(ideaCanvasSummarySchema),
+});
+
 export const getCanvas = async (
   householdId: string,
   canvasId: string

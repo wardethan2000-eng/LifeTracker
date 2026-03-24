@@ -17,6 +17,7 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
   const [canvases, setCanvases] = useState<IdeaCanvasSummary[]>(initialCanvases);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newMode, setNewMode] = useState<"diagram" | "floorplan">("diagram");
   const [loading, setLoading] = useState(initialCanvases.length === 0);
 
   const refreshCanvases = useCallback(async () => {
@@ -58,13 +59,13 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
     if (!name) return;
     setCreating(true);
     try {
-      await createCanvas(householdId, { name });
+      await createCanvas(householdId, { name, canvasMode: newMode });
       await refreshCanvases();
       setNewName("");
     } finally {
       setCreating(false);
     }
-  }, [householdId, newName, refreshCanvases]);
+  }, [householdId, newName, newMode, refreshCanvases]);
 
   const handleDelete = useCallback(async (canvasId: string) => {
     if (!confirm("Delete this canvas?")) return;
@@ -78,21 +79,29 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
         <input
           type="text"
           className="canvas-list__create-input"
-          placeholder="New canvas name…"
+          placeholder="Canvas name…"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           maxLength={200}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreate();
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
+          autoFocus
         />
+        <select
+          className="canvas-list__create-mode"
+          value={newMode}
+          onChange={(e) => setNewMode(e.target.value as "diagram" | "floorplan")}
+          aria-label="Canvas type"
+        >
+          <option value="diagram">General</option>
+          <option value="floorplan">Floorplan</option>
+        </select>
         <button
           type="button"
           className="button button--primary button--small"
           onClick={handleCreate}
           disabled={!newName.trim() || creating}
         >
-          {creating ? "Creating…" : "Create Canvas"}
+          {creating ? "Creating…" : "Create"}
         </button>
       </div>
 
@@ -126,6 +135,9 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
                 <div className="canvas-list__card-info">
                   <strong className="canvas-list__card-name">{canvas.name}</strong>
                   <span className="canvas-list__card-meta">
+                    {canvas.canvasMode && canvas.canvasMode !== "diagram" ? (
+                      <span className="canvas-list__card-mode-badge">{canvas.canvasMode}</span>
+                    ) : null}
                     {canvas.nodeCount} node{canvas.nodeCount !== 1 ? "s" : ""} · {canvas.edgeCount} edge{canvas.edgeCount !== 1 ? "s" : ""}
                   </span>
                   <time className="canvas-list__card-date">{formatDate(canvas.updatedAt)}</time>
