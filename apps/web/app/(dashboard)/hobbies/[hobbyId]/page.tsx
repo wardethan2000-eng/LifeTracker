@@ -6,6 +6,7 @@ import {
   getHobbySessions,
   getHobbySeries,
   getEntries,
+  getCanvasesByEntity,
   getMe,
   getSourceIdea,
   listHobbyPracticeGoals,
@@ -29,7 +30,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       return <p>No household found.</p>;
     }
 
-    const [hobby, sessions, series, entriesResult, sourceIdea, goalsResult, routinesResult] = await Promise.all([
+    const [hobby, sessions, series, entriesResult, sourceIdea, goalsResult, routinesResult, canvases] = await Promise.all([
       getHobbyDetail(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbySeries(household.id, hobbyId),
@@ -43,6 +44,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       getSourceIdea(household.id, "hobby", hobbyId).catch(() => null),
       listHobbyPracticeGoals(household.id, hobbyId, { limit: 10, status: "active" }).catch(() => ({ items: [], nextCursor: null })),
       listHobbyPracticeRoutines(household.id, hobbyId, { limit: 10, isActive: true }).catch(() => ({ items: [], nextCursor: null })),
+      getCanvasesByEntity(household.id, "hobby", hobbyId).catch(() => []),
     ]);
 
     const activeSessions = sessions.filter((s) => s.status !== "completed" && s.status !== "cancelled");
@@ -56,6 +58,10 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
         title: e.title ?? "",
         entryDate: e.entryDate,
       }));
+
+    const rawNote = entriesResult.items.find((e) => !(e.tags ?? []).includes("dashboard_notepad")) ?? null;
+    const recentNote = rawNote ? { id: rawNote.id, title: rawNote.title ?? null, body: rawNote.body, bodyFormat: rawNote.bodyFormat, entryDate: rawNote.entryDate } : null;
+    const canvasSummaries = canvases.map((c) => ({ id: c.id, name: c.name, canvasMode: c.canvasMode, nodeCount: c.nodeCount, edgeCount: c.edgeCount, updatedAt: c.updatedAt }));
 
     return (
       <>
@@ -104,6 +110,8 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
         recentEntries={recentEntries}
         activeGoals={goalsResult.items.slice(0, 3)}
         topRoutines={routinesResult.items.slice(0, 3)}
+        recentNote={recentNote}
+        canvases={canvasSummaries}
       />
       </>
     );

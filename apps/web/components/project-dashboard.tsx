@@ -7,6 +7,7 @@ import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
 import { AttachmentSection } from "./attachment-section";
+import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
 import type { ProjectPhaseProgress } from "@lifekeeper/types";
 import { useFormattedDate } from "../lib/formatted-date";
 
@@ -36,6 +37,8 @@ type ProjectDashboardProps = {
   recentEntries: { id: string; title: string; entryDate: string }[];
   upcomingTasks: { id: string; title: string; dueDate: string | null; status: string }[];
   phaseProgress: ProjectPhaseProgress[];
+  recentNote: NccNoteSummary | null;
+  canvases: NccCanvasSummary[];
 };
 
 function formatCurrency(amount: number | null, fallback = "Not set"): string {
@@ -79,6 +82,8 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     recentEntries,
     upcomingTasks,
     phaseProgress,
+    recentNote,
+    canvases,
   } = props;
 
   const base = `/projects/${projectId}`;
@@ -270,6 +275,16 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
         cards={cards}
         defaultLayout={defaultLayout}
       />
+      <div className="ncc-section">
+        <NotesAndCanvasCard
+          householdId={householdId}
+          entityType="project"
+          entityId={projectId}
+          recentNote={recentNote}
+          canvases={canvases}
+          allNotesHref={`/projects/${projectId}/notes${qs}`}
+        />
+      </div>
     </>
   );
 }

@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import Link from "next/link";
 import { AssetLabelActions } from "./asset-label-actions";
 import { AttachmentSection } from "./attachment-section";
+import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
 import {
   formatCategoryLabel,
   formatCurrency,
@@ -25,9 +26,12 @@ type AssetOverviewTabProps = {
   assetId: string;
   transferHistory: AssetTransferList;
   overviewTimeline: AssetTimelineFeed;
+  householdId: string;
+  recentNote: NccNoteSummary | null;
+  canvases: NccCanvasSummary[];
 };
 
-export async function AssetOverviewTab({ detail, assetId, transferHistory, overviewTimeline }: AssetOverviewTabProps): Promise<JSX.Element> {
+export async function AssetOverviewTab({ detail, assetId, transferHistory, overviewTimeline, householdId, recentNote, canvases }: AssetOverviewTabProps): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const dueNow = detail.schedules.filter((schedule) => schedule.status === "due" || schedule.status === "overdue");
 
@@ -226,6 +230,15 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
           )}
         </div>
       </section>
+
+      <NotesAndCanvasCard
+        householdId={householdId}
+        entityType="asset"
+        entityId={assetId}
+        recentNote={recentNote}
+        canvases={canvases}
+        allNotesHref={`/assets/${assetId}/history`}
+      />
 
       <section className="panel">
         <div className="panel__header">

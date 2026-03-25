@@ -16491,3 +16491,342 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-style: italic;
   padding: 4px 0;
 }
+
+/* ─── Notes & Canvas Card (ncc) ───────────────────────────────────────────── */
+
+/* Preview (collapsed) */
+.ncc-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.ncc-preview__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ncc-preview__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.ncc-preview__text {
+  font-size: 0.82rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.ncc-preview__empty {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.ncc-preview__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.ncc-canvas-chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tabs */
+.ncc-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.ncc-tab {
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms;
+}
+
+.ncc-tab:hover {
+  color: var(--ink);
+}
+
+.ncc-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Panel */
+.ncc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ncc-panel__footer {
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* Note display */
+.ncc-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ncc-note__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ncc-note__body {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+  white-space: pre-wrap;
+  line-height: 1.55;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition: border-color 150ms, background 150ms;
+}
+
+.ncc-note__body:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.ncc-note__textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ncc-status {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+/* Empty CTA */
+.ncc-empty-cta {
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms, background 150ms;
+}
+
+.ncc-empty-cta:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.ncc-empty-state {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 4px 0;
+}
+
+/* Create form */
+.ncc-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ncc-create-form__title {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 150ms;
+}
+
+.ncc-create-form__title:focus {
+  border-color: var(--accent);
+}
+
+.ncc-create-form__body {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 150ms;
+}
+
+.ncc-create-form__body:focus {
+  border-color: var(--accent);
+}
+
+.ncc-create-form__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ncc-feedback {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.ncc-feedback--info {
+  color: var(--ink-muted);
+}
+
+.ncc-feedback--success {
+  color: var(--success-text, #1f6b47);
+}
+
+.ncc-feedback--error {
+  color: var(--danger-text, #a12d2d);
+}
+
+.ncc-legacy-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: var(--radius);
+}
+
+.ncc-legacy-banner__content {
+  display: grid;
+  gap: 4px;
+}
+
+.ncc-legacy-banner__content p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .ncc-legacy-banner {
+    flex-direction: column;
+  }
+}
+
+/* Canvas list */
+.ncc-canvas-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ncc-canvas-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ncc-canvas-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ncc-canvas-item__name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ncc-canvas-item__meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ncc-canvas-item__count {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+/* Section wrapper used when placing card below DashboardGrid */
+.ncc-section {
+  margin-top: 24px;
+}

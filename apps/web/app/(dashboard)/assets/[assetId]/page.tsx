@@ -3,6 +3,8 @@ import {
   getAssetDetail,
   getAssetTimeline,
   getAssetTransferHistory,
+  getCanvasesByEntity,
+  getEntries,
   getSourceIdea,
 } from "../../../../lib/api";
 import { AssetOverviewTab } from "../../../../components/asset-overview-tab";
@@ -20,7 +22,15 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
     getAssetTimeline(assetId, { limit: 5 }),
   ]);
 
-  const sourceIdea = await getSourceIdea(detail.asset.householdId, "asset", assetId).catch(() => null);
+  const householdId = detail.asset.householdId;
+
+  const [sourceIdea, entriesResult, canvases] = await Promise.all([
+    getSourceIdea(householdId, "asset", assetId).catch(() => null),
+    getEntries(householdId, { entityType: "asset", entityId: assetId, limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
+    getCanvasesByEntity(householdId, "asset", assetId).catch(() => []),
+  ]);
+
+  const recentNote = entriesResult.items[0] ?? null;
 
   return (
     <>
@@ -32,6 +42,9 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
         assetId={assetId}
         transferHistory={transferHistory}
         overviewTimeline={overviewTimeline}
+        householdId={householdId}
+        recentNote={recentNote ? { id: recentNote.id, title: recentNote.title ?? null, body: recentNote.body, bodyFormat: recentNote.bodyFormat, entryDate: recentNote.entryDate } : null}
+        canvases={canvases.map((c) => ({ id: c.id, name: c.name, canvasMode: c.canvasMode, nodeCount: c.nodeCount, edgeCount: c.edgeCount, updatedAt: c.updatedAt }))}
       />
     </>
   );

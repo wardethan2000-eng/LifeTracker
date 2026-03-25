@@ -9,6 +9,7 @@ import { createHobbySession } from "../lib/api";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
+import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
 import { useFormattedDate } from "../lib/formatted-date";
 
 type SessionSummary = {
@@ -53,6 +54,8 @@ type HobbyDashboardProps = {
   recentEntries: EntrySummary[];
   activeGoals: HobbyPracticeGoalSummary[];
   topRoutines: HobbyPracticeRoutineSummary[];
+  recentNote: NccNoteSummary | null;
+  canvases: NccCanvasSummary[];
 };
 
 function statusBadgeClass(status: string): string {
@@ -83,6 +86,8 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
     recentEntries,
     activeGoals,
     topRoutines,
+    recentNote,
+    canvases,
   } = props;
 
   const [quickLogName, setQuickLogName] = useState("");
@@ -309,6 +314,16 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
         cards={cards}
         defaultLayout={defaultLayout}
       />
+      <div className="ncc-section">
+        <NotesAndCanvasCard
+          householdId={householdId}
+          entityType="hobby"
+          entityId={hobbyId}
+          recentNote={recentNote}
+          canvases={canvases}
+          allNotesHref={`/hobbies/${hobbyId}/entries`}
+        />
+      </div>
     </>
   );
 }

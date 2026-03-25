@@ -1,14 +1,15 @@
 import Link from "next/link";
 import type { JSX } from "react";
-import { ApiError, getIdea, getMe } from "../../../../lib/api";\nimport { formatDate } from "../../../../lib/formatters";
+import { ApiError, getCanvasesByEntity, getEntries, getIdea, getMe } from "../../../../lib/api";
+import { formatDate } from "../../../../lib/formatters";
 import { IdeaDescriptionCard } from "../../../../components/idea-description-card";
-import { IdeaNotesLog } from "../../../../components/idea-notes-log";
 import { IdeaLinksCard } from "../../../../components/idea-links-card";
 import { IdeaStatusCard } from "../../../../components/idea-status-card";
 import { IdeaPromotionCard } from "../../../../components/idea-promotion-card";
 import { IdeaProvenanceCard } from "../../../../components/idea-provenance-card";
 import { IdeaMaterialsCard } from "../../../../components/idea-materials-card";
 import { IdeaStepsCard } from "../../../../components/idea-steps-card";
+import { NotesAndCanvasCard } from "../../../../components/notes-canvas-card";
 
 const stageLabels: Record<string, string> = {
   spark: "Spark",
@@ -56,7 +57,30 @@ export default async function IdeaDetailPage({ params }: IdeaDetailPageProps): P
       return <p>No household found. <Link href="/ideas" className="text-link">← Ideas</Link>.</p>;
     }
 
-    const idea = await getIdea(household.id, ideaId);
+    const [idea, entriesResult, canvases] = await Promise.all([
+      getIdea(household.id, ideaId),
+      getEntries(household.id, {
+        entityType: "idea",
+        entityId: ideaId,
+        limit: 1,
+        sortBy: "entryDate",
+        excludeFlags: ["archived"],
+      }).catch(() => ({ items: [], nextCursor: null })),
+      getCanvasesByEntity(household.id, "idea", ideaId).catch(() => []),
+    ]);
+
+    const rawNote = entriesResult.items[0] ?? null;
+    const recentNote = rawNote
+      ? { id: rawNote.id, title: rawNote.title ?? null, body: rawNote.body, bodyFormat: rawNote.bodyFormat, entryDate: rawNote.entryDate }
+      : null;
+    const canvasSummaries = canvases.map((c) => ({
+      id: c.id,
+      name: c.name,
+      canvasMode: c.canvasMode,
+      nodeCount: c.nodeCount,
+      edgeCount: c.edgeCount,
+      updatedAt: c.updatedAt,
+    }));
 
     const createdDate = formatDate(idea.createdAt, "-", household.timezone);
 
@@ -110,10 +134,18 @@ export default async function IdeaDetailPage({ params }: IdeaDetailPageProps): P
                 ideaId={idea.id}
                 description={idea.description}
               />
-              <IdeaNotesLog
+              <NotesAndCanvasCard
                 householdId={household.id}
-                ideaId={idea.id}
-                notes={idea.notes}
+                entityType="idea"
+                entityId={idea.id}
+                recentNote={recentNote}
+                canvases={canvasSummaries}
+                allNotesHref={`/notes?entityType=idea&entityId=${idea.id}`}
+                legacyIdeaNotes={idea.notes.map((note) => ({
+                  id: note.id,
+                  text: note.text,
+                  createdAt: note.createdAt,
+                }))}
               />
               <IdeaLinksCard
                 householdId={household.id}

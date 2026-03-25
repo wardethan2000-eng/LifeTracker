@@ -225,6 +225,7 @@ export function ProjectPortfolioWorkspace({
                           )}
                           onSave={(v) => { void handleSave(project.id, "status", v); }}
                         />
+                      </td>
                       <td>
                         <ProjectProgressBar
                           phases={project.phaseProgress ?? []}

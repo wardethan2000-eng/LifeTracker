@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { createCanvas, createEntry, updateEntry } from "../lib/api";
+import { importIdeaLegacyNotesAction } from "../app/actions";
 import { ExpandableCard } from "./expandable-card";
 
 export type NccNoteSummary = {
@@ -23,6 +24,12 @@ export type NccCanvasSummary = {
   updatedAt: string;
 };
 
+type NccLegacyIdeaNote = {
+  id: string;
+  text: string;
+  createdAt: string;
+};
+
 type NotesAndCanvasCardProps = {
   householdId: string;
   entityType: "asset" | "project" | "hobby" | "idea";
@@ -30,6 +37,7 @@ type NotesAndCanvasCardProps = {
   recentNote: NccNoteSummary | null;
   canvases: NccCanvasSummary[];
   allNotesHref: string;
+  legacyIdeaNotes?: NccLegacyIdeaNote[];
 };
 
 function truncate(str: string, max: number): string {
@@ -39,12 +47,14 @@ function truncate(str: string, max: number): string {
 
 function formatCanvasMode(mode: string): string {
   switch (mode) {
-    case "freeform": return "Freeform";
-    case "mind_map": return "Mind Map";
-    case "flowchart": return "Flowchart";
+    case "freehand": return "Freehand";
+    case "diagram": return "Diagram";
+    case "floorplan": return "Floor Plan";
     default: return mode;
   }
 }
+
+type StatusTone = "success" | "error" | "info";
 
 export function NotesAndCanvasCard({
   householdId,
@@ -53,6 +63,7 @@ export function NotesAndCanvasCard({
   recentNote: initialNote,
   canvases: initialCanvases,
   allNotesHref,
+  legacyIdeaNotes: initialLegacyIdeaNotes = [],
 }: NotesAndCanvasCardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"notes" | "canvas">("notes");
@@ -66,12 +77,16 @@ export function NotesAndCanvasCard({
   const [createTitle, setCreateTitle] = useState("");
   const [createBody, setCreateBody] = useState("");
   const [creating, setCreating] = useState(false);
+  const [noteStatus, setNoteStatus] = useState<{ tone: StatusTone; message: string } | null>(null);
+  const [legacyIdeaNotes, setLegacyIdeaNotes] = useState<NccLegacyIdeaNote[]>(initialLegacyIdeaNotes);
+  const [migratingLegacyNotes, setMigratingLegacyNotes] = useState(false);
 
   // Canvas state
-  const [canvases, setCanvases] = useState<NccCanvasSummary[]>(initialCanvases);
+  const [canvases] = useState<NccCanvasSummary[]>(initialCanvases);
   const [creatingCanvas, setCreatingCanvas] = useState(false);
   const [newCanvasName, setNewCanvasName] = useState("");
   const [canvasCreateMode, setCanvasCreateMode] = useState(false);
+  const [canvasStatus, setCanvasStatus] = useState<{ tone: StatusTone; message: string } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -80,6 +95,7 @@ export function NotesAndCanvasCard({
       setEditingBody(false);
       return;
     }
+    setNoteStatus({ tone: "info", message: "Saving note..." });
     setSaving(true);
     try {
       const updated = await updateEntry(householdId, note.id, { body: editBody });
@@ -91,7 +107,9 @@ export function NotesAndCanvasCard({
         entryDate: updated.entryDate,
       });
       setEditingBody(false);
+      setNoteStatus({ tone: "success", message: "Note saved." });
     } catch {
+      setNoteStatus({ tone: "error", message: "Could not save the note. Changes are still in the editor." });
       // keep editing state open on failure
     } finally {
       setSaving(false);
@@ -101,6 +119,7 @@ export function NotesAndCanvasCard({
   const handleCreateNote = useCallback(async () => {
     const body = createBody.trim();
     if (!body) return;
+    setNoteStatus({ tone: "info", message: "Creating note..." });
     setCreating(true);
     try {
       const created = await createEntry(householdId, {
@@ -120,7 +139,9 @@ export function NotesAndCanvasCard({
       setCreateMode(false);
       setCreateTitle("");
       setCreateBody("");
+      setNoteStatus({ tone: "success", message: "Note created." });
     } catch {
+      setNoteStatus({ tone: "error", message: "Could not create the note. Please retry." });
       // leave form open so user can retry
     } finally {
       setCreating(false);
@@ -129,19 +150,41 @@ export function NotesAndCanvasCard({
 
   const handleCreateCanvas = useCallback(async () => {
     const name = newCanvasName.trim() || "Untitled Canvas";
+    setCanvasStatus({ tone: "info", message: "Creating canvas..." });
     setCreatingCanvas(true);
     try {
       const created = await createCanvas(householdId, {
         name,
         entityType,
         entityId,
-        canvasMode: "freeform",
+        canvasMode: "freehand",
       });
+      setCanvasStatus({ tone: "success", message: "Opening canvas..." });
       router.push(`/canvases/${created.id}`);
     } catch {
+      setCanvasStatus({ tone: "error", message: "Could not create the canvas. Please retry." });
       setCreatingCanvas(false);
     }
   }, [householdId, entityType, entityId, newCanvasName, router]);
+
+  const handleImportLegacyIdeaNotes = useCallback(async () => {
+    if (entityType !== "idea" || legacyIdeaNotes.length === 0) {
+      return;
+    }
+
+    setNoteStatus({ tone: "info", message: `Importing ${legacyIdeaNotes.length} legacy note${legacyIdeaNotes.length === 1 ? "" : "s"}...` });
+    setMigratingLegacyNotes(true);
+    try {
+      const importedCount = await importIdeaLegacyNotesAction(householdId, entityId, legacyIdeaNotes);
+      setLegacyIdeaNotes([]);
+      setNoteStatus({ tone: "success", message: `Imported ${importedCount} legacy note${importedCount === 1 ? "" : "s"}.` });
+      router.refresh();
+    } catch {
+      setNoteStatus({ tone: "error", message: "Could not import legacy idea notes." });
+    } finally {
+      setMigratingLegacyNotes(false);
+    }
+  }, [entityId, entityType, householdId, legacyIdeaNotes, router]);
 
   // ── Preview (collapsed state) ──────────────────────────────────────
   const previewContent = (
@@ -158,7 +201,7 @@ export function NotesAndCanvasCard({
       <div className="ncc-preview__item">
         <span className="ncc-preview__label">Canvas</span>
         {canvases.length > 0 ? (
-          <span className="ncc-canvas-chip">{canvases[0].name}</span>
+          <span className="ncc-canvas-chip">{canvases.at(0)?.name ?? "Untitled Canvas"}</span>
         ) : (
           <span className="ncc-preview__empty">No canvases</span>
         )}
@@ -169,6 +212,25 @@ export function NotesAndCanvasCard({
   // ── Expanded: Notes tab ────────────────────────────────────────────
   const notesTab = (
     <div className="ncc-panel">
+      {entityType === "idea" && legacyIdeaNotes.length > 0 ? (
+        <div className="ncc-legacy-banner">
+          <div className="ncc-legacy-banner__content">
+            <strong>Legacy idea notes detected</strong>
+            <p>
+              This idea still has {legacyIdeaNotes.length} older note{legacyIdeaNotes.length === 1 ? "" : "s"} stored in the legacy idea record.
+              Import them into the shared notes system to keep everything in one place.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            disabled={migratingLegacyNotes}
+            onClick={() => { void handleImportLegacyIdeaNotes(); }}
+          >
+            {migratingLegacyNotes ? "Importing..." : `Import ${legacyIdeaNotes.length} note${legacyIdeaNotes.length === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      ) : null}
       {note ? (
         <div className="ncc-note">
           {note.title ? <p className="ncc-note__title">{note.title}</p> : null}
@@ -243,6 +305,7 @@ export function NotesAndCanvasCard({
           + Take a note…
         </button>
       )}
+      {noteStatus ? <p className={`ncc-feedback ncc-feedback--${noteStatus.tone}`}>{noteStatus.message}</p> : null}
       <div className="ncc-panel__footer">
         <Link href={allNotesHref} className="text-link">View all notes →</Link>
       </div>
@@ -311,6 +374,7 @@ export function NotesAndCanvasCard({
           + New canvas
         </button>
       )}
+      {canvasStatus ? <p className={`ncc-feedback ncc-feedback--${canvasStatus.tone}`}>{canvasStatus.message}</p> : null}
     </div>
   );
 

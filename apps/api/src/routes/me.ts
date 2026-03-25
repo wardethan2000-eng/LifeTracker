@@ -115,8 +115,14 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
     if (request.auth.clerkUserId) {
       try {
         const { createClerkClient } = await import("@clerk/backend");
-        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-        await clerkClient.users.deleteUser(request.auth.clerkUserId);
+        const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+
+        if (!secretKey) {
+          app.log.warn("Skipping Clerk user deletion because CLERK_SECRET_KEY is not configured");
+        } else {
+          const clerkClient = createClerkClient({ secretKey });
+          await clerkClient.users.deleteUser(request.auth.clerkUserId);
+        }
       } catch (err) {
         app.log.warn({ err }, "Failed to delete Clerk user during account deletion");
       }

@@ -3675,6 +3675,34 @@ export async function removeIdeaNoteAction(
   revalidateIdeaPaths(ideaId);
 }
 
+export async function importIdeaLegacyNotesAction(
+  householdId: string,
+  ideaId: string,
+  notes: Array<{ id: string; text: string; createdAt: string }>
+): Promise<number> {
+  let imported = 0;
+
+  for (const note of notes) {
+    const text = note.text.trim();
+    if (!text) {
+      continue;
+    }
+
+    await createEntry(householdId, {
+      entityType: "idea",
+      entityId: ideaId,
+      title: null,
+      body: text,
+      entryDate: note.createdAt,
+    });
+    await removeIdeaNote(householdId, ideaId, note.id);
+    imported += 1;
+  }
+
+  revalidateIdeaPaths(ideaId);
+  return imported;
+ }
+
 export async function addIdeaLinkAction(
   householdId: string,
   ideaId: string,

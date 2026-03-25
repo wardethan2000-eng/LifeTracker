@@ -8,6 +8,7 @@ import {
   getMe,
   getProjectDetail,
   getEntries,
+  getCanvasesByEntity,
   getSourceIdea,
 } from "../../../../lib/api";
 import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
@@ -48,7 +49,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, entriesResult, sourceIdea] = await Promise.all([
+    const [project, entriesResult, sourceIdea, canvases] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getEntries(household.id, {
         entityType: "project",
@@ -59,6 +60,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         tags: undefined,
       }).catch(() => ({ items: [], nextCursor: null })),
       getSourceIdea(household.id, "project", routeParams.projectId).catch(() => null),
+      getCanvasesByEntity(household.id, "project", routeParams.projectId).catch(() => []),
     ]);
 
     const qs = `?householdId=${household.id}`;
@@ -136,6 +138,10 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         entryDate: e.entryDate,
       }));
 
+    const rawNote = entriesResult.items.find((e) => !(e.tags ?? []).includes("dashboard_notepad")) ?? null;
+    const recentNote = rawNote ? { id: rawNote.id, title: rawNote.title ?? null, body: rawNote.body, bodyFormat: rawNote.bodyFormat, entryDate: rawNote.entryDate } : null;
+    const canvasSummaries = canvases.map((c) => ({ id: c.id, name: c.name, canvasMode: c.canvasMode, nodeCount: c.nodeCount, edgeCount: c.edgeCount, updatedAt: c.updatedAt }));
+
     return (
       <>
         {sourceIdea && (
@@ -167,6 +173,8 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         recentEntries={recentEntries}
         upcomingTasks={upcomingTasks}
         phaseProgress={phaseProgress}
+        recentNote={recentNote}
+        canvases={canvasSummaries}
       />
       </>
     );
