@@ -78,6 +78,8 @@ import type {
   DemoteToIdeaInput,
   UpdateNotificationPreferencesInput,
   UpdateDisplayPreferencesInput,
+  CreateProjectTaskDependencyInput,
+  UpdateProjectTaskDependencyInput,
 } from "@lifekeeper/types";
 import {
   assetCustomFieldsSchema,
@@ -225,6 +227,9 @@ import {
   purgeProject as purgeProjectApi,
   purgeInventoryItem as purgeInventoryItemApi,
   purgeAllTrash as purgeAllTrashApi,
+  createProjectDependency,
+  updateProjectDependency,
+  deleteProjectDependency,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
@@ -2699,6 +2704,45 @@ export async function deleteProjectTaskAction(formData: FormData): Promise<void>
   const taskId = getRequiredString(formData, "taskId");
 
   await deleteProjectTask(householdId, projectId, taskId);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function createTaskDependencyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateProjectTaskDependencyInput = {
+    predecessorTaskId: getRequiredString(formData, "predecessorTaskId"),
+    successorTaskId: getRequiredString(formData, "successorTaskId"),
+  };
+  const dependencyType = getOptionalString(formData, "dependencyType");
+  if (dependencyType) input.dependencyType = dependencyType as CreateProjectTaskDependencyInput["dependencyType"];
+  const lagDays = getOptionalNumber(formData, "lagDays");
+  if (lagDays !== undefined) input.lagDays = lagDays;
+
+  await createProjectDependency(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function updateTaskDependencyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const dependencyId = getRequiredString(formData, "dependencyId");
+  const input: UpdateProjectTaskDependencyInput = {};
+  const dependencyType = getOptionalString(formData, "dependencyType");
+  if (dependencyType) input.dependencyType = dependencyType as UpdateProjectTaskDependencyInput["dependencyType"];
+  const lagDays = getOptionalNumber(formData, "lagDays");
+  if (lagDays !== undefined) input.lagDays = lagDays;
+
+  await updateProjectDependency(householdId, projectId, dependencyId, input);
+  revalidateProjectPaths(householdId, projectId);
+}
+
+export async function deleteTaskDependencyAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const dependencyId = getRequiredString(formData, "dependencyId");
+
+  await deleteProjectDependency(householdId, projectId, dependencyId);
   revalidateProjectPaths(householdId, projectId);
 }
 

@@ -92,6 +92,9 @@ import {
   projectExpenseSchema,
   projectNoteSchema,
   projectNoteListSchema,
+  projectTaskDependencySchema,
+  projectTaskDependencyListSchema,
+  projectTimelineDataSchema,
   projectPhaseChecklistItemSchema,
   projectPhaseDetailSchema,
   projectPhaseDetailListSchema,
@@ -164,6 +167,8 @@ import {
   type CreateProjectInput,
   type CreateProjectTaskChecklistItemInput,
   type CreateProjectTaskInput,
+  type CreateProjectTaskDependencyInput,
+  type UpdateProjectTaskDependencyInput,
   type CreateQuickTodoInput,
   type PromoteTaskInput,
   type CreatePresetProfileInput,
@@ -259,6 +264,9 @@ import {
   type ProjectPhaseSupply,
   type ProjectPhaseSummary,
   type ProjectTimelinePayload,
+  type ProjectTimelineData,
+  type ProjectTaskDependency,
+  type TaskDependencyType,
   type ProjectTemplate,
   type ProjectShoppingList,
   type CreateProjectPurchaseRequestInput,
@@ -3611,6 +3619,56 @@ export const deleteProjectNote = async (
   });
 };
 
+export const getProjectDependencies = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectTaskDependency[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/dependencies`,
+  schema: projectTaskDependencyListSchema
+});
+
+export const createProjectDependency = async (
+  householdId: string,
+  projectId: string,
+  input: CreateProjectTaskDependencyInput
+): Promise<ProjectTaskDependency> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/dependencies`,
+  method: "POST",
+  body: input,
+  schema: projectTaskDependencySchema
+});
+
+export const updateProjectDependency = async (
+  householdId: string,
+  projectId: string,
+  dependencyId: string,
+  input: UpdateProjectTaskDependencyInput
+): Promise<ProjectTaskDependency> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/dependencies/${dependencyId}`,
+  method: "PATCH",
+  body: input,
+  schema: projectTaskDependencySchema
+});
+
+export const deleteProjectDependency = async (
+  householdId: string,
+  projectId: string,
+  dependencyId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/dependencies/${dependencyId}`,
+    method: "DELETE"
+  });
+};
+
+export const fetchProjectTimelineData = async (
+  householdId: string,
+  projectId: string
+): Promise<ProjectTimelineData> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/timeline-data`,
+  schema: projectTimelineDataSchema
+});
+
 export const applyLibraryPreset = async (assetId: string, presetKey: string): Promise<void> => applyPreset(assetId, {
   source: "library",
   presetKey
@@ -4155,17 +4213,6 @@ export const createHobby = async (
   body: input,
   schema: hobbySchema,
 });
-
-export const getHobby = async (
-  householdId: string,
-  hobbyId: string
-): Promise<Hobby> => {
-  const result = await apiRequest<unknown>({
-    path: `/v1/households/${householdId}/hobbies/${hobbyId}`,
-  });
-
-  return parseHobbyResponse(result);
-};
 
 export const getHobbyDetail = async (
   householdId: string,
@@ -4717,18 +4764,6 @@ export const deleteHobbySessionIngredient = async (
 
 // ── Hobby Session Steps ──────────────────────────────────────────────
 
-export const createHobbySessionStep = async (
-  householdId: string,
-  hobbyId: string,
-  sessionId: string,
-  input: CreateHobbySessionStepInput
-): Promise<HobbySessionStep> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/steps`,
-  method: "POST",
-  body: input,
-  schema: hobbySessionStepSchema,
-});
-
 export const updateHobbySessionStep = async (
   householdId: string,
   hobbyId: string,
@@ -4741,19 +4776,6 @@ export const updateHobbySessionStep = async (
   body: input,
   schema: hobbySessionStepSchema,
 });
-
-export const reorderHobbySessionSteps = async (
-  householdId: string,
-  hobbyId: string,
-  sessionId: string,
-  stepIds: string[]
-): Promise<void> => {
-  await apiRequest({
-    path: `/v1/households/${householdId}/hobbies/${hobbyId}/sessions/${sessionId}/steps/reorder`,
-    method: "POST",
-    body: { stepIds },
-  });
-};
 
 export const reorderHobbySessionStepsOrdered = async (
   householdId: string,
@@ -4858,14 +4880,6 @@ export const deleteHobbyMetricReading = async (
 
 // ── Hobby Links ──────────────────────────────────────────────────────
 
-export const getHobbyAssets = async (
-  householdId: string,
-  hobbyId: string
-): Promise<HobbyAsset[]> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/assets`,
-  schema: hobbyAssetSchema.array(),
-});
-
 export const linkHobbyAsset = async (
   householdId: string,
   hobbyId: string,
@@ -4888,14 +4902,6 @@ export const unlinkHobbyAsset = async (
   });
 };
 
-export const getHobbyInventory = async (
-  householdId: string,
-  hobbyId: string
-): Promise<HobbyInventoryItem[]> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/inventory`,
-  schema: hobbyInventoryItemSchema.array(),
-});
-
 export const linkHobbyInventory = async (
   householdId: string,
   hobbyId: string,
@@ -4917,14 +4923,6 @@ export const unlinkHobbyInventory = async (
     method: "DELETE",
   });
 };
-
-export const getHobbyProjectLinks = async (
-  householdId: string,
-  hobbyId: string
-): Promise<HobbyProjectLink[]> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/projects`,
-  schema: hobbyProjectLinkSchema.array(),
-});
 
 export const linkHobbyProjectLink = async (
   householdId: string,
@@ -5369,14 +5367,6 @@ export const deleteHobbyCollectionItem = async (
 };
 
 // ── Hobby Inventory Categories ───────────────────────────────────────
-
-export const getHobbyInventoryCategories = async (
-  householdId: string,
-  hobbyId: string
-): Promise<HobbyInventoryCategory[]> => apiRequest({
-  path: `/v1/households/${householdId}/hobbies/${hobbyId}/links/inventory-categories`,
-  schema: hobbyInventoryCategorySchema.array(),
-});
 
 export const createHobbyInventoryCategory = async (
   householdId: string,

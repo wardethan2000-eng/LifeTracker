@@ -15981,3 +15981,513 @@ html[data-ui-density="compact"] .resource-layout__aside {
   color: var(--ink);
 }
 
+
+/* ============================================================
+   60. Gantt / Project Timeline
+   ============================================================ */
+
+.gantt-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 400px;
+}
+
+/* Toolbar */
+.gantt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.gantt-toolbar__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.gantt-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.gantt-zoom-controls__label {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.gantt-zoom-btn {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--ink);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.gantt-zoom-btn:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: var(--accent);
+}
+
+.gantt-zoom-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Empty state */
+.gantt-empty {
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  color: var(--ink-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.gantt-empty p {
+  margin: var(--space-2) 0;
+  font-size: 0.9rem;
+}
+
+/* Main workspace: sidebar + chart scroll side-by-side */
+.gantt-workspace {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Sidebar */
+.gantt-sidebar {
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.gantt-sidebar__header {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+}
+
+.gantt-sidebar__row {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.gantt-sidebar__row--phase {
+  background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+}
+
+.gantt-sidebar__row--task {
+  padding-left: var(--space-5);
+}
+
+.gantt-sidebar__row--critical .gantt-sidebar__task-name {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.gantt-sidebar__phase-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-sidebar__task-name {
+  font-size: 0.8rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.gantt-sidebar__assignee {
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Chart scroll wrapper */
+.gantt-chart-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Chart canvas (positioned context) */
+.gantt-chart {
+  position: relative;
+  background: var(--surface);
+}
+
+/* Header */
+.gantt-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.gantt-header__cell {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+  border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  white-space: nowrap;
+  padding: 0 4px;
+  overflow: hidden;
+}
+
+/* Grid column stripes */
+.gantt-grid-col {
+  position: absolute;
+  pointer-events: none;
+}
+
+.gantt-grid-col--alt {
+  background: color-mix(in srgb, var(--ink) 2%, transparent);
+}
+
+/* Today marker */
+.gantt-today-marker {
+  position: absolute;
+  width: 2px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Rows */
+.gantt-row {
+  position: absolute;
+  left: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.gantt-row--phase {
+  background: color-mix(in srgb, var(--ink) 2%, transparent);
+}
+
+/* Bars */
+.gantt-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  cursor: default;
+  overflow: hidden;
+}
+
+.gantt-bar--phase {
+  height: 12px;
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  border-radius: 2px;
+}
+
+.gantt-bar--task {
+  height: 20px;
+  background: color-mix(in srgb, var(--accent) 55%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  transition: filter 0.1s;
+}
+
+.gantt-bar--task:hover {
+  filter: brightness(1.1);
+  z-index: 4;
+}
+
+.gantt-bar--critical {
+  background: color-mix(in srgb, var(--accent) 80%, transparent);
+  border-color: var(--accent);
+  border-left-width: 3px;
+}
+
+.gantt-bar--done {
+  background: color-mix(in srgb, #22c55e 40%, var(--surface));
+  border-color: color-mix(in srgb, #22c55e 70%, transparent);
+  opacity: 0.75;
+}
+
+.gantt-bar--blocked {
+  background: color-mix(in srgb, #ef4444 40%, var(--surface));
+  border-color: color-mix(in srgb, #ef4444 70%, transparent);
+}
+
+.gantt-bar__label {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 8px);
+  pointer-events: none;
+}
+
+/* Dependency SVG */
+.gantt-dependency-svg {
+  overflow: visible;
+}
+
+/* Tooltip */
+.gantt-tooltip {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--ink) 12%, transparent);
+  min-width: 180px;
+  max-width: 260px;
+  pointer-events: none;
+}
+
+.gantt-tooltip__title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+}
+
+.gantt-tooltip__row {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin-bottom: 3px;
+}
+
+.gantt-tooltip__row span {
+  color: var(--ink);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.gantt-tooltip__badge {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.gantt-tooltip__badge--critical {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.gantt-tooltip__badge--blocked {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  color: #ef4444;
+}
+
+/* Unscheduled section */
+.gantt-unscheduled {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-4);
+}
+
+.gantt-unscheduled__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.gantt-unscheduled__hint {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.gantt-unscheduled__phase {
+  margin-bottom: var(--space-4);
+}
+
+.gantt-unscheduled__phase-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+}
+
+.gantt-unscheduled__tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+}
+
+.gantt-unscheduled__task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--ink);
+  padding: 3px 0;
+}
+
+.gantt-unscheduled__task--done {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+
+.gantt-unscheduled__task-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.gantt-unscheduled__task--done .gantt-unscheduled__task-status {
+  background: #22c55e;
+}
+
+/* ============================================================
+   Dependency Editor
+   ============================================================ */
+
+.dep-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-4);
+}
+
+.dep-editor__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.dep-editor__section {
+  margin-bottom: var(--space-4);
+}
+
+.dep-editor__section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.dep-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dep-editor__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.dep-editor__row-task {
+  flex: 1;
+  font-weight: 500;
+}
+
+.dep-editor__row-type {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.dep-editor__row-lag {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.dep-editor__remove-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+.dep-editor__remove-btn:hover {
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  color: #ef4444;
+}
+
+.dep-editor__add-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: var(--space-2);
+  align-items: end;
+  margin-top: var(--space-3);
+}
+
+.dep-editor__add-label {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+
+.dep-editor__add-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.dep-editor__add-btn:hover {
+  opacity: 0.9;
+}
+
+.dep-editor__empty {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  font-style: italic;
+  padding: 4px 0;
+}

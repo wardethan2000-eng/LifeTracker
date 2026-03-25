@@ -46,6 +46,7 @@ import { invitationRoutes } from "./routes/invitations/index.js";
 import { projectRoutes } from "./routes/projects/index.js";
 import { projectBulkRoutes } from "./routes/projects/bulk.js";
 import { projectInventoryRoutes } from "./routes/projects/inventory.js";
+import { projectDependencyRoutes } from "./routes/projects/dependencies.js";
 import { projectNoteRoutes } from "./routes/projects/notes.js";
 import { projectPhaseRoutes } from "./routes/projects/phases.js";
 import { searchRoutes } from "./routes/search/index.js";
@@ -183,6 +184,7 @@ const assetRoutePlugins: FastifyPluginAsync[] = [
 
 const projectRoutePlugins: FastifyPluginAsync[] = [
   projectBulkRoutes,
+  projectDependencyRoutes,
   projectRoutes,
   projectInventoryRoutes,
   projectPhaseRoutes,

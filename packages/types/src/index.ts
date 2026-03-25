@@ -2217,10 +2217,29 @@ export const projectTaskStatusSchema = z.enum(projectTaskStatusValues);
 export const projectPhaseStatusValues = ["pending", "in_progress", "completed", "skipped"] as const;
 export const projectPhaseStatusSchema = z.enum(projectPhaseStatusValues);
 
+export const taskDependencyTypeValues = ["finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"] as const;
+export const taskDependencyTypeSchema = z.enum(taskDependencyTypeValues);
+
 export const projectTaskDependencySchema = z.object({
+  id: z.string().cuid(),
   predecessorTaskId: z.string().cuid(),
   successorTaskId: z.string().cuid(),
-  createdAt: z.string().datetime()
+  dependencyType: taskDependencyTypeSchema.default("finish_to_start"),
+  lagDays: z.number().int().default(0),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const createProjectTaskDependencySchema = z.object({
+  predecessorTaskId: z.string().cuid(),
+  successorTaskId: z.string().cuid(),
+  dependencyType: taskDependencyTypeSchema.default("finish_to_start").optional(),
+  lagDays: z.number().int().min(0).max(365).default(0).optional()
+});
+
+export const updateProjectTaskDependencySchema = z.object({
+  dependencyType: taskDependencyTypeSchema.optional(),
+  lagDays: z.number().int().min(0).max(365).optional()
 });
 
 export const projectCriticalPathSchema = z.object({
@@ -2823,6 +2842,54 @@ export const projectNoteSchema = z.object({
 });
 
 export const projectNoteListSchema = z.array(projectNoteSchema);
+
+export const projectTaskDependencyListSchema = z.array(projectTaskDependencySchema);
+
+// ── Project Timeline Data Schemas ────────────────────────────────────
+
+export const projectTimelineTaskSchema = z.object({
+  id: z.string().cuid(),
+  title: z.string(),
+  status: projectTaskStatusSchema,
+  dueDate: z.string().datetime().nullable(),
+  derivedStartDate: z.string().datetime().nullable(),
+  estimatedHours: z.number().nullable(),
+  assignedToId: z.string().cuid().nullable(),
+  assigneeName: z.string().nullable(),
+  isCriticalPath: z.boolean(),
+  isBlocked: z.boolean(),
+  predecessorTaskIds: z.array(z.string().cuid()).default([]),
+  successorTaskIds: z.array(z.string().cuid()).default([])
+});
+
+export const projectTimelinePhaseSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string(),
+  status: projectPhaseStatusSchema,
+  startDate: z.string().datetime().nullable(),
+  targetEndDate: z.string().datetime().nullable(),
+  actualEndDate: z.string().datetime().nullable(),
+  tasks: z.array(projectTimelineTaskSchema).default([])
+});
+
+export const projectTimelineDependencySchema = z.object({
+  id: z.string().cuid(),
+  predecessorTaskId: z.string().cuid(),
+  successorTaskId: z.string().cuid(),
+  dependencyType: taskDependencyTypeSchema,
+  lagDays: z.number().int()
+});
+
+export const projectTimelineDataSchema = z.object({
+  projectId: z.string().cuid(),
+  projectName: z.string(),
+  scheduledPhases: z.array(projectTimelinePhaseSchema).default([]),
+  unscheduledPhases: z.array(projectTimelinePhaseSchema).default([]),
+  dependencies: z.array(projectTimelineDependencySchema).default([]),
+  criticalPathTaskIds: z.array(z.string().cuid()).default([]),
+  projectStartDate: z.string().datetime().nullable(),
+  projectTargetEndDate: z.string().datetime().nullable()
+});
 
 export const createProjectNoteSchema = z.object({
   title: z.string().min(1).max(300),
@@ -3678,8 +3745,15 @@ export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 export type ProjectStatusCount = z.infer<typeof projectStatusCountSchema>;
 export type ProjectTaskStatus = z.infer<typeof projectTaskStatusSchema>;
 export type ProjectPhaseStatus = z.infer<typeof projectPhaseStatusSchema>;
+export type TaskDependencyType = z.infer<typeof taskDependencyTypeSchema>;
 export type ProjectTaskDependency = z.infer<typeof projectTaskDependencySchema>;
+export type CreateProjectTaskDependencyInput = z.infer<typeof createProjectTaskDependencySchema>;
+export type UpdateProjectTaskDependencyInput = z.infer<typeof updateProjectTaskDependencySchema>;
 export type ProjectCriticalPath = z.infer<typeof projectCriticalPathSchema>;
+export type ProjectTimelineTask = z.infer<typeof projectTimelineTaskSchema>;
+export type ProjectTimelinePhase = z.infer<typeof projectTimelinePhaseSchema>;
+export type ProjectTimelineDependency = z.infer<typeof projectTimelineDependencySchema>;
+export type ProjectTimelineData = z.infer<typeof projectTimelineDataSchema>;
 export type NoteCategory = z.infer<typeof noteCategorySchema>;
 export type ProjectNote = z.infer<typeof projectNoteSchema>;
 export type CreateProjectNoteInput = z.infer<typeof createProjectNoteSchema>;

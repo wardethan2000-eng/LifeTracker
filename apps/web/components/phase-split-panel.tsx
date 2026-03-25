@@ -41,6 +41,7 @@ import { CategoryAccordionList } from "./category-accordion-list";
 import { createEntry, getEntries, reorderPhaseChecklistItems, reorderProjectPhaseSupplies, reorderProjectPhases, reorderTaskChecklistItems, updateEntry, updateProjectTask } from "../lib/api";
 import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 import { RichEditor } from "./rich-editor";
+import { ProjectTaskDependencyEditor } from "./project-task-dependency-editor";
 
 const statusOptions = [
   { value: "pending" as const, label: "Pending" },
@@ -647,19 +648,20 @@ function TaskCompactRow({
                 <span>Actual Cost</span>
                 <input name="actualCost" type="number" min="0" step="0.01" defaultValue={task.actualCost ?? ""} />
               </label>
-              <label className="field field--full">
-                <span>Depends On</span>
-                <select name="predecessorTaskIds" multiple size={Math.min(Math.max(dependencyCandidates.length, 2), 4)} defaultValue={task.predecessorTaskIds}>
-                  {dependencyCandidates.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </label>
             </div>
             <div className="inline-actions" style={{ marginTop: 12 }}>
               <button type="submit" className="button button--ghost button--sm">Save</button>
             </div>
           </form>
+
+          <div style={{ marginTop: 16 }}>
+            <ProjectTaskDependencyEditor
+              householdId={householdId}
+              projectId={projectId}
+              taskId={task.id}
+              allTasks={dependencyCandidates}
+            />
+          </div>
 
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: "0.8rem", color: "var(--ink-muted)", marginBottom: 8 }}>Task checklist</div>

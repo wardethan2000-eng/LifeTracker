@@ -47,6 +47,7 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
   const tabs: WorkspaceTab[] = [
     { id: "overview", label: "Overview", href: `${base}${qs}` },
     { id: "phases", label: "Plan", href: `${base}/phases${qs}` },
+    { id: "timeline", label: "Timeline", href: `${base}/timeline${qs}` },
     { id: "budget", label: "Budget", href: `${base}/budget${qs}` },
     { id: "supplies", label: "Materials", href: `${base}/supplies${qs}` },
     { id: "notes", label: "Log", href: `${base}/notes${qs}` },

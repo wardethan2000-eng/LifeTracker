@@ -1230,13 +1230,17 @@ model ProjectTask {
 
 // A finish-to-start dependency between two tasks in the same project.
 model ProjectTaskDependency {
+  id                String      @id @default(cuid())
   predecessorTaskId String
   successorTaskId   String
+  dependencyType    String      @default("finish_to_start")
+  lagDays           Int         @default(0)
   createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
   predecessorTask   ProjectTask @relation("ProjectTaskDependencyPredecessor", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
   successorTask     ProjectTask @relation("ProjectTaskDependencySuccessor", fields: [successorTaskId], references: [id], onDelete: Cascade)
 
-  @@id([predecessorTaskId, successorTaskId])
+  @@unique([predecessorTaskId, successorTaskId])
   @@index([successorTaskId])
 }
 

@@ -2655,4 +2655,134 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send(summary);
   });
+
+  // ── Project Timeline Data ───────────────────────────────────────────
+
+  app.get("/v1/households/:householdId/projects/:projectId/timeline-data", async (request, reply) => {
+    const params = projectParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const project = await app.prisma.project.findFirst({
+      where: { id: params.projectId, householdId: params.householdId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        startDate: true,
+        targetEndDate: true
+      }
+    });
+
+    if (!project) {
+      return notFound(reply, "Project not found.");
+    }
+
+    const phases = await app.prisma.projectPhase.findMany({
+      where: { projectId: params.projectId, deletedAt: null },
+      include: {
+        tasks: {
+          where: { deletedAt: null },
+          include: {
+            assignedTo: { select: { id: true, displayName: true } },
+            predecessorLinks: { select: { predecessorTaskId: true } },
+            successorLinks: { select: { successorTaskId: true } }
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        }
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+    });
+
+    const allTasks = phases.flatMap((phase) => phase.tasks);
+
+    const allDependencies = await app.prisma.projectTaskDependency.findMany({
+      where: {
+        predecessorTask: { projectId: params.projectId, deletedAt: null }
+      }
+    });
+
+    const graphSummary = buildProjectTaskGraphSummary(
+      allTasks.map((task) => ({
+        id: task.id,
+        status: task.status,
+        taskType: task.taskType ?? "full",
+        isCompleted: task.isCompleted ?? false,
+        estimatedHours: task.estimatedHours ?? null,
+        predecessorTaskIds: task.predecessorLinks.map((link) => link.predecessorTaskId)
+      })),
+      allDependencies.map((dep) => ({
+        predecessorTaskId: dep.predecessorTaskId,
+        successorTaskId: dep.successorTaskId
+      })),
+      new Map(allTasks.map((task) => [task.id, task.actualHours ?? 0]))
+    );
+
+    // Build a map of taskId → earliest predecessor dueDate for deriving start dates
+    const buildDerivedStartDate = (task: typeof allTasks[number], phaseStartDate: Date | null): string | null => {
+      const predecessorIds = task.predecessorLinks.map((link) => link.predecessorTaskId);
+      if (predecessorIds.length === 0) {
+        return phaseStartDate?.toISOString() ?? null;
+      }
+      const predecessorDueDates = predecessorIds
+        .map((id) => allTasks.find((t) => t.id === id)?.dueDate)
+        .filter((d): d is Date => d !== null && d !== undefined);
+      if (predecessorDueDates.length === 0) {
+        return phaseStartDate?.toISOString() ?? null;
+      }
+      return new Date(Math.max(...predecessorDueDates.map((d) => d.getTime()))).toISOString();
+    };
+
+    const mapPhase = (phase: typeof phases[number]) => ({
+      id: phase.id,
+      name: phase.name,
+      status: phase.status,
+      startDate: phase.startDate?.toISOString() ?? null,
+      targetEndDate: phase.targetEndDate?.toISOString() ?? null,
+      actualEndDate: phase.actualEndDate?.toISOString() ?? null,
+      tasks: phase.tasks.map((task) => {
+        const graphNode = graphSummary.byTaskId.get(task.id);
+        return {
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          dueDate: task.dueDate?.toISOString() ?? null,
+          derivedStartDate: buildDerivedStartDate(task, phase.startDate),
+          estimatedHours: task.estimatedHours ?? null,
+          assignedToId: task.assignedToId,
+          assigneeName: task.assignedTo?.displayName ?? null,
+          isCriticalPath: graphNode?.isCriticalPath ?? false,
+          isBlocked: graphNode?.isBlocked ?? false,
+          predecessorTaskIds: task.predecessorLinks.map((link) => link.predecessorTaskId),
+          successorTaskIds: task.successorLinks.map((link) => link.successorTaskId)
+        };
+      })
+    });
+
+    const scheduledPhases = phases
+      .filter((phase) => phase.startDate !== null || phase.targetEndDate !== null)
+      .map(mapPhase);
+
+    const unscheduledPhases = phases
+      .filter((phase) => phase.startDate === null && phase.targetEndDate === null)
+      .map(mapPhase);
+
+    return reply.send({
+      projectId: project.id,
+      projectName: project.name,
+      scheduledPhases,
+      unscheduledPhases,
+      dependencies: allDependencies.map((dep) => ({
+        id: dep.id,
+        predecessorTaskId: dep.predecessorTaskId,
+        successorTaskId: dep.successorTaskId,
+        dependencyType: dep.dependencyType,
+        lagDays: dep.lagDays
+      })),
+      criticalPathTaskIds: graphSummary.criticalPathTaskIds,
+      projectStartDate: project.startDate?.toISOString() ?? null,
+      projectTargetEndDate: project.targetEndDate?.toISOString() ?? null
+    });
+  });
 };

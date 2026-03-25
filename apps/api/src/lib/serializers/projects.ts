@@ -14,7 +14,8 @@ import {
   projectSchema,
   projectTemplateSchema,
   projectTaskChecklistItemSchema,
-  projectTaskSchema
+  projectTaskSchema,
+  projectTaskDependencySchema
 } from "@lifekeeper/types";
 import { parseProjectEntryPayload } from "@lifekeeper/utils";
 import { buildProjectTaskGraphSummary } from "../project-task-graph.js";
@@ -691,6 +692,24 @@ export const toProjectNoteResponse = (note: {
   phaseName: note.phase?.name ?? null,
   createdAt: note.createdAt.toISOString(),
   updatedAt: note.updatedAt.toISOString()
+});
+
+export const toProjectTaskDependencyResponse = (dep: {
+  id: string;
+  predecessorTaskId: string;
+  successorTaskId: string;
+  dependencyType: string;
+  lagDays: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) => projectTaskDependencySchema.parse({
+  id: dep.id,
+  predecessorTaskId: dep.predecessorTaskId,
+  successorTaskId: dep.successorTaskId,
+  dependencyType: dep.dependencyType,
+  lagDays: dep.lagDays,
+  createdAt: dep.createdAt.toISOString(),
+  updatedAt: dep.updatedAt.toISOString()
 });
 
 export const toProjectTemplateResponse = (template: {
