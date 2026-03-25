@@ -15,6 +15,7 @@ import { AssetDangerActions } from "./asset-danger-actions";
 import { DemoteToIdeaButton } from "./demote-to-idea-button";
 import { AssetLabelActions } from "./asset-label-actions";
 import { AssetProfileWorkbench } from "./asset-profile-workbench";
+import { ExpandableCard } from "./expandable-card";
 import {
   formatCategoryLabel,
   formatDateTime
@@ -46,18 +47,18 @@ export async function AssetSettingsTab({
   const visiblePresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
   const latestTransfer = transferHistory.items[0] ?? null;
 
+  const editPreview = (
+    <dl className="data-list" style={{ margin: 0 }}>
+      <div><dt>Name</dt><dd>{detail.asset.name}</dd></div>
+      <div><dt>Category</dt><dd>{formatCategoryLabel(detail.asset.category)}</dd></div>
+      {detail.asset.manufacturer ? <div><dt>Make</dt><dd>{detail.asset.manufacturer}</dd></div> : null}
+      {detail.asset.model ? <div><dt>Model</dt><dd>{detail.asset.model}</dd></div> : null}
+      {detail.asset.description ? <div><dt>Description</dt><dd style={{ color: "var(--ink-muted)" }}>{detail.asset.description}</dd></div> : null}
+    </dl>
+  );
+
   return (
     <div style={{ display: "grid", gap: "24px" }}>
-      <AssetProfileWorkbench
-        action={updateAssetAction}
-        householdId={detail.asset.householdId}
-        householdAssets={householdAssets}
-        submitLabel="Update Asset"
-        libraryPresets={visiblePresets}
-        customPresets={customPresets}
-        initialAsset={detail.asset}
-      />
-
       <section className="panel asset-label-panel">
         <div className="panel__header">
           <h2>Labels &amp; Ownership</h2>
@@ -136,6 +137,23 @@ export async function AssetSettingsTab({
           </form>
         </div>
       </section>
+
+      <ExpandableCard
+        title="Edit Asset Details"
+        modalTitle="Edit Asset Details"
+        previewContent={editPreview}
+        defaultOpen={false}
+      >
+        <AssetProfileWorkbench
+          action={updateAssetAction}
+          householdId={detail.asset.householdId}
+          householdAssets={householdAssets}
+          submitLabel="Update Asset"
+          libraryPresets={visiblePresets}
+          customPresets={customPresets}
+          initialAsset={detail.asset}
+        />
+      </ExpandableCard>
 
       <section className="panel panel--danger">
         <div className="panel__header">

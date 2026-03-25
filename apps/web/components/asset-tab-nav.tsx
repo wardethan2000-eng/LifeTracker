@@ -10,13 +10,11 @@ type AssetTabNavProps = {
 
 const tabs = [
   { id: "overview", label: "Overview" },
-  { id: "details", label: "Structured Details" },
-  { id: "metrics", label: "Usage Metrics" },
-  { id: "costs", label: "Costs" },
   { id: "maintenance", label: "Maintenance" },
+  { id: "details", label: "Details" },
+  { id: "metrics", label: "Metrics" },
+  { id: "costs", label: "Costs" },
   { id: "history", label: "History" },
-  { id: "entries", label: "Entries" },
-  { id: "comments", label: "Comments" },
   { id: "settings", label: "Settings" }
 ] as const;
 

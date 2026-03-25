@@ -38,6 +38,7 @@ type AssetProfileWorkbenchProps = {
   libraryPresets: LibraryPreset[];
   customPresets: CustomPresetProfile[];
   initialAsset?: Asset;
+  initialParentAssetId?: string;
 };
 
 type Blueprint = {
@@ -980,7 +981,8 @@ export function AssetProfileWorkbench({
   submitLabel,
   libraryPresets,
   customPresets,
-  initialAsset
+  initialAsset,
+  initialParentAssetId,
 }: AssetProfileWorkbenchProps): JSX.Element {
   const { timezone } = useTimezone();
   const toLocalDateTimeValue = (v: string | undefined) => toHouseholdDateTimeInputValue(v, timezone);
@@ -1420,7 +1422,7 @@ export function AssetProfileWorkbench({
       model: initialAsset?.model ?? "",
       serialNumber: initialAsset?.serialNumber ?? "",
       purchaseDate: initialAsset?.purchaseDate ? initialAsset.purchaseDate.slice(0, 10) : "",
-      parentAssetId: initialAsset?.parentAssetId ?? "",
+      parentAssetId: initialAsset?.parentAssetId ?? initialParentAssetId ?? "",
       conditionScore: initialAsset?.conditionScore ?? undefined,
       saveAsPreset: false,
       presetLabel: initialAsset?.assetTypeLabel ?? initialBlueprint?.label ?? "",

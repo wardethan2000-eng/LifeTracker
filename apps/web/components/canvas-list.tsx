@@ -12,12 +12,24 @@ type CanvasListProps = {
   initialCanvases: IdeaCanvasSummary[];
 };
 
+type CanvasTemplate = "blank" | "floorplan" | "flowchart";
+
+const TEMPLATES: { value: CanvasTemplate; label: string; description: string }[] = [
+  { value: "blank", label: "Blank Canvas", description: "Start with a clean slate" },
+  { value: "floorplan", label: "Floor Plan", description: "Physical units, grid, and walls" },
+  { value: "flowchart", label: "Flowchart", description: "Nodes and connectors" },
+];
+
+function templateToMode(t: CanvasTemplate): "diagram" | "floorplan" {
+  return t === "floorplan" ? "floorplan" : "diagram";
+}
+
 export function CanvasList({ householdId, initialCanvases }: CanvasListProps): JSX.Element {
   const { formatDate } = useFormattedDate();
   const [canvases, setCanvases] = useState<IdeaCanvasSummary[]>(initialCanvases);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newMode, setNewMode] = useState<"diagram" | "floorplan">("diagram");
+  const [newTemplate, setNewTemplate] = useState<CanvasTemplate>("blank");
   const [loading, setLoading] = useState(initialCanvases.length === 0);
 
   const refreshCanvases = useCallback(async () => {
@@ -59,13 +71,13 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
     if (!name) return;
     setCreating(true);
     try {
-      await createCanvas(householdId, { name, canvasMode: newMode });
+      await createCanvas(householdId, { name, canvasMode: templateToMode(newTemplate) });
       await refreshCanvases();
       setNewName("");
     } finally {
       setCreating(false);
     }
-  }, [householdId, newName, newMode, refreshCanvases]);
+  }, [householdId, newName, newTemplate, refreshCanvases]);
 
   const handleDelete = useCallback(async (canvasId: string) => {
     if (!confirm("Delete this canvas?")) return;
@@ -88,12 +100,13 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
         />
         <select
           className="canvas-list__create-mode"
-          value={newMode}
-          onChange={(e) => setNewMode(e.target.value as "diagram" | "floorplan")}
-          aria-label="Canvas type"
+          value={newTemplate}
+          onChange={(e) => setNewTemplate(e.target.value as CanvasTemplate)}
+          aria-label="Canvas template"
         >
-          <option value="diagram">General</option>
-          <option value="floorplan">Floorplan</option>
+          {TEMPLATES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
         </select>
         <button
           type="button"

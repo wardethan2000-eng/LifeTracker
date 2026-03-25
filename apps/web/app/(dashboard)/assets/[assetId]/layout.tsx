@@ -34,8 +34,11 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
             <Link href={`/assets/${detail.asset.id}/maintenance`} className="button button--primary button--sm">
               Log Maintenance
             </Link>
+            <Link href={`/assets/new?parentAssetId=${detail.asset.id}`} className="button button--ghost button--sm">
+              Add Component
+            </Link>
             <Link href={`/assets/${detail.asset.id}/settings`} className="button button--ghost button--sm">
-              Transfer Asset
+              Edit Asset
             </Link>
             <AssetDangerActions
               householdId={detail.asset.householdId}

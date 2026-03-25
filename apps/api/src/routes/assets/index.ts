@@ -46,7 +46,9 @@ const listAssetsQuerySchema = createOffsetPaginationQuerySchema({
 }).extend({
   householdId: z.string().cuid(),
   includeArchived: z.coerce.boolean().default(false),
-  includeDeleted: z.coerce.boolean().default(false)
+  includeDeleted: z.coerce.boolean().default(false),
+  search: z.string().max(200).optional(),
+  category: assetCategorySchema.optional()
 });
 
 const assetLabelQuerySchema = z.object({
@@ -85,11 +87,26 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
+    const searchFilter: Prisma.AssetWhereInput = query.search
+      ? {
+          OR: [
+            { name: { contains: query.search, mode: "insensitive" } },
+            { description: { contains: query.search, mode: "insensitive" } },
+            { manufacturer: { contains: query.search, mode: "insensitive" } },
+            { model: { contains: query.search, mode: "insensitive" } },
+            { serialNumber: { contains: query.search, mode: "insensitive" } },
+            { assetTag: { contains: query.search, mode: "insensitive" } }
+          ]
+        }
+      : {};
+
     const where: Prisma.AssetWhereInput = {
       householdId: query.householdId,
       ...personalAssetAccessWhere(request.auth.userId),
       ...(query.includeArchived ? {} : { isArchived: false }),
-      ...optionallyIncludeDeleted(query.includeDeleted)
+      ...optionallyIncludeDeleted(query.includeDeleted),
+      ...(query.category ? { category: query.category } : {}),
+      ...searchFilter
     };
 
     if (query.paginated) {

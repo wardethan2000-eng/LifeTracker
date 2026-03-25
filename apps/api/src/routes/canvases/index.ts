@@ -36,9 +36,10 @@ function serializeNode(n: {
   color: string | null; strokeColor: string | null; fillColor: string | null; strokeWidth: number;
   shape: string; objectType: string; rotation: number; sortOrder: number; imageUrl: string | null;
   maskJson?: string | null;
-  wallThickness?: number; wallAngle?: number | null; physicalLength?: number | null;
+  wallThickness?: number; wallAngle?: number | null; wallHeight?: number | null; physicalLength?: number | null;
   parentNodeId?: string | null;
   pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
+  pointsJson?: string | null;
   createdAt: Date; updatedAt: Date;
 }) {
   return ideaCanvasNodeSchema.parse({
@@ -293,12 +294,14 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         imageUrl: input.imageUrl ?? null,
         wallThickness: input.wallThickness ?? 6,
         wallAngle: input.wallAngle ?? null,
+        wallHeight: input.wallHeight ?? null,
         physicalLength: input.physicalLength ?? null,
         parentNodeId: input.parentNodeId ?? null,
         pointAx: input.pointAx ?? null,
         pointAy: input.pointAy ?? null,
         pointBx: input.pointBx ?? null,
         pointBy: input.pointBy ?? null,
+        pointsJson: input.pointsJson ?? null,
       },
     });
 
@@ -344,6 +347,8 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.pointAy !== undefined) data.pointAy = input.pointAy;
     if (input.pointBx !== undefined) data.pointBx = input.pointBx;
     if (input.pointBy !== undefined) data.pointBy = input.pointBy;
+    if (input.wallHeight !== undefined) data.wallHeight = input.wallHeight;
+    if (input.pointsJson !== undefined) data.pointsJson = input.pointsJson;
 
     const updated = await app.prisma.ideaCanvasNode.update({
       where: { id: nodeId },

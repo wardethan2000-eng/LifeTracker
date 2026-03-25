@@ -14,6 +14,10 @@ import type {
 import type { JSX } from "react";
 import { createPortal } from "react-dom";
 import CanvasObjectPicker, { type CanvasObjectPlacement } from "./canvas-object-picker";
+import { CanvasToolbar } from "./canvas/canvas-toolbar";
+import { CanvasSettingsPanel } from "./canvas/canvas-settings-panel";
+import type { ActiveTool } from "./canvas/canvas-tools/types";
+import { simplifyPoints, findNearestWallEndpoint, wallPolygonFromLine, fmtPhysical, computeWallPolygonsWithMiters, arcFromThreePoints, svgArcPath, arcLength, arcWallPolygonPath, polygonArea, polygonCentroid, projectPointOnWall } from "./canvas/canvas-tools/types";
 import {
   useCallback,
   useEffect,
@@ -38,8 +42,6 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTool = "select" | "pan" | "node" | "rect" | "circle" | "line" | "text" | "image" | "object" | "wall" | "measure";
-
 type DragState =
   | { type: "none" }
   | { type: "pan"; startX: number; startY: number; startPanX: number; startPanY: number }
@@ -49,7 +51,8 @@ type DragState =
   | { type: "draw"; tool: "rect" | "circle" | "line" | "text"; startCX: number; startCY: number; currentCX: number; currentCY: number }
   | { type: "resize"; nodeId: string; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startX2: number; startY2: number; startMouseCX: number; startMouseCY: number }
   | { type: "wall"; startCX: number; startCY: number; endCX: number; endCY: number; shiftKey: boolean }
-  | { type: "measure"; startCX: number; startCY: number; endCX: number; endCY: number };
+  | { type: "measure"; startCX: number; startCY: number; endCX: number; endCY: number }
+  | { type: "freehand"; points: { x: number; y: number }[] };
 
 type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "line-start" | "line-end";
 
@@ -173,12 +176,6 @@ function snapWallAngle(dx: number, dy: number, shiftKey: boolean): { dx: number;
   return { dx: Math.round(Math.cos(snapped) * len), dy: Math.round(Math.sin(snapped) * len) };
 }
 
-// Format a physical distance as a string with unit.
-function fmtPhysical(px: number, pxPerUnit: number, unit: string): string {
-  const v = px / pxPerUnit;
-  return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)} ${unit}`;
-}
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function CanvasRenderer({
@@ -210,6 +207,38 @@ export function CanvasRenderer({
   const [showDimensions, setShowDimensions] = useState(initialCanvas.showDimensions ?? true);
   // Wall chain: last completed wall endpoint (for chain drawing)
   const wallChainStartRef = useRef<{ cx: number; cy: number } | null>(null);
+  // Wall preview endpoint (tracks mouse while wall tool is active and chain is started)
+  const [wallPreviewEnd, setWallPreviewEnd] = useState<{ cx: number; cy: number } | null>(null);
+  // Inline wall dimension input: shown after placing a wall segment (only when physical units set)
+  const [wallDimEdit, setWallDimEdit] = useState<{
+    nodeId: string;
+    /** Canvas coords of the wall start */
+    sx: number; sy: number;
+    /** Canvas coords of the wall end */
+    ex: number; ey: number;
+    /** Current input value (physical units string) */
+    value: string;
+  } | null>(null);
+  // Curved wall (wall-arc) drawing state: phase 1 = start set, phase 2 = start+end set, mouse defines arc midpoint
+  const arcWallRef = useRef<{
+    phase: 1 | 2;
+    sx: number; sy: number;   // start point
+    ex?: number; ey?: number; // end point (set in phase 2)
+  } | null>(null);
+  const [arcPreview, setArcPreview] = useState<{
+    sx: number; sy: number;
+    ex: number; ey: number;
+    mx: number; my: number; // arc midpoint (cursor)
+    phase: 1 | 2;
+  } | null>(null);
+  // Room polygon drawing state
+  const roomPointsRef = useRef<{ x: number; y: number }[]>([]);
+  const [roomPreviewPoints, setRoomPreviewPoints] = useState<{ x: number; y: number }[]>([]);
+  const [roomPreviewCursor, setRoomPreviewCursor] = useState<{ x: number; y: number } | null>(null);
+  // Door/window placement preview
+  const [openingPreview, setOpeningPreview] = useState<{
+    wallId: string; x: number; y: number; angle: number; wallThickness: number;
+  } | null>(null);
   // Cursor physical coord readout
   const [cursorPhysical, setCursorPhysical] = useState<{ x: number; y: number } | null>(null);
   const [settings, setSettings] = useState<UpdateCanvasSettingsInput>({
@@ -458,21 +487,247 @@ export function CanvasRenderer({
     } else if (activeTool === "rect" || activeTool === "circle" || activeTool === "line" || activeTool === "text") {
       setDrag({ type: "draw", tool: activeTool, startCX: cp.x, startCY: cp.y, currentCX: cp.x, currentCY: cp.y });
     } else if (activeTool === "wall") {
-      // If we are continuing a wall chain, start from the last endpoint
+      // Click-to-place wall: first click starts chain, subsequent clicks place segments
       const chain = wallChainStartRef.current;
-      const startCX = chain ? chain.cx : maybeSnap(cp.x);
-      const startCY = chain ? chain.cy : maybeSnap(cp.y);
-      setDrag({ type: "wall", startCX, startCY, endCX: startCX, endCY: startCY, shiftKey: e.shiftKey });
+      if (!chain) {
+        // Start chain: snap to existing wall endpoint or grid
+        const snap = findNearestWallEndpoint(cp.x, cp.y, nodes, 15 / zoom);
+        const sx = snap.snapped ? snap.x : maybeSnap(cp.x);
+        const sy = snap.snapped ? snap.y : maybeSnap(cp.y);
+        wallChainStartRef.current = { cx: sx, cy: sy };
+        setWallPreviewEnd({ cx: sx, cy: sy });
+      } else {
+        // Place wall segment
+        const rawDx = cp.x - chain.cx;
+        const rawDy = cp.y - chain.cy;
+        const snapped = snapWallAngle(rawDx, rawDy, e.shiftKey);
+        const snap = findNearestWallEndpoint(chain.cx + snapped.dx, chain.cy + snapped.dy, nodes, 15 / zoom);
+        const ex = snap.snapped ? snap.x : maybeSnap(chain.cx + snapped.dx);
+        const ey = snap.snapped ? snap.y : maybeSnap(chain.cy + snapped.dy);
+        const dx = ex - chain.cx;
+        const dy = ey - chain.cy;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len >= 4) {
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const wallStartCx = chain.cx;
+          const wallStartCy = chain.cy;
+          createCanvasNode(householdId, canvasId, {
+            label: "",
+            x: chain.cx, y: chain.cy,
+            x2: ex, y2: ey,
+            width: 1, height: 1,
+            objectType: "wall",
+            strokeWidth: 6,
+            strokeColor: "#374151",
+            wallAngle: angle,
+          }).then((node) => {
+            const newNodes = [...nodes, node];
+            setNodes(newNodes);
+            pushHistory(newNodes, edges);
+            setSelectedIds(new Set([node.id]));
+            // Show inline dimension input if physical units are set
+            if (pixelsPerUnit && settings.physicalUnit) {
+              const physLen = len / pixelsPerUnit;
+              setWallDimEdit({
+                nodeId: node.id,
+                sx: wallStartCx, sy: wallStartCy,
+                ex, ey,
+                value: physLen % 1 === 0 ? physLen.toFixed(0) : physLen.toFixed(1),
+              });
+            }
+          });
+          // Continue chain
+          wallChainStartRef.current = { cx: ex, cy: ey };
+          setWallPreviewEnd({ cx: ex, cy: ey });
+        }
+      }
+    } else if (activeTool === "wall-arc") {
+      // Curved wall 3-click flow: 1=start, 2=end, 3=finalize arc midpoint
+      const state = arcWallRef.current;
+      if (!state) {
+        // Phase 1: set start point
+        const snap = findNearestWallEndpoint(cp.x, cp.y, nodes, 15 / zoom);
+        const sx = snap.snapped ? snap.x : maybeSnap(cp.x);
+        const sy = snap.snapped ? snap.y : maybeSnap(cp.y);
+        arcWallRef.current = { phase: 1, sx, sy };
+        setArcPreview({ sx, sy, ex: sx, ey: sy, mx: sx, my: sy, phase: 1 });
+      } else if (state.phase === 1) {
+        // Phase 2: set end point
+        const snap = findNearestWallEndpoint(cp.x, cp.y, nodes, 15 / zoom);
+        const ex = snap.snapped ? snap.x : maybeSnap(cp.x);
+        const ey = snap.snapped ? snap.y : maybeSnap(cp.y);
+        arcWallRef.current = { phase: 2, sx: state.sx, sy: state.sy, ex, ey };
+        setArcPreview({ sx: state.sx, sy: state.sy, ex, ey, mx: (state.sx + ex) / 2, my: (state.sy + ey) / 2, phase: 2 });
+      } else {
+        // Phase 3: finalize — use current arc preview midpoint to create arc wall
+        if (arcPreview) {
+          const arc = arcFromThreePoints(
+            { x: state.sx, y: state.sy },
+            { x: arcPreview.mx, y: arcPreview.my },
+            { x: state.ex!, y: state.ey! },
+          );
+          if (arc) {
+            createCanvasNode(householdId, canvasId, {
+              label: "",
+              x: state.sx, y: state.sy,
+              x2: state.ex!, y2: state.ey!,
+              pointAx: arcPreview.mx, pointAy: arcPreview.my,
+              width: 1, height: 1,
+              objectType: "wall",
+              strokeWidth: 6,
+              strokeColor: "#374151",
+            }).then((node) => {
+              const newNodes = [...nodes, node];
+              setNodes(newNodes);
+              pushHistory(newNodes, edges);
+              setSelectedIds(new Set([node.id]));
+            });
+          }
+        }
+        arcWallRef.current = null;
+        setArcPreview(null);
+      }
     } else if (activeTool === "measure") {
       setDrag({ type: "measure", startCX: maybeSnap(cp.x), startCY: maybeSnap(cp.y), endCX: maybeSnap(cp.x), endCY: maybeSnap(cp.y) });
+    } else if (activeTool === "freehand") {
+      setDrag({ type: "freehand", points: [{ x: cp.x, y: cp.y }] });
+    } else if (activeTool === "room") {
+      // Room polygon: each click adds a vertex; double-click closes
+      const snap = findNearestWallEndpoint(maybeSnap(cp.x), maybeSnap(cp.y), nodes, 15 / zoom);
+      const px = snap.snapped ? snap.x : maybeSnap(cp.x);
+      const py = snap.snapped ? snap.y : maybeSnap(cp.y);
+      const pts = roomPointsRef.current;
+      // Close polygon: if clicking near start point and we have ≥3 points
+      if (pts.length >= 3) {
+        const d = Math.hypot(px - pts[0].x, py - pts[0].y);
+        if (d < 15 / zoom) {
+          // Compute bounding box
+          const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+          const minX = Math.min(...xs), minY = Math.min(...ys);
+          const maxX = Math.max(...xs), maxY = Math.max(...ys);
+          const w = maxX - minX || 1, h = maxY - minY || 1;
+          // Centroid for label positioning
+          const centroid = polygonCentroid(pts);
+          // Compute area label
+          let areaLabel = "";
+          if (pixelsPerUnit) {
+            const pxArea = Math.abs(polygonArea(pts));
+            const physArea = pxArea / (pixelsPerUnit * pixelsPerUnit);
+            const unit = settings.physicalUnit || "m";
+            areaLabel = `${physArea.toFixed(1)} ${unit}²`;
+          }
+          createCanvasNode(householdId, canvasId, {
+            label: areaLabel,
+            x: minX, y: minY,
+            width: w, height: h,
+            objectType: "room",
+            fillColor: "rgba(59,130,246,0.08)",
+            strokeColor: "#3b82f6",
+            strokeWidth: 1,
+            maskJson: JSON.stringify({ type: "polygon", points: pts.map(p => ({ x: p.x - minX, y: p.y - minY })) }),
+          }).then((node) => {
+            const newNodes = [...nodes, node];
+            setNodes(newNodes);
+            pushHistory(newNodes, edges);
+            setSelectedIds(new Set([node.id]));
+          });
+          roomPointsRef.current = [];
+          setRoomPreviewPoints([]);
+          setRoomPreviewCursor(null);
+          return;
+        }
+      }
+      pts.push({ x: px, y: py });
+      setRoomPreviewPoints([...pts]);
+    } else if (activeTool === "door" || activeTool === "window") {
+      // Place door/window on nearest wall
+      const proj = projectPointOnWall(cp.x, cp.y, nodes as never[], 30 / zoom);
+      if (!proj) return;
+      // Default opening width: 36 inches / 0.9m scaled to pixels
+      const defaultWidthPx = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 3 : settings.physicalUnit === "in" ? 36 : 0.9) : 40;
+      createCanvasNode(householdId, canvasId, {
+        label: "",
+        x: proj.x, y: proj.y,
+        width: defaultWidthPx,
+        height: proj.wallThickness,
+        objectType: activeTool,
+        strokeColor: "#374151",
+        strokeWidth: 1,
+        rotation: (proj.angle * 180) / Math.PI,
+        parentNodeId: proj.wallId,
+      }).then((node) => {
+        const newNodes = [...nodes, node];
+        setNodes(newNodes);
+        pushHistory(newNodes, edges);
+        setSelectedIds(new Set([node.id]));
+      });
+      setOpeningPreview(null);
+    } else if (activeTool === "stairs") {
+      // Stairs: create rectangle at click point
+      const defaultW = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 3 : settings.physicalUnit === "in" ? 36 : 0.9) : 60;
+      const defaultH = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 10 : settings.physicalUnit === "in" ? 120 : 3) : 120;
+      createCanvasNode(householdId, canvasId, {
+        label: "",
+        x: maybeSnap(cp.x) - defaultW / 2,
+        y: maybeSnap(cp.y) - defaultH / 2,
+        width: defaultW, height: defaultH,
+        objectType: "stairs",
+        fillColor: "rgba(255,255,255,0.9)",
+        strokeColor: "#374151",
+        strokeWidth: 1,
+      }).then((node) => {
+        const newNodes = [...nodes, node];
+        setNodes(newNodes);
+        pushHistory(newNodes, edges);
+        setSelectedIds(new Set([node.id]));
+        setActiveTool("select");
+      });
     }
-  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, wallChainStartRef]);
+  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, wallChainStartRef, arcPreview, pixelsPerUnit, settings.physicalUnit, zoom]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Update physical cursor readout
     if (pixelsPerUnit) {
       const cp = screenToCanvas(e.clientX, e.clientY);
       setCursorPhysical({ x: cp.x / pixelsPerUnit, y: cp.y / pixelsPerUnit });
+    }
+    // Wall tool preview: track mouse when chain is active
+    if (activeTool === "wall" && wallChainStartRef.current && drag.type === "none") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const chain = wallChainStartRef.current;
+      const rawDx = cp.x - chain.cx;
+      const rawDy = cp.y - chain.cy;
+      const snapped = snapWallAngle(rawDx, rawDy, e.shiftKey);
+      const snap = findNearestWallEndpoint(chain.cx + snapped.dx, chain.cy + snapped.dy, nodes, 15 / zoom);
+      const ex = snap.snapped ? snap.x : maybeSnap(chain.cx + snapped.dx);
+      const ey = snap.snapped ? snap.y : maybeSnap(chain.cy + snapped.dy);
+      setWallPreviewEnd({ cx: ex, cy: ey });
+    }
+    // Arc wall tool preview
+    if (activeTool === "wall-arc" && arcWallRef.current && drag.type === "none") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const state = arcWallRef.current;
+      if (state.phase === 1) {
+        // Phase 1: preview straight line from start to cursor (end position)
+        const snap = findNearestWallEndpoint(cp.x, cp.y, nodes, 15 / zoom);
+        const ex = snap.snapped ? snap.x : maybeSnap(cp.x);
+        const ey = snap.snapped ? snap.y : maybeSnap(cp.y);
+        setArcPreview({ sx: state.sx, sy: state.sy, ex, ey, mx: (state.sx + ex) / 2, my: (state.sy + ey) / 2, phase: 1 });
+      } else if (state.phase === 2 && state.ex != null && state.ey != null) {
+        // Phase 2: preview arc — cursor defines the midpoint the arc passes through
+        setArcPreview({ sx: state.sx, sy: state.sy, ex: state.ex, ey: state.ey, mx: cp.x, my: cp.y, phase: 2 });
+      }
+    }
+    // Room polygon: track cursor for preview closing edge
+    if (activeTool === "room" && roomPointsRef.current.length > 0 && drag.type === "none") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      setRoomPreviewCursor({ x: maybeSnap(cp.x), y: maybeSnap(cp.y) });
+    }
+    // Door/window placement preview: project cursor onto nearest wall
+    if ((activeTool === "door" || activeTool === "window") && drag.type === "none") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const proj = projectPointOnWall(cp.x, cp.y, nodes as never[], 30 / zoom);
+      setOpeningPreview(proj ? { wallId: proj.wallId, x: proj.x, y: proj.y, angle: proj.angle, wallThickness: proj.wallThickness } : null);
     }
     if (drag.type === "pan") {
       const dx = (e.clientX - drag.startX) / zoom;
@@ -534,17 +789,14 @@ export function CanvasRenderer({
       newW = Math.max(MIN_SIZE, maybeSnap(newW)); newH = Math.max(MIN_SIZE, maybeSnap(newH));
 
       setNodes((prev) => prev.map((n) => n.id === drag.nodeId ? { ...n, x: newX, y: newY, width: newW, height: newH } : n));
-    } else if (drag.type === "wall") {
-      const cp = screenToCanvas(e.clientX, e.clientY);
-      const rawDx = cp.x - drag.startCX;
-      const rawDy = cp.y - drag.startCY;
-      const snapped = snapWallAngle(rawDx, rawDy, e.shiftKey);
-      setDrag({ ...drag, endCX: drag.startCX + snapped.dx, endCY: drag.startCY + snapped.dy, shiftKey: e.shiftKey });
     } else if (drag.type === "measure") {
       const cp = screenToCanvas(e.clientX, e.clientY);
       setDrag({ ...drag, endCX: cp.x, endCY: cp.y });
+    } else if (drag.type === "freehand") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      setDrag({ ...drag, points: [...drag.points, { x: cp.x, y: cp.y }] });
     }
-  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit]);
+  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit, activeTool, nodes]);
 
   const handleMouseUp = useCallback(async () => {
     if (drag.type === "pan") {
@@ -636,34 +888,6 @@ export function CanvasRenderer({
         pushHistory(nodes, edges);
         scheduleSyncPositions();
       }
-    } else if (drag.type === "wall") {
-      const { startCX, startCY, endCX, endCY } = drag;
-      const dx = endCX - startCX;
-      const dy = endCY - startCY;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len >= 4) {
-        // Snap wall angle
-        const snapped = snapWallAngle(dx, dy, drag.shiftKey);
-        const ex = maybeSnap(startCX + snapped.dx);
-        const ey = maybeSnap(startCY + snapped.dy);
-        const angle = Math.atan2(snapped.dy, snapped.dx) * (180 / Math.PI);
-        const node = await createCanvasNode(householdId, canvasId, {
-          label: "",
-          x: maybeSnap(startCX), y: maybeSnap(startCY),
-          x2: ex, y2: ey,
-          width: 1, height: 1,
-          objectType: "wall",
-          strokeWidth: 6,
-          strokeColor: "#374151",
-          wallAngle: angle,
-        });
-        const newNodes = [...nodes, node];
-        setNodes(newNodes);
-        pushHistory(newNodes, edges);
-        setSelectedIds(new Set([node.id]));
-        // Continue chain from this wall's endpoint
-        wallChainStartRef.current = { cx: ex, cy: ey };
-      }
     } else if (drag.type === "measure") {
       const { startCX, startCY, endCX, endCY } = drag;
       const dx = endCX - startCX;
@@ -685,6 +909,35 @@ export function CanvasRenderer({
         pushHistory(newNodes, edges);
         setSelectedIds(new Set([node.id]));
         setActiveTool("select");
+      }
+    } else if (drag.type === "freehand") {
+      const { points } = drag;
+      if (points.length >= 2) {
+        const simplified = simplifyPoints(points, 2);
+        // Compute bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of simplified) {
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+        const w = Math.max(1, maxX - minX);
+        const h = Math.max(1, maxY - minY);
+        const pointsJson = JSON.stringify(simplified);
+        const node = await createCanvasNode(householdId, canvasId, {
+          label: "",
+          x: minX, y: minY,
+          width: w, height: h,
+          objectType: "freehand",
+          strokeColor: "#333333",
+          strokeWidth: 2,
+          pointsJson,
+        });
+        const newNodes = [...nodes, node];
+        setNodes(newNodes);
+        pushHistory(newNodes, edges);
+        setSelectedIds(new Set([node.id]));
       }
     }
     setDrag({ type: "none" });
@@ -878,6 +1131,39 @@ export function CanvasRenderer({
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { strokeWidth })));
     setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, strokeWidth } : n));
   }, [selectedIds, householdId, canvasId]);
+
+  const handleChangeWallHeight = useCallback(async (wallHeight: number | null) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { wallHeight })));
+    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, wallHeight } : n));
+  }, [selectedIds, householdId, canvasId]);
+
+  /** Commit inline wall dimension edit: resize wall to specified physical length, keeping angle */
+  const commitWallDimEdit = useCallback(async (confirm: boolean) => {
+    if (!wallDimEdit) return;
+    if (confirm && pixelsPerUnit) {
+      const newPhysLen = parseFloat(wallDimEdit.value);
+      if (!isNaN(newPhysLen) && newPhysLen > 0) {
+        const dx = wallDimEdit.ex - wallDimEdit.sx;
+        const dy = wallDimEdit.ey - wallDimEdit.sy;
+        const oldLen = Math.sqrt(dx * dx + dy * dy);
+        if (oldLen > 0.5) {
+          const newPxLen = newPhysLen * pixelsPerUnit;
+          const scale = newPxLen / oldLen;
+          const newEx = wallDimEdit.sx + dx * scale;
+          const newEy = wallDimEdit.sy + dy * scale;
+          await updateCanvasNode(householdId, canvasId, wallDimEdit.nodeId, { x2: newEx, y2: newEy });
+          setNodes((prev) => prev.map((n) =>
+            n.id === wallDimEdit.nodeId ? { ...n, x2: newEx, y2: newEy } : n
+          ));
+          // Also update the chain start point so the next wall starts from the correct spot
+          wallChainStartRef.current = { cx: newEx, cy: newEy };
+        }
+      }
+    }
+    setWallDimEdit(null);
+  }, [wallDimEdit, pixelsPerUnit, householdId, canvasId]);
 
   const handleChangeShape = useCallback(async (shape: CanvasNodeShape) => {
     const ids = Array.from(selectedIds);
@@ -1211,14 +1497,31 @@ export function CanvasRenderer({
         setEditingEdgeId(null);
         setPendingObjectPlacement(null);
         wallChainStartRef.current = null; // cancel wall chain
+        setWallPreviewEnd(null);
+        setWallDimEdit(null);
+        arcWallRef.current = null; // cancel arc wall
+        setArcPreview(null);
+        roomPointsRef.current = []; // cancel room polygon
+        setRoomPreviewPoints([]);
+        setRoomPreviewCursor(null);
+      } else if (e.key === "Enter" && activeTool === "wall" && wallChainStartRef.current) {
+        // Finish wall chain but stay in wall mode for a new chain
+        wallChainStartRef.current = null;
+        setWallPreviewEnd(null);
       } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setSelectedIds(new Set(nodes.map((n) => n.id)));
+      } else if (e.key === "s" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool("select");
+      } else if (e.key === "p" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool("freehand");
+      } else if (e.key === "w" && !e.ctrlKey && !e.metaKey) {
+        if (settings.physicalUnit) setActiveTool("wall");
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [editingNodeId, editingEdgeId, editingName, showSettings, handleDeleteSelected, undo, redo, handleCopy, handlePaste, nodes]);
+  }, [editingNodeId, editingEdgeId, editingName, showSettings, handleDeleteSelected, undo, redo, handleCopy, handlePaste, nodes, activeTool, settings.physicalUnit]);
 
   // ─── Derived ─────────────────────────────────────────────────────────────
 
@@ -1309,6 +1612,13 @@ export function CanvasRenderer({
       </>
     );
   };
+
+  // Pre-compute wall polygons with miter joins at shared endpoints
+  const wallMiterPolygons = useMemo(() => {
+    const wallNodes = nodes.filter((n) => n.objectType === "wall");
+    if (wallNodes.length < 2) return new Map<string, { x: number; y: number }[]>();
+    return computeWallPolygonsWithMiters(wallNodes);
+  }, [nodes]);
 
   const renderNode = (node: IdeaCanvasNode) => {
     const isSelected = selectedIds.has(node.id);
@@ -1415,12 +1725,73 @@ export function CanvasRenderer({
       );
     }
 
-    if (node.objectType === "line" || node.objectType === "wall") {
-      const isWall = node.objectType === "wall";
-      const wallSW = isWall ? ((node.strokeWidth ?? 6) * (isSelected ? 1.3 : 1)) : sw;
-      const wallStroke = isWall ? (isSelected ? selStroke : (node.strokeColor ?? "#374151")) : stroke;
-      // Physical length label for walls
-      const wallLenLabel = (isWall && pixelsPerUnit && settings.physicalUnit) ? (() => {
+    if (node.objectType === "wall") {
+      const thickness = (node.strokeWidth ?? 6) * (isSelected ? 1.15 : 1);
+      const wallFill = isSelected ? "var(--accent-soft, rgba(99,102,241,0.15))" : (node.fillColor ?? "#d1d5db");
+      const wallStroke = isSelected ? selStroke : (node.strokeColor ?? "#374151");
+      const isCurved = node.pointAx != null && node.pointAy != null;
+
+      if (isCurved) {
+        // Curved wall: render as SVG arc
+        const arc = arcFromThreePoints(
+          { x: node.x, y: node.y },
+          { x: node.pointAx!, y: node.pointAy! },
+          { x: node.x2, y: node.y2 },
+        );
+        if (arc) {
+          const centerD = svgArcPath(node.x, node.y, node.x2, node.y2, arc.radius, arc.sweepFlag);
+          const thickD = arcWallPolygonPath(
+            node.x, node.y, node.x2, node.y2,
+            arc.radius, arc.sweepFlag, thickness,
+          );
+          const len = arcLength(arc);
+          const mx = (node.x + node.x2) / 2;
+          const my = (node.y + node.y2) / 2;
+          const lenLabel = (pixelsPerUnit && settings.physicalUnit)
+            ? fmtPhysical(len, pixelsPerUnit, settings.physicalUnit!)
+            : null;
+          return (
+            <g key={node.id}>
+              {/* Wide hit area arc */}
+              <path d={centerD} fill="none" stroke="transparent"
+                strokeWidth={Math.max(thickness * 2, 14)} style={{ cursor }} {...nodeEvents} />
+              {/* Filled arc wall */}
+              <path d={thickD} fill={wallFill} stroke={wallStroke}
+                strokeWidth={1} pointerEvents="none" />
+              {/* Endpoint dots */}
+              <circle cx={node.x} cy={node.y} r={thickness / 2} fill={wallFill} stroke={wallStroke}
+                strokeWidth={1} pointerEvents="none" />
+              <circle cx={node.x2} cy={node.y2} r={thickness / 2} fill={wallFill} stroke={wallStroke}
+                strokeWidth={1} pointerEvents="none" />
+              {lenLabel ? (
+                <text x={mx} y={my - thickness / 2 - 6}
+                  textAnchor="middle" fontSize={11 / zoom} fill="var(--ink)"
+                  pointerEvents="none" style={{ userSelect: "none" }}>
+                  {lenLabel}
+                </text>
+              ) : null}
+              {isSelected && (
+                <path d={thickD} fill="none" stroke={selStroke}
+                  strokeWidth={1.5 / zoom} strokeDasharray={`${4 / zoom},${2 / zoom}`}
+                  pointerEvents="none" />
+              )}
+              {isSelected && renderResizeHandles(node)}
+            </g>
+          );
+        }
+        // Fallback: render as straight wall if arc computation fails (e.g., collinear)
+      }
+
+      // Straight wall
+      // Use miter-joined polygon if available, otherwise basic
+      const miterPoly = wallMiterPolygons.get(node.id);
+      const poly = miterPoly ?? wallPolygonFromLine(node.x, node.y, node.x2, node.y2, thickness);
+      const polyPts = poly.map(p => `${p.x},${p.y}`).join(" ");
+      // Wide transparent hit area (uses polygon shape, not stroke line)
+      const hitPoly = wallPolygonFromLine(node.x, node.y, node.x2, node.y2, Math.max(thickness * 2, 14));
+      const hitPts = hitPoly.map(p => `${p.x},${p.y}`).join(" ");
+      // Physical length label
+      const wallLenLabel = (pixelsPerUnit && settings.physicalUnit) ? (() => {
         const dx = node.x2 - node.x;
         const dy = node.y2 - node.y;
         const len = Math.sqrt(dx * dx + dy * dy);
@@ -1430,7 +1801,7 @@ export function CanvasRenderer({
         const label = fmtPhysical(len, pixelsPerUnit, settings.physicalUnit!);
         return (
           <text
-            x={mx} y={my - 6}
+            x={mx} y={my - thickness / 2 - 4}
             textAnchor="middle" fontSize={11 / zoom} fill="var(--ink)"
             transform={`rotate(${Math.abs(angle) > 90 ? angle + 180 : angle}, ${mx}, ${my})`}
             pointerEvents="none" style={{ userSelect: "none" }}>
@@ -1441,13 +1812,39 @@ export function CanvasRenderer({
       return (
         <g key={node.id}>
           {/* Wide hit area */}
+          <polygon points={hitPts} fill="transparent" style={{ cursor }} {...nodeEvents} />
+          {/* Filled wall polygon */}
+          <polygon points={polyPts} fill={wallFill} stroke={wallStroke}
+            strokeWidth={1} pointerEvents="none" />
+          {/* Endpoint dots */}
+          <circle cx={node.x} cy={node.y} r={thickness / 2} fill={wallFill} stroke={wallStroke}
+            strokeWidth={1} pointerEvents="none" />
+          <circle cx={node.x2} cy={node.y2} r={thickness / 2} fill={wallFill} stroke={wallStroke}
+            strokeWidth={1} pointerEvents="none" />
+          {wallLenLabel}
+          {isSelected && (
+            <>
+              {/* Selection outline */}
+              <polygon points={polyPts} fill="none" stroke={selStroke}
+                strokeWidth={1.5 / zoom} strokeDasharray={`${4 / zoom},${2 / zoom}`}
+                pointerEvents="none" />
+            </>
+          )}
+          {isSelected && renderResizeHandles(node)}
+        </g>
+      );
+    }
+
+    if (node.objectType === "line") {
+      return (
+        <g key={node.id}>
+          {/* Wide hit area */}
           <line x1={node.x} y1={node.y} x2={node.x2} y2={node.y2}
-            stroke="transparent" strokeWidth={Math.max(wallSW * 2, 12)} style={{ cursor }}
+            stroke="transparent" strokeWidth={Math.max(sw * 2, 12)} style={{ cursor }}
             {...nodeEvents} />
           <line x1={node.x} y1={node.y} x2={node.x2} y2={node.y2}
-            stroke={wallStroke} strokeWidth={wallSW} strokeLinecap="round"
+            stroke={stroke} strokeWidth={sw} strokeLinecap="round"
             pointerEvents="none" />
-          {wallLenLabel}
           {isSelected && renderResizeHandles(node)}
         </g>
       );
@@ -1505,12 +1902,12 @@ export function CanvasRenderer({
     }
 
     if (node.objectType === "room") {
-      // Room polygon stored in maskJson as { type: "polygon", points: {x,y}[] }
+      // Room polygon stored in maskJson as { type: "polygon", points: {x,y}[] } relative to node origin
       let pts = "";
       if (node.maskJson) {
         try {
           const mask = JSON.parse(node.maskJson) as { type: string; points: { x: number; y: number }[] };
-          if (mask.type === "polygon") pts = mask.points.map((p) => `${p.x},${p.y}`).join(" ");
+          if (mask.type === "polygon") pts = mask.points.map((p) => `${node.x + p.x},${node.y + p.y}`).join(" ");
         } catch { /* no-op */ }
       }
       if (!pts) pts = `${node.x},${node.y} ${node.x + node.width},${node.y} ${node.x + node.width},${node.y + node.height} ${node.x},${node.y + node.height}`;
@@ -1532,6 +1929,133 @@ export function CanvasRenderer({
             </text>
           ) : null}
           {isSelected && renderResizeHandles(node)}
+        </g>
+      );
+    }
+
+    if (node.objectType === "door") {
+      // Door: centered at (x,y), rotated to wall angle, width = opening width
+      const w = node.width;
+      const h = node.height || 6;
+      const rot = node.rotation ?? 0;
+      return (
+        <g key={node.id} transform={`translate(${node.x},${node.y}) rotate(${rot})`}>
+          {/* Gap clear rectangle (white to mask wall) */}
+          <rect x={-w / 2} y={-h / 2 - 1} width={w} height={h + 2}
+            fill="#ffffff" stroke="none" style={{ cursor }} {...nodeEvents} />
+          {/* Door line (the leaf) */}
+          <line x1={-w / 2} y1={0} x2={w / 2} y2={0}
+            stroke={isSelected ? selStroke : (node.strokeColor ?? "#374151")}
+            strokeWidth={1.5 / zoom} pointerEvents="none" />
+          {/* Swing arc (90°) */}
+          <path d={`M ${w / 2},0 A ${w},${w} 0 0,1 ${-w / 2 + w * (1 - Math.cos(Math.PI / 2))},${-w * Math.sin(Math.PI / 2)}`}
+            fill="none" stroke={isSelected ? selStroke : (node.strokeColor ?? "#374151")}
+            strokeWidth={0.75 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`}
+            pointerEvents="none" />
+          {/* Hinge markers */}
+          <circle cx={-w / 2} cy={0} r={2 / zoom} fill={node.strokeColor ?? "#374151"} pointerEvents="none" />
+          {isSelected && (
+            <rect x={-w / 2 - 2} y={-w - 2} width={w + 4} height={w + h / 2 + 4}
+              fill="none" stroke="var(--accent)" strokeWidth={1 / zoom}
+              strokeDasharray={`${4 / zoom},${2 / zoom}`}
+              pointerEvents="none" />
+          )}
+        </g>
+      );
+    }
+
+    if (node.objectType === "window") {
+      // Window: centered at (x,y), rotated to wall angle
+      const w = node.width;
+      const h = node.height || 6;
+      const rot = node.rotation ?? 0;
+      return (
+        <g key={node.id} transform={`translate(${node.x},${node.y}) rotate(${rot})`}>
+          {/* Gap clear rectangle */}
+          <rect x={-w / 2} y={-h / 2 - 1} width={w} height={h + 2}
+            fill="#ffffff" stroke="none" style={{ cursor }} {...nodeEvents} />
+          {/* Window frame */}
+          <rect x={-w / 2} y={-h / 4} width={w} height={h / 2}
+            fill="none" stroke={isSelected ? selStroke : (node.strokeColor ?? "#374151")}
+            strokeWidth={1 / zoom} pointerEvents="none" />
+          {/* Glass panes (two parallel lines) */}
+          <line x1={-w / 2} y1={-1 / zoom} x2={w / 2} y2={-1 / zoom}
+            stroke={isSelected ? selStroke : "#93c5fd"} strokeWidth={1 / zoom} pointerEvents="none" />
+          <line x1={-w / 2} y1={1 / zoom} x2={w / 2} y2={1 / zoom}
+            stroke={isSelected ? selStroke : "#93c5fd"} strokeWidth={1 / zoom} pointerEvents="none" />
+          {/* Hit area */}
+          <rect x={-w / 2} y={-h / 2} width={w} height={h}
+            fill="transparent" stroke="none" style={{ cursor }} {...nodeEvents} />
+          {isSelected && (
+            <rect x={-w / 2 - 2} y={-h / 2 - 2} width={w + 4} height={h + 4}
+              fill="none" stroke="var(--accent)" strokeWidth={1 / zoom}
+              strokeDasharray={`${4 / zoom},${2 / zoom}`}
+              pointerEvents="none" />
+          )}
+        </g>
+      );
+    }
+
+    if (node.objectType === "stairs") {
+      // Stairs: rectangle with step lines and direction arrow
+      const w = node.width;
+      const h = node.height;
+      const stepCount = Math.max(3, Math.round(h / (pixelsPerUnit ? pixelsPerUnit * 0.25 : 12)));
+      const stepH = h / stepCount;
+      return (
+        <g key={node.id}>
+          {/* Outer rectangle */}
+          <rect x={node.x} y={node.y} width={w} height={h}
+            fill={node.fillColor ?? "rgba(255,255,255,0.9)"}
+            stroke={isSelected ? selStroke : (node.strokeColor ?? "#374151")}
+            strokeWidth={isSelected ? 2 / zoom : 1 / zoom}
+            style={{ cursor }} {...nodeEvents} />
+          {/* Step lines */}
+          {Array.from({ length: stepCount - 1 }, (_, i) => {
+            const sy = node.y + stepH * (i + 1);
+            return (
+              <line key={i} x1={node.x} y1={sy} x2={node.x + w} y2={sy}
+                stroke={node.strokeColor ?? "#374151"} strokeWidth={0.5 / zoom} pointerEvents="none" />
+            );
+          })}
+          {/* Direction arrow (up) */}
+          <line x1={node.x + w / 2} y1={node.y + h * 0.85}
+            x2={node.x + w / 2} y2={node.y + h * 0.15}
+            stroke={node.strokeColor ?? "#374151"} strokeWidth={1.5 / zoom} pointerEvents="none" />
+          <polygon points={`${node.x + w / 2},${node.y + h * 0.1} ${node.x + w / 2 - 5 / zoom},${node.y + h * 0.2} ${node.x + w / 2 + 5 / zoom},${node.y + h * 0.2}`}
+            fill={node.strokeColor ?? "#374151"} pointerEvents="none" />
+          {isSelected && renderResizeHandles(node)}
+        </g>
+      );
+    }
+
+    if (node.objectType === "freehand") {
+      let d = "";
+      if (node.pointsJson) {
+        try {
+          const pts = JSON.parse(node.pointsJson) as { x: number; y: number }[];
+          d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+        } catch { /* ignore */ }
+      }
+      if (!d) {
+        d = `M${node.x},${node.y} L${node.x + node.width},${node.y + node.height}`;
+      }
+      return (
+        <g key={node.id}>
+          {/* Wide hit area */}
+          <path d={d} fill="none" stroke="transparent" strokeWidth={Math.max(sw * 4, 12)}
+            style={{ cursor }} {...nodeEvents} />
+          <path d={d} fill="none"
+            stroke={isSelected ? selStroke : (node.strokeColor ?? "#333333")}
+            strokeWidth={isSelected ? sw + 1 : (node.strokeWidth ?? 2)}
+            strokeLinecap="round" strokeLinejoin="round"
+            pointerEvents="none" />
+          {isSelected ? (
+            <rect x={node.x - 2} y={node.y - 2} width={node.width + 4} height={node.height + 4}
+              fill="none" stroke="var(--accent)" strokeWidth={1 / zoom}
+              strokeDasharray={`${4 / zoom},${2 / zoom}`}
+              pointerEvents="none" />
+          ) : null}
         </g>
       );
     }
@@ -1658,22 +2182,49 @@ export function CanvasRenderer({
   // ─── Draw preview ─────────────────────────────────────────────────────────
 
   const renderDrawPreview = () => {
+    if (drag.type === "freehand" && drag.points.length >= 2) {
+      const d = drag.points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+      return (
+        <path d={d} fill="none" stroke="#333333" strokeWidth={2} strokeLinecap="round"
+          strokeLinejoin="round" pointerEvents="none" />
+      );
+    }
     if (drag.type === "wall") {
-      const { startCX, startCY, endCX, endCY } = drag;
+      // Legacy drag-based preview (kept for backwards compat, but shouldn't fire with new click-based tool)
+      return null;
+    }
+    // Wall click-based preview
+    if (activeTool === "wall" && wallChainStartRef.current && wallPreviewEnd) {
+      const startCX = wallChainStartRef.current.cx;
+      const startCY = wallChainStartRef.current.cy;
+      const endCX = wallPreviewEnd.cx;
+      const endCY = wallPreviewEnd.cy;
       const dx = endCX - startCX;
       const dy = endCY - startCY;
       const len = Math.sqrt(dx * dx + dy * dy);
+      const previewThickness = 6;
+      const poly = wallPolygonFromLine(startCX, startCY, endCX, endCY, previewThickness);
+      const polyPts = poly.map(p => `${p.x},${p.y}`).join(" ");
       return (
         <g>
-          <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
-            stroke="#374151" strokeWidth={6} strokeLinecap="round"
-            strokeDasharray="8,4" pointerEvents="none" />
+          {/* Polygon preview outline */}
+          <polygon points={polyPts} fill="rgba(209,213,219,0.35)" stroke="#374151"
+            strokeWidth={1} strokeDasharray="6,3" pointerEvents="none" />
+          {/* Endpoint caps */}
+          <circle cx={startCX} cy={startCY} r={previewThickness / 2} fill="rgba(209,213,219,0.35)"
+            stroke="#374151" strokeWidth={1} strokeDasharray="6,3" pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={previewThickness / 2} fill="rgba(209,213,219,0.35)"
+            stroke="#374151" strokeWidth={1} strokeDasharray="6,3" pointerEvents="none" />
           {len > 4 && pixelsPerUnit && settings.physicalUnit ? (
-            <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - 8}
+            <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - previewThickness / 2 - 4}
               textAnchor="middle" fontSize={11 / zoom} fill="#374151" pointerEvents="none">
               {fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)}
             </text>
           ) : null}
+          {/* Start point marker */}
+          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#374151" pointerEvents="none" />
+          {/* Snap indicator at endpoint */}
+          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#374151" opacity={0.5} pointerEvents="none" />
         </g>
       );
     }
@@ -1694,6 +2245,132 @@ export function CanvasRenderer({
             </text>
           ) : null}
           <circle cx={startCX} cy={startCY} r={3 / zoom} fill="#6366f1" pointerEvents="none" />
+        </g>
+      );
+    }
+    // Arc wall preview
+    if (arcPreview) {
+      if (arcPreview.phase === 1) {
+        // Phase 1: straight line from start to cursor
+        return (
+          <g>
+            <line x1={arcPreview.sx} y1={arcPreview.sy} x2={arcPreview.ex} y2={arcPreview.ey}
+              stroke="#374151" strokeWidth={2} strokeDasharray="6,3" opacity={0.6} pointerEvents="none" />
+            <circle cx={arcPreview.sx} cy={arcPreview.sy} r={4 / zoom} fill="#374151" pointerEvents="none" />
+            <circle cx={arcPreview.ex} cy={arcPreview.ey} r={4 / zoom} fill="#374151" opacity={0.5} pointerEvents="none" />
+          </g>
+        );
+      } else {
+        // Phase 2: arc preview from start to end passing through midpoint
+        const arc = arcFromThreePoints(
+          { x: arcPreview.sx, y: arcPreview.sy },
+          { x: arcPreview.mx, y: arcPreview.my },
+          { x: arcPreview.ex, y: arcPreview.ey },
+        );
+        if (arc) {
+          const d = svgArcPath(arcPreview.sx, arcPreview.sy, arcPreview.ex, arcPreview.ey, arc.radius, arc.sweepFlag);
+          const len = arcLength(arc);
+          const midX = (arcPreview.sx + arcPreview.ex) / 2;
+          const midY = (arcPreview.sy + arcPreview.ey) / 2;
+          return (
+            <g>
+              <path d={d} fill="none" stroke="#374151" strokeWidth={6}
+                strokeDasharray="8,4" opacity={0.6} pointerEvents="none" />
+              {/* Arc midpoint indicator */}
+              <circle cx={arcPreview.mx} cy={arcPreview.my} r={4 / zoom}
+                fill="#0ea5e9" opacity={0.7} pointerEvents="none" />
+              {/* Endpoint markers */}
+              <circle cx={arcPreview.sx} cy={arcPreview.sy} r={4 / zoom} fill="#374151" pointerEvents="none" />
+              <circle cx={arcPreview.ex} cy={arcPreview.ey} r={4 / zoom} fill="#374151" pointerEvents="none" />
+              {/* Length label */}
+              {len > 4 && pixelsPerUnit && settings.physicalUnit ? (
+                <text x={midX} y={midY - 10}
+                  textAnchor="middle" fontSize={11 / zoom} fill="#374151" pointerEvents="none">
+                  {fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)} (arc)
+                </text>
+              ) : null}
+            </g>
+          );
+        }
+        // Fallback: straight line if arc can't be computed (collinear)
+        return (
+          <g>
+            <line x1={arcPreview.sx} y1={arcPreview.sy} x2={arcPreview.ex} y2={arcPreview.ey}
+              stroke="#374151" strokeWidth={2} strokeDasharray="6,3" opacity={0.6} pointerEvents="none" />
+            <circle cx={arcPreview.mx} cy={arcPreview.my} r={4 / zoom}
+              fill="#0ea5e9" opacity={0.5} pointerEvents="none" />
+          </g>
+        );
+      }
+    }
+    // Door/window placement preview
+    if (openingPreview && (activeTool === "door" || activeTool === "window")) {
+      const { x, y, angle, wallThickness } = openingPreview;
+      const defaultW = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 3 : settings.physicalUnit === "in" ? 36 : 0.9) : 40;
+      const rot = (angle * 180) / Math.PI;
+      if (activeTool === "door") {
+        return (
+          <g transform={`translate(${x},${y}) rotate(${rot})`} opacity={0.6} pointerEvents="none">
+            <rect x={-defaultW / 2} y={-wallThickness / 2 - 1} width={defaultW} height={wallThickness + 2}
+              fill="#ffffff" stroke="none" />
+            <line x1={-defaultW / 2} y1={0} x2={defaultW / 2} y2={0}
+              stroke="#374151" strokeWidth={1.5 / zoom} />
+            <path d={`M ${defaultW / 2},0 A ${defaultW},${defaultW} 0 0,1 ${-defaultW / 2 + defaultW * (1 - Math.cos(Math.PI / 2))},${-defaultW * Math.sin(Math.PI / 2)}`}
+              fill="none" stroke="#374151" strokeWidth={0.75 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`} />
+            <circle cx={-defaultW / 2} cy={0} r={2 / zoom} fill="#374151" />
+          </g>
+        );
+      } else {
+        return (
+          <g transform={`translate(${x},${y}) rotate(${rot})`} opacity={0.6} pointerEvents="none">
+            <rect x={-defaultW / 2} y={-wallThickness / 2 - 1} width={defaultW} height={wallThickness + 2}
+              fill="#ffffff" stroke="none" />
+            <rect x={-defaultW / 2} y={-wallThickness / 4} width={defaultW} height={wallThickness / 2}
+              fill="none" stroke="#374151" strokeWidth={1 / zoom} />
+            <line x1={-defaultW / 2} y1={-1 / zoom} x2={defaultW / 2} y2={-1 / zoom}
+              stroke="#93c5fd" strokeWidth={1 / zoom} />
+            <line x1={-defaultW / 2} y1={1 / zoom} x2={defaultW / 2} y2={1 / zoom}
+              stroke="#93c5fd" strokeWidth={1 / zoom} />
+          </g>
+        );
+      }
+    }
+    // Room polygon preview
+    if (roomPreviewPoints.length > 0) {
+      const pts = roomPreviewPoints;
+      const cursor = roomPreviewCursor;
+      const allPts = cursor ? [...pts, cursor] : pts;
+      const polyPts = allPts.map(p => `${p.x},${p.y}`).join(" ");
+      // Check if cursor is near start point (close indicator)
+      const nearStart = cursor && pts.length >= 3 && Math.hypot(cursor.x - pts[0].x, cursor.y - pts[0].y) < 15 / zoom;
+      return (
+        <g>
+          {/* Filled preview */}
+          <polygon points={polyPts} fill="rgba(59,130,246,0.06)" stroke="#3b82f6"
+            strokeWidth={1.5 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
+          {/* Vertex markers */}
+          {pts.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={4 / zoom}
+              fill={i === 0 && nearStart ? "#22c55e" : "#3b82f6"} pointerEvents="none" />
+          ))}
+          {/* Close indicator ring around first point */}
+          {nearStart && (
+            <circle cx={pts[0].x} cy={pts[0].y} r={8 / zoom} fill="none"
+              stroke="#22c55e" strokeWidth={2 / zoom} pointerEvents="none" />
+          )}
+          {/* Area label in preview */}
+          {allPts.length >= 3 && pixelsPerUnit && settings.physicalUnit ? (() => {
+            const pxArea = Math.abs(polygonArea(allPts));
+            const physArea = pxArea / (pixelsPerUnit * pixelsPerUnit);
+            const unit = settings.physicalUnit;
+            const centroid = polygonCentroid(allPts);
+            return (
+              <text x={centroid.x} y={centroid.y} textAnchor="middle" dominantBaseline="central"
+                fontSize={12 / zoom} fill="#3b82f6" opacity={0.7} pointerEvents="none">
+                {physArea.toFixed(1)} {unit}²
+              </text>
+            );
+          })() : null}
         </g>
       );
     }
@@ -1881,105 +2558,6 @@ export function CanvasRenderer({
     );
   };
 
-  // ─── Settings panel ───────────────────────────────────────────────────────
-
-  const SettingsPanel = () => {
-    const [local, setLocal] = useState<UpdateCanvasSettingsInput>({ ...settings });
-
-    return (
-      <div className="idea-canvas__settings-panel">
-        <div className="idea-canvas__settings-header">
-          <h3>Canvas Settings</h3>
-          <button type="button" className="button button--ghost button--small" onClick={() => setShowSettings(false)}>✕</button>
-        </div>
-        <div className="idea-canvas__settings-body">
-          <div className="idea-canvas__settings-row">
-            <label>Physical Width</label>
-            <input type="number" min={0} step={0.1}
-              value={local.physicalWidth ?? ""}
-              onChange={(e) => setLocal((p) => ({ ...p, physicalWidth: e.target.value ? parseFloat(e.target.value) : null }))}
-              placeholder="e.g. 20" />
-          </div>
-          <div className="idea-canvas__settings-row">
-            <label>Physical Height</label>
-            <input type="number" min={0} step={0.1}
-              value={local.physicalHeight ?? ""}
-              onChange={(e) => setLocal((p) => ({ ...p, physicalHeight: e.target.value ? parseFloat(e.target.value) : null }))}
-              placeholder="e.g. 15" />
-          </div>
-          <div className="idea-canvas__settings-row">
-            <label>Unit</label>
-            <select value={local.physicalUnit ?? ""}
-              onChange={(e) => setLocal((p) => ({ ...p, physicalUnit: (e.target.value || null) as UpdateCanvasSettingsInput["physicalUnit"] }))}>
-              <option value="">None</option>
-              {PHYSICAL_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
-          </div>
-          <div className="idea-canvas__settings-row">
-            <label>Snap to Grid</label>
-            <input type="checkbox" checked={!!local.snapToGrid}
-              onChange={(e) => setLocal((p) => ({ ...p, snapToGrid: e.target.checked }))} />
-          </div>
-          <div className="idea-canvas__settings-row">
-            <label>Grid Size (px)</label>
-            <input type="number" min={8} max={200} step={4}
-              value={local.gridSize ?? 24}
-              onChange={(e) => setLocal((p) => ({ ...p, gridSize: parseInt(e.target.value) || 24 }))} />
-          </div>
-          {local.physicalUnit ? (
-            <>
-              <div className="idea-canvas__settings-row">
-                <label>Show Dimensions</label>
-                <input type="checkbox" checked={!!local.showDimensions}
-                  onChange={(e) => setLocal((p) => ({ ...p, showDimensions: e.target.checked }))} />
-              </div>
-              <div className="idea-canvas__settings-row idea-canvas__settings-row--info">
-                <span>Scale: 1 grid square = 1 {local.physicalUnit}</span>
-              </div>
-            </>
-          ) : null}
-          <div className="idea-canvas__settings-row idea-canvas__settings-row--full">
-            <label>Background Image</label>
-            <div className="idea-canvas__bg-image-controls">
-              {resolvedBgUrl ? (
-                <>
-                  <span className="idea-canvas__bg-image-name">
-                    {bgImageDims ? `${bgImageDims.w} × ${bgImageDims.h} px` : "Uploaded"}
-                  </span>
-                  <button type="button" className="button button--ghost button--small"
-                    onClick={async () => { await handleRemoveBgImage(); }}>Remove</button>
-                  <button type="button" className="button button--ghost button--small"
-                    onClick={() => { if (bgImageDims) fitViewportToImage(bgImageDims.w, bgImageDims.h); }}>Fit View</button>
-                </>
-              ) : (
-                <>
-                  <label className={`button button--ghost button--small idea-canvas__upload-btn${bgUploading ? " idea-canvas__upload-btn--loading" : ""}`}>
-                    {bgUploading ? "Uploading…" : "Upload Image"}
-                    <input type="file" accept="image/*" style={{ display: "none" }}
-                      disabled={bgUploading}
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (f) await handleBgImageUpload(f);
-                        e.target.value = "";
-                      }} />
-                  </label>
-                  <span className="idea-canvas__bg-image-hint">PNG, JPG, WebP up to 50 MB</span>
-                  {bgUploadError ? (
-                    <span className="idea-canvas__upload-error" title={bgUploadError}>⚠️ {bgUploadError}</span>
-                  ) : null}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="idea-canvas__settings-footer">
-          <button type="button" className="button button--ghost button--small" onClick={() => setShowSettings(false)}>Cancel</button>
-          <button type="button" className="button button--primary button--small" onClick={() => handleSaveSettings(local)}>Save</button>
-        </div>
-      </div>
-    );
-  };
-
   // ─── Physical scale label ─────────────────────────────────────────────────
 
   const renderScaleLabels = () => {
@@ -2009,8 +2587,8 @@ export function CanvasRenderer({
 
   const svgCursor = drag.type === "pan" ? "grabbing"
     : activeTool === "pan" ? "grab"
-    : drag.type === "edge" || drag.type === "wall" || drag.type === "measure"
-      || ["rect", "circle", "line", "text", "node", "wall", "measure"].includes(activeTool) ? "crosshair"
+    : drag.type === "freehand" || drag.type === "edge" || drag.type === "wall" || drag.type === "measure"
+      || ["rect", "circle", "line", "text", "node", "wall", "wall-arc", "room", "door", "window", "stairs", "measure", "freehand"].includes(activeTool) ? "crosshair"
     : "default";
 
   return (
@@ -2038,177 +2616,51 @@ export function CanvasRenderer({
       </div>
 
       {/* Toolbar */}
-      <div className="idea-canvas__toolbar">
-        {/* Tool group */}
-        <div className="idea-canvas__tool-group">
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "select" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("select")} title="Select / drag (S)">
-            <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}>
-              <path d="M0 0v11.5l3-3L5.5 14l1.8-.9L4.8 8H10L0 0z" />
-            </svg>{" "}Select
-          </button>
-          <button type="button"
-            className={`idea-canvas__tool-btn${activeTool === "pan" ? " idea-canvas__tool-btn--active" : ""}`}
-            onClick={() => setActiveTool("pan")} title="Pan canvas (hold Alt)">
-            ✋ Pan
-          </button>
-        </div>
-        <div className="idea-canvas__toolbar-divider" />
-        {/* Shape tools — diagram mode */}
-        {canvasMode !== "floorplan" ? (
-          <div className="idea-canvas__tool-group">
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "node" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("node")} title="Add flowchart node">
-              ☐ Node
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "rect" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("rect")} title="Draw rectangle">
-              ▭ Rect
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "circle" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("circle")} title="Draw circle/ellipse">
-              ◯ Circle
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "line" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("line")} title="Draw line">
-              ╱ Line
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "text" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("text")} title="Add text">
-              T Text
-            </button>
-          </div>
-        ) : null}
-        {/* Floorplan tools */}
-        {canvasMode === "floorplan" ? (
-          <div className="idea-canvas__tool-group">
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "wall" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => { setActiveTool("wall"); }}
-              title="Draw wall (chain drawing, Enter to finish, Esc to cancel)">
-              ⊟ Wall
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "measure" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("measure")}
-              title="Add manual dimension annotation">
-              ↔ Measure
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "text" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("text")} title="Add text label">
-              T Label
-            </button>
-            <button type="button"
-              className={`idea-canvas__tool-btn${activeTool === "rect" ? " idea-canvas__tool-btn--active" : ""}`}
-              onClick={() => setActiveTool("rect")} title="Draw room/space rectangle">
-              ▭ Room
-            </button>
-          </div>
-        ) : null}
-        <div className="idea-canvas__toolbar-divider" />
-        {/* Object library button */}
-        <button type="button"
-          className={`idea-canvas__tool-btn${activeTool === "object" || objectPickerOpen ? " idea-canvas__tool-btn--active" : ""}`}
-          title="Place object from library"
-          onClick={() => {
-            if (objectPickerOpen) {
-              setObjectPickerOpen(false);
-              if (!pendingObjectPlacement) setActiveTool("select");
-              return;
-            }
-            setActiveTool("object");
-            setObjectPickerOpen(true);
-          }}>
-          🧩 Object
-        </button>
-        <div className="idea-canvas__toolbar-divider" />
-        {/* Connect (only when a flowchart node selected) */}
-        {allFlowchartSelected ? (
-          <button type="button" className="idea-canvas__tool-btn" onClick={handleStartEdge} title="Draw edge">
-            ↗ Connect
-          </button>
-        ) : null}
-        {/* Selection-specific controls */}
-        {singleSelected ? (
-          <>
-            {singleSelected.objectType === "flowchart" ? (
-              <>
-                <select className="idea-canvas__tool-select"
-                  value={singleSelected.color ?? ""}
-                  onChange={(e) => handleChangeColor(e.target.value || null)} title="Fill color">
-                  {NODE_COLORS.map((c) => (
-                    <option key={c.value ?? ""} value={c.value ?? ""}>{c.label}</option>
-                  ))}
-                </select>
-                <select className="idea-canvas__tool-select"
-                  value={singleSelected.shape ?? "rectangle"}
-                  onChange={(e) => handleChangeShape(e.target.value as CanvasNodeShape)} title="Shape">
-                  {SHAPES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </>
-            ) : singleSelected.objectType !== "line" ? (
-              <input type="color" className="idea-canvas__color-picker"
-                value={singleSelected.fillColor ?? "#e8f0fe"}
-                onChange={(e) => handleChangeFillColor(e.target.value)}
-                title="Fill color" />
-            ) : null}
-            {singleSelected.objectType !== "text" && singleSelected.objectType !== "flowchart" ? (
-              <>
-                <input type="color" className="idea-canvas__color-picker"
-                  value={singleSelected.strokeColor ?? "#555555"}
-                  onChange={(e) => handleChangeStrokeColor(e.target.value)}
-                  title="Stroke color" />
-                <select className="idea-canvas__tool-select"
-                  value={singleSelected.strokeWidth ?? 1}
-                  onChange={(e) => handleChangeStrokeWidth(parseInt(e.target.value))} title="Stroke width">
-                  {[1, 2, 3, 4, 6, 8].map((w) => <option key={w} value={w}>{w}px</option>)}
-                </select>
-              </>
-            ) : null}
-          </>
-        ) : null}
-        {selectedEdgeId ? (
-          <select className="idea-canvas__tool-select"
-            value={selectedEdge?.style ?? "solid"}
-            onChange={(e) => handleChangeEdgeStyle(e.target.value as CanvasEdgeStyle)} title="Edge style">
-            {EDGE_STYLES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        ) : null}
-        {(selectedIds.size > 0 || selectedEdgeId) ? (
-          <button type="button" className="idea-canvas__tool-btn idea-canvas__tool-btn--danger"
-            onClick={handleDeleteSelected} title="Delete selected (Del)">
-            🗑 Delete
-          </button>
-        ) : null}
-        <div className="idea-canvas__toolbar-spacer" />
-        {/* Undo / Redo */}
-        <button type="button" className="idea-canvas__tool-btn" onClick={undo} title="Undo (Ctrl+Z)">↩</button>
-        <button type="button" className="idea-canvas__tool-btn" onClick={redo} title="Redo (Ctrl+Y)">↪</button>
-        <div className="idea-canvas__toolbar-divider" />
-        {/* Zoom controls */}
-        <button type="button" className="idea-canvas__tool-btn" onClick={() => {
-          const next = Math.max(MIN_ZOOM, zoom - ZOOM_STEP * 2);
-          setZoom(next); scheduleViewportSync(next, panX, panY);
-        }} title="Zoom out">−</button>
-        <span className="idea-canvas__zoom-label">{Math.round(zoom * 100)}%</span>
-        <button type="button" className="idea-canvas__tool-btn" onClick={() => {
+      <CanvasToolbar
+        activeTool={activeTool}
+        onToolChange={setActiveTool}
+        hasPhysicalUnits={!!settings.physicalUnit}
+        onOpenSettings={() => setShowSettings((v) => !v)}
+        selectedCount={selectedIds.size}
+        selectedEdgeId={selectedEdgeId}
+        singleSelected={singleSelected ?? null}
+        allFlowchartSelected={allFlowchartSelected}
+        selectedEdge={selectedEdge ?? null}
+        onStartEdge={handleStartEdge}
+        onChangeColor={handleChangeColor}
+        onChangeShape={handleChangeShape}
+        onChangeFillColor={handleChangeFillColor}
+        onChangeStrokeColor={handleChangeStrokeColor}
+        onChangeStrokeWidth={handleChangeStrokeWidth}
+        onChangeEdgeStyle={handleChangeEdgeStyle}
+        onChangeWallHeight={handleChangeWallHeight}
+        physicalUnit={settings.physicalUnit}
+        pixelsPerUnit={pixelsPerUnit}
+        onDeleteSelected={handleDeleteSelected}
+        onUndo={undo}
+        onRedo={redo}
+        zoom={zoom}
+        onZoomIn={() => {
           const next = Math.min(MAX_ZOOM, zoom + ZOOM_STEP * 2);
           setZoom(next); scheduleViewportSync(next, panX, panY);
-        }} title="Zoom in">+</button>
-        <button type="button" className="idea-canvas__tool-btn" onClick={handleFitToView} title="Fit all to view">Fit</button>
-        <div className="idea-canvas__toolbar-divider" />
-        <button type="button" className={`idea-canvas__tool-btn${showSettings ? " idea-canvas__tool-btn--active" : ""}`}
-          onClick={() => setShowSettings((v) => !v)} title="Canvas settings">
-          ⚙
-        </button>
-      </div>
+        }}
+        onZoomOut={() => {
+          const next = Math.max(MIN_ZOOM, zoom - ZOOM_STEP * 2);
+          setZoom(next); scheduleViewportSync(next, panX, panY);
+        }}
+        onFitToView={handleFitToView}
+        objectPickerOpen={objectPickerOpen}
+        onToggleObjectPicker={() => {
+          if (objectPickerOpen) {
+            setObjectPickerOpen(false);
+            if (!pendingObjectPlacement) setActiveTool("select");
+            return;
+          }
+          setActiveTool("object");
+          setObjectPickerOpen(true);
+        }}
+        showSettings={showSettings}
+      />
 
       {/* SVG Canvas */}
       <svg
@@ -2327,8 +2779,51 @@ export function CanvasRenderer({
         {renderRuler()}
       </svg>
 
+      {/* Inline wall dimension input (floating over canvas) */}
+      {wallDimEdit && svgRef.current ? (() => {
+        const svgRect = svgRef.current.getBoundingClientRect();
+        // Midpoint in canvas coords → screen coords
+        const midCX = (wallDimEdit.sx + wallDimEdit.ex) / 2;
+        const midCY = (wallDimEdit.sy + wallDimEdit.ey) / 2;
+        const screenX = (midCX + panX) * zoom;
+        const screenY = (midCY + panY) * zoom;
+        return (
+          <div className="idea-canvas__dim-input-overlay"
+            style={{ left: screenX, top: screenY - 30 }}>
+            <input
+              type="text"
+              className="idea-canvas__dim-input"
+              value={wallDimEdit.value}
+              onChange={(e) => setWallDimEdit({ ...wallDimEdit, value: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { commitWallDimEdit(true); e.preventDefault(); }
+                if (e.key === "Escape") { commitWallDimEdit(false); e.preventDefault(); }
+                e.stopPropagation();
+              }}
+              onBlur={() => commitWallDimEdit(true)}
+              autoFocus
+              size={6}
+            />
+            <span className="idea-canvas__dim-input-unit">{settings.physicalUnit}</span>
+          </div>
+        );
+      })() : null}
+
       {/* Settings panel */}
-      {showSettings ? <SettingsPanel /> : null}
+      {showSettings ? (
+        <CanvasSettingsPanel
+          settings={settings}
+          resolvedBgUrl={resolvedBgUrl}
+          bgImageDims={bgImageDims}
+          bgUploading={bgUploading}
+          bgUploadError={bgUploadError}
+          onSave={handleSaveSettings}
+          onClose={() => setShowSettings(false)}
+          onRemoveBgImage={handleRemoveBgImage}
+          onUploadBgImage={handleBgImageUpload}
+          onFitViewportToImage={fitViewportToImage}
+        />
+      ) : null}
 
       {/* Context menu */}
       {contextMenu ? (
@@ -2421,6 +2916,8 @@ export function CanvasRenderer({
                 : "Click where the wall starts.")
             : activeTool === "measure"
               ? "Click and drag to add a dimension annotation."
+              : activeTool === "freehand"
+                ? "Click and drag to draw freehand. Release to finish stroke."
               : activeTool === "node" ? "Click to place a flowchart node."
               : activeTool === "line" ? "Click and drag to draw a line."
               : activeTool === "text" ? "Click to place a text box."

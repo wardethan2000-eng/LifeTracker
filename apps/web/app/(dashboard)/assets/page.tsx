@@ -19,6 +19,8 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
   const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const includeArchived = params.includeArchived === "true";
+  const search = typeof params.search === "string" ? params.search.trim() : "";
+  const category = typeof params.category === "string" ? params.category : "";
   const limit = typeof params.limit === "string" && limitOptions.includes(Number(params.limit) as (typeof limitOptions)[number])
     ? Number(params.limit)
     : prefs.pageSize;
@@ -30,6 +32,8 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
     const query = new URLSearchParams();
     if (householdId) query.set("householdId", householdId);
     if (includeArchived) query.set("includeArchived", "true");
+    if (search) query.set("search", search);
+    if (category) query.set("category", category);
     query.set("limit", String(p.limit));
     query.set("offset", String(p.offset));
     return `/assets?${query.toString()}`;
@@ -50,7 +54,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
       );
     }
 
-    const assetPage = await getHouseholdAssetsPaginated(household.id, { limit, offset, includeArchived });
+    const assetPage = await getHouseholdAssetsPaginated(household.id, { limit, offset, includeArchived, search: search || undefined, category: category || undefined });
 
     return (
       <>
@@ -67,7 +71,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
               <h2>{t("listTitle", { count: assetPage.total })}</h2>
             </div>
             <div className="panel__body">
-              <AssetListWorkspace householdId={household.id} assets={assetPage.items} totalAssets={assetPage.total} includeArchived={includeArchived} />
+              <AssetListWorkspace householdId={household.id} assets={assetPage.items} totalAssets={assetPage.total} includeArchived={includeArchived} currentSearch={search} currentCategory={category} />
             </div>
           </section>
 

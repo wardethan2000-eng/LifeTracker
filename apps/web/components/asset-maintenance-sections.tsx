@@ -2,6 +2,7 @@
 
 import type { AssetDetailResponse, MaintenanceLog } from "@lifekeeper/types";
 import type { JSX } from "react";
+import Link from "next/link";
 import { AttachmentSection } from "./attachment-section";
 import { Card } from "./card";
 import { CompactMaintenanceSchedulePreview } from "./compact-maintenance-schedule-preview";
@@ -181,6 +182,16 @@ export function AssetMaintenanceSections({
                         />
                       </div>
                     ))}
+                  </div>
+                ) : null}
+                {detail.recentLogs.length > 0 ? (
+                  <div style={{ padding: "12px 0 4px", textAlign: "center" }}>
+                    <Link
+                      href={`/assets/${detail.asset.id}/history?sourceType=maintenance_log`}
+                      className="text-link"
+                    >
+                      View full maintenance history &rarr;
+                    </Link>
                   </div>
                 ) : null}
               </>

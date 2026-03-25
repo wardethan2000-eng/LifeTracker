@@ -984,7 +984,8 @@ const revalidateProjectPaths = (householdId: string, projectId?: string): void =
     revalidatePath(`/projects/${projectId}`, "layout");
     revalidatePath(`/projects/${projectId}/phases`);
     revalidatePath(`/projects/${projectId}/supplies`);
-    revalidatePath(`/projects/${projectId}/tasks`);
+    revalidatePath(`/projects/${projectId}/budget`);
+    revalidatePath(`/projects/${projectId}/notes`);
   }
 };
 
@@ -2832,6 +2833,8 @@ export async function createProjectExpenseAction(formData: FormData): Promise<vo
 
   const category = getOptionalString(formData, "category");
   const date = toIsoString(getOptionalString(formData, "date"));
+  const phaseId = getOptionalString(formData, "phaseId");
+  const budgetCategoryId = getOptionalString(formData, "budgetCategoryId");
   const taskId = getOptionalString(formData, "taskId");
   const serviceProviderId = getOptionalString(formData, "serviceProviderId");
   const notes = getOptionalString(formData, "notes");
@@ -2842,6 +2845,14 @@ export async function createProjectExpenseAction(formData: FormData): Promise<vo
 
   if (date) {
     input.date = date;
+  }
+
+  if (phaseId) {
+    input.phaseId = phaseId;
+  }
+
+  if (budgetCategoryId) {
+    input.budgetCategoryId = budgetCategoryId;
   }
 
   if (taskId) {
@@ -2869,6 +2880,8 @@ export async function updateProjectExpenseAction(formData: FormData): Promise<vo
     amount: getRequiredString(formData, "amount") ? Number(getRequiredString(formData, "amount")) : 0,
     category: getNullableString(formData, "category"),
     date: toNullableIsoString(getNullableString(formData, "date")),
+    phaseId: getNullableString(formData, "phaseId"),
+    budgetCategoryId: getNullableString(formData, "budgetCategoryId"),
     taskId: getNullableString(formData, "taskId"),
     serviceProviderId: getNullableString(formData, "serviceProviderId"),
     notes: getNullableString(formData, "notes")

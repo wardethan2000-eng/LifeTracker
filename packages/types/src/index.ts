@@ -5582,7 +5582,7 @@ export type CanvasEdgeStyle = z.infer<typeof canvasEdgeStyleSchema>;
 
 export const canvasObjectTypeSchema = z.enum([
   "flowchart", "rect", "circle", "line", "text", "image", "object",
-  "wall", "door", "window", "stairs", "room", "dimension",
+  "wall", "door", "window", "stairs", "room", "dimension", "freehand",
 ]);
 export type CanvasObjectType = z.infer<typeof canvasObjectTypeSchema>;
 
@@ -5614,15 +5614,18 @@ export const ideaCanvasNodeSchema = z.object({
   sortOrder: z.number(),
   imageUrl: z.string().nullable().optional(),
   maskJson: z.string().nullable().optional(),
-  // Floorplan fields
+  // Building / floorplan fields
   wallThickness: z.number().optional(),
   wallAngle: z.number().nullable().optional(),
+  wallHeight: z.number().nullable().optional(),
   physicalLength: z.number().nullable().optional(),
   parentNodeId: z.string().nullable().optional(),
   pointAx: z.number().nullable().optional(),
   pointAy: z.number().nullable().optional(),
   pointBx: z.number().nullable().optional(),
   pointBy: z.number().nullable().optional(),
+  // Freehand / polyline data
+  pointsJson: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -5725,15 +5728,18 @@ export const createCanvasNodeSchema = z.object({
   rotation: z.number().default(0),
   sortOrder: z.number().int().default(0),
   imageUrl: z.string().max(1000).optional().nullable(),
-  // Floorplan fields
+  // Building / floorplan fields
   wallThickness: z.number().positive().optional(),
   wallAngle: z.number().optional().nullable(),
+  wallHeight: z.number().positive().optional().nullable(),
   physicalLength: z.number().optional().nullable(),
   parentNodeId: z.string().optional().nullable(),
   pointAx: z.number().optional().nullable(),
   pointAy: z.number().optional().nullable(),
   pointBx: z.number().optional().nullable(),
   pointBy: z.number().optional().nullable(),
+  // Freehand / polyline data
+  pointsJson: z.string().max(50000).optional().nullable(),
 });
 export type CreateCanvasNodeInput = z.input<typeof createCanvasNodeSchema>;
 
@@ -5756,15 +5762,18 @@ export const updateCanvasNodeSchema = z.object({
   rotation: z.number().optional(),
   sortOrder: z.number().int().optional(),
   imageUrl: z.string().max(1000).optional().nullable(),
-  // Floorplan fields
+  // Building / floorplan fields
   wallThickness: z.number().positive().optional().nullable(),
   wallAngle: z.number().optional().nullable(),
+  wallHeight: z.number().positive().optional().nullable(),
   physicalLength: z.number().optional().nullable(),
   parentNodeId: z.string().optional().nullable(),
   pointAx: z.number().optional().nullable(),
   pointAy: z.number().optional().nullable(),
   pointBx: z.number().optional().nullable(),
   pointBy: z.number().optional().nullable(),
+  // Freehand / polyline data
+  pointsJson: z.string().max(50000).optional().nullable(),
 });
 export type UpdateCanvasNodeInput = z.infer<typeof updateCanvasNodeSchema>;
 

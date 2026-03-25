@@ -12,6 +12,7 @@ import {
 } from "../lib/formatters";
 import { useDisplayPreferences } from "./display-preferences-context";
 import { AssetBulkActions } from "./asset-bulk-actions";
+import { AssetListFilters } from "./asset-list-filters";
 import { BulkActionBar } from "./bulk-action-bar";
 import { ClickToEdit } from "./click-to-edit";
 import { ClickToEditSelect } from "./click-to-edit-select";
@@ -23,6 +24,8 @@ type AssetListWorkspaceProps = {
   assets: Asset[];
   totalAssets: number;
   includeArchived: boolean;
+  currentSearch?: string;
+  currentCategory?: string;
 };
 
 const CATEGORY_OPTIONS = assetCategoryValues.map((v) => ({
@@ -35,7 +38,7 @@ const VISIBILITY_OPTIONS = assetVisibilityValues.map((v) => ({
   label: formatVisibilityLabel(v as AssetVisibility),
 }));
 
-export function AssetListWorkspace({ householdId, assets, totalAssets, includeArchived }: AssetListWorkspaceProps): JSX.Element {
+export function AssetListWorkspace({ householdId, assets, totalAssets, includeArchived, currentSearch = "", currentCategory = "" }: AssetListWorkspaceProps): JSX.Element {
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
   const { pushToast } = useToast();
   const { formatDate } = useDisplayPreferences();
@@ -95,7 +98,7 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
     [householdId, pushToast],
   );
 
-  if (assets.length === 0) {
+  if (assets.length === 0 && !currentSearch && !currentCategory) {
     return (
       <p className="panel__empty">
         No assets found.{" "}
@@ -106,7 +109,16 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      <AssetListFilters
+        currentSearch={currentSearch}
+        currentCategory={currentCategory}
+        includeArchived={includeArchived}
+        householdId={householdId}
+      />
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        {assets.length === 0 ? (
+          <p className="panel__empty">No assets match the current filters.</p>
+        ) : null}
         <AssetBulkActions
           householdId={householdId}
           selectedItems={selectedItems}

@@ -95,7 +95,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
           <div><dt>Critical Path</dt><dd>{criticalPathTasks}</dd></div>
         </dl>
       ),
-      footerLink: { label: "View all tasks →", href: `${base}/tasks${qs}` },
+      footerLink: { label: "View all tasks →", href: `${base}/phases${qs}` },
     },
     {
       key: "phases",
@@ -144,14 +144,14 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     },
     {
       key: "inventory",
-      title: "Inventory",
+      title: "Materials",
       content: (
         <dl className="dashboard-card__kv">
           <div><dt>Total Items</dt><dd>{supplyTotalItems}</dd></div>
           <div><dt>Needed</dt><dd>{supplyNeededItems}</dd></div>
         </dl>
       ),
-      footerLink: { label: "View inventory →", href: `${base}/supplies${qs}` },
+      footerLink: { label: "View materials →", href: `${base}/supplies${qs}` },
     },
     {
       key: "upcoming",
@@ -168,7 +168,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
       ) : (
         <p className="dashboard-card__empty">No upcoming tasks</p>
       ),
-      footerLink: { label: "View tasks →", href: `${base}/tasks${qs}` },
+      footerLink: { label: "View tasks →", href: `${base}/phases${qs}` },
     },
     {
       key: "journal",
@@ -185,7 +185,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
       ) : (
         <p className="dashboard-card__empty">No journal entries yet</p>
       ),
-      footerLink: { label: "View journal →", href: `${base}/entries${qs}` },
+      footerLink: { label: "View log →", href: `${base}/notes${qs}` },
     },
     {
       key: "notepad",
@@ -197,7 +197,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
           entityId={projectId}
         />
       ),
-      footerLink: { label: "Open journal →", href: `${base}/entries${qs}` },
+      footerLink: { label: "Open log →", href: `${base}/notes${qs}` },
     },
     {
       key: "attachments",

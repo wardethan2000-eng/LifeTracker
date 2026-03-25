@@ -2368,15 +2368,18 @@ model IdeaCanvasNode {
   maskJson       String?         @db.Text
   rotation       Float           @default(0)
   sortOrder      Int             @default(0)
-  // Floorplan fields
+  // Floorplan / building fields
   wallThickness  Float           @default(6)
   wallAngle      Float?
+  wallHeight     Float?
   physicalLength Float?
   parentNodeId   String?
   pointAx        Float?
   pointAy        Float?
   pointBx        Float?
   pointBy        Float?
+  // Freehand / polyline data
+  pointsJson     String?         @db.Text
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   canvas         IdeaCanvas      @relation(fields: [canvasId], references: [id], onDelete: Cascade)

@@ -1182,12 +1182,35 @@ const getHouseholdAssetsPaginatedCached = cache(async (
   householdId: string,
   limit: number,
   offset: number,
-  includeArchived: boolean
-): Promise<AssetPage> => apiRequest({
-  path: `/v1/assets?householdId=${householdId}&paginated=true&limit=${limit}&offset=${offset}${includeArchived ? "&includeArchived=true" : ""}`,
-  schema: assetPageSchema,
-  cacheOptions: { revalidate: 30 }
-}));
+  includeArchived: boolean,
+  search: string,
+  category: string
+): Promise<AssetPage> => {
+  const params = new URLSearchParams({
+    householdId,
+    paginated: "true",
+    limit: String(limit),
+    offset: String(offset)
+  });
+
+  if (includeArchived) {
+    params.set("includeArchived", "true");
+  }
+
+  if (search) {
+    params.set("search", search);
+  }
+
+  if (category) {
+    params.set("category", category);
+  }
+
+  return apiRequest({
+    path: `/v1/assets?${params.toString()}`,
+    schema: assetPageSchema,
+    cacheOptions: { revalidate: 30 }
+  });
+});
 
 const getHouseholdMembersCached = cache(async (householdId: string): Promise<HouseholdMember[]> => apiRequest({
   path: `/v1/households/${householdId}/members`,
@@ -1208,16 +1231,6 @@ const getHouseholdInventoryCached = cache(async (
   path: `/v1/households/${householdId}/inventory${suffix}`,
   schema: householdInventoryListSchema,
   cacheOptions: { revalidate: 30 }
-}));
-
-const getProjectNotesCached = cache(async (
-  householdId: string,
-  projectId: string,
-  suffix: string
-): Promise<ProjectNote[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/notes${suffix}`,
-  schema: projectNoteListSchema,
-  cacheOptions: { revalidate: 15 }
 }));
 
 const getProjectBudgetAnalysisCached = cache(async (
@@ -1854,8 +1867,8 @@ export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> 
 
 export const getHouseholdAssetsPaginated = async (
   householdId: string,
-  options: { limit: number; offset: number; includeArchived?: boolean }
-): Promise<AssetPage> => getHouseholdAssetsPaginatedCached(householdId, options.limit, options.offset, options.includeArchived ?? false);
+  options: { limit: number; offset: number; includeArchived?: boolean; search?: string; category?: string }
+): Promise<AssetPage> => getHouseholdAssetsPaginatedCached(householdId, options.limit, options.offset, options.includeArchived ?? false, options.search ?? "", options.category ?? "");
 
 export const getHouseholdUsageHighlights = async (
   householdId: string,
@@ -3640,34 +3653,6 @@ export const applyPreset = async (
       skipExistingSchedules: true
     }
   });
-};
-
-export const getProjectNotes = async (
-  householdId: string,
-  projectId: string,
-  options?: {
-    category?: string;
-    phaseId?: string;
-    pinned?: boolean;
-  }
-): Promise<ProjectNote[]> => {
-  const query = new URLSearchParams();
-
-  if (options?.category) {
-    query.set("category", options.category);
-  }
-
-  if (options?.phaseId) {
-    query.set("phaseId", options.phaseId);
-  }
-
-  if (options?.pinned !== undefined) {
-    query.set("pinned", String(options.pinned));
-  }
-
-  const suffix = query.size > 0 ? `?${query.toString()}` : "";
-
-  return getProjectNotesCached(householdId, projectId, suffix);
 };
 
 export const createProjectNote = async (

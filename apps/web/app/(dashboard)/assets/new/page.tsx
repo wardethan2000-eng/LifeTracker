@@ -5,8 +5,15 @@ import { AssetProfileWorkbench } from "../../../../components/asset-profile-work
 import { ApiError, getHouseholdAssets, getHouseholdPresets, getLibraryPresets, getMe } from "../../../../lib/api";
 import Link from "next/link";
 
-export default async function NewAssetPage(): Promise<JSX.Element> {
+type NewAssetPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function NewAssetPage({ searchParams }: NewAssetPageProps): Promise<JSX.Element> {
   const t = await getTranslations("assets");
+  const resolvedParams = await (searchParams ?? Promise.resolve({}));
+  const parentAssetId = typeof resolvedParams.parentAssetId === "string" ? resolvedParams.parentAssetId : undefined;
+
   try {
     const me = await getMe();
     const household = me.households[0];
@@ -28,6 +35,8 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
       getHouseholdAssets(household.id)
     ]);
 
+    const parentAsset = parentAssetId ? householdAssets.find((a) => a.id === parentAssetId) : undefined;
+
     return (
       <>
         <header className="page-header">
@@ -37,6 +46,17 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
         </header>
 
         <div className="page-body">
+          {parentAsset && (
+            <div className="info-bar" style={{ marginBottom: "16px" }}>
+              <span>
+                Creating a component of{" "}
+                <Link href={`/assets/${parentAsset.id}`} className="text-link">
+                  {parentAsset.name}
+                </Link>
+                . The parent asset will be pre-selected below.
+              </span>
+            </div>
+          )}
           <AssetProfileWorkbench
             action={createAssetAction}
             householdId={household.id}
@@ -44,6 +64,7 @@ export default async function NewAssetPage(): Promise<JSX.Element> {
             submitLabel="Create Asset"
             libraryPresets={presets}
             customPresets={customPresets}
+            initialParentAssetId={parentAssetId}
           />
         </div>
       </>

@@ -16,7 +16,7 @@ type AssetCostsTabProps = {
 
 export async function AssetCostsTab({ costSummary, costPerUnit, costForecast }: AssetCostsTabProps): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
-  const fc = (v: number | null | undefined, fb = "$0.00") => fc(v, fb, prefs.currencyCode);
+  const fc = (v: number | null | undefined, fb = "$0.00") => formatCurrency(v, fb, prefs.currencyCode);
   const totalLogs = costSummary?.costByMonth.reduce((sum, entry) => sum + entry.logCount, 0) ?? 0;
   const normalizedMetrics = costPerUnit?.metrics.filter((metric) => metric.costPerUnit !== null) ?? [];
 
