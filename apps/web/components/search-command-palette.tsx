@@ -14,6 +14,21 @@ type SearchCommandPaletteProps = {
 
 type SearchFilter = "all" | "items" | "spaces" | "historical";
 
+type QuickAction = {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+};
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { id: "new-asset", label: "New Asset", description: "Track a new appliance, vehicle, or other asset", href: "/assets/new" },
+  { id: "new-project", label: "New Project", description: "Start a new home improvement or maintenance project", href: "/projects/new" },
+  { id: "new-hobby", label: "New Hobby", description: "Track a new hobby or activity", href: "/hobbies/new" },
+  { id: "new-idea", label: "New Idea", description: "Capture a new idea for later", href: "/ideas/new" },
+  { id: "new-inventory", label: "New Inventory Item", description: "Add a new item to your inventory", href: "/inventory/items/new" },
+];
+
 const FILTER_OPTIONS: Array<{ value: SearchFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "items", label: "Items" },
@@ -152,8 +167,18 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
 
   const householdId = searchParams.get("householdId") ?? fallbackHouseholdId;
   const normalizedCodeQuery = query.trim().toUpperCase();
+  const trimmedQuery = query.trim().toLowerCase();
   const canLookupSpaceCode = Boolean(householdId) && /^[A-Z0-9]{4,6}$/.test(normalizedCodeQuery);
-  const actionCount = canLookupSpaceCode ? 1 : 0;
+  const matchedQuickActions = useMemo(() => {
+    if (!householdId) return [];
+    if (!trimmedQuery) return QUICK_ACTIONS;
+    return QUICK_ACTIONS.filter((a) =>
+      a.label.toLowerCase().includes(trimmedQuery) || a.description.toLowerCase().includes(trimmedQuery)
+    );
+  }, [householdId, trimmedQuery]);
+  const spaceCodeActionCount = canLookupSpaceCode ? 1 : 0;
+  const quickActionCount = (!debouncedQuery || matchedQuickActions.length > 0) ? matchedQuickActions.length : 0;
+  const actionCount = spaceCodeActionCount + quickActionCount;
   const visibleGroups = useMemo(() => groups.filter((group) => {
     if (filter === "historical") {
       return group.entityType === "historical_inventory_item";
@@ -360,6 +385,16 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
         return;
       }
 
+      const quickActionIndex = activeIndex - spaceCodeActionCount;
+      if (quickActionIndex >= 0 && quickActionIndex < quickActionCount) {
+        const action = matchedQuickActions[quickActionIndex];
+        if (action) {
+          close();
+          router.push(action.href);
+          return;
+        }
+      }
+
       const resultIndex = activeIndex - actionCount;
 
       if (resultIndex >= 0 && results[resultIndex]) {
@@ -459,9 +494,7 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                       ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="search-palette__empty">Start typing to search across the household.</div>
-                )
+                ) : null
               ) : null}
 
               {householdId && debouncedQuery && isLoading ? (
@@ -497,7 +530,35 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                 </section>
               ) : null}
 
-              {householdId && debouncedQuery && !isLoading && !fetchError && visibleGroups.length === 0 ? (
+              {quickActionCount > 0 ? (
+                <section className="search-palette__group">
+                  <div className="search-palette__section-title">Create</div>
+                  <div className="search-palette__results">
+                    {matchedQuickActions.map((action, index) => {
+                      const absoluteIndex = spaceCodeActionCount + index;
+                      return (
+                        <button
+                          key={action.id}
+                          type="button"
+                          className={`search-palette__result${activeIndex === absoluteIndex ? " search-palette__result--active" : ""}`}
+                          onClick={() => {
+                            close();
+                            router.push(action.href);
+                          }}
+                          onMouseEnter={() => setActiveIndex(absoluteIndex)}
+                        >
+                          <span className="search-palette__result-heading">
+                            <span className="search-palette__result-title">{action.label}</span>
+                          </span>
+                          <span className="search-palette__result-subtitle">{action.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
+              {householdId && debouncedQuery && !isLoading && !fetchError && visibleGroups.length === 0 && actionCount === 0 ? (
                 <div className="search-palette__empty">No results found.</div>
               ) : null}
 

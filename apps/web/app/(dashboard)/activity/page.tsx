@@ -6,6 +6,7 @@ import { ApiError, getDisplayPreferences, getHouseholdActivity, getMe } from "..
 import { formatDateTime } from "../../../lib/formatters";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
 import { getEntityLabel, getEntityUrl, getEntityDisplayName } from "../../../lib/entity-url";
+import { PageHeader } from "../../../components/page-header";
 
 type ActivityPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -124,7 +125,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Activity</h1></header>
+          <PageHeader title="Activity" />
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
@@ -156,13 +157,11 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
 
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>Activity Log</h1>
-            <p style={{ marginTop: 6 }}>Household audit trail for assets, schedules, projects, invitations, and collaboration events.</p>
-          </div>
-          <HouseholdCsvExportButton householdId={household.id} dataset="activity-log" />
-        </header>
+        <PageHeader
+          title="Activity Log"
+          subtitle="Household audit trail for assets, schedules, projects, invitations, and collaboration events."
+          actions={<HouseholdCsvExportButton householdId={household.id} dataset="activity-log" />}
+        />
 
         <div className="page-body">
           <section className="panel">
@@ -267,7 +266,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
     if (error instanceof ApiError) {
       return (
         <>
-          <header className="page-header"><h1>Activity</h1></header>
+          <PageHeader title="Activity" />
           <div className="page-body">
             <div className="panel">
               <div className="panel__body--padded">

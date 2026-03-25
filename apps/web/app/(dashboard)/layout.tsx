@@ -1,28 +1,61 @@
 import type { JSX, ReactNode } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { getDisplayPreferences, getMe } from "../../lib/api";
+import { getDisplayPreferences, getHouseholdDashboard, getMe } from "../../lib/api";
 import { SearchCommandPaletteLazy } from "../../components/search-command-palette-lazy";
 import { RoutePrefetcher } from "../../components/route-prefetcher";
 import { RealtimeStatusIndicator } from "../../components/realtime-status-indicator";
-import { SidebarNav, type SidebarNavItem } from "../../components/sidebar-nav";
+import { SidebarNav, type SidebarNavGroup } from "../../components/sidebar-nav";
 import { TimezoneProvider } from "../../lib/timezone-context";
 import { DisplayPreferencesProvider } from "../../components/display-preferences-context";
 
-const navItems: Array<SidebarNavItem & { translationKey: string }> = [
-  { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" },
-  { href: "/ideas", label: "Ideas", translationKey: "ideas", icon: "lightbulb" },
-  { href: "/notes", label: "Notes", translationKey: "notes", icon: "file-text" },
-  { href: "/assets", label: "Assets", translationKey: "assets", icon: "box" },
-  { href: "/inventory", label: "Inventory", translationKey: "inventory", icon: "layers" },
-  { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
-  { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
-  { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
-  { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
-  { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
-  { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
-  { href: "/trash", label: "Trash", translationKey: "trash", icon: "trash" },
-];
+type NavItemDef = {
+  href: string;
+  label: string;
+  translationKey: string;
+  icon: string;
+};
+
+function buildNavGroups(
+  t: (key: string) => string,
+  badges: { maintenance: number; notifications: number },
+): SidebarNavGroup[] {
+  const item = (def: NavItemDef, badge?: number) => ({
+    href: def.href,
+    label: t(`nav.${def.translationKey}`),
+    icon: def.icon,
+    ...(badge && badge > 0 ? { badge } : {}),
+  });
+
+  const dashboard: NavItemDef = { href: "/", label: "Dashboard", translationKey: "dashboard", icon: "grid" };
+  const capture: NavItemDef[] = [
+    { href: "/ideas", label: "Ideas", translationKey: "ideas", icon: "lightbulb" },
+    { href: "/notes", label: "Notes", translationKey: "notes", icon: "file-text" },
+  ];
+  const manage: NavItemDef[] = [
+    { href: "/assets", label: "Assets", translationKey: "assets", icon: "box" },
+    { href: "/inventory", label: "Inventory", translationKey: "inventory", icon: "layers" },
+    { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
+    { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
+    { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
+  ];
+  const insights: NavItemDef[] = [
+    { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
+    { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
+    { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
+  ];
+  const tools: NavItemDef[] = [
+    { href: "/trash", label: "Trash", translationKey: "trash", icon: "trash" },
+  ];
+
+  return [
+    { label: null, items: [item(dashboard)] },
+    { label: t("nav.groupCapture"), items: capture.map((d) => item(d)) },
+    { label: t("nav.groupManage"), items: manage.map((d) => item(d, d.href === "/maintenance" ? badges.maintenance : undefined)) },
+    { label: t("nav.groupInsights"), items: insights.map((d) => item(d)) },
+    { label: null, items: tools.map((d) => item(d)) },
+  ];
+}
 
 const prefetchedRoutes = [
   "/ideas",
@@ -41,6 +74,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   let userRole = "Member";
   let fallbackHouseholdId: string | null = null;
   let householdTimezone = "America/New_York";
+  let maintenanceBadge = 0;
 
   const [displayPreferences] = await Promise.allSettled([getDisplayPreferences()]);
   const resolvedDisplayPreferences = displayPreferences.status === "fulfilled" ? displayPreferences.value : { pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" };
@@ -51,9 +85,23 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     userRole = me.households[0] ? "Owner" : "Member";
     fallbackHouseholdId = me.households[0]?.id ?? null;
     householdTimezone = me.households[0]?.timezone ?? "America/New_York";
+
+    if (fallbackHouseholdId) {
+      try {
+        const dashboard = await getHouseholdDashboard(fallbackHouseholdId);
+        maintenanceBadge = dashboard.stats.overdueScheduleCount + dashboard.stats.dueScheduleCount;
+      } catch {
+        // Badge counts are best-effort
+      }
+    }
   } catch {
     // Shell still renders even if user fetch fails.
   }
+
+  const navGroups = buildNavGroups(t, {
+    maintenance: maintenanceBadge,
+    notifications: 0,
+  });
 
   const initials = userName
     .split(/\s+/)
@@ -69,7 +117,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <p>{t("brand.tagline")}</p>
         </div>
 
-        <SidebarNav navItems={navItems.map((item) => ({ ...item, label: t(`nav.${item.translationKey}`) }))} householdId={fallbackHouseholdId} />
+        <SidebarNav groups={navGroups} householdId={fallbackHouseholdId} />
 
         <div className="sidebar__footer">
           <div className="sidebar__user">

@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import { ApiError, getMe, getNoteTemplates } from "../../../../lib/api";
 import { NoteTemplateManager } from "../../../../components/note-template-manager";
+import { PageHeader } from "../../../../components/page-header";
 
 export default async function NoteTemplatesPage(): Promise<JSX.Element> {
   try {
@@ -19,14 +20,10 @@ export default async function NoteTemplatesPage(): Promise<JSX.Element> {
 
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>Note Templates</h1>
-            <p className="note">
-              Reusable note structures for common workflows. Built-in templates are read-only.
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Note Templates"
+          subtitle="Reusable note structures for common workflows. Built-in templates are read-only."
+        />
 
         <div className="page-body">
           <NoteTemplateManager

@@ -4,6 +4,7 @@ import type { PrismaExecutor } from "./prisma-types.js";
 
 
 export class ForbiddenError extends Error {
+  statusCode = 403;
   constructor(message = "FORBIDDEN") {
     super(message);
   }

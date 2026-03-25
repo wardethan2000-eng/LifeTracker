@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import { ApiError, getCanvases, getMe, getNoteFolders, getEntries, getNoteTemplates } from "../../../lib/api";
 import { NotesHub } from "../../../components/notes-hub";
+import { PageHeader } from "../../../components/page-header";
 
 export default async function NotesPage(): Promise<JSX.Element> {
   try {
@@ -24,14 +25,10 @@ export default async function NotesPage(): Promise<JSX.Element> {
 
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>Notes</h1>
-            <p className="note">
-              Capture, organize, and develop your thoughts across all areas of LifeKeeper.
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Notes"
+          subtitle="Capture, organize, and develop your thoughts across all areas of LifeKeeper."
+        />
 
         <div className="page-body">
           <NotesHub

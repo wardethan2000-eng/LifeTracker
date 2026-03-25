@@ -8,6 +8,7 @@ import {
 } from "../../actions";
 import { ApiError, getHouseholdInvitations, getMe } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/formatters";
+import { PageHeader } from "../../../components/page-header";
 
 type InvitationsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -25,7 +26,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Invitations</h1></header>
+          <PageHeader title="Invitations" />
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
@@ -37,12 +38,10 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
 
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>Household Invitations</h1>
-            <p style={{ marginTop: 6 }}>Invite members by email, share the generated token manually, and track pending or accepted invites.</p>
-          </div>
-        </header>
+        <PageHeader
+          title="Household Invitations"
+          subtitle="Invite members by email, share the generated token manually, and track pending or accepted invites."
+        />
 
         <div className="page-body" style={{ display: "grid", gap: "24px" }}>
           <section className="panel">
@@ -132,7 +131,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
     if (error instanceof ApiError) {
       return (
         <>
-          <header className="page-header"><h1>Invitations</h1></header>
+          <PageHeader title="Invitations" />
           <div className="page-body">
             <div className="panel">
               <div className="panel__body--padded">

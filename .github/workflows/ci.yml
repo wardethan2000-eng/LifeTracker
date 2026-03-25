@@ -13,13 +13,44 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.6.3
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm typecheck
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Type check all packages first — catches compile errors before running tests
+      - name: Type check
+        run: pnpm typecheck
+
+      # Build all packages — verifies nothing is broken at the compilation level
+      - name: Build
+        run: pnpm build
+
+      # Run the full test suite with coverage and enforce thresholds
+      - name: Test (with coverage)
+        run: pnpm test:coverage
+
+      # Upload coverage artifacts for local inspection (optional future Codecov integration)
+      - name: Upload API coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api/coverage/lcov.info
+          retention-days: 7
+
+      - name: Upload web coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: apps/web/coverage/lcov.info
+          retention-days: 7

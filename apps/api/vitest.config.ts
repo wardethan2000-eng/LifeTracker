@@ -11,7 +11,15 @@ export default {
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      reportsDirectory: "./coverage"
+      reportsDirectory: "./coverage",
+      // Enforce a minimum floor — tighten these upward over time as coverage improves.
+      // These are calibrated to the existing suite; if CI fails here, a regression occurred.
+      thresholds: {
+        lines: 22,
+        functions: 44,
+        branches: 40,
+        statements: 22
+      }
     }
   },
   resolve: {

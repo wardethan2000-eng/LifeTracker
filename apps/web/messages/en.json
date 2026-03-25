@@ -19,7 +19,10 @@
       "providers": "Providers",
       "ideas": "Ideas",
       "notes": "Notes",
-      "trash": "Recently Deleted"
+      "trash": "Recently Deleted",
+      "groupCapture": "Capture",
+      "groupManage": "Manage",
+      "groupInsights": "Insights"
     },
     "actions": {
       "cancel": "Cancel",

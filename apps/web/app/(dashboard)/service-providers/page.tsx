@@ -6,6 +6,8 @@ import {
   updateServiceProviderAction
 } from "../../actions";
 import { ApiError, getHouseholdServiceProviders, getMe } from "../../../lib/api";
+import { PageHeader } from "../../../components/page-header";
+import { EmptyState } from "../../../components/empty-state";
 
 type ServiceProvidersPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -25,7 +27,7 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
     if (!household) {
       return (
         <>
-          <header className="page-header"><h1>Service Providers</h1></header>
+          <PageHeader title="Service Providers" />
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
           </div>
@@ -37,12 +39,10 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
 
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>Service Providers</h1>
-            <p style={{ marginTop: 6 }}>Manage contractors, shops, installers, and vendors used across maintenance work.</p>
-          </div>
-        </header>
+        <PageHeader
+          title="Service Providers"
+          subtitle="Manage contractors, shops, installers, and vendors used across maintenance work."
+        />
 
         <div className="page-body">
           <section className="panel">
@@ -75,7 +75,11 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
             </div>
             <div className="panel__body">
               {providers.length === 0 ? (
-                <p className="panel__empty">No providers saved yet.</p>
+                <EmptyState
+                  icon="wrench"
+                  title="No providers yet"
+                  message="Add a contractor, shop, or vendor to start tracking your service providers."
+                />
               ) : (
                 <div className="schedule-stack">
                   {providers.map((provider) => (
@@ -118,7 +122,7 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
     if (error instanceof ApiError) {
       return (
         <>
-          <header className="page-header"><h1>Service Providers</h1></header>
+          <PageHeader title="Service Providers" />
           <div className="page-body">
             <div className="panel">
               <div className="panel__body--padded">

@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { ApiError, getHouseholdIdeas, getMe } from "../../../lib/api";
 import { IdeaList } from "../../../components/idea-list";
 import { IdeaLocalMigration } from "../../../components/idea-local-migration";
+import { PageHeader } from "../../../components/page-header";
 
 export default async function IdeasPage(): Promise<JSX.Element> {
   try {
@@ -12,9 +13,7 @@ export default async function IdeasPage(): Promise<JSX.Element> {
     if (!household) {
       return (
         <>
-          <header className="page-header">
-            <div><h1>Ideas</h1></div>
-          </header>
+          <PageHeader title="Ideas" />
           <div className="page-body">
             <p>No household found. <Link href="/" className="text-link">Go to Dashboard</Link> to create one.</p>
           </div>
@@ -26,19 +25,15 @@ export default async function IdeasPage(): Promise<JSX.Element> {
 
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>Ideas</h1>
-            <p className="note">
-              Capture thoughts, concepts, and materials before they become plans or projects.
-            </p>
-          </div>
-          <div className="page-header__actions">
+        <PageHeader
+          title="Ideas"
+          subtitle="Capture thoughts, concepts, and materials before they become plans or projects."
+          actions={
             <Link href="/ideas/new" className="button button--primary">
               + New Idea
             </Link>
-          </div>
-        </header>
+          }
+        />
 
         <div className="page-body">
           <IdeaLocalMigration householdId={household.id} />
@@ -50,9 +45,7 @@ export default async function IdeasPage(): Promise<JSX.Element> {
     if (error instanceof ApiError) {
       return (
         <>
-          <header className="page-header">
-            <div><h1>Ideas</h1></div>
-          </header>
+          <PageHeader title="Ideas" />
           <div className="page-body">
             <section className="panel">
               <div className="panel__body--padded">

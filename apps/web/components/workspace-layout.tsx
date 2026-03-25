@@ -19,7 +19,7 @@ type BreadcrumbItem = {
 };
 
 type WorkspaceLayoutProps = {
-  entityType: "project" | "hobby" | "plan";
+  entityType: "project" | "hobby" | "plan" | "idea" | "provider";
   title: string;
   status?: string;
   statusVariant?: "success" | "warning" | "muted" | "info" | "accent" | "danger";

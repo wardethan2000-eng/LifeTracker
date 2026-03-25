@@ -20,7 +20,20 @@ const apiMocks = vi.hoisted(() => ({
   createInventoryItem: vi.fn(),
   completeSchedule: vi.fn(),
   createMaintenanceLog: vi.fn(),
-  createSchedule: vi.fn()
+  createSchedule: vi.fn(),
+  // Ideas
+  createIdea: vi.fn(),
+  updateIdea: vi.fn(),
+  deleteIdea: vi.fn(),
+  permanentlyDeleteIdea: vi.fn(),
+  addIdeaNote: vi.fn(),
+  removeIdeaNote: vi.fn(),
+  addIdeaLink: vi.fn(),
+  removeIdeaLink: vi.fn(),
+  updateIdeaStage: vi.fn(),
+  promoteIdea: vi.fn(),
+  demoteToIdea: vi.fn(),
+  createEntry: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({
@@ -59,7 +72,20 @@ vi.mock("../lib/api", async (importOriginal) => {
     createInventoryItem: apiMocks.createInventoryItem,
     completeSchedule: apiMocks.completeSchedule,
     createMaintenanceLog: apiMocks.createMaintenanceLog,
-    createSchedule: apiMocks.createSchedule
+    createSchedule: apiMocks.createSchedule,
+    // Ideas
+    createIdea: apiMocks.createIdea,
+    updateIdea: apiMocks.updateIdea,
+    deleteIdea: apiMocks.deleteIdea,
+    permanentlyDeleteIdea: apiMocks.permanentlyDeleteIdea,
+    addIdeaNote: apiMocks.addIdeaNote,
+    removeIdeaNote: apiMocks.removeIdeaNote,
+    addIdeaLink: apiMocks.addIdeaLink,
+    removeIdeaLink: apiMocks.removeIdeaLink,
+    updateIdeaStage: apiMocks.updateIdeaStage,
+    promoteIdea: apiMocks.promoteIdea,
+    demoteToIdea: apiMocks.demoteToIdea,
+    createEntry: apiMocks.createEntry,
   };
 });
 
@@ -70,7 +96,17 @@ import {
   cloneProjectAction,
   createInventoryItemAction,
   createLogAction,
-  createScheduleAction
+  createScheduleAction,
+  createIdeaAction,
+  updateIdeaAction,
+  deleteIdeaAction,
+  permanentlyDeleteIdeaAction,
+  addIdeaNoteAction,
+  removeIdeaNoteAction,
+  addIdeaLinkAction,
+  removeIdeaLinkAction,
+  updateIdeaStageAction,
+  promoteIdeaAction,
 } from "./actions";
 
 beforeEach(() => {
@@ -86,6 +122,19 @@ beforeEach(() => {
   apiMocks.instantiateProjectTemplate.mockResolvedValue({ id: "clprojecttemplate000000001" });
   apiMocks.cloneProject.mockResolvedValue({ id: "clprojectclone000000000001" });
   apiMocks.getProjectDetail.mockResolvedValue({ phases: [{ id: "phase-loaded-from-project" }] });
+  // Ideas
+  apiMocks.createIdea.mockResolvedValue({ id: "clkeeperidea0000000000001", title: "Build a greenhouse" });
+  apiMocks.updateIdea.mockResolvedValue({ id: "clkeeperidea0000000000001" });
+  apiMocks.deleteIdea.mockResolvedValue(undefined);
+  apiMocks.permanentlyDeleteIdea.mockResolvedValue(undefined);
+  apiMocks.addIdeaNote.mockResolvedValue({ id: "clkeeperidea0000000000001", notes: [] });
+  apiMocks.removeIdeaNote.mockResolvedValue({ id: "clkeeperidea0000000000001", notes: [] });
+  apiMocks.addIdeaLink.mockResolvedValue({ id: "clkeeperidea0000000000001", links: [] });
+  apiMocks.removeIdeaLink.mockResolvedValue({ id: "clkeeperidea0000000000001", links: [] });
+  apiMocks.updateIdeaStage.mockResolvedValue({ id: "clkeeperidea0000000000001", stage: "validating" });
+  apiMocks.promoteIdea.mockResolvedValue({ createdEntity: { type: "project", id: "clprojectfromidea00000001" } });
+  apiMocks.demoteToIdea.mockResolvedValue({ id: "clkeeperidea0000000000001", title: "Promoted item" });
+  apiMocks.createEntry.mockResolvedValue({ id: "clkeeperentry000000000001" });
 });
 
 describe("server actions", () => {
@@ -303,5 +352,90 @@ describe("server actions", () => {
     expect(nextMocks.redirect).toHaveBeenCalledWith(
       "/projects/clprojectclone000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
     );
+  });
+});
+
+// ─── Idea server actions ──────────────────────────────────────────────────────
+
+const householdId = "clkeeperhouse000000000001";
+const ideaId = "clkeeperidea0000000000001";
+
+describe("idea actions", () => {
+  it("createIdeaAction calls createIdea and revalidates /ideas, returns new idea id", async () => {
+    const id = await createIdeaAction(householdId, { title: "Build a greenhouse" });
+
+    expect(apiMocks.createIdea).toHaveBeenCalledWith(householdId, { title: "Build a greenhouse" });
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/ideas");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${id}`);
+    expect(id).toBe("clkeeperidea0000000000001");
+  });
+
+  it("updateIdeaAction calls updateIdea and revalidates idea paths", async () => {
+    await updateIdeaAction(householdId, ideaId, { title: "Updated greenhouse" });
+
+    expect(apiMocks.updateIdea).toHaveBeenCalledWith(householdId, ideaId, { title: "Updated greenhouse" });
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("deleteIdeaAction calls deleteIdea and revalidates idea paths", async () => {
+    await deleteIdeaAction(householdId, ideaId);
+
+    expect(apiMocks.deleteIdea).toHaveBeenCalledWith(householdId, ideaId);
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/ideas");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("permanentlyDeleteIdeaAction calls permanentlyDeleteIdea and revalidates paths", async () => {
+    await permanentlyDeleteIdeaAction(householdId, ideaId);
+
+    expect(apiMocks.permanentlyDeleteIdea).toHaveBeenCalledWith(householdId, ideaId);
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/ideas");
+  });
+
+  it("addIdeaNoteAction calls addIdeaNote and revalidates idea paths", async () => {
+    await addIdeaNoteAction(householdId, ideaId, "Check zoning regulations");
+
+    expect(apiMocks.addIdeaNote).toHaveBeenCalledWith(householdId, ideaId, { text: "Check zoning regulations" });
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("removeIdeaNoteAction calls removeIdeaNote and revalidates idea paths", async () => {
+    await removeIdeaNoteAction(householdId, ideaId, "note-uuid-1");
+
+    expect(apiMocks.removeIdeaNote).toHaveBeenCalledWith(householdId, ideaId, "note-uuid-1");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("addIdeaLinkAction calls addIdeaLink with url and label", async () => {
+    await addIdeaLinkAction(householdId, ideaId, "https://example.com/greenhouse", "Greenhouse guide");
+
+    expect(apiMocks.addIdeaLink).toHaveBeenCalledWith(householdId, ideaId, {
+      url: "https://example.com/greenhouse",
+      label: "Greenhouse guide",
+    });
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("removeIdeaLinkAction calls removeIdeaLink and revalidates idea paths", async () => {
+    await removeIdeaLinkAction(householdId, ideaId, "link-uuid-1");
+
+    expect(apiMocks.removeIdeaLink).toHaveBeenCalledWith(householdId, ideaId, "link-uuid-1");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("updateIdeaStageAction calls updateIdeaStage and revalidates idea paths", async () => {
+    await updateIdeaStageAction(householdId, ideaId, "validating");
+
+    expect(apiMocks.updateIdeaStage).toHaveBeenCalledWith(householdId, ideaId, "validating");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith(`/ideas/${ideaId}`);
+  });
+
+  it("promoteIdeaAction calls promoteIdea, revalidates ideas and projects, returns entity", async () => {
+    const result = await promoteIdeaAction(householdId, ideaId, { target: "project" });
+
+    expect(apiMocks.promoteIdea).toHaveBeenCalledWith(householdId, ideaId, { target: "project" });
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/ideas");
+    expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/projects");
+    expect(result).toEqual({ type: "project", id: "clprojectfromidea00000001" });
   });
 });

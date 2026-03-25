@@ -10,10 +10,16 @@ export type SidebarNavItem = {
   href: string;
   label: string;
   icon: string;
+  badge?: number;
+};
+
+export type SidebarNavGroup = {
+  label: string | null;
+  items: SidebarNavItem[];
 };
 
 type SidebarNavProps = {
-  navItems: SidebarNavItem[];
+  groups: SidebarNavGroup[];
   householdId?: string | null;
 };
 
@@ -54,7 +60,7 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
   }
 };
 
-export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Element {
+export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Element {
   const pathname = usePathname();
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const quickAddRef = useRef<HTMLButtonElement>(null);
@@ -95,7 +101,10 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
         <span className="sidebar__collapse-label">Collapse</span>
       </button>
       <div className="sidebar__section-label">Main</div>
-      {navItems.map((item) => {
+      {groups.map((group, groupIndex) => (
+        <div key={group.label ?? groupIndex} className="sidebar__group">
+          {group.label ? <div className="sidebar__section-label">{group.label}</div> : null}
+          {group.items.map((item) => {
         const isAssetsCreatePath = pathname === "/assets/new" || pathname.startsWith("/assets/new/");
         const isActive = item.href === "/"
           ? pathname === "/"
@@ -115,6 +124,7 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
               >
                 <NavIcon icon={item.icon} />
                 <span className="sidebar__link-label">{item.label}</span>
+                {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
               </Link>
               <button
                 ref={quickAddRef}
@@ -146,9 +156,12 @@ export function SidebarNav({ navItems, householdId }: SidebarNavProps): JSX.Elem
           >
             <NavIcon icon={item.icon} />
             <span className="sidebar__link-label">{item.label}</span>
+            {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
           </Link>
         );
       })}
+        </div>
+      ))}
     </div>
   );
 }
