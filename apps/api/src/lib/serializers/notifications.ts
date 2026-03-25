@@ -2,7 +2,7 @@ import type { Notification } from "@prisma/client";
 import { householdNotificationListSchema, notificationSchema } from "@lifekeeper/types";
 
 export const toNotificationResponse = (
-  notification: Pick<Notification, "id" | "userId" | "householdId" | "assetId" | "scheduleId" | "dedupeKey" | "type" | "channel" | "status" | "title" | "body" | "scheduledFor" | "sentAt" | "readAt" | "escalationLevel" | "payload" | "createdAt" | "updatedAt">
+  notification: Pick<Notification, "id" | "userId" | "householdId" | "assetId" | "scheduleId" | "entryId" | "dedupeKey" | "type" | "channel" | "status" | "title" | "body" | "scheduledFor" | "sentAt" | "readAt" | "escalationLevel" | "payload" | "createdAt" | "updatedAt">
 ) => notificationSchema.parse({
   ...notification,
   scheduledFor: notification.scheduledFor.toISOString(),

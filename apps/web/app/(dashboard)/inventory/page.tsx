@@ -92,6 +92,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
   const activeTab = typeof params.tab === "string" && params.tab === "spaces" ? "spaces" : "inventory";
   const itemTypeFilter = typeof params.itemType === "string" && (params.itemType === "consumable" || params.itemType === "equipment") ? params.itemType : undefined;
+  const searchFilter = typeof params.search === "string" && params.search.length > 0 ? params.search : undefined;
+  const categoryFilter = typeof params.category === "string" && params.category.length > 0 ? params.category : undefined;
+  const sortParam = typeof params.sort === "string" ? params.sort : undefined;
   const isEquipmentView = itemTypeFilter === "equipment";
 
   try {
@@ -114,7 +117,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     const inventoryRedirectHref = `/inventory?householdId=${household.id}`;
 
     const [{ items }, lowStockItems, shoppingList, spaces] = await Promise.all([
-      getHouseholdInventory(household.id, { limit: 100, ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}) }),
+      getHouseholdInventory(household.id, {
+        limit: 100,
+        ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
+        ...(searchFilter ? { search: searchFilter } : {}),
+        ...(categoryFilter ? { category: categoryFilter } : {}),
+      }),
       getHouseholdLowStockInventory(household.id),
       getInventoryShoppingList(household.id),
       getHouseholdSpacesTree(household.id)
@@ -139,7 +147,18 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         .filter((value): value is string => Boolean(value))
     )).sort((left, right) => left.localeCompare(right));
 
-    const groupedItems = Array.from(items.reduce((groups, item) => {
+    const sortedItems = [...items].sort((a, b) => {
+      switch (sortParam) {
+        case "name-asc": return a.name.localeCompare(b.name);
+        case "name-desc": return b.name.localeCompare(a.name);
+        case "qty-asc": return a.quantityOnHand - b.quantityOnHand;
+        case "qty-desc": return b.quantityOnHand - a.quantityOnHand;
+        case "updated-desc": return b.updatedAt.localeCompare(a.updatedAt);
+        default: return 0;
+      }
+    });
+
+    const groupedItems = Array.from(sortedItems.reduce((groups, item) => {
       const label = item.category?.trim() || "Uncategorized";
       const existingGroup = groups.get(label);
 
@@ -228,7 +247,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
           {activeTab === "inventory" ? (
             <>
-              <InventoryFilterBar currentFilter={itemTypeFilter ?? "all"} />
+              <InventoryFilterBar currentFilter={itemTypeFilter ?? "all"} categoryOptions={categoryOptions} />
 
               {!isEquipmentView ? (
                 <>

@@ -48,6 +48,10 @@ describe("project notifications", () => {
       notification: {
         create: createMock,
         findFirst: async () => null
+      },
+      entry: {
+        findMany: async () => [],
+        update: async () => ({})
       }
     } as never, {
       householdId,
@@ -114,6 +118,10 @@ describe("project notifications", () => {
       notification: {
         create: createMock,
         findFirst: async () => null
+      },
+      entry: {
+        findMany: async () => [],
+        update: async () => ({})
       }
     } as never, {
       householdId,

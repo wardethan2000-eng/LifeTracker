@@ -201,6 +201,9 @@ import {
   type InventoryPurchase,
   type InventoryShoppingListSummary,
   type AddSpaceItemInput,
+  type BulkDeleteInventoryItems,
+  type BulkAdjustInventoryItems,
+  type UpdateInventoryPurchaseBody,
   type CreateInventoryItemInput,
   type CreateSpaceInput,
   type CreateQuickRestockInput,
@@ -991,6 +994,18 @@ export const getEntries = async (
 
   if (query?.folderId) {
     params.set("folderId", query.folderId);
+  }
+
+  if (query?.hasReminder !== undefined) {
+    params.set("hasReminder", String(query.hasReminder));
+  }
+
+  if (query?.reminderAfter) {
+    params.set("reminderAfter", query.reminderAfter);
+  }
+
+  if (query?.reminderBefore) {
+    params.set("reminderBefore", query.reminderBefore);
   }
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
@@ -2578,6 +2593,51 @@ export const updateInventoryItem = async (
 export const deleteInventoryItem = async (householdId: string, inventoryItemId: string): Promise<void> => {
   await apiRequest({
     path: `/v1/households/${householdId}/inventory/${inventoryItemId}`,
+    method: "DELETE"
+  });
+};
+
+export const getHouseholdInventoryTrash = async (householdId: string): Promise<InventoryItemSummary[]> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/trash`,
+  schema: inventoryItemSummarySchema.array()
+});
+
+export const bulkDeleteInventoryItems = async (householdId: string, input: BulkDeleteInventoryItems): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/inventory/bulk-delete`,
+    method: "POST",
+    body: input
+  });
+};
+
+export const bulkAdjustInventoryItems = async (householdId: string, input: BulkAdjustInventoryItems): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/inventory/bulk-adjust`,
+    method: "POST",
+    body: input
+  });
+};
+
+export const duplicateInventoryItem = async (householdId: string, inventoryItemId: string): Promise<InventoryItemSummary> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/${inventoryItemId}/duplicate`,
+  method: "POST",
+  schema: inventoryItemSummarySchema
+});
+
+export const updateInventoryPurchase = async (
+  householdId: string,
+  purchaseId: string,
+  input: UpdateInventoryPurchaseBody
+): Promise<InventoryPurchase> => apiRequest({
+  path: `/v1/households/${householdId}/inventory/purchases/${purchaseId}`,
+  method: "PATCH",
+  body: input,
+  schema: inventoryPurchaseSchemaResponse
+});
+
+export const deleteInventoryPurchase = async (householdId: string, purchaseId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/inventory/purchases/${purchaseId}`,
     method: "DELETE"
   });
 };

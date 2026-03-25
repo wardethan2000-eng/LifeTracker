@@ -150,27 +150,30 @@ function PurchaseLineRow({ householdId, purchaseId, line, redirectTo }: {
 }
 
 export function InventoryShoppingListSection({ householdId, shoppingList, redirectTo }: InventoryShoppingListSectionProps): JSX.Element {
+  const [collapsed, setCollapsed] = useState(true);
+
   return (
     <section className="panel">
-      <div className="panel__header">
+      <div className="panel__header" style={{ cursor: "pointer" }} onClick={() => setCollapsed((v) => !v)}>
         <div>
-          <h2>Shopping List / Reorder Cart</h2>
+          <h2>Shopping List / Reorder Cart <span className="panel__collapse-indicator">{collapsed ? "▸" : "▾"}</span></h2>
           <div className="data-table__secondary">
             {shoppingList.lineCount} line{shoppingList.lineCount === 1 ? "" : "s"} across {shoppingList.supplierCount} supplier{shoppingList.supplierCount === 1 ? "" : "s"}
             {shoppingList.totalEstimatedCost !== null ? ` • ${formatCurrency(shoppingList.totalEstimatedCost, "$0.00")} estimated` : ""}
           </div>
         </div>
-        <div className="panel__header-actions">
+        <div className="panel__header-actions" onClick={(e) => e.stopPropagation()}>
           <form action={generateInventoryShoppingListAction}>
             <input type="hidden" name="householdId" value={householdId} />
             <button type="submit" className="button button--primary button--sm">Generate Shopping List</button>
           </form>
         </div>
       </div>
-      <div className="panel__body">
-        {shoppingList.purchaseCount === 0 ? (
-          <p className="panel__empty">No active reorder carts yet. Generate one from the low-stock watchlist or use Quick Restock below.</p>
-        ) : (
+      {!collapsed && (
+        <div className="panel__body">
+          {shoppingList.purchaseCount === 0 ? (
+            <p className="panel__empty">No active reorder carts yet. Generate one from the low-stock watchlist or use Quick Restock below.</p>
+          ) : (
           <div className="purchase-group-list">
             {shoppingList.purchases.map((purchase) => (
               <section key={purchase.id} className="purchase-group">
@@ -218,7 +221,8 @@ export function InventoryShoppingListSection({ householdId, shoppingList, redire
             ))}
           </div>
         )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

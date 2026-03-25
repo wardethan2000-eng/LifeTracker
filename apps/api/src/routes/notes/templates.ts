@@ -1,54 +1,18 @@
 ﻿import {
   createNoteTemplateSchema,
-  noteTemplateSchema,
   updateNoteTemplateSchema,
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { createActivityLogger } from "../../lib/activity-log.js";
-import { parseTags } from "../../lib/prisma-json.js";
 import { notFound } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
 import { householdParamsSchema } from "../../lib/schemas.js";
+import { toNoteTemplateResponse } from "../../lib/serializers/index.js";
 
 const templateParamsSchema = householdParamsSchema.extend({
   templateId: z.string().cuid()
-});
-
-const parseFlags = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value.filter((t): t is string => typeof t === "string");
-  return [];
-};
-
-const toTemplateResponse = (t: {
-  id: string;
-  householdId: string;
-  name: string;
-  description: string | null;
-  bodyTemplate: string;
-  entryType: string;
-  defaultTags: unknown;
-  defaultFlags: unknown;
-  isBuiltIn: boolean;
-  sortOrder: number;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) => noteTemplateSchema.parse({
-  id: t.id,
-  householdId: t.householdId,
-  name: t.name,
-  description: t.description,
-  bodyTemplate: t.bodyTemplate,
-  entryType: t.entryType,
-  defaultTags: parseTags(t.defaultTags),
-  defaultFlags: parseFlags(t.defaultFlags),
-  isBuiltIn: t.isBuiltIn,
-  sortOrder: t.sortOrder,
-  createdById: t.createdById,
-  createdAt: t.createdAt.toISOString(),
-  updatedAt: t.updatedAt.toISOString()
 });
 
 export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
@@ -63,7 +27,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       orderBy: [{ isBuiltIn: "desc" }, { sortOrder: "asc" }, { name: "asc" }]
     });
 
-    return templates.map(toTemplateResponse);
+    return templates.map(toNoteTemplateResponse);
   });
 
   // GET /v1/households/:householdId/note-templates/:templateId
@@ -78,7 +42,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, "Template");
     }
 
-    return toTemplateResponse(template);
+    return toNoteTemplateResponse(template);
   });
 
   // POST /v1/households/:householdId/note-templates — create custom template
@@ -106,7 +70,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
         await createActivityLogger(app.prisma, userId).log("note_template", template.id, "note_template_created", householdId, { name: template.name });
 
     reply.code(201);
-    return toTemplateResponse(template);
+    return toNoteTemplateResponse(template);
   });
 
   // PATCH /v1/households/:householdId/note-templates/:templateId — update (not built-in)
@@ -142,7 +106,7 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
 
         await createActivityLogger(app.prisma, userId).log("note_template", template.id, "note_template_updated", householdId, { name: template.name });
 
-    return toTemplateResponse(template);
+    return toNoteTemplateResponse(template);
   });
 
   // DELETE /v1/households/:householdId/note-templates/:templateId — soft delete (not built-in)
@@ -168,6 +132,6 @@ export const noteTemplateRoutes: FastifyPluginAsync = async (app) => {
 
         await createActivityLogger(app.prisma, userId).log("note_template", templateId, "note_template_deleted", householdId, { name: existing.name });
 
-    return { success: true };
+    return reply.code(204).send();
   });
 };

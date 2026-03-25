@@ -10,6 +10,7 @@ import { IdeaProvenanceCard } from "../../../../components/idea-provenance-card"
 import { IdeaMaterialsCard } from "../../../../components/idea-materials-card";
 import { IdeaStepsCard } from "../../../../components/idea-steps-card";
 import { NotesAndCanvasCard } from "../../../../components/notes-canvas-card";
+import { PinnedNotesCard } from "../../../../components/pinned-notes-card";
 
 const priorityLabels: Record<string, string> = {
   low: "Low",
@@ -32,7 +33,7 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
       return <p>No household found. <Link href="/ideas" className="text-link">← Ideas</Link>.</p>;
     }
 
-    const [idea, entriesResult, canvases] = await Promise.all([
+    const [idea, entriesResult, canvases, pinnedResult] = await Promise.all([
       getIdea(household.id, ideaId),
       getEntries(household.id, {
         entityType: "idea",
@@ -42,6 +43,7 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
         excludeFlags: ["archived"],
       }).catch(() => ({ items: [], nextCursor: null })),
       getCanvasesByEntity(household.id, "idea", ideaId).catch(() => []),
+      getEntries(household.id, { entityType: "idea", entityId: ideaId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
     ]);
 
     const rawNote = entriesResult.items[0] ?? null;
@@ -73,6 +75,7 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
         </div>
 
         {/* Two-column layout */}
+        <PinnedNotesCard householdId={household.id} entries={pinnedResult.items} />
         <div className="resource-layout">
           <div className="resource-layout__primary">
             <IdeaDescriptionCard

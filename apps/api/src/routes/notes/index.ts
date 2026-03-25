@@ -9,6 +9,7 @@ import { createActivityLogger } from "../../lib/activity-log.js";
 import { notFound } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
 import { householdParamsSchema } from "../../lib/schemas.js";
+import { toNoteFolderResponse, toNoteFolderWithCountsResponse } from "../../lib/serializers/index.js";
 
 const folderParamsSchema = householdParamsSchema.extend({
   folderId: z.string().cuid()
@@ -51,20 +52,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    return folders.map((f: typeof folders[number]) => ({
-      id: f.id,
-      householdId: f.householdId,
-      parentFolderId: f.parentFolderId,
-      name: f.name,
-      color: f.color,
-      icon: f.icon,
-      sortOrder: f.sortOrder,
-      createdById: f.createdById,
-      createdAt: f.createdAt.toISOString(),
-      updatedAt: f.updatedAt.toISOString(),
-      entryCount: f._count.entries,
-      childCount: f._count.children
-    }));
+    return folders.map(toNoteFolderWithCountsResponse);
   });
 
   // POST /v1/households/:householdId/note-folders — create folder
@@ -105,18 +93,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
         await createActivityLogger(app.prisma, userId).log("note_folder", folder.id, "note_folder_created", householdId, { name: folder.name });
 
     reply.code(201);
-    return {
-      id: folder.id,
-      householdId: folder.householdId,
-      parentFolderId: folder.parentFolderId,
-      name: folder.name,
-      color: folder.color,
-      icon: folder.icon,
-      sortOrder: folder.sortOrder,
-      createdById: folder.createdById,
-      createdAt: folder.createdAt.toISOString(),
-      updatedAt: folder.updatedAt.toISOString()
-    };
+    return toNoteFolderResponse(folder);
   });
 
   // PATCH /v1/households/:householdId/note-folders/:folderId — update folder
@@ -181,18 +158,7 @@ export const noteFolderRoutes: FastifyPluginAsync = async (app) => {
 
         await createActivityLogger(app.prisma, userId).log("note_folder", folder.id, "note_folder_updated", householdId, { name: folder.name });
 
-    return {
-      id: folder.id,
-      householdId: folder.householdId,
-      parentFolderId: folder.parentFolderId,
-      name: folder.name,
-      color: folder.color,
-      icon: folder.icon,
-      sortOrder: folder.sortOrder,
-      createdById: folder.createdById,
-      createdAt: folder.createdAt.toISOString(),
-      updatedAt: folder.updatedAt.toISOString()
-    };
+    return toNoteFolderResponse(folder);
   });
 
   // DELETE /v1/households/:householdId/note-folders/:folderId — soft delete folder

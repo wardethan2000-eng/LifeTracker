@@ -4,10 +4,6 @@ import type { InventoryItemConsumption, InventoryItemSummary } from "@lifekeeper
 import Link from "next/link";
 import type { JSX, MouseEvent, ReactNode } from "react";
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ExpandableCard } from "./expandable-card";
-import { InventoryItemEditForm } from "./inventory-item-edit-form";
-import { AttachmentSection } from "./attachment-section";
 import { formatCurrency, formatDate } from "../lib/formatters";
 
 type InventoryEditableRowProps = {
@@ -28,19 +24,8 @@ const formatConsumptionRate = (value: number | null, unit: string): string => {
   return `~${value.toFixed(1)} ${unit}/month`;
 };
 
-const getAnalyticsLink = (householdId: string): string => {
-  const query = new URLSearchParams({
-    householdId,
-    view: "analytics",
-    section: "turnover"
-  });
-
-  return `/inventory?${query.toString()}`;
-};
-
-export function InventoryEditableRow({ householdId, item, className, defaultOpen = false, analytics = null, columnCount = 7, children }: InventoryEditableRowProps): JSX.Element {
-  const [editing, setEditing] = useState(defaultOpen);
-  const router = useRouter();
+export function InventoryEditableRow({ householdId, item, className, defaultOpen = false, analytics = null, columnCount = 6, children }: InventoryEditableRowProps): JSX.Element {
+  const [open, setOpen] = useState(defaultOpen);
 
   const handleClick = useCallback((event: MouseEvent<HTMLTableRowElement>) => {
     const target = event.target as HTMLElement;
@@ -49,13 +34,8 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
       return;
     }
 
-    setEditing((current) => !current);
+    setOpen((current) => !current);
   }, []);
-
-  const handleSaved = useCallback(() => {
-    setEditing(false);
-    router.refresh();
-  }, [router]);
 
   const costTrendTotals = analytics
     ? analytics.costTrend.reduce((sum, entry) => ({
@@ -73,79 +53,72 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
         className={className}
         style={{ cursor: "pointer" }}
         onClick={handleClick}
-        title={editing ? "Click to collapse" : "Click to edit"}
+        title={open ? "Click to collapse" : "Click to expand"}
       >
         {children}
       </tr>
-      {editing && (
-        <tr>
-          <td colSpan={columnCount} style={{ padding: "12px 0 0" }}>
-            <ExpandableCard
-              title={`Edit ${item.name}`}
-              modalTitle={`Edit ${item.name}`}
-              open={editing}
-              onOpenChange={setEditing}
-              previewContent={(
-                analytics ? (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    <div className="analytics-detail-grid">
-                      <div>
-                        <div className="data-table__primary">Average consumption rate</div>
-                        <div className="data-table__secondary">{formatConsumptionRate(analytics.averageConsumptionPerMonth, item.unit)}</div>
-                      </div>
-                      <div>
-                        <div className="data-table__primary">Projected depletion</div>
-                        <div className="data-table__secondary">
-                          {analytics.projectedDepletionDate ? `Stock runs out ~${formatDate(analytics.projectedDepletionDate, "—")}` : "No consumption trend"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="data-table__primary">Projected reorder</div>
-                        <div className="data-table__secondary">
-                          {item.reorderThreshold === null
-                            ? "No threshold set"
-                            : analytics.projectedReorderDate
-                              ? `Reorder needed by ~${formatDate(analytics.projectedReorderDate, "—")}`
-                              : "No consumption trend"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="data-table__primary">Cost trend</div>
-                        <div className="data-table__secondary">Avg cost: {formatCurrency(averageCost, "—")} (last 12 months)</div>
-                      </div>
-                    </div>
-                    <Link href={getAnalyticsLink(householdId)} className="data-table__link">View full analytics</Link>
+      <tr className="inventory-row-expand-wrapper" aria-hidden={!open}>
+        <td colSpan={columnCount} style={{ padding: 0, border: "none" }}>
+          <div className={`inventory-row-expand${open ? " inventory-row-expand--open" : ""}`}>
+            <div>
+              <div className="inventory-row-expand__body">
+                <div className="inventory-row-expand__grid">
+                  <div>
+                    <span className="inventory-row-expand__label">Reorder At</span>
+                    <span className="inventory-row-expand__value">{item.reorderThreshold !== null ? `${item.reorderThreshold} ${item.unit}` : "—"}</span>
                   </div>
-                ) : (
-                  <div className="compact-preview">
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-                      <span className="compact-preview__pill">{item.quantityOnHand} {item.unit} on hand</span>
-                      <span className="compact-preview__pill">{formatCurrency(item.unitCost, "No price")}</span>
-                      <span className="compact-preview__pill">{item.preferredSupplier ?? "No supplier"}</span>
-                    </div>
-                    <p className="compact-preview__overflow">Update stock, pricing, reorder rules, and attachments inline.</p>
+                  <div>
+                    <span className="inventory-row-expand__label">Restock Qty</span>
+                    <span className="inventory-row-expand__value">{item.reorderQuantity !== null ? `${item.reorderQuantity} ${item.unit}` : "—"}</span>
                   </div>
-                )
-              )}
-            >
-              <InventoryItemEditForm
-                householdId={householdId}
-                item={item}
-                onSaved={handleSaved}
-                onCancel={() => setEditing(false)}
-              />
-              <div style={{ marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                <AttachmentSection
-                  householdId={householdId}
-                  entityType="inventory_item"
-                  entityId={item.id}
-                  compact
-                />
+                  <div>
+                    <span className="inventory-row-expand__label">Last Price</span>
+                    <span className="inventory-row-expand__value">{formatCurrency(item.unitCost, "—")}</span>
+                  </div>
+                  <div>
+                    <span className="inventory-row-expand__label">Supplier</span>
+                    <span className="inventory-row-expand__value">{item.preferredSupplier ?? "—"}</span>
+                  </div>
+                  {item.conditionStatus && (
+                    <div>
+                      <span className="inventory-row-expand__label">Condition</span>
+                      <span className="inventory-row-expand__value">{item.conditionStatus.replace(/_/g, " ")}</span>
+                    </div>
+                  )}
+                  {item.supplierUrl && (
+                    <div>
+                      <span className="inventory-row-expand__label">Buy Link</span>
+                      <a href={item.supplierUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: "0.8rem" }}>Visit supplier ↗</a>
+                    </div>
+                  )}
+                </div>
+                {analytics && (
+                  <div className="inventory-row-expand__analytics">
+                    <span className="inventory-row-expand__label">Consumption</span>
+                    <span className="inventory-row-expand__value">{formatConsumptionRate(analytics.averageConsumptionPerMonth, item.unit)}</span>
+                    {analytics.projectedDepletionDate && (
+                      <>
+                        <span className="inventory-row-expand__label">Depletion</span>
+                        <span className="inventory-row-expand__value">~{formatDate(analytics.projectedDepletionDate, "—")}</span>
+                      </>
+                    )}
+                    {averageCost !== null && (
+                      <>
+                        <span className="inventory-row-expand__label">Avg Cost</span>
+                        <span className="inventory-row-expand__value">{formatCurrency(averageCost, "—")}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                {item.notes && (
+                  <p className="inventory-row-expand__notes">{item.notes.length > 120 ? `${item.notes.slice(0, 120)}…` : item.notes}</p>
+                )}
+                <Link href={`/inventory/${item.id}?householdId=${householdId}`} className="button button--ghost button--sm" style={{ marginTop: 8 }}>Open full editor →</Link>
               </div>
-            </ExpandableCard>
-          </td>
-        </tr>
-      )}
+            </div>
+          </div>
+        </td>
+      </tr>
     </>
   );
 }

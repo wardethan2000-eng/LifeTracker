@@ -12,6 +12,7 @@ export * from "./ideas.js";
 export * from "./invitations.js";
 export * from "./inventory.js";
 export * from "./maintenance-logs.js";
+export * from "./notes.js";
 export * from "./notifications.js";
 export * from "./project-analytics.js";
 export * from "./projects.js";

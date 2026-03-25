@@ -9,6 +9,7 @@ import {
 } from "../../../../lib/api";
 import { AssetOverviewTab } from "../../../../components/asset-overview-tab";
 import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
+import { PinnedNotesCard } from "../../../../components/pinned-notes-card";
 
 type AssetOverviewPageProps = {
   params: Promise<{ assetId: string }>;
@@ -24,10 +25,11 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
 
   const householdId = detail.asset.householdId;
 
-  const [sourceIdea, entriesResult, canvases] = await Promise.all([
+  const [sourceIdea, entriesResult, canvases, pinnedResult] = await Promise.all([
     getSourceIdea(householdId, "asset", assetId).catch(() => null),
     getEntries(householdId, { entityType: "asset", entityId: assetId, limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
     getCanvasesByEntity(householdId, "asset", assetId).catch(() => []),
+    getEntries(householdId, { entityType: "asset", entityId: assetId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
   ]);
 
   const recentNote = entriesResult.items[0] ?? null;
@@ -37,6 +39,7 @@ export default async function AssetOverviewPage({ params }: AssetOverviewPagePro
       {sourceIdea && (
         <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
       )}
+      <PinnedNotesCard householdId={householdId} entries={pinnedResult.items} />
       <AssetOverviewTab
         detail={detail}
         assetId={assetId}

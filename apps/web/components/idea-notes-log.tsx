@@ -6,6 +6,7 @@ import type { IdeaNoteItem } from "@lifekeeper/types";
 import { addIdeaNoteAction, removeIdeaNoteAction } from "../app/actions";
 import { useTimezone } from "../lib/timezone-context";
 import { Card } from "./card";
+import { RichEditor } from "./rich-editor";
 
 type IdeaNotesLogProps = {
   householdId: string;
@@ -36,11 +37,13 @@ export function IdeaNotesLog({ householdId, ideaId, notes }: IdeaNotesLogProps):
   };
 
   const [text, setText] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [richBody, setRichBody] = useState("");
   const [isPending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleAdd = useCallback(() => {
-    const trimmed = text.trim();
+    const trimmed = expanded ? richBody.trim() : text.trim();
     if (!trimmed) return;
 
     // Optimistic update
@@ -51,6 +54,8 @@ export function IdeaNotesLog({ householdId, ideaId, notes }: IdeaNotesLogProps):
     };
     setLocalNotes((prev) => [optimisticNote, ...prev]);
     setText("");
+    setRichBody("");
+    if (expanded) setExpanded(false);
 
     startTransition(async () => {
       await addIdeaNoteAction(householdId, ideaId, trimmed);
@@ -58,7 +63,7 @@ export function IdeaNotesLog({ householdId, ideaId, notes }: IdeaNotesLogProps):
 
     // Re-focus for rapid entry
     setTimeout(() => textareaRef.current?.focus(), 0);
-  }, [text, householdId, ideaId]);
+  }, [text, richBody, expanded, householdId, ideaId]);
 
   const handleRemove = useCallback(
     (noteId: string) => {
@@ -106,25 +111,50 @@ export function IdeaNotesLog({ householdId, ideaId, notes }: IdeaNotesLogProps):
       )}
 
       <div className="idea-note-form">
-        <textarea
-          ref={textareaRef}
-          className="input"
-          placeholder="Add a note…"
-          aria-label="New note text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isPending}
-        />
-        <button
-          type="button"
-          className="button button--primary button--sm"
-          onClick={handleAdd}
-          disabled={isPending || !text.trim()}
-          aria-label="Add note"
-        >
-          Add
-        </button>
+        {expanded ? (
+          <div className="idea-note-expanded-editor">
+            <RichEditor
+              content={richBody}
+              onChange={setRichBody}
+              placeholder="Write your note…"
+              autoFocus
+            />
+          </div>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            className="input"
+            placeholder="Add a note…"
+            aria-label="New note text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isPending}
+          />
+        )}
+        <div className="idea-note-form__actions">
+          <button
+            type="button"
+            className="button button--ghost button--xs"
+            onClick={() => {
+              if (!expanded && text.trim()) {
+                setRichBody(`<p>${text}</p>`);
+              }
+              setExpanded(!expanded);
+            }}
+          >
+            {expanded ? "↙ Collapse" : "⤢ Expand"}
+          </button>
+          <button
+            type="button"
+            className="button button--primary button--sm"
+            onClick={handleAdd}
+            disabled={isPending || (expanded ? !richBody.trim() : !text.trim())}
+            aria-label="Add note"
+          >
+            Add
+          </button>
+        </div>
       </div>
     </Card>
   );

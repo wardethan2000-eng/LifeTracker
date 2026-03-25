@@ -69,6 +69,9 @@ type HomeDashboardProps = {
   pins: DashboardPin[];
   ideas?: IdeaSummaryItem[];
   savedQuickActionIds?: string[] | null;
+  inventoryTotalCount?: number;
+  lowStockCount?: number;
+  outOfStockCount?: number;
 };
 
 const AVAILABLE_QUICK_ACTIONS: Array<{ id: string; label: string; href: string }> = [
@@ -103,6 +106,9 @@ export function HomeDashboard(props: HomeDashboardProps) {
     pins,
     ideas = [],
     savedQuickActionIds,
+    inventoryTotalCount = 0,
+    lowStockCount = 0,
+    outOfStockCount = 0,
   } = props;
 
   const [editingQuickActions, setEditingQuickActions] = useState(false);
@@ -376,6 +382,19 @@ export function HomeDashboard(props: HomeDashboardProps) {
     });
   }
 
+  cards.push({
+    key: "inventory",
+    title: "📦 Inventory",
+    content: (
+      <dl className="dashboard-card__kv">
+        <div><dt>Tracked Items</dt><dd>{inventoryTotalCount}</dd></div>
+        <div><dt>Low Stock</dt><dd style={lowStockCount > 0 ? { color: "var(--warning)" } : undefined}>{lowStockCount}</dd></div>
+        <div><dt>Out of Stock</dt><dd style={outOfStockCount > 0 ? { color: "var(--danger)" } : undefined}>{outOfStockCount}</dd></div>
+      </dl>
+    ),
+    footerLink: { label: "View inventory →", href: `/inventory?householdId=${householdId}` },
+  });
+
   const defaultLayout: LayoutItem[] = [
     { i: "stats", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "duework", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
@@ -385,6 +404,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
     { i: "actionitems", x: 1, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "notepad", x: 2, y: 3, w: 2, h: 4, minW: 1, minH: 3 },
     ...(ideas.length > 0 ? [{ i: "ideas", x: 0, y: 7, w: 1, h: 3, minW: 1, minH: 2 }] : []),
+    { i: "inventory", x: 1, y: 7, w: 1, h: 3, minW: 1, minH: 2 },
     ...pins.map((pin, i) => ({
       i: `pin-${pin.entityType}-${pin.entityId}`,
       x: i % 4,

@@ -2,6 +2,7 @@ import type { PrismaExecutor } from "../../lib/prisma-types.js";
 ﻿import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createQuickRestockSchema,
+  updateInventoryPurchaseBodySchema,
   updateInventoryPurchaseLineSchema
 } from "@lifekeeper/types";
 import type { FastifyPluginAsync } from "fastify";
@@ -25,6 +26,10 @@ import { householdParamsSchema } from "../../lib/schemas.js";
 const purchaseLineParamsSchema = householdParamsSchema.extend({
   purchaseId: z.string().cuid(),
   lineId: z.string().cuid()
+});
+
+const purchaseParamsSchema = householdParamsSchema.extend({
+  purchaseId: z.string().cuid()
 });
 
 const purchaseInclude = {
@@ -497,5 +502,67 @@ export const householdInventoryPurchaseRoutes: FastifyPluginAsync = async (app) 
       });
 
     return reply.code(201).send(toInventoryPurchaseResponse(purchase));
+  });
+
+  // ── Update purchase metadata ──────────────────────────────────────
+
+  app.patch("/v1/households/:householdId/inventory/purchases/:purchaseId", async (request, reply) => {
+    const params = purchaseParamsSchema.parse(request.params);
+    const input = updateInventoryPurchaseBodySchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const existing = await app.prisma.inventoryPurchase.findFirst({
+      where: { id: params.purchaseId, householdId: params.householdId }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Purchase not found." });
+    }
+
+    const updated = await app.prisma.inventoryPurchase.update({
+      where: { id: existing.id },
+      data: {
+        ...(input.supplierName !== undefined ? { supplierName: input.supplierName ?? null } : {}),
+        ...(input.supplierUrl !== undefined ? { supplierUrl: input.supplierUrl ?? null } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes ?? null } : {})
+      },
+      include: purchaseInclude
+    });
+
+    return reply.send(toInventoryPurchaseResponse(updated));
+  });
+
+  // ── Delete (cancel) a draft or ordered purchase ───────────────────
+
+  app.delete("/v1/households/:householdId/inventory/purchases/:purchaseId", async (request, reply) => {
+    const params = purchaseParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const existing = await app.prisma.inventoryPurchase.findFirst({
+      where: { id: params.purchaseId, householdId: params.householdId }
+    });
+
+    if (!existing) {
+      return reply.code(404).send({ message: "Purchase not found." });
+    }
+
+    if (existing.status === "received") {
+      return reply.code(409).send({ message: "Received purchases cannot be deleted." });
+    }
+
+    await app.prisma.inventoryPurchase.delete({ where: { id: existing.id } });
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("inventory_purchase", existing.id, "inventory.purchase.deleted", params.householdId, {
+      supplierName: existing.supplierName,
+      status: existing.status
+    });
+
+    return reply.code(204).send();
   });
 };

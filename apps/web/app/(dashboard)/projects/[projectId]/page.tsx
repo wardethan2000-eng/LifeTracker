@@ -12,6 +12,7 @@ import {
   getSourceIdea,
 } from "../../../../lib/api";
 import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
+import { PinnedNotesCard } from "../../../../components/pinned-notes-card";
 import { ProjectDashboard } from "../../../../components/project-dashboard";
 
 type ProjectDetailPageProps = {
@@ -49,7 +50,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       );
     }
 
-    const [project, entriesResult, sourceIdea, canvases] = await Promise.all([
+    const [project, entriesResult, sourceIdea, canvases, pinnedResult] = await Promise.all([
       getProjectDetail(household.id, routeParams.projectId),
       getEntries(household.id, {
         entityType: "project",
@@ -61,6 +62,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       }).catch(() => ({ items: [], nextCursor: null })),
       getSourceIdea(household.id, "project", routeParams.projectId).catch(() => null),
       getCanvasesByEntity(household.id, "project", routeParams.projectId).catch(() => []),
+      getEntries(household.id, { entityType: "project", entityId: routeParams.projectId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
     ]);
 
     const qs = `?householdId=${household.id}`;
@@ -147,6 +149,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         {sourceIdea && (
           <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
         )}
+        <PinnedNotesCard householdId={household.id} entries={pinnedResult.items} />
         <ProjectDashboard
         householdId={household.id}
         projectId={project.id}

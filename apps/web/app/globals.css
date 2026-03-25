@@ -1751,6 +1751,12 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
   font-size: 1.05rem;
 }
 
+.panel__collapse-indicator {
+  font-size: 0.8em;
+  color: var(--ink-muted);
+  margin-left: 4px;
+}
+
 .panel__header-actions {
   display: flex;
   gap: 8px;
@@ -1815,8 +1821,173 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
 
 .inventory-filter-bar {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
   padding: 0 0 16px;
+  flex-wrap: wrap;
+}
+
+.inventory-filter-bar__tabs {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.inventory-filter-bar__search {
+  width: 180px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.inventory-filter-bar__search:focus {
+  border-color: var(--accent);
+}
+
+.inventory-filter-bar__select {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.inventory-table--sticky thead {
+  position: sticky;
+  top: var(--nav-height, 64px);
+  z-index: 2;
+  background: var(--bg);
+}
+
+/* ── Animated Row Expansion ── */
+
+.inventory-row-expand-wrapper td {
+  padding: 0 !important;
+  border: none !important;
+}
+
+.inventory-row-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 180ms ease;
+}
+
+.inventory-row-expand--open {
+  grid-template-rows: 1fr;
+}
+
+.inventory-row-expand > div {
+  overflow: hidden;
+}
+
+.inventory-row-expand__body {
+  padding: 12px 16px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.inventory-row-expand__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin-bottom: 8px;
+}
+
+.inventory-row-expand__grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inventory-row-expand__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.inventory-row-expand__value {
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.inventory-row-expand__analytics {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.inventory-row-expand__notes {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+/* ── Quantity Stepper ── */
+
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.qty-stepper__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.qty-stepper__btn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.qty-stepper__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.qty-stepper__value {
+  min-width: 40px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty-stepper--pending .qty-stepper__value {
+  color: var(--accent);
+}
+
+.qty-stepper--disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .inventory-filter-bar__tab {
@@ -5152,6 +5323,78 @@ textarea { resize: vertical; }
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* ── Slide-in Drawer ── */
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.drawer-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 81;
+  width: min(460px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(15, 23, 42, 0.12);
+  transform: translateX(100%);
+  transition: transform 220ms ease;
+}
+
+.drawer-panel--open {
+  transform: translateX(0);
+}
+
+.drawer-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.drawer-panel__header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.drawer-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.drawer-panel__body .form-grid {
+  grid-template-columns: 1fr;
+}
+
+.drawer-panel__footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
 }
 
 .dialog-overlay {
@@ -14391,6 +14634,238 @@ html[data-ui-density="compact"] .resource-layout__aside {
   gap: 4px;
   margin-top: 4px;
 }
+
+/* ─── Note Editor Flags ─── */
+.note-editor__flag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.note-editor__flag-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted, #777);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.note-editor__flag-toggle:hover {
+  border-color: var(--accent);
+}
+.note-editor__flag-toggle--active {
+  background: var(--accent-bg, #e3f2fd);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+.note-editor__flag-toggle--accent.note-editor__flag-toggle--active { background: var(--accent-bg, #e3f2fd); border-color: var(--accent); }
+.note-editor__flag-toggle--warning.note-editor__flag-toggle--active { background: #fff3e0; border-color: #e65100; color: #e65100; }
+.note-editor__flag-toggle--danger.note-editor__flag-toggle--active { background: #fce4ec; border-color: #c62828; color: #c62828; }
+.note-editor__flag-toggle--success.note-editor__flag-toggle--active { background: #e8f5e9; border-color: #2e7d32; color: #2e7d32; }
+.note-editor__flag-toggle--info.note-editor__flag-toggle--active { background: #e0f7fa; border-color: #0277bd; color: #0277bd; }
+.note-editor__flag-toggle--muted.note-editor__flag-toggle--active { background: var(--bg); border-color: var(--ink-muted); color: var(--ink-muted); }
+
+/* ─── Note Reminder Section ─── */
+.note-reminder-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  width: 100%;
+}
+.note-reminder-section__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.note-reminder-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ─── Note List Flags ─── */
+.note-list__item-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.pill--accent {
+  background: var(--accent-bg, #e3f2fd);
+  color: var(--accent);
+}
+.pill--warning {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+/* ─── Pinned Notes Card ─── */
+.pinned-notes-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.pinned-notes-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.pinned-notes-card__icon {
+  font-size: 1rem;
+}
+.pinned-notes-card__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+}
+.pinned-notes-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.pinned-notes-card__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pinned-notes-card__link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 0.82rem;
+  padding: 4px 0;
+}
+.pinned-notes-card__link:hover {
+  color: var(--accent);
+}
+.pinned-notes-card__item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.pinned-notes-card__item-date {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+.pinned-notes-card__unpin {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.pinned-notes-card__unpin:hover {
+  opacity: 1;
+}
+
+/* Dashboard Reminders */
+.dashboard-reminders {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.dashboard-reminders__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.dashboard-reminders__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.dashboard-reminders__window {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.dashboard-reminders__window:disabled {
+  opacity: 0.5;
+}
+.dashboard-reminders__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dashboard-reminders__item {
+  border-radius: 8px;
+}
+.dashboard-reminders__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+.dashboard-reminders__link:hover {
+  background: var(--hover, rgba(0,0,0,0.04));
+}
+.dashboard-reminders__item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dashboard-reminders__item-title {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dashboard-reminders__item-entity {
+  font-size: 0.75rem;
+  color: var(--ink-muted, #888);
+}
+.dashboard-reminders__item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--ink-muted, #888);
+}
+.dashboard-reminders__item-relative {
+  font-weight: 500;
+  color: var(--accent);
+}
+.dashboard-reminders__item-repeat {
+  font-size: 1rem;
+  opacity: 0.6;
+}
+
 .note-editor__delete-btn:hover {
   color: var(--error, #d00);
 }
@@ -14732,8 +15207,8 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .idea-note-form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: flex-end;
   margin-top: 12px;
 }
 
@@ -14741,6 +15216,21 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex: 1;
   min-height: 60px;
   resize: vertical;
+}
+
+.idea-note-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+
+.idea-note-expanded-editor {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 160px;
+  background: var(--surface);
 }
 
 .idea-link-entry {

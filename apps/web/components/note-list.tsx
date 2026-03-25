@@ -64,12 +64,21 @@ export function NoteList({
                 >
                   <div className="note-list__item-header">
                     <strong className="note-list__item-title">
+                      {entry.reminderAt && <span className="note-reminder-badge" title={`Reminder: ${formatDate(entry.reminderAt)}`}>🔔</span>}
                       {entry.title || preview.slice(0, 60) || "Untitled"}
                     </strong>
                     <time className="note-list__item-date">
                       {formatDate(entry.entryDate)}
                     </time>
                   </div>
+
+                  {entry.flags && Array.isArray(entry.flags) && (entry.flags as string[]).length > 0 && (
+                    <div className="note-list__item-flags">
+                      {(entry.flags as string[]).map((flag) => (
+                        <span key={flag} className={`pill pill--${flag === "important" || flag === "actionable" ? "accent" : flag === "warning" ? "warning" : "muted"}`}>{flag}</span>
+                      ))}
+                    </div>
+                  )}
 
                   {entry.bodyFormat === "rich_text" ? (
                     <div className="note-list__item-preview">

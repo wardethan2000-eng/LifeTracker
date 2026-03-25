@@ -389,6 +389,7 @@ export const mergeHouseholdInventoryItems = async (
       unitCost: mergedTargetItem.unitCost,
       storageLocation: mergedTargetItem.storageLocation,
       notes: mergedTargetItem.notes,
+      expiresAt: mergedTargetItem.expiresAt?.toISOString() ?? null,
       deletedAt: null,
       totalValue: calculateInventoryTotalValue(mergedTargetItem.quantityOnHand, mergedTargetItem.unitCost),
       lowStock: isInventoryLowStock(mergedTargetItem.quantityOnHand, mergedTargetItem.reorderThreshold),

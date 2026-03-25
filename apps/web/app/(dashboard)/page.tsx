@@ -5,8 +5,9 @@ import { getDashboardData } from "../../components/dashboard-data";
 import { HomeDashboard } from "../../components/home-dashboard";
 import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
-import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdProjectStatusCounts, getLayoutPreference, getMe, getQuickActionsPreference } from "../../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getEntries, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdLowStockInventory, getHouseholdProjectStatusCounts, getLayoutPreference, getMe, getQuickActionsPreference } from "../../lib/api";
 import { OnboardingChecklistClient } from "../../components/onboarding-checklist";
+import { DashboardReminders } from "../../components/dashboard-reminders";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
 
 type HomePageProps = {
@@ -67,22 +68,36 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, onboardingPref, savedQuickActionIds] = await Promise.all([
+    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, lowStockItems, onboardingPref, savedQuickActionIds, reminderWindowPref, entryProbe] = await Promise.all([
       getDashboardData(selectedHousehold.id),
       getDashboardPins().catch(() => []),
       getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
       getHouseholdProjectStatusCounts(selectedHousehold.id).catch(() => []),
       getHouseholdHobbies(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
-      getHouseholdInventory(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
+      getHouseholdInventory(selectedHousehold.id, { limit: 100 }).catch(() => ({ items: [], nextCursor: null })),
+      getHouseholdLowStockInventory(selectedHousehold.id).catch(() => []),
       getLayoutPreference("onboarding", "dismissed").catch(() => null),
       getQuickActionsPreference().catch(() => null),
+      getLayoutPreference("reminders_dashboard", "window_days").catch(() => null),
+      getEntries(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
     ]);
+
+    const reminderWindowDays = (reminderWindowPref as Array<{ value: number }> | null)?.[0]?.value ?? 7;
+    const reminderCutoff = new Date(Date.now() + reminderWindowDays * 24 * 60 * 60 * 1000).toISOString();
+    const reminderEntries = await getEntries(selectedHousehold.id, {
+      hasReminder: true,
+      reminderBefore: reminderCutoff,
+      limit: 20,
+    }).catch(() => ({ items: [], nextCursor: null }));
 
     const projectCount = projectStatusCounts.reduce((sum, s) => sum + s.count, 0);
     const hobbyCount = hobbyData.items.length;
     const inventoryCount = inventoryData.items.length;
     const ideaCount = recentIdeas.length;
+    const entryCount = entryProbe.items.length;
     const onboardingDismissed = onboardingPref !== null;
+    const lowStockCount = lowStockItems.length;
+    const outOfStockCount = inventoryData.items.filter((i) => i.quantityOnHand <= 0).length;
 
     const sortedAssets = [...dashboard.assets].sort(
       (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -156,6 +171,11 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
         <div className="page-body">
           <LaunchPad />
+          <DashboardReminders
+            householdId={selectedHousehold.id}
+            entries={reminderEntries.items}
+            windowDays={reminderWindowDays}
+          />
           {!onboardingDismissed && (
             <OnboardingChecklistClient
               assetCount={dashboard.stats.assetCount}
@@ -164,6 +184,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
               hobbyCount={hobbyCount}
               inventoryItemCount={inventoryCount}
               ideaCount={ideaCount}
+              entryCount={entryCount}
               maintenanceScheduleCount={dashboard.stats.dueScheduleCount + dashboard.stats.overdueScheduleCount}
             />
           )}
@@ -183,6 +204,9 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             nextDueAssetName={firstDueWork?.assetName ?? null}
             pins={pins}
             savedQuickActionIds={savedQuickActionIds}
+            inventoryTotalCount={inventoryCount}
+            lowStockCount={lowStockCount}
+            outOfStockCount={outOfStockCount}
             ideas={recentIdeas.map((idea) => ({
               id: idea.id,
               title: idea.title,

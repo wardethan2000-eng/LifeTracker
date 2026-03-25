@@ -826,10 +826,174 @@ export const scanAndCreateNotifications = async (
     }
   }
 
+  const noteReminderIds = await scanNoteReminders(prisma, { householdId: options.householdId, now });
+  createdNotificationIds.push(...noteReminderIds);
+
   return {
     createdCount: createdNotificationIds.length,
     createdNotificationIds
   };
+};
+
+// ─── Note Reminder Scan ───────────────────────────────────────────────────────
+
+interface NoteReminderCandidate {
+  id: string;
+  title: string | null;
+  body: string;
+  entityType: string;
+  entityId: string;
+  reminderAt: Date;
+  reminderRepeatDays: number | null;
+  reminderUntil: Date | null;
+  createdById: string;
+  householdId: string;
+  household: {
+    members: Array<{
+      userId: string;
+      user: Pick<User, "id" | "notificationPreferences">;
+    }>;
+  };
+  createdBy: Pick<User, "id" | "notificationPreferences">;
+}
+
+const buildNoteReminderTitle = (entry: NoteReminderCandidate): string => {
+  if (entry.title) {
+    return `Reminder: ${entry.title}`;
+  }
+  const preview = entry.body.replace(/<[^>]*>/g, "").slice(0, 60).trim();
+  return `Note reminder: ${preview || "untitled note"}`;
+};
+
+const buildNoteReminderBody = (entry: NoteReminderCandidate): string => {
+  const preview = entry.body.replace(/<[^>]*>/g, "").slice(0, 200).trim();
+  if (entry.reminderRepeatDays) {
+    const cadenceLabel =
+      entry.reminderRepeatDays === 1 ? "daily" :
+      entry.reminderRepeatDays === 7 ? "weekly" :
+      entry.reminderRepeatDays === 14 ? "every 2 weeks" :
+      entry.reminderRepeatDays === 30 ? "monthly" :
+      `every ${entry.reminderRepeatDays} days`;
+    return `${preview || "You have a note reminder."} (repeating ${cadenceLabel})`;
+  }
+  return preview || "You have a note reminder.";
+};
+
+const advanceReminderAt = (current: Date, repeatDays: number, now: Date, until: Date | null): Date | null => {
+  let next = new Date(current.getTime() + repeatDays * 24 * 60 * 60 * 1000);
+  // Skip past any missed windows — keep advancing until next > now
+  while (next <= now) {
+    next = new Date(next.getTime() + repeatDays * 24 * 60 * 60 * 1000);
+  }
+  if (until && next > until) {
+    return null; // Series ended
+  }
+  return next;
+};
+
+const scanNoteReminders = async (
+  prisma: PrismaClient,
+  options: { householdId?: string; now: Date }
+): Promise<string[]> => {
+  const { now } = options;
+  const graceCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const entries = await prisma.entry.findMany({
+    where: {
+      reminderAt: {
+        lte: now,
+        gte: graceCutoff
+      },
+      ...(options.householdId ? { householdId: options.householdId } : {})
+    },
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      entityType: true,
+      entityId: true,
+      reminderAt: true,
+      reminderRepeatDays: true,
+      reminderUntil: true,
+      createdById: true,
+      householdId: true,
+      household: {
+        select: {
+          members: {
+            select: {
+              userId: true,
+              user: {
+                select: { id: true, notificationPreferences: true }
+              }
+            }
+          }
+        }
+      },
+      createdBy: {
+        select: { id: true, notificationPreferences: true }
+      }
+    }
+  });
+
+  const createdIds: string[] = [];
+
+  for (const entry of entries) {
+    const candidate = entry as NoteReminderCandidate;
+    const title = buildNoteReminderTitle(candidate);
+    const body = buildNoteReminderBody(candidate);
+    const reminderAtKey = candidate.reminderAt.toISOString();
+    const creatorPrefs = parsePreferences(candidate.createdBy.notificationPreferences);
+    const recipients: Recipient[] = [{ userId: candidate.createdById, preferences: creatorPrefs }];
+    const channels = resolveChannels(creatorPrefs.enabledChannels, creatorPrefs);
+
+    for (const recipient of recipients) {
+      for (const channel of channels) {
+        const dedupeKey = `note_reminder:${recipient.userId}:${channel}:${candidate.id}:${reminderAtKey}`;
+        try {
+          const notification = await prisma.notification.create({
+            data: {
+              userId: recipient.userId,
+              householdId: candidate.householdId,
+              entryId: candidate.id,
+              dedupeKey,
+              type: "note_reminder",
+              channel,
+              status: "pending",
+              title,
+              body,
+              scheduledFor: candidate.reminderAt,
+              escalationLevel: 0,
+              payload: {
+                entryId: candidate.id,
+                entityType: candidate.entityType,
+                entityId: candidate.entityId,
+                reminderAt: reminderAtKey,
+                reminderRepeatDays: candidate.reminderRepeatDays ?? null,
+                createdAt: now.toISOString()
+              } as Prisma.InputJsonValue
+            }
+          });
+          createdIds.push(notification.id);
+        } catch (error) {
+          if (isUniqueConstraintError(error)) {
+            continue;
+          }
+          throw error;
+        }
+      }
+    }
+
+    // Advance reminderAt if repeating
+    if (candidate.reminderRepeatDays) {
+      const nextDate = advanceReminderAt(candidate.reminderAt, candidate.reminderRepeatDays, now, candidate.reminderUntil);
+      await prisma.entry.update({
+        where: { id: candidate.id },
+        data: { reminderAt: nextDate }
+      });
+    }
+  }
+
+  return createdIds;
 };
 
 type DeliveryMode = "log" | "noop" | "live";

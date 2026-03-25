@@ -53,7 +53,7 @@ export const assetCategoryValues = [
 export const assetVisibilityValues = ["shared", "personal"] as const;
 export const householdRoleValues = ["owner", "member"] as const;
 export const authSourceValues = ["clerk", "dev-bypass"] as const;
-export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "announcement", "inventory_low_stock"] as const;
+export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "announcement", "inventory_low_stock", "note_reminder"] as const;
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
 export const notificationStatusValues = ["pending", "sent", "failed", "read"] as const;
@@ -925,6 +925,7 @@ export const notificationSchema = z.object({
   householdId: z.string().cuid().nullable(),
   assetId: z.string().cuid().nullable(),
   scheduleId: z.string().cuid().nullable(),
+  entryId: z.string().cuid().nullable(),
   dedupeKey: z.string(),
   type: notificationTypeSchema,
   channel: notificationChannelSchema,
@@ -1411,6 +1412,7 @@ export const inventoryItemSchema = z.object({
   unitCost: z.number().nullable(),
   storageLocation: z.string().nullable(),
   notes: z.string().nullable(),
+  expiresAt: z.string().datetime().nullable().default(null),
   deletedAt: z.string().datetime().nullable().default(null),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
@@ -1432,10 +1434,32 @@ export const createInventoryItemSchema = z.object({
   supplierUrl: z.string().url().max(1000).optional(),
   unitCost: z.number().min(0).optional(),
   storageLocation: z.string().max(200).optional(),
-  notes: z.string().max(4000).optional()
+  notes: z.string().max(4000).optional(),
+  expiresAt: z.string().datetime().nullable().optional()
 });
 
 export const updateInventoryItemSchema = createInventoryItemSchema.partial();
+
+export const bulkDeleteInventoryItemsSchema = z.object({
+  itemIds: z.array(z.string().cuid()).min(1).max(100)
+});
+
+export const bulkAdjustInventoryItemsSchema = z.object({
+  adjustments: z.array(z.object({
+    inventoryItemId: z.string().cuid(),
+    newQuantity: z.number().min(0)
+  })).min(1).max(100)
+});
+
+export const updateInventoryPurchaseBodySchema = z.object({
+  supplierName: z.string().max(200).nullable().optional(),
+  supplierUrl: z.string().url().max(1000).nullable().optional(),
+  notes: z.string().max(4000).nullable().optional()
+});
+
+export type BulkDeleteInventoryItems = z.infer<typeof bulkDeleteInventoryItemsSchema>;
+export type BulkAdjustInventoryItems = z.infer<typeof bulkAdjustInventoryItemsSchema>;
+export type UpdateInventoryPurchaseBody = z.infer<typeof updateInventoryPurchaseBodySchema>;
 
 export const mergeInventoryItemsSchema = z.object({
   sourceInventoryItemId: z.string().cuid()
@@ -3042,6 +3066,9 @@ export const entrySchema = z.object({
   sourceId: z.string().nullable().default(null),
   folderId: z.string().cuid().nullable().default(null),
   flags: z.array(entryFlagSchema).default([]),
+  reminderAt: z.string().datetime().nullable().default(null),
+  reminderRepeatDays: z.number().int().min(1).nullable().default(null),
+  reminderUntil: z.string().datetime().nullable().default(null),
   createdBy: shallowUserSchema,
   resolvedEntity: entryResolvedEntitySchema,
   createdAt: z.string().datetime(),
@@ -3084,7 +3111,10 @@ export const createEntrySchema = z.object({
   sourceType: z.string().trim().max(120).optional().nullable(),
   sourceId: z.string().trim().max(191).optional().nullable(),
   folderId: z.string().cuid().optional().nullable(),
-  flags: entryFlagsInputSchema
+  flags: entryFlagsInputSchema,
+  reminderAt: z.string().datetime().optional().nullable(),
+  reminderRepeatDays: z.number().int().min(1).optional().nullable(),
+  reminderUntil: z.string().datetime().optional().nullable()
 });
 
 export const updateEntrySchema = z.object({
@@ -3098,7 +3128,10 @@ export const updateEntrySchema = z.object({
   attachmentUrl: z.string().url().max(2000).optional().nullable(),
   attachmentName: z.string().trim().max(500).optional().nullable(),
   folderId: z.string().cuid().optional().nullable(),
-  flags: entryFlagsInputSchema.optional()
+  flags: entryFlagsInputSchema.optional(),
+  reminderAt: z.string().datetime().optional().nullable(),
+  reminderRepeatDays: z.number().int().min(1).optional().nullable(),
+  reminderUntil: z.string().datetime().optional().nullable()
 });
 
 const commaSeparatedStringsSchema = z.union([z.string(), z.array(z.string())]).optional();
@@ -3181,7 +3214,10 @@ export const entryListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().cuid().optional(),
   includeArchived: z.coerce.boolean().default(false),
-  folderId: z.string().cuid().optional()
+  folderId: z.string().cuid().optional(),
+  reminderAfter: z.string().datetime().optional(),
+  reminderBefore: z.string().datetime().optional(),
+  hasReminder: z.coerce.boolean().optional()
 }).superRefine((value, context) => {
   if ((value.entityType && !value.entityId) || (!value.entityType && value.entityId)) {
     context.addIssue({

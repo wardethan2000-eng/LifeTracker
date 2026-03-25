@@ -66,6 +66,7 @@ enum NotificationType {
   digest
   announcement
   inventory_low_stock
+  note_reminder
 }
 
 // Delivery channel selected for a notification.
@@ -753,24 +754,29 @@ model Entry {
   entryType      EntryType       @default(note)
   measurements   Json            @default("[]")
   tags           Json            @default("[]")
-  attachmentUrl  String?
-  attachmentName String?
-  sourceType     String?
-  sourceId       String?
-  folderId       String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  household      Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  createdBy      User            @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  flags          EntryFlagEntry[]
-  folder         NoteFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  canvasNodes    IdeaCanvasNode[]
+  attachmentUrl    String?
+  attachmentName   String?
+  sourceType       String?
+  sourceId         String?
+  folderId         String?
+  reminderAt       DateTime?
+  reminderRepeatDays Int?
+  reminderUntil    DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  household        Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy        User            @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  flags            EntryFlagEntry[]
+  folder           NoteFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  canvasNodes      IdeaCanvasNode[]
+  reminderNotifications Notification[]
 
   @@index([householdId, entityType, entityId])
   @@index([householdId, entryType])
   @@index([householdId, entryDate])
   @@index([householdId, createdById])
   @@index([folderId])
+  @@index([reminderAt])
 }
 
 // Join table that assigns behavioral flags to entries.
@@ -835,6 +841,7 @@ model Notification {
   householdId     String?
   assetId         String?
   scheduleId      String?
+  entryId         String?
   dedupeKey       String               @unique
   type            NotificationType
   channel         NotificationChannel
@@ -852,12 +859,14 @@ model Notification {
   household       Household?           @relation(fields: [householdId], references: [id], onDelete: Cascade)
   asset           Asset?               @relation(fields: [assetId], references: [id], onDelete: Cascade)
   schedule        MaintenanceSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  entry           Entry?               @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@index([scheduledFor])
   @@index([householdId])
   @@index([assetId])
   @@index([scheduleId])
+  @@index([entryId])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -924,6 +933,7 @@ model InventoryItem {
   unitCost           Float?
   storageLocation    String?
   notes              String?
+  expiresAt          DateTime?
   deletedAt          DateTime?
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
@@ -951,6 +961,7 @@ model InventoryItem {
   @@index([householdId, partNumber])
   @@index([householdId, itemType])
   @@index([householdId, scanTag])
+  @@index([householdId, expiresAt])
 }
 
 model SpaceInventoryItem {

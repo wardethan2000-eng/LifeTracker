@@ -14,6 +14,7 @@ import {
 } from "../../../../lib/api";
 import { HobbyDashboard } from "../../../../components/hobby-dashboard";
 import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
+import { PinnedNotesCard } from "../../../../components/pinned-notes-card";
 
 type HobbyDetailPageProps = {
   params: Promise<{ hobbyId: string }>;
@@ -30,7 +31,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       return <p>No household found.</p>;
     }
 
-    const [hobby, sessions, series, entriesResult, sourceIdea, goalsResult, routinesResult, canvases] = await Promise.all([
+    const [hobby, sessions, series, entriesResult, sourceIdea, goalsResult, routinesResult, canvases, pinnedResult] = await Promise.all([
       getHobbyDetail(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbySeries(household.id, hobbyId),
@@ -45,6 +46,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       listHobbyPracticeGoals(household.id, hobbyId, { limit: 10, status: "active" }).catch(() => ({ items: [], nextCursor: null })),
       listHobbyPracticeRoutines(household.id, hobbyId, { limit: 10, isActive: true }).catch(() => ({ items: [], nextCursor: null })),
       getCanvasesByEntity(household.id, "hobby", hobbyId).catch(() => []),
+      getEntries(household.id, { entityType: "hobby", entityId: hobbyId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
     ]);
 
     const activeSessions = sessions.filter((s) => s.status !== "completed" && s.status !== "cancelled");
@@ -68,6 +70,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
         {sourceIdea && (
           <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
         )}
+        <PinnedNotesCard householdId={household.id} entries={pinnedResult.items} />
         <HobbyDashboard
         householdId={household.id}
         hobbyId={hobbyId}

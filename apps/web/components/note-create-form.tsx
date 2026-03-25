@@ -69,11 +69,11 @@ export function NoteCreateForm({ householdId, projectId, phases, templates = [] 
         <label className="field">
           <span className="field__label">Category</span>
           <select name="category" defaultValue="general">
+            <option value="general">General</option>
             <option value="research">Research</option>
             <option value="reference">Reference</option>
             <option value="decision">Decision</option>
             <option value="measurement">Measurement</option>
-            <option value="general">General</option>
           </select>
         </label>
         <label className="field">

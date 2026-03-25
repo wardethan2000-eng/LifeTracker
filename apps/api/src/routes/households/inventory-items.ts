@@ -1,6 +1,8 @@
 ﻿import type { Prisma } from "@prisma/client";
 import {
   bulkPartsReadinessSchema,
+  bulkDeleteInventoryItemsSchema,
+  bulkAdjustInventoryItemsSchema,
   createInventoryItemSchema,
   inventoryItemMergeResultSchema,
   inventoryItemSummarySchema,
@@ -138,9 +140,13 @@ type InventoryMetadataSnapshot = {
   storageLocation: string | null;
   notes: string | null;
   unitCost: number | null;
+  expiresAt: Date | null;
 };
 
-const metadataValue = (value: string | number | null | undefined): string | number | null => value ?? null;
+const metadataValue = (value: string | number | Date | null | undefined): InventoryRevisionValue => {
+  if (value instanceof Date) return value.toISOString();
+  return value ?? null;
+};
 
 const inventoryRevisionFields: Array<{
   field: keyof InventoryMetadataSnapshot;
@@ -160,7 +166,8 @@ const inventoryRevisionFields: Array<{
   { field: "supplierUrl", label: "Supplier Link" },
   { field: "storageLocation", label: "Storage Location" },
   { field: "notes", label: "Notes" },
-  { field: "unitCost", label: "Last Price" }
+  { field: "unitCost", label: "Last Price" },
+  { field: "expiresAt", label: "Expiration Date" }
 ];
 
 const buildInventoryRevisionChanges = (
@@ -805,7 +812,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           ...(input.supplierUrl !== undefined ? { supplierUrl: input.supplierUrl ?? null } : {}),
           ...(input.storageLocation !== undefined ? { storageLocation: input.storageLocation ?? null } : {}),
           ...(input.notes !== undefined ? { notes: input.notes ?? null } : {}),
-          ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {})
+          ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {}),
+          ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } : {})
         }
       });
 
@@ -1044,5 +1052,131 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
     await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", existing.id, "inventory_item.purged", params.householdId, { name: existing.name });
 
     return reply.code(204).send();
+  });
+
+  // ── Trash listing ─────────────────────────────────────────────────
+
+  app.get("/v1/households/:householdId/inventory/trash", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const items = await app.prisma.inventoryItem.findMany({
+      where: { householdId: params.householdId, deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" }
+    });
+
+    return items.map(toInventoryItemSummaryResponse);
+  });
+
+  // ── Bulk soft-delete ──────────────────────────────────────────────
+
+  app.post("/v1/households/:householdId/inventory/bulk-delete", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const input = bulkDeleteInventoryItemsSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    await app.prisma.inventoryItem.updateMany({
+      where: { id: { in: input.itemIds }, householdId: params.householdId, deletedAt: null },
+      data: softDeleteData()
+    });
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", params.householdId, "inventory_item.bulk_deleted", params.householdId, {
+      itemIds: input.itemIds,
+      count: input.itemIds.length
+    });
+
+    return reply.code(204).send();
+  });
+
+  // ── Bulk quantity adjust (cycle count) ───────────────────────────
+
+  app.post("/v1/households/:householdId/inventory/bulk-adjust", async (request, reply) => {
+    const params = householdParamsSchema.parse(request.params);
+    const input = bulkAdjustInventoryItemsSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      for (const adjustment of input.adjustments) {
+        const item = await getHouseholdInventoryItem(tx, params.householdId, adjustment.inventoryItemId);
+        if (!item || item.deletedAt) continue;
+
+        const delta = adjustment.newQuantity - item.quantityOnHand;
+        if (delta === 0) continue;
+
+        await applyInventoryTransaction(tx, {
+          inventoryItemId: item.id,
+          userId: request.auth.userId,
+          input: {
+            type: "adjust",
+            quantity: delta,
+            referenceType: "cycle_count",
+            referenceId: item.id,
+            notes: "Cycle count adjustment"
+          },
+          preventNegative: false,
+          clampToZero: false
+        });
+      }
+    });
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", params.householdId, "inventory_item.bulk_adjusted", params.householdId, {
+      count: input.adjustments.length
+    });
+
+    return reply.code(204).send();
+  });
+
+  // ── Duplicate item ────────────────────────────────────────────────
+
+  app.post("/v1/households/:householdId/inventory/:inventoryItemId/duplicate", async (request, reply) => {
+    const params = inventoryItemParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const source = await getHouseholdInventoryItem(app.prisma, params.householdId, params.inventoryItemId);
+    if (!source) return notFound(reply, "Inventory item");
+
+    const copy = await app.prisma.inventoryItem.create({
+      data: {
+        householdId: params.householdId,
+        itemType: source.itemType,
+        conditionStatus: source.conditionStatus,
+        name: `${source.name} (copy)`,
+        partNumber: source.partNumber,
+        description: source.description,
+        category: source.category,
+        manufacturer: source.manufacturer,
+        quantityOnHand: 0,
+        unit: source.unit,
+        reorderThreshold: source.reorderThreshold,
+        reorderQuantity: source.reorderQuantity,
+        preferredSupplier: source.preferredSupplier,
+        supplierUrl: source.supplierUrl,
+        unitCost: source.unitCost,
+        storageLocation: source.storageLocation,
+        notes: source.notes,
+        expiresAt: source.expiresAt
+      }
+    });
+
+    await createActivityLogger(app.prisma, request.auth.userId).log("inventory_item", copy.id, "inventory_item.created", params.householdId, {
+      name: copy.name,
+      duplicatedFrom: source.id
+    });
+
+    void syncInventoryItemToSearchIndex(app.prisma, copy.id).catch(console.error);
+
+    return reply.code(201).send(toInventoryItemSummaryResponse(copy));
   });
 };

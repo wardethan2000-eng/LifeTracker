@@ -183,6 +183,22 @@ const buildEntryFilterClauses = (
     conditions.push(Prisma.sql`e."folderId" = ${query.folderId}`);
   }
 
+  if (query.reminderAfter) {
+    conditions.push(Prisma.sql`e."reminderAt" >= ${new Date(query.reminderAfter)}`);
+  }
+
+  if (query.reminderBefore) {
+    conditions.push(Prisma.sql`e."reminderAt" <= ${new Date(query.reminderBefore)}`);
+  }
+
+  if (query.hasReminder !== undefined) {
+    if (query.hasReminder) {
+      conditions.push(Prisma.sql`e."reminderAt" IS NOT NULL`);
+    } else {
+      conditions.push(Prisma.sql`e."reminderAt" IS NULL`);
+    }
+  }
+
   const archivedExplicitlyIncluded = query.flags?.includes("archived") ?? false;
   if (!query.includeArchived && !archivedExplicitlyIncluded) {
     conditions.push(Prisma.sql`
@@ -450,6 +466,9 @@ const buildEntryCreateData = (
   attachmentName: input.attachmentName ?? null,
   sourceType: input.sourceType ?? null,
   sourceId: input.sourceId ?? null,
+  reminderAt: input.reminderAt ? new Date(input.reminderAt) : null,
+  reminderRepeatDays: input.reminderRepeatDays ?? null,
+  reminderUntil: input.reminderUntil ? new Date(input.reminderUntil) : null,
   ...(input.folderId ? { folder: { connect: { id: input.folderId } } } : {}),
   ...(input.flags.length > 0
     ? {
@@ -478,6 +497,9 @@ const buildEntryUpdateData = (input: z.infer<typeof updateEntrySchema>, existing
   if (input.folderId !== undefined) {
     data.folder = input.folderId ? { connect: { id: input.folderId } } : { disconnect: true };
   }
+  if (input.reminderAt !== undefined) data.reminderAt = input.reminderAt ? new Date(input.reminderAt) : null;
+  if (input.reminderRepeatDays !== undefined) data.reminderRepeatDays = input.reminderRepeatDays ?? null;
+  if (input.reminderUntil !== undefined) data.reminderUntil = input.reminderUntil ? new Date(input.reminderUntil) : null;
 
   return data;
 };

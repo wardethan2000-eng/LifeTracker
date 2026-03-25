@@ -9,7 +9,7 @@ import { InventoryBulkActions } from "./inventory-bulk-actions";
 import { InventoryEditableRow } from "./inventory-editable-row";
 import { InventorySection } from "./inventory-section";
 import { ClickToEdit } from "./click-to-edit";
-import { ClickToEditNumber } from "./click-to-edit-number";
+import { QuantityStepper } from "./quantity-stepper";
 import { useToast } from "./toast-provider";
 import { updateInventoryItemFieldAction } from "../app/actions";
 
@@ -30,34 +30,6 @@ type InventoryListWorkspaceProps = {
 };
 
 const normalizeUnit = (unit: string): string => unit.trim().toLowerCase();
-
-const formatReorderPoint = (value: number | null, unit: string): string => {
-  if (value === null) {
-    return "No reorder trigger";
-  }
-
-  const normalizedUnit = normalizeUnit(unit);
-
-  if (normalizedUnit === "each") {
-    return `Reorder when ${value} item${value === 1 ? "" : "s"} remain`;
-  }
-
-  return `Reorder when ${value} ${unit} remain`;
-};
-
-const formatRestockPlan = (value: number | null, unit: string): string => {
-  if (value === null) {
-    return "No restock amount set";
-  }
-
-  const normalizedUnit = normalizeUnit(unit);
-
-  if (normalizedUnit === "each") {
-    return `Usually buy ${value} item${value === 1 ? "" : "s"}`;
-  }
-
-  return `Usually buy ${value} ${unit}`;
-};
 
 export function InventoryListWorkspace({
   householdId,
@@ -155,7 +127,7 @@ export function InventoryListWorkspace({
                     <p>{group.items.length} item{group.items.length === 1 ? "" : "s"} in this category</p>
                   </div>
                 </div>
-                <table className="data-table">
+                <table className="data-table inventory-table--sticky">
                   <thead>
                     <tr>
                       <th style={{ width: 44 }}>
@@ -167,12 +139,10 @@ export function InventoryListWorkspace({
                         />
                       </th>
                       <th>Item</th>
-                      <th>{isEquipmentView ? "Count" : "On Hand"}</th>
-                      <th>{isEquipmentView ? "Condition" : "Reorder Rule"}</th>
-                      <th>Last Price</th>
-                      <th>Supplier</th>
+                      <th>{isEquipmentView ? "Count" : "Stock"}</th>
                       <th>Status</th>
                       <th>Location</th>
+                      <th style={{ width: 44 }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -180,7 +150,6 @@ export function InventoryListWorkspace({
                       const ov = optimistic[item.id] ?? {};
                       const name = ov.name ?? item.name;
                       const quantityOnHand = ov.quantityOnHand !== undefined ? ov.quantityOnHand : item.quantityOnHand;
-                      const unitCost = ov.unitCost !== undefined ? ov.unitCost : item.unitCost;
                       const storageLocation = ov.storageLocation !== undefined ? ov.storageLocation : item.storageLocation;
 
                       return (
@@ -188,7 +157,7 @@ export function InventoryListWorkspace({
                         key={item.id}
                         householdId={householdId}
                         item={item}
-                        columnCount={8}
+                        columnCount={6}
                         className={[item.lowStock ? "row--due" : null, item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ") || ""}
                         defaultOpen={item.id === highlightId && highlightedAnalytics !== null}
                         analytics={item.id === highlightId ? highlightedAnalytics : null}
@@ -214,51 +183,18 @@ export function InventoryListWorkspace({
                           </div>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          {item.itemType === "equipment" ? (
-                            <ClickToEditNumber
-                              value={quantityOnHand}
-                              min={0}
-                              suffix={`unit${quantityOnHand === 1 ? "" : "s"}`}
-                              disabled={saving.has(`${item.id}:quantityOnHand`)}
-                              aria-label={`Edit count of ${item.name}`}
-                              onSave={(v) => { void handleSave(item.id, "quantityOnHand", v); }}
-                            />
-                          ) : (
-                            <ClickToEditNumber
-                              value={quantityOnHand}
-                              min={0}
-                              suffix={item.unit !== "each" ? item.unit : undefined}
-                              disabled={saving.has(`${item.id}:quantityOnHand`)}
-                              aria-label={`Edit on hand quantity of ${item.name}`}
-                              onSave={(v) => { void handleSave(item.id, "quantityOnHand", v); }}
-                            />
-                          )}
-                        </td>
-                        <td>
-                          {item.itemType === "equipment" ? (
-                            <div className="data-table__primary">{item.conditionStatus ? item.conditionStatus.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()) : "No condition set"}</div>
-                          ) : (
-                            <>
-                              <div className="data-table__primary">{formatReorderPoint(item.reorderThreshold, item.unit)}</div>
-                              <div className="data-table__secondary">{formatRestockPlan(item.reorderQuantity, item.unit)}</div>
-                            </>
-                          )}
-                        </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <ClickToEditNumber
-                            value={unitCost}
+                          <QuantityStepper
+                            value={quantityOnHand}
                             min={0}
-                            step={0.01}
-                            prefix="$"
-                            disabled={saving.has(`${item.id}:unitCost`)}
-                            aria-label={`Edit last price of ${item.name}`}
-                            onSave={(v) => { void handleSave(item.id, "unitCost", v); }}
+                            suffix={item.unit !== "each" ? item.unit : undefined}
+                            disabled={saving.has(`${item.id}:quantityOnHand`)}
+                            aria-label={`Edit quantity of ${item.name}`}
+                            onSave={(v) => { void handleSave(item.id, "quantityOnHand", v); }}
                           />
                         </td>
-                        <td>{item.preferredSupplier ?? "—"}</td>
                         <td>
                           <span className={`status-chip status-chip--${item.lowStock ? "due" : "upcoming"}`}>
-                            {item.lowStock ? "Needs reorder" : "OK"}
+                            {item.lowStock ? "Low" : "OK"}
                           </span>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
@@ -269,6 +205,9 @@ export function InventoryListWorkspace({
                             aria-label={`Edit storage location of ${item.name}`}
                             onSave={(v) => { void handleSave(item.id, "storageLocation", v || null as unknown as string); }}
                           />
+                        </td>
+                        <td>
+                          <button type="button" className="button button--ghost button--sm" aria-label="More actions" style={{ padding: "2px 6px", fontSize: "1.1rem", lineHeight: 1 }}>⋮</button>
                         </td>
                       </InventoryEditableRow>
                     );})}

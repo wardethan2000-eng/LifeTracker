@@ -19,6 +19,7 @@ type OnboardingChecklistProps = {
   hobbyCount: number;
   inventoryItemCount: number;
   ideaCount: number;
+  entryCount: number;
   maintenanceScheduleCount: number;
   onDismiss: () => void;
 };
@@ -29,6 +30,7 @@ export function OnboardingChecklist({
   hobbyCount,
   inventoryItemCount,
   ideaCount,
+  entryCount,
   maintenanceScheduleCount,
   onDismiss,
 }: OnboardingChecklistProps) {
@@ -74,6 +76,13 @@ export function OnboardingChecklist({
       description: "Jot down a raw idea before you lose it — promote it later.",
       href: "/ideas/new",
       completed: ideaCount > 0,
+    },
+    {
+      id: "write-note",
+      label: "Write a note",
+      description: "Record observations, reminders, or logs against any entity.",
+      href: "/notes",
+      completed: entryCount > 0,
     },
   ];
 
