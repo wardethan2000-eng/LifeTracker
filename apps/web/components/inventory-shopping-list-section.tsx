@@ -2,9 +2,12 @@
 
 import type { InventoryPurchaseLine, InventoryShoppingListSummary } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { generateInventoryShoppingListAction, updateInventoryPurchaseLineAction } from "../app/actions";
+import { deleteInventoryPurchase, updateInventoryPurchase } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
+import { useToast } from "./toast-provider";
 
 type InventoryShoppingListSectionProps = {
   householdId: string;
@@ -149,8 +152,62 @@ function PurchaseLineRow({ householdId, purchaseId, line, redirectTo }: {
   );
 }
 
+type PurchaseEditFormProps = {
+  purchase: { supplierName: string | null; notes: string | null };
+  onSave: (data: { supplierName?: string; notes?: string }) => void;
+  onCancel: () => void;
+};
+
+function PurchaseEditForm({ purchase, onSave, onCancel }: PurchaseEditFormProps): JSX.Element {
+  const [supplierName, setSupplierName] = useState(purchase.supplierName ?? "");
+  const [notes, setNotes] = useState(purchase.notes ?? "");
+
+  return (
+    <div className="purchase-group__edit" style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+      <div className="form-grid" style={{ marginBottom: 12 }}>
+        <label className="field">
+          <span>Supplier Name</span>
+          <input type="text" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="AutoZone, Amazon, etc." />
+        </label>
+        <label className="field field--full">
+          <span>Notes</span>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="PO number, delivery notes..." />
+        </label>
+      </div>
+      <div className="inline-actions inline-actions--end">
+        <button type="button" className="button button--ghost button--sm" onClick={onCancel}>Cancel</button>
+        <button type="button" className="button button--primary button--sm" onClick={() => onSave({ supplierName: supplierName || undefined, notes: notes || undefined })}>Save</button>
+      </div>
+    </div>
+  );
+}
+
 export function InventoryShoppingListSection({ householdId, shoppingList, redirectTo }: InventoryShoppingListSectionProps): JSX.Element {
   const [collapsed, setCollapsed] = useState(true);
+  const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null);
+  const router = useRouter();
+  const { pushToast } = useToast();
+
+  const handleDeletePurchase = useCallback(async (purchaseId: string) => {
+    try {
+      await deleteInventoryPurchase(householdId, purchaseId);
+      pushToast({ message: "Purchase deleted." });
+      router.refresh();
+    } catch {
+      pushToast({ message: "Failed to delete purchase.", tone: "danger" });
+    }
+  }, [householdId, pushToast, router]);
+
+  const handleUpdatePurchase = useCallback(async (purchaseId: string, data: { supplierName?: string; notes?: string }) => {
+    try {
+      await updateInventoryPurchase(householdId, purchaseId, data);
+      pushToast({ message: "Purchase updated." });
+      setEditingPurchaseId(null);
+      router.refresh();
+    } catch {
+      pushToast({ message: "Failed to update purchase.", tone: "danger" });
+    }
+  }, [householdId, pushToast, router]);
 
   return (
     <section className="panel">
@@ -193,7 +250,31 @@ export function InventoryShoppingListSection({ householdId, shoppingList, redire
                       Open Supplier ↗
                     </a>
                   ) : null}
+                  <div className="purchase-group__actions">
+                    <button
+                      type="button"
+                      className="button button--ghost button--sm"
+                      onClick={() => setEditingPurchaseId(editingPurchaseId === purchase.id ? null : purchase.id)}
+                    >
+                      {editingPurchaseId === purchase.id ? "Cancel" : "Edit"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--ghost button--sm"
+                      style={{ color: "var(--red, #dc2626)" }}
+                      onClick={() => { void handleDeletePurchase(purchase.id); }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
+                {editingPurchaseId === purchase.id && (
+                  <PurchaseEditForm
+                    purchase={purchase}
+                    onSave={(data) => { void handleUpdatePurchase(purchase.id, data); }}
+                    onCancel={() => setEditingPurchaseId(null)}
+                  />
+                )}
                 <table className="data-table">
                   <thead>
                     <tr>

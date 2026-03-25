@@ -6,6 +6,24 @@ import type { JSX, MouseEvent, ReactNode } from "react";
 import { useCallback, useState } from "react";
 import { formatCurrency, formatDate } from "../lib/formatters";
 
+const formatExpirationLabel = (expiresAt: string | null): string | null => {
+  if (!expiresAt) return null;
+  const now = new Date();
+  const expDate = new Date(expiresAt);
+  const daysUntil = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysUntil < 0) return "Expired";
+  if (daysUntil <= 30) return `Expires in ${daysUntil}d`;
+  return formatDate(expiresAt, "—");
+};
+
+const expirationTone = (expiresAt: string | null): string => {
+  if (!expiresAt) return "";
+  const daysUntil = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (daysUntil < 0) return "status-chip--overdue";
+  if (daysUntil <= 30) return "status-chip--due";
+  return "status-chip--upcoming";
+};
+
 type InventoryEditableRowProps = {
   householdId: string;
   item: InventoryItemSummary;
@@ -89,6 +107,14 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
                     <div>
                       <span className="inventory-row-expand__label">Buy Link</span>
                       <a href={item.supplierUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: "0.8rem" }}>Visit supplier ↗</a>
+                    </div>
+                  )}
+                  {item.expiresAt && (
+                    <div>
+                      <span className="inventory-row-expand__label">Expires</span>
+                      <span className={`status-chip ${expirationTone(item.expiresAt)}`} style={{ fontSize: "0.75rem" }}>
+                        {formatExpirationLabel(item.expiresAt)}
+                      </span>
                     </div>
                   )}
                 </div>

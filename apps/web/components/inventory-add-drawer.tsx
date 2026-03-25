@@ -310,6 +310,10 @@ export function InventoryAddDrawer({ householdId, categoryOptions, open, onClose
                 <span>Storage Location</span>
                 <input type="text" name="storageLocation" placeholder="Garage shelf 2" />
               </label>
+              <label className="field">
+                <span>Expiration Date</span>
+                <input type="date" name="expiresAt" />
+              </label>
               <label className="field field--full">
                 <span>Notes</span>
                 <textarea name="notes" rows={3} placeholder="Compatible with both trucks, keep one spare on hand" />

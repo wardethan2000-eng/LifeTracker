@@ -5,8 +5,10 @@ import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";
 import { BulkActionBar } from "./bulk-action-bar";
+import { CycleCountMode } from "./cycle-count-mode";
 import { InventoryBulkActions } from "./inventory-bulk-actions";
 import { InventoryEditableRow } from "./inventory-editable-row";
+import { InventoryRowMenu } from "./inventory-row-menu";
 import { InventorySection } from "./inventory-section";
 import { ClickToEdit } from "./click-to-edit";
 import { QuantityStepper } from "./quantity-stepper";
@@ -94,6 +96,19 @@ export function InventoryListWorkspace({
 
   const allItems = useMemo(() => groupedItems.flatMap((group) => group.items), [groupedItems]);
   const selectedItems = useMemo(() => allItems.filter((item) => selectedIds.has(item.id)), [allItems, selectedIds]);
+  const [cycleCountMode, setCycleCountMode] = useState(false);
+
+  if (cycleCountMode) {
+    return (
+      <section className="panel">
+        <CycleCountMode
+          householdId={householdId}
+          items={allItems}
+          onExit={() => setCycleCountMode(false)}
+        />
+      </section>
+    );
+  }
 
   return (
     <InventorySection
@@ -101,12 +116,21 @@ export function InventoryListWorkspace({
       totalCount={totalCount}
       categoryOptions={categoryOptions}
       actions={(
+        <>
+        <button
+          type="button"
+          className="button button--ghost button--sm"
+          onClick={() => setCycleCountMode(true)}
+        >
+          Cycle Count
+        </button>
         <InventoryBulkActions
           householdId={householdId}
           selectedItems={selectedItems}
           spaces={spaces}
           onBulkAssigned={clearSelection}
         />
+        </>
       )}
     >
       {allItems.length === 0 ? (
@@ -206,8 +230,8 @@ export function InventoryListWorkspace({
                             onSave={(v) => { void handleSave(item.id, "storageLocation", v || null as unknown as string); }}
                           />
                         </td>
-                        <td>
-                          <button type="button" className="button button--ghost button--sm" aria-label="More actions" style={{ padding: "2px 6px", fontSize: "1.1rem", lineHeight: 1 }}>⋮</button>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <InventoryRowMenu householdId={householdId} itemId={item.id} itemName={item.name} />
                         </td>
                       </InventoryEditableRow>
                     );})}

@@ -194,6 +194,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </div>
           <div className="page-header__actions">
             <InventoryValuationReportButton householdId={household.id} />
+            <Link href="/inventory/trash" className="button button--ghost button--sm">Trash</Link>
             <Link href={inventoryViewHref} className="button button--primary button--sm">{t("inventoryButton")}</Link>
             <Link href={analyticsViewHref} className="button button--ghost button--sm">{t("analyticsHub")}</Link>
           </div>

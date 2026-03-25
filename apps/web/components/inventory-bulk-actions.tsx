@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { addItemToSpace } from "../app/actions";
 import {
   ApiError,
+  bulkDeleteInventoryItems,
   exportHouseholdInventory,
   importHouseholdInventory,
   type ImportInventoryResult
@@ -141,6 +142,7 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
   const [assignResult, setAssignResult] = useState<AssignResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportInventoryResult | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const resultTone = useMemo(() => {
     if (!importResult) {
@@ -257,6 +259,24 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
     }
   };
 
+  const handleBulkDelete = async (): Promise<void> => {
+    if (selectedItems.length === 0) return;
+
+    try {
+      setIsDeleting(true);
+      setErrorMessage(null);
+      await bulkDeleteInventoryItems(householdId, { itemIds: selectedItems.map((item) => item.id) });
+      pushToast({ message: `Moved ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} to trash.` });
+      onBulkAssigned?.();
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete items.";
+      setErrorMessage(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
       <div className="inventory-bulk-actions">
@@ -281,6 +301,15 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
           }}
         >
           Assign to Space{selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
+        </button>
+
+        <button
+          type="button"
+          className="button button--danger button--sm"
+          disabled={selectedItems.length === 0 || isDeleting}
+          onClick={() => { void handleBulkDelete(); }}
+        >
+          {isDeleting ? "Deleting..." : `Delete${selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}`}
         </button>
 
         {(() => {

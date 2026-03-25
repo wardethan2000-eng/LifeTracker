@@ -50,7 +50,8 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
       supplierUrl: item.supplierUrl ?? "",
       unitCost: item.unitCost !== null && item.unitCost !== undefined ? String(item.unitCost) : "",
       storageLocation: item.storageLocation ?? "",
-      notes: item.notes ?? ""
+      notes: item.notes ?? "",
+      expiresAt: item.expiresAt ? item.expiresAt.slice(0, 10) : ""
     }
   });
   const itemType = watch("itemType") === "equipment" ? "equipment" : "consumable";
@@ -104,6 +105,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
     if (values.unitCost !== undefined) input.unitCost = values.unitCost;
     if (values.storageLocation !== undefined) input.storageLocation = values.storageLocation;
     if (values.notes !== undefined) input.notes = values.notes;
+    if (values.expiresAt !== undefined) input.expiresAt = values.expiresAt ? new Date(values.expiresAt).toISOString() : null;
 
     try {
       const formData = new FormData();
@@ -126,6 +128,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
       formData.set("unitCost", values.unitCost === undefined ? "" : String(values.unitCost));
       formData.set("storageLocation", values.storageLocation ?? "");
       formData.set("notes", values.notes ?? "");
+      formData.set("expiresAt", values.expiresAt ?? "");
 
       await updateInventoryItemAction(formData);
       onSaved();
@@ -226,6 +229,11 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
         <span>Storage Location</span>
         <input type="text" {...register("storageLocation")} />
         <InlineError message={errors.storageLocation?.message} size="sm" />
+      </label>
+      <label className="field">
+        <span>Expiration Date</span>
+        <input type="date" {...register("expiresAt")} />
+        <InlineError message={errors.expiresAt?.message} size="sm" />
       </label>
       <label className="field field--full">
         <span>Description</span>

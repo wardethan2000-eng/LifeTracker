@@ -164,6 +164,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                     <div><dt>Storage Location</dt><dd>{item.storageLocation ?? "Not recorded"}</dd></div>
                     <div><dt>Preferred Supplier</dt><dd>{item.preferredSupplier ?? "Not recorded"}</dd></div>
                     <div><dt>Supplier Link</dt><dd>{item.supplierUrl ? <a href={item.supplierUrl} className="text-link" target="_blank" rel="noreferrer">Open supplier page</a> : "Not recorded"}</dd></div>
+                    <div><dt>Expiration Date</dt><dd>{item.expiresAt ? formatDate(item.expiresAt, "Not set") : "Not set"}</dd></div>
                     <div><dt>Created</dt><dd>{formatDateTime(item.createdAt, "—")}</dd></div>
                     <div><dt>Last Updated</dt><dd>{formatDateTime(item.updatedAt, "—")}</dd></div>
                   </dl>
