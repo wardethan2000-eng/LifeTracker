@@ -8,7 +8,27 @@ const activityMocks = vi.hoisted(() => ({
 const seriesLibMocks = vi.hoisted(() => ({
   getNextHobbySeriesBatchNumber: vi.fn(async () => 2),
   syncHobbySeriesBatchCount: vi.fn(async () => undefined),
-  updateHobbySessionSeriesLink: vi.fn(async () => undefined),
+  updateHobbySessionSeriesLink: vi.fn(async () => ({
+    id: "clkeepersession0000000001",
+    hobbyId: "clkeeperhobby000000000001",
+    recipeId: null,
+    seriesId: "clkeeperseries00000000001",
+    routineId: null,
+    collectionItemId: null,
+    batchNumber: 2,
+    name: "Spring Batch Series - Batch 2",
+    status: "active",
+    startDate: null,
+    completedDate: null,
+    durationMinutes: null,
+    pipelineStepId: null,
+    customFields: {},
+    totalCost: null,
+    rating: null,
+    notes: null,
+    createdAt: new Date("2026-03-17T00:00:00.000Z"),
+    updatedAt: new Date("2026-03-17T00:00:00.000Z"),
+  })),
 }));
 
 const searchMocks = vi.hoisted(() => ({
@@ -51,6 +71,7 @@ const basePrisma = () => {
     create: vi.fn(async () => seriesRecord),
     findUniqueOrThrow: vi.fn(async () => seriesRecord),
     update: vi.fn(async () => seriesRecord),
+    delete: vi.fn(async () => seriesRecord),
   };
   const txSession = {
     updateMany: vi.fn(async () => ({ count: 0 })),
@@ -289,10 +310,10 @@ describe("hobby series routes", () => {
       try {
         const res = await app.inject({
           method: "POST",
-          url: `${BASE}/${seriesId}/sessions/${sessionId}`,
-          payload: {},
+          url: `${BASE}/${seriesId}/sessions`,
+          payload: { sessionId },
         });
-        expect(res.statusCode).toBe(200);
+        expect(res.statusCode).toBe(201);
         expect(seriesLibMocks.updateHobbySessionSeriesLink).toHaveBeenCalledTimes(1);
       } finally {
         await app.close();

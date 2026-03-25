@@ -231,7 +231,7 @@ describe("hobby metric routes", () => {
         });
         expect(res.statusCode).toBe(201);
         expect(res.json().id).toBe(readingId);
-        expect(prisma.hobbyMetricReading.create).toHaveBeenCalledTimes(1);
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       } finally {
         await app.close();
       }
@@ -284,7 +284,7 @@ describe("hobby metric routes", () => {
           url: `${BASE}/${metricId}/readings/${readingId}`,
         });
         expect(res.statusCode).toBe(204);
-        expect(prisma.hobbyMetricReading.delete).toHaveBeenCalledTimes(1);
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       } finally {
         await app.close();
       }

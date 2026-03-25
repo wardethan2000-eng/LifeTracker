@@ -51,6 +51,7 @@ const createPublicShareApp = async () => {
       )
     },
     assetTimelineEntry: { findMany: async () => [] },
+    entry: { findMany: async () => [] },
     projectTask: { findMany: async () => [] },
     projectPhase: { findMany: async () => [] },
     maintenanceLog: { findMany: async () => [] },

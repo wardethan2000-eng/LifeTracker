@@ -105,7 +105,12 @@ describe("hobby activity mode routes", () => {
       hobby: {
         create: hobbyCreate,
         findMany: hobbyFindMany
-      }
+      },
+      hobbySessionStatusStep: {
+        createMany: vi.fn(async () => ({ count: 0 }))
+      },
+      $transaction: async <T>(callback: (tx: { hobby: { create: typeof hobbyCreate }; hobbySessionStatusStep: { createMany: Function } }) => Promise<T>) =>
+        callback({ hobby: { create: hobbyCreate }, hobbySessionStatusStep: { createMany: vi.fn(async () => ({ count: 0 })) } })
     }, [hobbyRoutes]);
 
     try {

@@ -203,16 +203,17 @@ describe("hobby session bulk routes", () => {
       }
     });
 
-    it("returns 404 when hobby not found", async () => {
+    it("does not 404 when hobby sessions are not found", async () => {
       const prisma = basePrisma();
-      // archive does NOT validate hobby existence — it queries hobbySession directly
-      // so test that an empty sessionIds input works cleanly
+      // archive route does NOT validate hobby existence — it queries hobbySession directly
+      // when no sessions are found for the given IDs, it returns succeeded=0
+      prisma.hobbySession.findMany = vi.fn(async () => []);
       const app = await createApp(prisma);
       try {
         const res = await app.inject({
           method: "POST",
           url: `${BASE}/bulk/archive`,
-          payload: { householdId, hobbyId, sessionIds: [] },
+          payload: { householdId, hobbyId, sessionIds: [sessionId1] },
         });
         expect(res.statusCode).toBe(200);
         expect(res.json().succeeded).toBe(0);

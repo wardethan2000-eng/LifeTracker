@@ -127,6 +127,7 @@ const basePrisma = () => ({
         create: vi.fn(async () => baseSessionRecord),
         update: vi.fn(async () => baseSessionRecord),
         findUniqueOrThrow: vi.fn(async () => baseSessionRecord),
+        delete: vi.fn(async () => baseSessionRecord),
       },
       hobbyRecipe: { findUnique: vi.fn(async () => null) },
       hobbySessionIngredient: { createMany: vi.fn(async () => ({ count: 0 })) },
