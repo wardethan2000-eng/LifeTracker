@@ -37,7 +37,7 @@ export default async function HobbyProjectDetailPage({ params }: HobbyProjectDet
           <div>
             <div style={{ display: "grid", gap: "4px" }}>
               <Link href="/hobbies" className="text-link" style={{ fontSize: "0.85rem" }}>← All Hobbies</Link>
-              <Link href={`/hobbies/${hobbyId}?tab=projects`} className="text-link" style={{ fontSize: "0.85rem" }}>← Back to {hobby.name}</Link>
+              <Link href={`/hobbies/${hobbyId}?tab=projects`} className="text-link" style={{ fontSize: "0.85rem" }}>← {hobby.name}</Link>
             </div>
             <h1 style={{ marginTop: "4px" }}>{project.name}</h1>
             <p style={{ color: "var(--ink-muted)", fontSize: "0.9rem" }}>{project.description ?? "No description."}</p>

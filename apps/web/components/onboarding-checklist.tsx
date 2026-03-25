@@ -124,7 +124,7 @@ export function OnboardingChecklist({
           className="button button--ghost"
           onClick={onDismiss}
         >
-          Dismiss getting started
+          Dismiss
         </button>
       </div>
     </div>

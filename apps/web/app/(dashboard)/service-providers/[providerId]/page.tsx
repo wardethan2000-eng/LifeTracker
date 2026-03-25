@@ -61,7 +61,7 @@ export default async function ServiceProviderDetailPage({ params, searchParams }
             </p>
           </div>
           <div className="page-header__actions">
-            <Link href={backHref} className="button button--ghost button--sm">Back to Providers</Link>
+            <Link href={backHref} className="button button--ghost button--sm">← Providers</Link>
           </div>
         </header>
 

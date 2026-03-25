@@ -44,7 +44,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
     if (!household) {
       return (
-        <p>No household found. <Link href="/projects" className="text-link">Go back to projects</Link>.</p>
+        <p>No household found. <Link href="/projects" className="text-link">← Projects</Link>.</p>
       );
     }
 

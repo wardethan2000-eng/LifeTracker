@@ -122,7 +122,7 @@ export function InventorySection({ householdId, totalCount, categoryOptions, act
             className={`button button--primary button--sm${showForm ? " button--active" : ""}`}
             onClick={() => setShowForm((current) => !current)}
           >
-            {showForm ? "Close Menu" : "Add to Inventory"}
+            {showForm ? "Cancel" : "Add to Inventory"}
           </button>
         </div>
       </div>

@@ -34,6 +34,7 @@ export function RichEditorDisplay({
 
 function RichDisplay({ content, className }: { content: string; className?: string | undefined }) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,

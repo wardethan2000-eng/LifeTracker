@@ -114,7 +114,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
               details={[item.name, ...(item.partNumber ? [`Part ${item.partNumber}`] : [])]}
               copyValue={item.scanTag ?? item.id}
             />
-            <Link href={backHref} className="button button--ghost button--sm">Back to Inventory</Link>
+            <Link href={backHref} className="button button--ghost button--sm">← Inventory</Link>
           </div>
         </header>
 

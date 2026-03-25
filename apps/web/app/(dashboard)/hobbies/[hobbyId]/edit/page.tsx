@@ -43,7 +43,7 @@ export default async function EditHobbyPage({ params }: EditHobbyPageProps): Pro
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=settings`} className="text-link" style={{ fontSize: "0.85rem" }}>
-              ← Back to {hobby.name}
+              ← {hobby.name}
             </Link>
             <h1 style={{ marginTop: "4px" }}>Edit Hobby</h1>
           </div>

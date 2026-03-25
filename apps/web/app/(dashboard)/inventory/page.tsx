@@ -195,7 +195,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             <div className="stat-card stat-card--danger">
               <span className="stat-card__label">Out of Stock</span>
               <strong className="stat-card__value">{outOfStockCount}</strong>
-              <span className="stat-card__sub">Items with nothing currently on hand</span>
+              <span className="stat-card__sub">Items with no stock on hand</span>
             </div>
             <div className="stat-card">
               <span className="stat-card__label">Categories</span>
@@ -250,7 +250,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                 </div>
                 <div className="panel__body">
                   {lowStockItems.length === 0 ? (
-                    <p className="panel__empty">Nothing is currently below its reorder threshold.</p>
+                    <p className="panel__empty">Nothing below reorder threshold.</p>
                   ) : (
                     <table className="data-table">
                       <thead>

@@ -29,7 +29,7 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
       <>
         <RealtimeRefreshBoundary householdId={detail.asset.householdId} eventTypes={["asset.updated", "maintenance.completed"]} />
         <div className="detail-topbar">
-          <Link href="/assets" className="text-link">&larr; Back to Assets</Link>
+          <Link href="/assets" className="text-link">&larr; Assets</Link>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <Link href={`/assets/${detail.asset.id}/maintenance`} className="button button--primary button--sm">
               Log Maintenance

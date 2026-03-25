@@ -21,7 +21,7 @@ const navItems: Array<SidebarNavItem & { translationKey: string }> = [
   { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
   { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
   { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
-  { href: "/trash", label: "Recently Deleted", translationKey: "trash", icon: "trash" },
+  { href: "/trash", label: "Trash", translationKey: "trash", icon: "trash" },
 ];
 
 const prefetchedRoutes = [

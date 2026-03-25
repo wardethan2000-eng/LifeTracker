@@ -39,7 +39,7 @@ export default async function HobbySeriesDetailPage({ params }: HobbySeriesDetai
                 ← All Hobbies
               </Link>
               <Link href={`/hobbies/${hobbyId}?tab=series`} className="text-link" style={{ fontSize: "0.85rem" }}>
-                ← Back to {hobby.name}
+                ← {hobby.name}
               </Link>
             </div>
             <h1 style={{ marginTop: "4px" }}>{series.name}</h1>

@@ -1207,7 +1207,9 @@ export function CanvasRenderer({
           <button type="button"
             className={`idea-canvas__tool-btn${activeTool === "select" ? " idea-canvas__tool-btn--active" : ""}`}
             onClick={() => setActiveTool("select")} title="Select / drag (S)">
-            ▲ Select
+            <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <path d="M0 0v11.5l3-3L5.5 14l1.8-.9L4.8 8H10L0 0z" />
+            </svg>{" "}Select
           </button>
           <button type="button"
             className={`idea-canvas__tool-btn${activeTool === "pan" ? " idea-canvas__tool-btn--active" : ""}`}

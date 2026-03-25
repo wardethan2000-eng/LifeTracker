@@ -367,7 +367,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                 <span className="stat-card__sub">For late completions only</span>
               </div>
               <div className="stat-card stat-card--danger">
-                <span className="stat-card__label">Currently Overdue</span>
+                <span className="stat-card__label">Overdue</span>
                 <strong className="stat-card__value">{complianceDashboard?.overview.currentOverdueCount ?? 0}</strong>
                 <span className="stat-card__sub">Active schedules overdue right now</span>
               </div>

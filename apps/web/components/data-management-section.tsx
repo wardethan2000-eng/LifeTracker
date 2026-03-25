@@ -20,7 +20,7 @@ export function DataManagementSection({ householdId }: DataManagementSectionProp
     try {
       await downloadHouseholdJson(householdId);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : "Export failed. Please try again.");
+      setExportError(error instanceof Error ? error.message : "Export failed. Try again.");
     } finally {
       setIsExporting(false);
     }

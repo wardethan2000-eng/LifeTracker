@@ -79,10 +79,10 @@ export default async function HobbySeriesComparePage({ params, searchParams }: H
           <div>
             <div style={{ display: "grid", gap: "4px" }}>
               <Link href={`/hobbies/${hobbyId}/series/${seriesId}`} className="text-link" style={{ fontSize: "0.85rem" }}>
-                ← Back to {comparison.series.name}
+                ← {comparison.series.name}
               </Link>
               <Link href={`/hobbies/${hobbyId}?tab=series`} className="text-link" style={{ fontSize: "0.85rem" }}>
-                ← Back to {hobby.name}
+                ← {hobby.name}
               </Link>
             </div>
             <h1 style={{ marginTop: "4px" }}>Batch Comparison</h1>

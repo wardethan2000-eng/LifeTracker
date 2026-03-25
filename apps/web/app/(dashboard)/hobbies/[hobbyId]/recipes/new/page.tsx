@@ -31,7 +31,7 @@ export default async function NewHobbyRecipePage({ params }: NewHobbyRecipePageP
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=recipes`} className="text-link" style={{ fontSize: "0.85rem" }}>
-              ← Back to {hobby.name}
+              ← {hobby.name}
             </Link>
             <h1 style={{ marginTop: "4px" }}>New Recipe</h1>
           </div>

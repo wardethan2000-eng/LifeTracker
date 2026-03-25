@@ -330,7 +330,7 @@ export function HobbyAnalyticsWorkspace({ householdId, hobbies }: HobbyAnalytics
           <div className="stat-card">
             <span className="stat-card__label">Active Hobbies</span>
             <strong className="stat-card__value">{overviewData.summary.activeHobbies}</strong>
-            <span className="stat-card__sub">Currently in rotation</span>
+            <span className="stat-card__sub">In rotation</span>
           </div>
           <div className="stat-card">
             <span className="stat-card__label">All-Time Sessions</span>

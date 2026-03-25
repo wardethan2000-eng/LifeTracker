@@ -27,7 +27,7 @@ export default async function CanvasPage({ params, searchParams }: CanvasPagePro
       <div>
         <div style={{ marginBottom: 12 }}>
           <Link href={`/notes?householdId=${household.id}`} className="button button--ghost button--small">
-            ← Back to Notes
+            ← Notes
           </Link>
         </div>
         <CanvasPageClient

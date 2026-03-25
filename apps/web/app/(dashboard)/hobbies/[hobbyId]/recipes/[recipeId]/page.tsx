@@ -73,7 +73,7 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=recipes`} className="text-link" style={{ fontSize: "0.85rem" }}>
-              ← Back to {hobby.name}
+              ← {hobby.name}
             </Link>
             <h1 style={{ marginTop: "4px" }}>{recipe.name}</h1>
             {recipe.styleCategory ? <p style={{ marginTop: "4px" }}>{recipe.styleCategory}</p> : null}

@@ -72,7 +72,7 @@ type HomeDashboardProps = {
 };
 
 const AVAILABLE_QUICK_ACTIONS: Array<{ id: string; label: string; href: string }> = [
-  { id: "add-asset", label: "+ Add New Asset", href: "/assets/new" },
+  { id: "add-asset", label: "+ New Asset", href: "/assets/new" },
   { id: "view-projects", label: "View Projects", href: "/projects" },
   { id: "maintenance-queue", label: "Maintenance Queue", href: "/maintenance" },
   { id: "asset-registry", label: "Asset Registry", href: "/assets" },

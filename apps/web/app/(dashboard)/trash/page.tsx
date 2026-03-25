@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import { getMe, getHouseholdTrash } from "../../../lib/api";
 import { TrashPageClient } from "./trash-client";
 
-export const metadata = { title: "Recently Deleted" };
+export const metadata = { title: "Trash" };
 
 export default async function TrashPage(): Promise<JSX.Element> {
   let householdId: string | null = null;
@@ -17,7 +17,7 @@ export default async function TrashPage(): Promise<JSX.Element> {
   if (!householdId) {
     return (
       <main className="trash-page">
-        <h1 className="trash-page__title">Recently Deleted</h1>
+        <h1 className="trash-page__title">Trash</h1>
         <p className="trash-page__empty">No household found.</p>
       </main>
     );
@@ -35,7 +35,7 @@ export default async function TrashPage(): Promise<JSX.Element> {
     <main className="trash-page">
       <div className="trash-page__header">
         <div>
-          <h1 className="trash-page__title">Recently Deleted</h1>
+          <h1 className="trash-page__title">Trash</h1>
           <p className="trash-page__subtitle">
             Deleted items are kept for 30 days before being permanently removed.
             Hobbies are deleted immediately and do not appear here.

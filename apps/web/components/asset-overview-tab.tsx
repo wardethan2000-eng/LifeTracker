@@ -136,7 +136,7 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
           </div>
           <div className="panel__body">
             {dueNow.length === 0 ? (
-              <p className="panel__empty">No maintenance items are currently due.</p>
+              <p className="panel__empty">No maintenance due.</p>
             ) : (
               <div className="schedule-stack">
                 {dueNow.map((schedule) => (

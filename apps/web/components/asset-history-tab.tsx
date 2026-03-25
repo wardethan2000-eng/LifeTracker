@@ -102,7 +102,7 @@ export async function AssetHistoryTab({ detail, assetId, searchParams, historyTi
 
           {items.length === 0 ? (
             <div className="timeline-empty">
-              No history recorded yet. Use the + Add Entry button to start building this asset&apos;s timeline, or log maintenance on the Maintenance tab.
+              No history yet. Add an entry or log maintenance to start this asset&apos;s timeline.
             </div>
           ) : (
             <div className="timeline-feed">

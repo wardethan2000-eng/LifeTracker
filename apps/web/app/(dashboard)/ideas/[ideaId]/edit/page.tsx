@@ -15,7 +15,7 @@ export default async function EditIdeaPage({ params }: EditIdeaPageProps): Promi
     const household = me.households[0];
 
     if (!household) {
-      return <p>No household found. <Link href="/ideas" className="text-link">Go back to Ideas</Link>.</p>;
+      return <p>No household found. <Link href="/ideas" className="text-link">← Ideas</Link>.</p>;
     }
 
     const idea = await getIdea(household.id, ideaId);
@@ -29,7 +29,7 @@ export default async function EditIdeaPage({ params }: EditIdeaPageProps): Promi
           </div>
           <div className="page-header__actions">
             <Link href={`/ideas/${ideaId}`} className="button button--ghost">
-              Back to Idea
+              ← Idea
             </Link>
           </div>
         </header>
@@ -45,7 +45,7 @@ export default async function EditIdeaPage({ params }: EditIdeaPageProps): Promi
         <div className="panel">
           <div className="panel__body--padded">
             <p>Failed to load idea: {error.message}</p>
-            <Link href="/ideas" className="text-link">← Back to Ideas</Link>
+            <Link href="/ideas" className="text-link">← Ideas</Link>
           </div>
         </div>
       );

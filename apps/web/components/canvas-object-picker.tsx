@@ -146,7 +146,7 @@ export default function CanvasObjectPicker({
         <div className="canvas-obj-picker__header">
           <div>
             <span className="canvas-obj-picker__title">Object Library</span>
-            <span className="canvas-obj-picker__subtitle">Click an object to place it on the canvas</span>
+            <span className="canvas-obj-picker__subtitle">Choose an object, then click the canvas to place it</span>
           </div>
           <button
             type="button"

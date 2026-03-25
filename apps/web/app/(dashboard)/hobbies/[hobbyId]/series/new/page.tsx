@@ -31,7 +31,7 @@ export default async function NewHobbySeriesPage({ params }: NewHobbySeriesPageP
         <header className="page-header">
           <div>
             <Link href={`/hobbies/${hobbyId}?tab=series`} className="text-link" style={{ fontSize: "0.85rem" }}>
-              ← Back to {hobby.name}
+              ← {hobby.name}
             </Link>
             <h1 style={{ marginTop: "4px" }}>New Series</h1>
           </div>

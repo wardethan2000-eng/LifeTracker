@@ -45,7 +45,7 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
                 ← All Hobbies
               </Link>
               <Link href={`/hobbies/${hobbyId}`} className="text-link" style={{ fontSize: "0.85rem" }}>
-                ← Back to {hobby.name}
+                ← {hobby.name}
               </Link>
             </div>
             <h1 style={{ marginTop: "4px" }}>{session.name}</h1>

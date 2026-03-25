@@ -233,6 +233,7 @@ export function CanvasRenderer({
 
   // Object picker panel visibility
   const [objectPickerOpen, setObjectPickerOpen] = useState(false);
+  const [pendingObjectPlacement, setPendingObjectPlacement] = useState<CanvasObjectPlacement | null>(null);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<IdeaCanvasNode[]>([]);
@@ -368,6 +369,51 @@ export function CanvasRenderer({
 
   // ─── Mouse handlers ─────────────────────────────────────────────────────
 
+  const placeObjectAtCanvasPoint = useCallback(async (placement: CanvasObjectPlacement, canvasX: number, canvasY: number) => {
+    let imageUrl: string;
+    let resolvedUrl: string;
+    let defaultWidth: number;
+    let defaultHeight: number;
+    let maskJson: string | undefined;
+
+    if (placement.source === "preset") {
+      const { preset } = placement;
+      imageUrl = preset.svgPath;
+      resolvedUrl = preset.svgPath;
+      defaultWidth = preset.defaultWidth;
+      defaultHeight = preset.defaultHeight;
+    } else {
+      const { object, resolvedUrl: ru } = placement;
+      imageUrl = object.attachmentId ? `attachment:${object.attachmentId}` : ru;
+      resolvedUrl = ru;
+      defaultWidth = 160;
+      defaultHeight = 160;
+      maskJson = object.maskData ?? undefined;
+    }
+
+    const x = maybeSnap(canvasX - defaultWidth / 2);
+    const y = maybeSnap(canvasY - defaultHeight / 2);
+
+    const node = await createCanvasNode(householdId, canvasId, {
+      label: placement.source === "preset" ? placement.preset.label : placement.object.name,
+      x, y,
+      width: defaultWidth,
+      height: defaultHeight,
+      objectType: "object",
+      imageUrl,
+      maskJson,
+      strokeWidth: 0,
+    });
+
+    setNodeImageUrls((prev) => new Map(prev).set(node.id, resolvedUrl));
+    const newNodes = [...nodes, node];
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+    setSelectedIds(new Set([node.id]));
+    setPendingObjectPlacement(null);
+    setActiveTool("select");
+  }, [householdId, canvasId, maybeSnap, nodes, edges, pushHistory]);
+
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     const target = e.target as SVGElement;
@@ -379,6 +425,9 @@ export function CanvasRenderer({
 
     if (activeTool === "pan") {
       setDrag({ type: "pan", startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
+    } else if (activeTool === "object") {
+      if (!pendingObjectPlacement) return;
+      void placeObjectAtCanvasPoint(pendingObjectPlacement, cp.x, cp.y);
     } else if (activeTool === "select") {
       if (e.shiftKey) {
         // Shift+drag on empty canvas → rubber-band select
@@ -417,7 +466,7 @@ export function CanvasRenderer({
     } else if (activeTool === "measure") {
       setDrag({ type: "measure", startCX: maybeSnap(cp.x), startCY: maybeSnap(cp.y), endCX: maybeSnap(cp.x), endCY: maybeSnap(cp.y) });
     }
-  }, [activeTool, panX, panY, screenToCanvas, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, wallChainStartRef]);
+  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, wallChainStartRef]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Update physical cursor readout
@@ -986,7 +1035,7 @@ export function CanvasRenderer({
       setBgImageDims(dims);
       fitViewportToImage(dims.w, dims.h);
     } catch (err) {
-      setBgUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setBgUploadError(err instanceof Error ? err.message : "Upload failed. Try again.");
     } finally {
       setBgUploading(false);
     }
@@ -1057,7 +1106,7 @@ export function CanvasRenderer({
       setSelectedIds(new Set([node.id]));
       setActiveTool("select");
     } catch (err) {
-      setImgObjUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setImgObjUploadError(err instanceof Error ? err.message : "Upload failed. Try again.");
     } finally {
       setImgObjUploading(false);
     }
@@ -1065,56 +1114,11 @@ export function CanvasRenderer({
 
   // ─── Place object from library / preset ───────────────────────────────────
 
-  const handlePlaceObject = useCallback(async (placement: CanvasObjectPlacement) => {
+  const handlePlaceObject = useCallback((placement: CanvasObjectPlacement) => {
     setObjectPickerOpen(false);
-    setActiveTool("select");
-
-    const svg = svgRef.current;
-    const rect = svg?.getBoundingClientRect();
-    const viewCX = rect ? rect.width / 2 / zoom - panX : 300;
-    const viewCY = rect ? rect.height / 2 / zoom - panY : 200;
-
-    let imageUrl: string;
-    let resolvedUrl: string;
-    let defaultWidth: number;
-    let defaultHeight: number;
-    let maskJson: string | undefined;
-
-    if (placement.source === "preset") {
-      const { preset } = placement;
-      imageUrl = preset.svgPath;
-      resolvedUrl = preset.svgPath;
-      defaultWidth = preset.defaultWidth;
-      defaultHeight = preset.defaultHeight;
-    } else {
-      const { object, resolvedUrl: ru } = placement;
-      imageUrl = object.attachmentId ? `attachment:${object.attachmentId}` : ru;
-      resolvedUrl = ru;
-      defaultWidth = 160;
-      defaultHeight = 160;
-      maskJson = object.maskData ?? undefined;
-    }
-
-    const x = maybeSnap(viewCX - defaultWidth / 2);
-    const y = maybeSnap(viewCY - defaultHeight / 2);
-
-    const node = await createCanvasNode(householdId, canvasId, {
-      label: placement.source === "preset" ? placement.preset.label : placement.object.name,
-      x, y,
-      width: defaultWidth,
-      height: defaultHeight,
-      objectType: "object",
-      imageUrl,
-      maskJson,
-      strokeWidth: 0,
-    });
-
-    setNodeImageUrls((prev) => new Map(prev).set(node.id, resolvedUrl));
-    const newNodes = [...nodes, node];
-    setNodes(newNodes);
-    pushHistory(newNodes, edges);
-    setSelectedIds(new Set([node.id]));
-  }, [householdId, canvasId, zoom, panX, panY, nodes, edges, maybeSnap, pushHistory]);
+    setPendingObjectPlacement(placement);
+    setActiveTool("object");
+  }, []);
 
   // ─── Copy / Paste ─────────────────────────────────────────────────────────
 
@@ -1205,6 +1209,7 @@ export function CanvasRenderer({
         setActiveTool("select");
         setEditingNodeId(null);
         setEditingEdgeId(null);
+        setPendingObjectPlacement(null);
         wallChainStartRef.current = null; // cancel wall chain
       } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
@@ -2039,7 +2044,9 @@ export function CanvasRenderer({
           <button type="button"
             className={`idea-canvas__tool-btn${activeTool === "select" ? " idea-canvas__tool-btn--active" : ""}`}
             onClick={() => setActiveTool("select")} title="Select / drag (S)">
-            ▲ Select
+            <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <path d="M0 0v11.5l3-3L5.5 14l1.8-.9L4.8 8H10L0 0z" />
+            </svg>{" "}Select
           </button>
           <button type="button"
             className={`idea-canvas__tool-btn${activeTool === "pan" ? " idea-canvas__tool-btn--active" : ""}`}
@@ -2110,7 +2117,15 @@ export function CanvasRenderer({
         <button type="button"
           className={`idea-canvas__tool-btn${activeTool === "object" || objectPickerOpen ? " idea-canvas__tool-btn--active" : ""}`}
           title="Place object from library"
-          onClick={() => { setActiveTool("object"); setObjectPickerOpen((v) => !v); }}>
+          onClick={() => {
+            if (objectPickerOpen) {
+              setObjectPickerOpen(false);
+              if (!pendingObjectPlacement) setActiveTool("select");
+              return;
+            }
+            setActiveTool("object");
+            setObjectPickerOpen(true);
+          }}>
           🧩 Object
         </button>
         <div className="idea-canvas__toolbar-divider" />
@@ -2390,7 +2405,15 @@ export function CanvasRenderer({
       {/* Hints */}
       {drag.type === "edge" ? (
         <div className="idea-canvas__hint">Click a target node to connect, or press Esc to cancel.</div>
-      ) : activeTool !== "select" && activeTool !== "pan" && activeTool !== "object" ? (
+      ) : activeTool === "object" ? (
+        <div className="idea-canvas__hint">
+          {objectPickerOpen
+            ? "Choose an object from the library."
+            : pendingObjectPlacement
+              ? `Click the canvas to place ${pendingObjectPlacement.source === "preset" ? pendingObjectPlacement.preset.label : pendingObjectPlacement.object.name}. Press Esc to cancel.`
+              : "Open the object library, then choose an object to place."}
+        </div>
+      ) : activeTool !== "select" && activeTool !== "pan" ? (
         <div className="idea-canvas__hint">
           {activeTool === "wall"
             ? (wallChainStartRef.current
@@ -2419,8 +2442,11 @@ export function CanvasRenderer({
       {objectPickerOpen && typeof document !== "undefined" ? createPortal(
         <CanvasObjectPicker
           householdId={householdId}
-          onPlace={(placement) => { void handlePlaceObject(placement); }}
-          onClose={() => { setObjectPickerOpen(false); setActiveTool("select"); }}
+          onPlace={handlePlaceObject}
+          onClose={() => {
+            setObjectPickerOpen(false);
+            if (!pendingObjectPlacement) setActiveTool("select");
+          }}
         />,
         document.body
       ) : null}

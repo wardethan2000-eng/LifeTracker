@@ -630,7 +630,7 @@ export function SpacesSectionClient({
             {printing ? "Preparing..." : "Print All Labels"}
           </button>
           <button type="button" className="button button--primary button--sm" onClick={() => setShowCreate((current) => !current)}>
-            {showCreate ? "Close Form" : "Add Space"}
+            {showCreate ? "Cancel" : "Add Space"}
           </button>
         </div>
       </div>

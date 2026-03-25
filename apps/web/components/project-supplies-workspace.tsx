@@ -238,7 +238,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
               <>
                 <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Category</button>
                 <button type="button" className="button button--sm" onClick={() => setShowCreateForm((v) => !v)}>
-                  {showCreateForm ? "Close form" : "+ Add Supply"}
+                  {showCreateForm ? "Cancel" : "+ Add Supply"}
                 </button>
               </>
             )}

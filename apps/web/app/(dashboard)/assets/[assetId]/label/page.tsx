@@ -54,7 +54,7 @@ export default async function AssetLabelPage({ params, searchParams }: AssetLabe
             <p>{label.assetTag} · {formatCategoryLabel(label.category)}</p>
           </div>
           <div className="inline-actions inline-actions--end">
-            <Link href={`/assets/${assetId}`} className="button button--ghost button--sm">Back to asset</Link>
+            <Link href={`/assets/${assetId}`} className="button button--ghost button--sm">← Asset</Link>
             <Link href={`/assets/${assetId}/label?layout=single`} className="button button--ghost button--sm">Single</Link>
             <Link href={`/assets/${assetId}/label?layout=sheet&copies=10`} className="button button--ghost button--sm">Sheet x10</Link>
             <AssetLabelPrintToolbar />

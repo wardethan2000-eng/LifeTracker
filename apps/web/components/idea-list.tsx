@@ -185,48 +185,50 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
             );
           })}
         </div>
-        <select
-          className="input input--sm"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          <option value="all">All Categories</option>
-          {Object.entries(categoryLabels).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-        <select
-          className="input input--sm"
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
-        >
-          <option value="all">All Priorities</option>
-          {Object.entries(priorityLabels).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-        <input
-          type="search"
-          className="input input--sm"
-          placeholder="Search ideas\u2026"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <div className="view-toggle" style={{ marginLeft: "auto" }}>
-          <button
-            type="button"
-            className={`button button--sm${viewMode === "board" ? " button--primary" : " button--ghost"}`}
-            onClick={() => setViewMode("board")}
+        <div className="idea-filter-row">
+          <select
+            className="input input--sm"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
           >
-            Board
-          </button>
-          <button
-            type="button"
-            className={`button button--sm${viewMode === "table" ? " button--primary" : " button--ghost"}`}
-            onClick={() => setViewMode("table")}
+            <option value="all">All Categories</option>
+            {Object.entries(categoryLabels).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+          <select
+            className="input input--sm"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
           >
-            Table
-          </button>
+            <option value="all">All Priorities</option>
+            {Object.entries(priorityLabels).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+          <input
+            type="search"
+            className="input input--sm idea-filter-row__search"
+            placeholder={"Search ideas\u2026"}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <div className="view-toggle">
+            <button
+              type="button"
+              className={`button button--sm${viewMode === "board" ? " button--primary" : " button--ghost"}`}
+              onClick={() => setViewMode("board")}
+            >
+              Board
+            </button>
+            <button
+              type="button"
+              className={`button button--sm${viewMode === "table" ? " button--primary" : " button--ghost"}`}
+              onClick={() => setViewMode("table")}
+            >
+              Table
+            </button>
+          </div>
         </div>
       </div>
 
@@ -282,7 +284,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                         aria-label={`Select ${idea.title}`}
                       />
                       <span className={`priority-dot priority-dot--${idea.priority}`} />
-                      <Link href={`/ideas/${idea.id}`} className="idea-board__card-title">
+                      <Link href={`/ideas/${idea.id}`} className="idea-board__card-title" style={{ flex: 1, minWidth: 0 }}>
                         {idea.title}
                       </Link>
                     </div>
@@ -308,7 +310,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                         className="button button--ghost button--xs"
                         onClick={() => setStageMenu(stageMenu === idea.id ? null : idea.id)}
                       >
-                        Move \u25BE
+                        {"Move \u25BE"}
                       </button>
                       {stageMenu === idea.id && (
                         <div className="dropdown-menu" style={{ position: "absolute", top: "100%", left: 0, zIndex: 10 }}>

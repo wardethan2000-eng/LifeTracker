@@ -31,7 +31,7 @@ export default async function NewIdeaPage(): Promise<JSX.Element> {
         </div>
         <div className="page-header__actions">
           <Link href="/ideas" className="button button--ghost">
-            Back to Ideas
+            ← Ideas
           </Link>
         </div>
       </header>

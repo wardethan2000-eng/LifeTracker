@@ -10,7 +10,7 @@ export default async function NoteTemplatesPage(): Promise<JSX.Element> {
     if (!household) {
       return (
         <div className="page-body">
-          <p className="note">No household found. Please create or join one first.</p>
+          <p className="note">No household found. Create or join one to continue.</p>
         </div>
       );
     }
@@ -40,7 +40,7 @@ export default async function NoteTemplatesPage(): Promise<JSX.Element> {
     if (error instanceof ApiError && error.status === 401) {
       return (
         <div className="page-body">
-          <p className="note">Please sign in to view templates.</p>
+          <p className="note">Sign in to view templates.</p>
         </div>
       );
     }

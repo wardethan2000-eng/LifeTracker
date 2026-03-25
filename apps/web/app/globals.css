@@ -6067,7 +6067,10 @@ textarea { resize: vertical; }
 .inline-filter-form {
   background: var(--surface-alt);
   border-radius: 6px;
-  padding: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .inline-filter-form__group {
@@ -6075,6 +6078,28 @@ textarea { resize: vertical; }
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.idea-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.idea-filter-row select,
+.idea-filter-row .input--sm {
+  width: auto;
+}
+
+.idea-filter-row__search {
+  flex: 1;
+  min-width: 160px;
+}
+
+.input--sm {
+  padding: 6px 10px;
+  font-size: 0.85rem;
 }
 
 .search-input-wrapper {
@@ -13310,7 +13335,10 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--ink);
-  margin: 0 0 6px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .idea-board__card-meta {
@@ -13348,6 +13376,27 @@ html[data-ui-density="compact"] .resource-layout__aside {
   .idea-board {
     grid-template-columns: 1fr;
   }
+}
+
+/* View toggle (Board / Table) */
+.view-toggle {
+  display: flex;
+  gap: 0;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.view-toggle .button--sm {
+  border-radius: 0;
+}
+
+.view-toggle .button--sm:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.view-toggle .button--sm:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-left: -1px;
 }
 
 /* Category chip */

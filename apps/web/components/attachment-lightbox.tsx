@@ -85,6 +85,7 @@ export function AttachmentLightbox({ images, initialIndex, onClose, onCaptionUpd
         <button
           type="button"
           className="attachment-lightbox__nav attachment-lightbox__nav--prev"
+          aria-label="Previous"
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
         >
           ‹
@@ -103,6 +104,7 @@ export function AttachmentLightbox({ images, initialIndex, onClose, onCaptionUpd
         <button
           type="button"
           className="attachment-lightbox__nav attachment-lightbox__nav--next"
+          aria-label="Next"
           onClick={(e) => { e.stopPropagation(); goNext(); }}
         >
           ›
