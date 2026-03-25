@@ -30,6 +30,7 @@ export default async function HobbyPracticePage({ params }: HobbySectionPageProp
 
     return (
       <HobbyPracticeTab
+        householdId={household.id}
         hobbyId={hobbyId}
         activityMode={hobby.activityMode}
         goals={practiceGoals.items}

@@ -18,17 +18,13 @@ import type {
   CreateSpaceInput,
   CreateMaintenanceLogInput,
   CreateMaintenanceScheduleInput,
-  CreateProjectAssetInput,
-  UpdateProjectAssetInput,
   CreateProjectBudgetCategoryInput,
   CreateProjectExpenseInput,
   CreateProjectNoteInput,
   CreateProjectPhaseChecklistItemInput,
   CreateProjectPhaseInput,
   CreateProjectPhaseSupplyInput,
-  CreateProjectPurchaseRequestInput,
   CreateProjectTemplateInput,
-  CreateProjectInventoryItemInput,
   CreateProjectInput,
   CreateProjectTaskChecklistItemInput,
   CreateProjectTaskInput,
@@ -41,6 +37,7 @@ import type {
   CreateHobbyRecipeInput,
   CreateHobbySeriesInput,
   CreateHobbySessionInput,
+  HobbyActivityMode,
   HobbySessionLifecycleMode,
   HobbyStatus,
   MaintenanceTrigger,
@@ -53,7 +50,6 @@ import type {
   UpdateCommentInput,
   UpdateAssetTimelineEntryInput,
   UpdateProjectBudgetCategoryInput,
-  UpdateProjectInventoryItemInput,
   UpdateProjectNoteInput,
   UpdateProjectPhaseChecklistItemInput,
   UpdateProjectPhaseInput,
@@ -106,9 +102,6 @@ import {
 } from "../lib/realtime-events";
 import {
   acceptInvitation,
-  addProjectAsset,
-  updateProjectAsset,
-  allocateProjectInventory,
   advanceHobbySession,
   allocateSupplyFromInventory,
   applyPreset,
@@ -128,7 +121,6 @@ import {
   createProjectPhase,
   createPhaseChecklistItem,
   createProjectPhaseSupply,
-  createProjectPurchaseRequests,
   createProjectTemplate,
   createProjectTask,
   createQuickTodo,
@@ -145,7 +137,6 @@ import {
   createQuickRestockBatch,
   createMaintenanceLog,
   createPresetProfile,
-  createProjectInventoryItem,
   createSchedule,
   createServiceProvider,
   cloneProject,
@@ -167,7 +158,6 @@ import {
   deleteProjectNote,
   updateInventoryPurchaseLine,
   deleteProjectPhase,
-  deleteProjectInventoryItem,
   deletePhaseChecklistItem,
   deleteProjectPhaseSupply,
   deleteProjectTask,
@@ -180,9 +170,6 @@ import {
   markNotificationRead,
   markNotificationUnread,
   recordConditionAssessment,
-  removeProjectAsset,
-  reorderProjectPhases,
-  reorderProjectPhaseSupplies,
   revokeInvitation,
   restoreAsset,
   restoreSpace as restoreSpaceRequest,
@@ -203,11 +190,9 @@ import {
   updateProjectBudgetCategory,
   updateProjectExpense,
   updateProjectNote,
-  updateProjectInventoryItem,
   updateProjectPhase,
   updatePhaseChecklistItem,
   updateProjectPhaseSupply,
-  updateProjectStatus,
   updateProjectTask,
   updateTaskChecklistItem,
   instantiateProjectTemplate,
@@ -2605,15 +2590,6 @@ export async function cloneProjectAction(formData: FormData): Promise<void> {
   redirect(await resolveProjectWorkspaceHref(householdId, project.id));
 }
 
-export async function updateProjectStatusAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const status = getRequiredString(formData, "status") as ProjectStatus;
-
-  await updateProjectStatus(householdId, projectId, status);
-  revalidateProjectPaths(householdId, projectId);
-}
-
 export async function deleteProjectAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
@@ -2624,66 +2600,6 @@ export async function deleteProjectAction(formData: FormData): Promise<void> {
   if (redirectTo !== "none") {
     redirect(redirectTo ?? `/projects?householdId=${householdId}`);
   }
-}
-
-export async function addProjectAssetAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const input: CreateProjectAssetInput = {
-    assetId: getRequiredString(formData, "assetId")
-  };
-
-  const relationship = getOptionalString(formData, "relationship");
-  const role = getOptionalString(formData, "role");
-  const notes = getOptionalString(formData, "notes");
-
-  if (relationship) {
-    input.relationship = relationship as CreateProjectAssetInput["relationship"];
-  }
-
-  if (role) {
-    input.role = role;
-  }
-
-  if (notes) {
-    input.notes = notes;
-  }
-
-  await addProjectAsset(householdId, projectId, input);
-  revalidateProjectPaths(householdId, projectId);
-}
-
-export async function updateProjectAssetAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const projectAssetId = getRequiredString(formData, "projectAssetId");
-  const input: UpdateProjectAssetInput = {};
-
-  const relationship = getOptionalString(formData, "relationship");
-  const role = formData.has("role") ? (getString(formData, "role") || null) : undefined;
-  const notes = formData.has("notes") ? (getString(formData, "notes") || null) : undefined;
-
-  if (relationship) {
-    input.relationship = relationship as UpdateProjectAssetInput["relationship"];
-  }
-  if (role !== undefined) {
-    input.role = role;
-  }
-  if (notes !== undefined) {
-    input.notes = notes;
-  }
-
-  await updateProjectAsset(householdId, projectId, projectAssetId, input);
-  revalidateProjectPaths(householdId, projectId);
-}
-
-export async function removeProjectAssetAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const projectAssetId = getRequiredString(formData, "projectAssetId");
-
-  await removeProjectAsset(householdId, projectId, projectAssetId);
-  revalidateProjectPaths(householdId, projectId);
 }
 
 export async function createProjectTaskAction(formData: FormData): Promise<void> {
@@ -3081,16 +2997,6 @@ export async function deleteProjectPhaseAction(formData: FormData): Promise<void
   revalidateProjectPaths(householdId, projectId);
 }
 
-export async function reorderProjectPhasesAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const rawPhaseIds = getRequiredString(formData, "phaseIds");
-  const phaseIds = JSON.parse(rawPhaseIds) as string[];
-
-  await reorderProjectPhases(householdId, projectId, phaseIds);
-  revalidateProjectPaths(householdId, projectId);
-}
-
 export async function createPhaseChecklistItemAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
@@ -3328,21 +3234,6 @@ export async function toggleProjectPhaseSupplyPurchasedAction(formData: FormData
   revalidateProjectPaths(householdId, projectId);
 }
 
-export async function reorderProjectPhaseSuppliesAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const phaseId = getRequiredString(formData, "phaseId");
-  const supplyIdsJson = getRequiredString(formData, "supplyIds");
-  const parsed = JSON.parse(supplyIdsJson) as unknown;
-
-  if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
-    throw new Error("supplyIds must be a JSON array of supply ID strings.");
-  }
-
-  await reorderProjectPhaseSupplies(householdId, projectId, phaseId, parsed);
-  revalidateProjectPaths(householdId, projectId);
-}
-
 export async function allocateSupplyFromInventoryAction(formData: FormData): Promise<void> {
   const householdId = getRequiredString(formData, "householdId");
   const projectId = getRequiredString(formData, "projectId");
@@ -3365,115 +3256,6 @@ export async function allocateSupplyFromInventoryAction(formData: FormData): Pro
   if (notes) input.notes = notes;
 
   await allocateSupplyFromInventory(householdId, projectId, phaseId, supplyId, input);
-  revalidateProjectPaths(householdId, projectId);
-}
-
-export async function createProjectPurchaseRequestsAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const supplyIdsPayload = getOptionalString(formData, "supplyIdsJson");
-  const input: CreateProjectPurchaseRequestInput = {};
-
-  if (supplyIdsPayload) {
-    const parsed = JSON.parse(supplyIdsPayload) as unknown;
-
-    if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
-      throw new Error("supplyIdsJson must be a JSON array of supply IDs.");
-    }
-
-    input.supplyIds = parsed;
-  }
-
-  await createProjectPurchaseRequests(householdId, projectId, input);
-  revalidateProjectPaths(householdId, projectId);
-  revalidateInventoryPaths(householdId);
-}
-
-export async function createProjectInventoryItemAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const quantityNeeded = getOptionalNumber(formData, "quantityNeeded");
-
-  if (quantityNeeded === undefined) {
-    throw new Error("quantityNeeded is required.");
-  }
-
-  const input: CreateProjectInventoryItemInput = {
-    inventoryItemId: getRequiredString(formData, "inventoryItemId"),
-    quantityNeeded
-  };
-
-  const budgetedUnitCost = getOptionalNumber(formData, "budgetedUnitCost");
-  const notes = getOptionalString(formData, "notes");
-
-  if (budgetedUnitCost !== undefined) {
-    input.budgetedUnitCost = budgetedUnitCost;
-  }
-
-  if (notes) {
-    input.notes = notes;
-  }
-
-  await createProjectInventoryItem(householdId, projectId, input);
-  revalidateProjectPaths(householdId, projectId);
-}
-
-export async function updateProjectInventoryItemAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
-  const quantityNeeded = getOptionalNumber(formData, "quantityNeeded");
-
-  if (quantityNeeded === undefined) {
-    throw new Error("quantityNeeded is required.");
-  }
-
-  const input: UpdateProjectInventoryItemInput = {
-    quantityNeeded,
-    budgetedUnitCost: getNullableNumber(formData, "budgetedUnitCost"),
-    notes: getNullableString(formData, "notes")
-  };
-
-  await updateProjectInventoryItem(householdId, projectId, inventoryItemId, input);
-  revalidateProjectPaths(householdId, projectId);
-}
-
-export async function allocateProjectInventoryItemAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
-  const quantity = getOptionalNumber(formData, "quantity");
-
-  if (quantity === undefined) {
-    throw new Error("quantity is required.");
-  }
-
-  const input: AllocateProjectInventoryInput = {
-    quantity
-  };
-
-  const unitCost = getOptionalNumber(formData, "unitCost");
-  const notes = getOptionalString(formData, "notes");
-
-  if (unitCost !== undefined) {
-    input.unitCost = unitCost;
-  }
-
-  if (notes) {
-    input.notes = notes;
-  }
-
-  await allocateProjectInventory(householdId, projectId, inventoryItemId, input);
-  revalidateProjectPaths(householdId, projectId);
-  revalidateInventoryPaths(householdId);
-}
-
-export async function deleteProjectInventoryItemAction(formData: FormData): Promise<void> {
-  const householdId = getRequiredString(formData, "householdId");
-  const projectId = getRequiredString(formData, "projectId");
-  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
-
-  await deleteProjectInventoryItem(householdId, projectId, inventoryItemId);
   revalidateProjectPaths(householdId, projectId);
 }
 
@@ -3501,12 +3283,14 @@ export async function createHobbyAction(formData: FormData): Promise<void> {
 
   const description = getOptionalString(formData, "description");
   const status = getOptionalString(formData, "status") as HobbyStatus | undefined;
+  const activityMode = getOptionalString(formData, "activityMode") as HobbyActivityMode | undefined;
   const hobbyType = getOptionalString(formData, "hobbyType");
   const lifecycleMode = getOptionalString(formData, "lifecycleMode") as HobbySessionLifecycleMode | undefined;
   const presetKey = getOptionalString(formData, "presetKey");
 
   if (description) input.description = description;
   if (status) input.status = status;
+  if (activityMode) input.activityMode = activityMode;
   if (hobbyType) input.hobbyType = hobbyType;
   if (lifecycleMode) input.lifecycleMode = lifecycleMode;
   if (presetKey) input.presetKey = presetKey;
@@ -3525,11 +3309,13 @@ export async function updateHobbyAction(formData: FormData): Promise<void> {
 
   const name = getOptionalString(formData, "name");
   const status = getOptionalString(formData, "status") as HobbyStatus | undefined;
+  const activityMode = getOptionalString(formData, "activityMode") as HobbyActivityMode | undefined;
   const lifecycleMode = getOptionalString(formData, "lifecycleMode") as HobbySessionLifecycleMode | undefined;
   const hobbyType = getOptionalString(formData, "hobbyType");
 
   if (name) input.name = name;
   if (status) input.status = status;
+  if (activityMode) input.activityMode = activityMode;
   if (lifecycleMode) input.lifecycleMode = lifecycleMode;
   if (hobbyType) input.hobbyType = hobbyType;
 

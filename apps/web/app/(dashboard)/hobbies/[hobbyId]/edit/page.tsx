@@ -31,6 +31,7 @@ export default async function EditHobbyPage({ params }: EditHobbyPageProps): Pro
       name: hobby.name,
       description: hobby.description,
       status: hobby.status,
+      activityMode: hobby.activityMode,
       lifecycleMode: hobby.lifecycleMode,
       hobbyType: hobby.hobbyType,
       notes: hobby.notes,

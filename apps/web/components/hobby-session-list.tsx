@@ -32,11 +32,6 @@ function statusBadgeClass(status: string): string {
   }
 }
 
-function formatDate(value: string | null | undefined, fallback = "-"): string {
-  if (!value) return fallback;
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
 export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessionListProps): JSX.Element {
   const { formatDate } = useFormattedDate();
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
@@ -50,7 +45,7 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
 
   return (
     <SectionFilterProvider items={sessions} keys={["name", "recipeName"]} placeholder="Filter sessions by name or recipe">
-      <div style={{ display: "grid", gap: "16px" }}>
+      <div>
         <section className="panel">
           <div className="panel__header">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -85,32 +80,28 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
                   {sessions.length === 0 ? <p className="panel__empty">No sessions yet. Start your first session to begin tracking.</p> : null}
                   {sessions.length > 0 && filteredSessions.length === 0 ? <p className="panel__empty">No sessions match that search.</p> : null}
                   {filteredSessions.length > 0 ? (
-                    <div style={{ display: "grid", gap: "12px" }}>
+                    <ul className="hobby-session-list">
                       {filteredSessions.map((session) => (
-                        <div
-                          key={session.id}
-                          style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}
-                        >
+                        <li key={session.id} className="hobby-session-row">
                           <input
                             type="checkbox"
                             className="bulk-checkbox"
                             checked={isSelected(session.id)}
                             onChange={() => toggleItem(session.id)}
                             aria-label={`Select ${session.name}`}
-                            style={{ marginTop: 18, flexShrink: 0 }}
                           />
                           <Link
                             href={`/hobbies/${hobbyId}/sessions/${session.id}`}
-                            style={{ textDecoration: "none", display: "block", flex: 1, padding: "16px", border: "1px solid var(--border)", borderRadius: "8px" }}
+                            className="hobby-session-card"
                           >
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div className="hobby-session-card__header">
                               <div>
                                 <strong>{session.name}</strong>
-                                {session.recipeName ? <span style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginLeft: "8px" }}>from {session.recipeName}</span> : null}
+                                {session.recipeName ? <span className="hobby-session-card__recipe">from {session.recipeName}</span> : null}
                               </div>
                               <span className={statusBadgeClass(session.status)}>{session.status}</span>
                             </div>
-                            <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+                            <div className="hobby-session-card__meta">
                               <span>{session.completedStepCount}/{session.stepCount} steps</span>
                               <span>{session.ingredientCount} ingredients</span>
                               {session.rating != null ? <span>{"★".repeat(session.rating)}</span> : null}
@@ -118,9 +109,9 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
                               {session.completedDate ? <span>Completed {formatDate(session.completedDate)}</span> : null}
                             </div>
                           </Link>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   ) : null}
                 </>
               )}

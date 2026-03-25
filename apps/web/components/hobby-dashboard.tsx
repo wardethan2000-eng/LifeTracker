@@ -1,7 +1,11 @@
 "use client";
 
+import type { HobbyPracticeGoalSummary, HobbyPracticeRoutineSummary } from "@lifekeeper/types";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { LayoutItem } from "react-grid-layout";
+import { createHobbySession } from "../lib/api";
 import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
@@ -47,6 +51,8 @@ type HobbyDashboardProps = {
   recentSessions: SessionSummary[];
   equipment: AssetLink[];
   recentEntries: EntrySummary[];
+  activeGoals: HobbyPracticeGoalSummary[];
+  topRoutines: HobbyPracticeRoutineSummary[];
 };
 
 function statusBadgeClass(status: string): string {
@@ -61,6 +67,7 @@ function statusBadgeClass(status: string): string {
 
 export function HobbyDashboard(props: HobbyDashboardProps) {
   const { formatDate } = useFormattedDate();
+  const router = useRouter();
   const {
     householdId,
     hobbyId,
@@ -74,7 +81,25 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
     recentSessions,
     equipment,
     recentEntries,
+    activeGoals,
+    topRoutines,
   } = props;
+
+  const [quickLogName, setQuickLogName] = useState("");
+  const [quickLogSaving, setQuickLogSaving] = useState(false);
+
+  const handleQuickLog = async () => {
+    const name = quickLogName.trim();
+    if (!name || quickLogSaving) return;
+    setQuickLogSaving(true);
+    try {
+      const session = await createHobbySession(householdId, hobbyId, { name });
+      setQuickLogName("");
+      router.push(`/hobbies/${hobbyId}/sessions/${session.id}`);
+    } finally {
+      setQuickLogSaving(false);
+    }
+  };
 
   const base = `/hobbies/${hobbyId}`;
 
@@ -190,6 +215,74 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
       ),
       footerLink: { label: "Open journal →", href: `${base}/entries` },
     },
+    {
+      key: "quicklog",
+      title: "Log a Session",
+      content: (
+        <div className="hobby-quick-log">
+          <p className="hobby-quick-log__hint">Create a new session and start tracking immediately.</p>
+          <div className="hobby-quick-log__row">
+            <input
+              type="text"
+              className="hobby-quick-log__input"
+              placeholder="Session name…"
+              value={quickLogName}
+              onChange={(e) => setQuickLogName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void handleQuickLog(); }}
+            />
+            <button
+              type="button"
+              className="button button--primary button--sm"
+              onClick={() => void handleQuickLog()}
+              disabled={quickLogSaving || !quickLogName.trim()}
+            >
+              {quickLogSaving ? "Creating…" : "Start"}
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "goals",
+      title: `Active Goals (${activeGoals.length})`,
+      content: activeGoals.length > 0 ? (
+        <div className="dashboard-card__list">
+          {activeGoals.map((goal) => (
+            <div key={goal.id} className="dashboard-card__list-item dashboard-card__list-item--col">
+              <div className="dashboard-card__list-item-row">
+                <Link href={`${base}/goals/${goal.id}`} className="text-link">{goal.name}</Link>
+                <span style={{ color: "var(--ink-muted)", fontSize: "0.78rem" }}>{goal.currentValue}/{goal.targetValue} {goal.unit}</span>
+              </div>
+              <div className="mode-progress__bar mode-progress__bar--sm">
+                <span style={{ width: `${Math.max(0, Math.min(100, goal.progressPercentage))}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="dashboard-card__empty">No active goals</p>
+      ),
+      footerLink: { label: "Manage goals →", href: `${base}/practice` },
+    },
+    {
+      key: "routines",
+      title: `Routines (${topRoutines.length})`,
+      content: topRoutines.length > 0 ? (
+        <div className="dashboard-card__list">
+          {topRoutines.map((routine) => (
+            <div key={routine.id} className="dashboard-card__list-item">
+              <Link href={`${base}/routines/${routine.id}`} className="text-link">{routine.name}</Link>
+              <span style={{ color: "var(--ink-muted)", fontSize: "0.78rem" }}>
+                {routine.currentStreak > 0 ? `🔥 ${routine.currentStreak}` : "No streak"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="dashboard-card__empty">No routines set up</p>
+      ),
+      footerLink: { label: "Manage routines →", href: `${base}/practice` },
+    },
   ];
 
   const defaultLayout: LayoutItem[] = [
@@ -200,6 +293,9 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
     { i: "equipment", x: 0, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
     { i: "journal", x: 2, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
     { i: "notepad", x: 0, y: 6, w: 2, h: 4, minW: 1, minH: 3 },
+    { i: "quicklog", x: 2, y: 6, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "goals", x: 0, y: 10, w: 2, h: 4, minW: 1, minH: 2 },
+    { i: "routines", x: 2, y: 10, w: 2, h: 4, minW: 1, minH: 2 },
   ];
 
   return (

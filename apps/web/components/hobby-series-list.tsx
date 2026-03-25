@@ -134,40 +134,49 @@ export function HobbySeriesList({ hobbyId, activityMode, series }: HobbySeriesLi
                   {visibleSeries.length > 0 ? (
                     <div className="hobby-series-grid">
                       {visibleSeries.map((item) => (
-                        <Link key={item.id} href={`/hobbies/${hobbyId}/series/${item.id}`} className="hobby-series-card">
-                          <div className="hobby-series-card__media">
-                            {item.coverImageUrl ? (
-                              <img src={item.coverImageUrl} alt="" className="hobby-series-card__image" />
-                            ) : (
-                              <div className="hobby-series-card__placeholder">Series</div>
-                            )}
-                          </div>
-                          <div className="hobby-series-card__content">
-                            <div className="hobby-series-card__topline">
-                              <strong>{item.name}</strong>
-                              <span className={statusBadgeClass(item.status)}>{item.status}</span>
+                        <div key={item.id} className="hobby-series-card">
+                          <Link href={`/hobbies/${hobbyId}/series/${item.id}`} className="hobby-series-card__inner">
+                            <div className="hobby-series-card__media">
+                              {item.coverImageUrl ? (
+                                <img src={item.coverImageUrl} alt="" className="hobby-series-card__image" />
+                              ) : (
+                                <div className="hobby-series-card__placeholder">Series</div>
+                              )}
                             </div>
-
-                            <p className="hobby-series-card__description">{previewText(item.description)}</p>
-
-                            <div className="hobby-series-card__stats">
-                              <span>{item.batchCount} batches</span>
-                              <span>Recent {formatDate(item.lastSessionDate)}</span>
-                            </div>
-
-                            {item.bestBatchSessionName ? (
-                              <p className="hobby-series-card__best">Best batch: {item.bestBatchSessionName}</p>
-                            ) : null}
-
-                            {item.tags.length > 0 ? (
-                              <div className="hobby-series-card__tags">
-                                {item.tags.slice(0, 5).map((tag) => (
-                                  <span key={tag} className="pill pill--muted">{tag}</span>
-                                ))}
+                            <div className="hobby-series-card__content">
+                              <div className="hobby-series-card__topline">
+                                <strong>{item.name}</strong>
+                                <span className={statusBadgeClass(item.status)}>{item.status}</span>
                               </div>
-                            ) : null}
-                          </div>
-                        </Link>
+
+                              <p className="hobby-series-card__description">{previewText(item.description)}</p>
+
+                              <div className="hobby-series-card__stats">
+                                <span>{item.batchCount} batches</span>
+                                <span>Recent {formatDate(item.lastSessionDate)}</span>
+                              </div>
+
+                              {item.bestBatchSessionName ? (
+                                <p className="hobby-series-card__best">Best batch: {item.bestBatchSessionName}</p>
+                              ) : null}
+
+                              {item.tags.length > 0 ? (
+                                <div className="hobby-series-card__tags">
+                                  {item.tags.slice(0, 5).map((tag) => (
+                                    <span key={tag} className="pill pill--muted">{tag}</span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </Link>
+                          {item.batchCount > 1 ? (
+                            <div className="hobby-series-card__actions">
+                              <Link href={`/hobbies/${hobbyId}/series/${item.id}`} className="button button--ghost button--sm">
+                                Compare batches →
+                              </Link>
+                            </div>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   ) : null}

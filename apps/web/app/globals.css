@@ -3244,6 +3244,15 @@ textarea { resize: vertical; }
   color: var(--ink);
 }
 
+.workbench-radio__help {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+  font-weight: 400;
+  grid-column: 2;
+}
+
 .workbench-form .field small {
   font-size: 0.72rem;
   color: var(--ink-muted);
@@ -7420,6 +7429,51 @@ html[data-ui-density="compact"] .resource-layout__aside {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+.hobby-session-list {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hobby-session-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hobby-session-row .bulk-checkbox {
+  margin-top: 18px;
+  flex-shrink: 0;
+}
+
+.hobby-session-row .hobby-session-card {
+  flex: 1;
+}
+
+.hobby-session-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.hobby-session-card__recipe {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  margin-left: 8px;
+}
+
+.hobby-session-card__meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  flex-wrap: wrap;
+}
+
 .session-detail-stack,
 .session-aside-stack,
 .session-flow-stack,
@@ -7780,15 +7834,13 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 .hobby-series-card {
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(13, 148, 136, 0.04), rgba(255, 255, 255, 0));
-  text-decoration: none;
-  color: inherit;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
@@ -7796,6 +7848,22 @@ html[data-ui-density="compact"] .resource-layout__aside {
   transform: translateY(-2px);
   border-color: var(--accent-border);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.hobby-series-card__inner {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.hobby-series-card__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
 }
 
 .hobby-series-card__media,
@@ -8241,6 +8309,97 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .mode-inline-form--grid {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.mode-progress__bar--sm {
+  height: 6px;
+}
+
+/* Practice inline create forms */
+.practice-inline-form {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt, var(--surface));
+  display: grid;
+  gap: 12px;
+}
+
+.practice-inline-form__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.practice-inline-form__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Quick log form on dashboard */
+.hobby-quick-log {
+  display: grid;
+  gap: 10px;
+}
+
+.hobby-quick-log__hint {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ink-muted);
+}
+
+.hobby-quick-log__row {
+  display: flex;
+  gap: 8px;
+}
+
+.hobby-quick-log__input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.hobby-quick-log__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Session custom fields grid */
+.session-custom-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.session-custom-fields-grid .field--wide {
+  grid-column: 1 / -1;
+}
+
+/* Dashboard goals card */
+.dashboard-card__list-item--col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.dashboard-card__list-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Field help text */
+.field__help {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+  margin-top: 3px;
 }
 
 .mode-inline-actions {

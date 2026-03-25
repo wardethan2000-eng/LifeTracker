@@ -1,4 +1,4 @@
-import type { HobbyStatus } from "@lifekeeper/types";
+import type { HobbyActivityMode, HobbyStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
@@ -21,6 +21,13 @@ const hobbyStatusPillClasses: Record<HobbyStatus, string> = {
   archived: "pill pill--muted",
 };
 
+const hobbyActivityModeLabels: Record<HobbyActivityMode, string> = {
+  session: "Session",
+  project: "Project",
+  practice: "Practice",
+  collection: "Collection",
+};
+
 const getParam = (value: string | string[] | undefined): string | undefined => {
   if (typeof value === "string" && value.length > 0) return value;
   return Array.isArray(value) ? value[0] : undefined;
@@ -35,6 +42,10 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
   const selectedStatus = (statusParam === "active" || statusParam === "paused" || statusParam === "archived")
     ? statusParam as HobbyStatus
     : undefined;
+  const modeParam = getParam(params.mode);
+  const selectedMode = (modeParam === "session" || modeParam === "project" || modeParam === "practice" || modeParam === "collection")
+    ? modeParam as HobbyActivityMode
+    : undefined;
   const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
   const history = typeof params.history === "string"
     ? params.history.split(",").map((v) => v.trim()).filter(Boolean)
@@ -46,9 +57,18 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
   const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
     const q = new URLSearchParams();
     if (selectedStatus) q.set("status", selectedStatus);
+    if (selectedMode) q.set("mode", selectedMode);
     q.set("limit", String(p.limit));
     if (p.cursor) q.set("cursor", p.cursor);
     if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
+    return `/hobbies?${q.toString()}`;
+  };
+
+  const buildFilterHref = (status: HobbyStatus | undefined, mode: HobbyActivityMode | undefined): string => {
+    const q = new URLSearchParams();
+    if (status) q.set("status", status);
+    if (mode) q.set("mode", mode);
+    q.set("limit", String(limit));
     return `/hobbies?${q.toString()}`;
   };
 
@@ -69,6 +89,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
 
     const hobbyPage = await getHouseholdHobbies(household.id, {
       ...(selectedStatus ? { status: selectedStatus } : {}),
+      ...(selectedMode ? { activityMode: selectedMode } : {}),
       limit,
       ...(cursor ? { cursor } : {})
     });
@@ -115,7 +136,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
           {/* Status filter */}
           <div className="hobby-status-strip">
             <Link
-              href="/hobbies"
+              href={buildFilterHref(undefined, selectedMode)}
               className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
             >
               <span>All</span>
@@ -124,13 +145,32 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
               return (
                 <Link
                   key={status}
-                  href={`/hobbies?status=${status}`}
+                  href={buildFilterHref(status, selectedMode)}
                   className={`project-status-chip${selectedStatus === status ? " project-status-chip--active" : ""}`}
                 >
                   <span>{hobbyStatusLabels[status]}</span>
                 </Link>
               );
             })}
+          </div>
+
+          {/* Activity mode filter */}
+          <div className="hobby-status-strip">
+            <Link
+              href={buildFilterHref(selectedStatus, undefined)}
+              className={`project-status-chip${selectedMode === undefined ? " project-status-chip--active" : ""}`}
+            >
+              <span>All Modes</span>
+            </Link>
+            {(Object.keys(hobbyActivityModeLabels) as HobbyActivityMode[]).map((mode) => (
+              <Link
+                key={mode}
+                href={buildFilterHref(selectedStatus, mode)}
+                className={`project-status-chip${selectedMode === mode ? " project-status-chip--active" : ""}`}
+              >
+                <span>{hobbyActivityModeLabels[mode]}</span>
+              </Link>
+            ))}
           </div>
 
           {/* Hobby cards */}

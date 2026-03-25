@@ -190,6 +190,11 @@ export function HobbySessionDetail({
   const [metricForms, setMetricForms] = useState<Record<string, MetricFormState>>({});
   const [pendingMetricIds, setPendingMetricIds] = useState<string[]>([]);
   const [deletingReadingId, setDeletingReadingId] = useState<string | null>(null);
+  const [customFieldDraft, setCustomFieldDraft] = useState<Record<string, unknown>>(
+    () => ({ ...(session.customFields as Record<string, unknown> ?? {}) })
+  );
+  const [customFieldSaving, setCustomFieldSaving] = useState(false);
+  const [customFieldSaved, setCustomFieldSaved] = useState(false);
   const [brewDayDraft, setBrewDayDraft] = useState<BrewDayData>(() => resolveBrewDayData(session.customFields, hobby));
   const [brewDaySaving, setBrewDaySaving] = useState(false);
   const [brewDaySaved, setBrewDaySaved] = useState(false);
@@ -202,6 +207,7 @@ export function HobbySessionDetail({
     setSessionState(session);
     setBrewDayDraft(resolveBrewDayData(session.customFields, hobby));
     setNotesDraft(session.notes ?? "");
+    setCustomFieldDraft({ ...(session.customFields as Record<string, unknown> ?? {}) });
   }, [hobby, session]);
 
   useEffect(() => {
@@ -466,6 +472,29 @@ export function HobbySessionDetail({
       setErrorMessage(error instanceof Error ? error.message : "Failed to delete metric reading.");
     } finally {
       setDeletingReadingId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!customFieldSaved) return undefined;
+    const id = window.setTimeout(() => setCustomFieldSaved(false), 1800);
+    return () => window.clearTimeout(id);
+  }, [customFieldSaved]);
+
+  const saveCustomField = async (key: string, value: unknown) => {
+    if (customFieldSaving) return;
+    setCustomFieldSaving(true);
+    setErrorMessage(null);
+    try {
+      const merged = { ...(sessionState.customFields as Record<string, unknown> ?? {}), [key]: value };
+      const updated = await updateHobbySession(householdId, hobbyId, sessionState.id, { customFields: merged });
+      updateSessionSummary(updated);
+      setCustomFieldDraft({ ...(updated.customFields as Record<string, unknown> ?? {}) });
+      setCustomFieldSaved(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save field.");
+    } finally {
+      setCustomFieldSaving(false);
     }
   };
 
@@ -741,6 +770,88 @@ export function HobbySessionDetail({
               </div>
             </Card>
           </div>
+        ) : null}
+
+        {!isBrewingSession && hobby.fieldDefinitions.length > 0 ? (
+          <Card
+            title="Session Fields"
+            actions={<span className={`session-saved-indicator${customFieldSaved ? " is-visible" : ""}`}>Saved</span>}
+          >
+            <div className="session-custom-fields-grid">
+              {[...hobby.fieldDefinitions].sort((a, b) => a.order - b.order).map((field) => {
+                const value = customFieldDraft[field.key];
+                const strVal = value == null ? "" : String(value);
+
+                if (field.type === "boolean") {
+                  return (
+                    <label key={field.key} className={`field${field.wide ? " field--wide" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(value)}
+                        onChange={(e) => {
+                          setCustomFieldDraft((prev) => ({ ...prev, [field.key]: e.target.checked }));
+                          void saveCustomField(field.key, e.target.checked);
+                        }}
+                      />
+                      <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
+                    </label>
+                  );
+                }
+
+                if (field.type === "select" && field.options.length > 0) {
+                  return (
+                    <label key={field.key} className={`field${field.wide ? " field--wide" : ""}`}>
+                      <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
+                      <select
+                        value={strVal}
+                        onChange={(e) => setCustomFieldDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        onBlur={(e) => void saveCustomField(field.key, e.target.value)}
+                      >
+                        <option value="">—</option>
+                        {field.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                      {field.helpText ? <span className="field__help">{field.helpText}</span> : null}
+                    </label>
+                  );
+                }
+
+                if (field.type === "textarea") {
+                  return (
+                    <label key={field.key} className={`field${field.wide ? " field--wide" : ""} field--wide`}>
+                      <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
+                      <textarea
+                        value={strVal}
+                        placeholder={field.placeholder ?? ""}
+                        rows={3}
+                        onChange={(e) => setCustomFieldDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        onBlur={(e) => void saveCustomField(field.key, e.target.value || null)}
+                      />
+                      {field.helpText ? <span className="field__help">{field.helpText}</span> : null}
+                    </label>
+                  );
+                }
+
+                const inputType = field.type === "number" || field.type === "currency" ? "number"
+                  : field.type === "date" ? "date"
+                  : field.type === "url" ? "url"
+                  : "text";
+
+                return (
+                  <label key={field.key} className={`field${field.wide ? " field--wide" : ""}`}>
+                    <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
+                    <input
+                      type={inputType}
+                      value={strVal}
+                      placeholder={field.placeholder ?? ""}
+                      onChange={(e) => setCustomFieldDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                      onBlur={(e) => void saveCustomField(field.key, e.target.value || null)}
+                    />
+                    {field.helpText ? <span className="field__help">{field.helpText}</span> : null}
+                  </label>
+                );
+              })}
+            </div>
+          </Card>
         ) : null}
 
         <SessionStepList

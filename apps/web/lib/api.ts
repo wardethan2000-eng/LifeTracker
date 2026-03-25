@@ -1233,15 +1233,6 @@ const getHouseholdInventoryCached = cache(async (
   cacheOptions: { revalidate: 30 }
 }));
 
-const getProjectBudgetAnalysisCached = cache(async (
-  householdId: string,
-  projectId: string
-): Promise<ProjectBudgetAnalysis> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/cost-analytics/budget-analysis`,
-  schema: projectBudgetAnalysisSchema,
-  cacheOptions: { revalidate: 15 }
-}));
-
 export const getHouseholdProjects = async (
   householdId: string,
   options?: {
@@ -1789,79 +1780,10 @@ export const deleteAssetTimelineEntry = async (assetId: string, entryId: string)
 
 export const getProjectDetail = async (householdId: string, projectId: string): Promise<ProjectDetail> => getProjectDetailCached(householdId, projectId);
 
-export const getProjectPhases = async (
-  householdId: string,
-  projectId: string
-): Promise<ProjectPhaseSummary[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/phases`,
-  schema: projectPhaseSummaryListSchema
-});
-
-export const getProjectPhaseDetail = async (
-  householdId: string,
-  projectId: string,
-  phaseId: string
-): Promise<ProjectPhaseDetail> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}`,
-  schema: projectPhaseDetailSchema
-});
-
 export const getProjectPhaseDetails = async (
   householdId: string,
   projectId: string
 ): Promise<ProjectPhaseDetail[]> => getProjectPhaseDetailsCached(householdId, projectId);
-
-export const getProjectBudgetCategories = async (
-  householdId: string,
-  projectId: string
-): Promise<ProjectBudgetCategorySummary[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/budget-categories`,
-  schema: projectBudgetCategorySummaryListSchema
-});
-
-export const getProjectPhaseSupplies = async (
-  householdId: string,
-  projectId: string,
-  phaseId: string
-): Promise<ProjectPhaseSupply[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies`,
-  schema: projectPhaseSupplySummaryListSchema
-});
-
-export const getProjectInventory = async (
-  householdId: string,
-  projectId: string
-): Promise<InventoryProjectLinkDetail[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/inventory`,
-  schema: projectInventoryListSchema
-});
-
-export const getProjectInventoryRollups = async (
-  householdId: string
-): Promise<ProjectInventoryRollup[]> => apiRequest({
-  path: `/v1/households/${householdId}/projects/inventory-rollups`,
-  schema: projectInventoryRollupListSchema,
-  cachePolicy: { next: { revalidate: 30 } }
-});
-
-export const getProjectShoppingList = async (
-  householdId: string,
-  projectId: string
-): Promise<ProjectShoppingList> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/shopping-list`,
-  schema: projectShoppingListSchema
-});
-
-export const createProjectPurchaseRequests = async (
-  householdId: string,
-  projectId: string,
-  input: CreateProjectPurchaseRequestInput
-): Promise<ProjectPurchaseRequestResult> => apiRequest({
-  path: `/v1/households/${householdId}/projects/${projectId}/shopping-list/purchase-requests`,
-  method: "POST",
-  body: input,
-  schema: projectPurchaseRequestResultSchema
-});
 
 export const getHouseholdAssets = async (householdId: string): Promise<Asset[]> => getHouseholdAssetsCached(householdId);
 
@@ -3830,11 +3752,6 @@ export const getAssetCostForecast = async (assetId: string): Promise<CostForecas
   path: `/v1/assets/${assetId}/cost-analytics/forecast`,
   schema: costForecastSchema
 });
-
-export const getProjectBudgetAnalysis = async (
-  householdId: string,
-  projectId: string
-): Promise<ProjectBudgetAnalysis> => getProjectBudgetAnalysisCached(householdId, projectId);
 
 export const createScheduleInventoryItem = async (
   assetId: string,

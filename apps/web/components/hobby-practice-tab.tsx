@@ -6,12 +6,17 @@ import type {
   HobbyPracticeGoalStatus,
   HobbyPracticeGoalSummary,
   HobbyPracticeRoutineSummary,
+  HobbyPracticeGoalType,
+  HobbyPracticeRoutineFrequency,
 } from "@lifekeeper/types";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type JSX } from "react";
+import { createHobbyPracticeGoal, createHobbyPracticeRoutine } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
 
 type HobbyPracticeTabProps = {
+  householdId: string;
   hobbyId: string;
   activityMode: HobbyActivityMode;
   goals: HobbyPracticeGoalSummary[];
@@ -50,10 +55,64 @@ function routineUrgencyLabel(targetDate: string | null): string | null {
   return null;
 }
 
-export function HobbyPracticeTab({ hobbyId, activityMode, goals, routines, metrics }: HobbyPracticeTabProps): JSX.Element {
+export function HobbyPracticeTab({ householdId, hobbyId, activityMode, goals, routines, metrics }: HobbyPracticeTabProps): JSX.Element {
   const { formatDate } = useFormattedDate();
+  const router = useRouter();
   const [goalFilter, setGoalFilter] = useState<HobbyPracticeGoalStatus | "all">("all");
   const metricNameById = useMemo(() => new Map(metrics.map((metric) => [metric.id, metric.name])), [metrics]);
+
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [goalName, setGoalName] = useState("");
+  const [goalType, setGoalType] = useState<HobbyPracticeGoalType>("cumulative");
+  const [goalTarget, setGoalTarget] = useState("");
+  const [goalUnit, setGoalUnit] = useState("");
+  const [goalSaving, setGoalSaving] = useState(false);
+
+  const handleCreateGoal = async () => {
+    const target = parseFloat(goalTarget);
+    if (!goalName.trim() || !goalUnit.trim() || isNaN(target)) return;
+    setGoalSaving(true);
+    try {
+      await createHobbyPracticeGoal(householdId, hobbyId, {
+        name: goalName.trim(),
+        goalType,
+        targetValue: target,
+        unit: goalUnit.trim(),
+      });
+      setGoalName("");
+      setGoalTarget("");
+      setGoalUnit("");
+      setShowGoalForm(false);
+      router.refresh();
+    } finally {
+      setGoalSaving(false);
+    }
+  };
+
+  const [showRoutineForm, setShowRoutineForm] = useState(false);
+  const [routineName, setRoutineName] = useState("");
+  const [routineFreq, setRoutineFreq] = useState<HobbyPracticeRoutineFrequency>("weekly");
+  const [routineSessions, setRoutineSessions] = useState("1");
+  const [routineSaving, setRoutineSaving] = useState(false);
+
+  const handleCreateRoutine = async () => {
+    const sessionsCount = parseInt(routineSessions, 10);
+    if (!routineName.trim() || isNaN(sessionsCount) || sessionsCount < 1) return;
+    setRoutineSaving(true);
+    try {
+      await createHobbyPracticeRoutine(householdId, hobbyId, {
+        name: routineName.trim(),
+        targetFrequency: routineFreq,
+        targetSessionsPerPeriod: sessionsCount,
+      });
+      setRoutineName("");
+      setRoutineSessions("1");
+      setShowRoutineForm(false);
+      router.refresh();
+    } finally {
+      setRoutineSaving(false);
+    }
+  };
 
   const visibleGoals = useMemo(() => goals
     .filter((goal) => goalFilter === "all" || goal.status === goalFilter)
@@ -80,8 +139,44 @@ export function HobbyPracticeTab({ hobbyId, activityMode, goals, routines, metri
           <div className="mode-workspace__header-meta">
             {activityMode === "practice" ? <span className="pill pill--info">Primary mode</span> : null}
             <span className="pill">{goals.filter((goal) => goal.status === "active").length} active</span>
+            <button type="button" className="button button--secondary button--sm" onClick={() => setShowGoalForm((prev) => !prev)}>
+              {showGoalForm ? "Cancel" : "New Goal"}
+            </button>
           </div>
         </div>
+
+        {showGoalForm ? (
+          <div className="practice-inline-form">
+            <div className="practice-inline-form__fields">
+              <label className="field">
+                <span>Goal name</span>
+                <input type="text" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="e.g. Run 100 miles" />
+              </label>
+              <label className="field">
+                <span>Type</span>
+                <select value={goalType} onChange={(e) => setGoalType(e.target.value as HobbyPracticeGoalType)}>
+                  <option value="cumulative">Cumulative</option>
+                  <option value="threshold">Threshold</option>
+                  <option value="streak">Streak</option>
+                  <option value="completion">Completion</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Target value</span>
+                <input type="number" value={goalTarget} onChange={(e) => setGoalTarget(e.target.value)} placeholder="100" min="0" />
+              </label>
+              <label className="field">
+                <span>Unit</span>
+                <input type="text" value={goalUnit} onChange={(e) => setGoalUnit(e.target.value)} placeholder="miles, sessions, hours…" />
+              </label>
+            </div>
+            <div className="practice-inline-form__actions">
+              <button type="button" className="button button--primary button--sm" onClick={() => void handleCreateGoal()} disabled={goalSaving || !goalName.trim() || !goalUnit.trim() || !goalTarget}>
+                {goalSaving ? "Saving…" : "Add Goal"}
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="section-filter__bar">
           <label className="section-filter__field">
             <span>Status</span>
@@ -134,8 +229,39 @@ export function HobbyPracticeTab({ hobbyId, activityMode, goals, routines, metri
           </div>
           <div className="mode-workspace__header-meta">
             <span className="pill">{routines.filter((routine) => routine.isActive).length} active</span>
+            <button type="button" className="button button--secondary button--sm" onClick={() => setShowRoutineForm((prev) => !prev)}>
+              {showRoutineForm ? "Cancel" : "New Routine"}
+            </button>
           </div>
         </div>
+
+        {showRoutineForm ? (
+          <div className="practice-inline-form">
+            <div className="practice-inline-form__fields">
+              <label className="field">
+                <span>Routine name</span>
+                <input type="text" value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="e.g. Morning drills" />
+              </label>
+              <label className="field">
+                <span>Frequency</span>
+                <select value={routineFreq} onChange={(e) => setRoutineFreq(e.target.value as HobbyPracticeRoutineFrequency)}>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Sessions per period</span>
+                <input type="number" value={routineSessions} onChange={(e) => setRoutineSessions(e.target.value)} min="1" max="100" />
+              </label>
+            </div>
+            <div className="practice-inline-form__actions">
+              <button type="button" className="button button--primary button--sm" onClick={() => void handleCreateRoutine()} disabled={routineSaving || !routineName.trim()}>
+                {routineSaving ? "Saving…" : "Add Routine"}
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="panel__body--padded">
           {visibleRoutines.length === 0 ? <p className="panel__empty">No routines created yet.</p> : (
             <div className="mode-stack">

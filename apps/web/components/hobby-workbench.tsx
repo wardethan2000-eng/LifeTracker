@@ -1,5 +1,5 @@
 "use client";
-import type { HobbyDetail, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
+import type { HobbyActivityMode, HobbyDetail, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
 import { useRouter } from "next/navigation";
 import { useState, type JSX, type FormEvent } from "react";
 import {
@@ -14,7 +14,7 @@ type HobbyWorkbenchProps = {
   action: (formData: FormData) => Promise<void>;
   householdId: string;
   presets: HobbyPreset[];
-  initialHobby?: Pick<HobbyDetail, "id" | "name" | "description" | "status" | "lifecycleMode" | "hobbyType" | "notes" | "statusPipeline" | "inventoryLinks"> | null;
+  initialHobby?: Pick<HobbyDetail, "id" | "name" | "description" | "status" | "activityMode" | "lifecycleMode" | "hobbyType" | "notes" | "statusPipeline" | "inventoryLinks"> | null;
 };
 
 const hobbyStatusOptions: { value: HobbyStatus; label: string }[] = [
@@ -34,6 +34,7 @@ export function HobbyWorkbench({
   const [name, setName] = useState(initialHobby?.name ?? "");
   const [description, setDescription] = useState(initialHobby?.description ?? "");
   const [status, setStatus] = useState<HobbyStatus>(initialHobby?.status ?? "active");
+  const [activityMode, setActivityMode] = useState<HobbyActivityMode>(initialHobby?.activityMode ?? "session");
   const [lifecycleMode, setLifecycleMode] = useState<HobbySessionLifecycleMode>(initialHobby?.lifecycleMode ?? "binary");
   const [hobbyType, setHobbyType] = useState(initialHobby?.hobbyType ?? "");
   const [notes, setNotes] = useState(initialHobby?.notes ?? "");
@@ -80,6 +81,7 @@ export function HobbyWorkbench({
       formData.set("status", status);
       formData.set("lifecycleMode", lifecycleMode);
       formData.set("hobbyType", hobbyType);
+      formData.set("activityMode", activityMode);
       formData.set("notes", notes);
       formData.set("statusPipelineJson", JSON.stringify(pipelineSteps.map((step, index) => ({
         ...(step.id ? { id: step.id } : {}),
@@ -171,6 +173,30 @@ export function HobbyWorkbench({
               placeholder="e.g. Brewing, Pottery, Woodworking"
             />
           </label>
+
+          <fieldset className="workbench-field workbench-fieldset">
+            <legend className="workbench-field__label">Activity Mode</legend>
+            <p className="workbench-field__help">Sets the default workspace view. All sections remain accessible regardless of mode.</p>
+            <div className="workbench-radio-group">
+              {([
+                { value: "session", label: "Session", help: "Track discrete sessions or batches (brewing, cooking, gaming)" },
+                { value: "project", label: "Project", help: "Long-running builds with milestones and work logs" },
+                { value: "practice", label: "Practice", help: "Skill training with goals, routines, and streak tracking" },
+                { value: "collection", label: "Collection", help: "Track specimens, variants, or collectible items" },
+              ] as Array<{ value: HobbyActivityMode; label: string; help: string }>).map(({ value, label, help }) => (
+                <label key={value} className="workbench-radio">
+                  <input
+                    type="radio"
+                    name="activityMode"
+                    value={value}
+                    checked={activityMode === value}
+                    onChange={() => setActivityMode(value)}
+                  />
+                  <span>{label}<span className="workbench-radio__help">{help}</span></span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <label className="workbench-field workbench-field--wide">
             <span className="workbench-field__label">Description</span>

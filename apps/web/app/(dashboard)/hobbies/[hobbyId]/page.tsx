@@ -8,6 +8,8 @@ import {
   getEntries,
   getMe,
   getSourceIdea,
+  listHobbyPracticeGoals,
+  listHobbyPracticeRoutines,
 } from "../../../../lib/api";
 import { HobbyDashboard } from "../../../../components/hobby-dashboard";
 import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
@@ -27,7 +29,7 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
       return <p>No household found.</p>;
     }
 
-    const [hobby, sessions, series, entriesResult, sourceIdea] = await Promise.all([
+    const [hobby, sessions, series, entriesResult, sourceIdea, goalsResult, routinesResult] = await Promise.all([
       getHobbyDetail(household.id, hobbyId),
       getHobbySessions(household.id, hobbyId),
       getHobbySeries(household.id, hobbyId),
@@ -39,6 +41,8 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
         excludeFlags: ["archived"],
       }).catch(() => ({ items: [], nextCursor: null })),
       getSourceIdea(household.id, "hobby", hobbyId).catch(() => null),
+      listHobbyPracticeGoals(household.id, hobbyId, { limit: 10, status: "active" }).catch(() => ({ items: [], nextCursor: null })),
+      listHobbyPracticeRoutines(household.id, hobbyId, { limit: 10, isActive: true }).catch(() => ({ items: [], nextCursor: null })),
     ]);
 
     const activeSessions = sessions.filter((s) => s.status !== "completed" && s.status !== "cancelled");
@@ -98,6 +102,8 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
           role: link.role ?? null,
         }))}
         recentEntries={recentEntries}
+        activeGoals={goalsResult.items.slice(0, 3)}
+        topRoutines={routinesResult.items.slice(0, 3)}
       />
       </>
     );
