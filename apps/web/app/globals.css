@@ -10738,8 +10738,8 @@ html[data-ui-density="compact"] .resource-layout__aside {
 }
 
 .phase-subtab {
-  padding: 7px 12px;
-  font-size: 0.82rem;
+  padding: 9px 14px;
+  font-size: 0.95rem;
   border: none;
   background: none;
   cursor: pointer;
@@ -10758,12 +10758,12 @@ html[data-ui-density="compact"] .resource-layout__aside {
 .phase-subtab--active {
   color: var(--ink);
   border-bottom-color: var(--accent);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .phase-subtab__count {
-  margin-left: 3px;
-  font-size: 0.72rem;
+  margin-left: 4px;
+  font-size: 0.78rem;
   color: var(--ink-muted);
   font-weight: 400;
 }
@@ -10993,6 +10993,443 @@ html[data-ui-density="compact"] .resource-layout__aside {
 .task-quick-add__input::placeholder {
   color: var(--ink-muted);
 }
+
+/* ─── Phase split: viewport fix + collapsed sidebar ─── */
+
+.phase-split {
+  height: calc(100svh - 220px);
+  min-height: 480px;
+}
+
+.phase-split__list {
+  overflow-y: auto;
+}
+
+.phase-split__detail {
+  overflow-y: auto;
+}
+
+.phase-split--collapsed {
+  grid-template-columns: 48px 1fr;
+}
+
+.phase-list-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.phase-rail-toggle {
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: var(--ink-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+  font-family: inherit;
+  margin-bottom: 4px;
+}
+.phase-rail-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.phase-rail-dot {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: box-shadow 0.12s, opacity 0.12s;
+  border: none;
+  font-family: inherit;
+  color: var(--surface);
+}
+.phase-rail-dot--pending    { background: var(--ink-muted); }
+.phase-rail-dot--in_progress { background: var(--accent); }
+.phase-rail-dot--completed  { background: var(--green, #22c55e); }
+.phase-rail-dot--skipped    { background: var(--warning, #f59e0b); }
+.phase-rail-dot--unphased   { background: var(--ink-muted); opacity: 0.5; }
+.phase-rail-dot--active     { box-shadow: 0 0 0 3px var(--accent); }
+.phase-rail-dot:hover       { opacity: 0.85; }
+
+.phase-list-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 1rem;
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  font-family: inherit;
+  transition: color 0.12s;
+}
+.phase-list-collapse-btn:hover { color: var(--ink); }
+
+/* Sticky sub-tabs */
+.phase-subtabs {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 10;
+}
+
+/* ─── Compact phase header bar ─── */
+
+.phase-detail-header--bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.phase-detail-header__title-static {
+  font-size: 1.05rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.phase-detail-header__stats {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.phase-detail-header__bar-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.phase-detail-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.phase-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.phase-status-badge--pending    { background: color-mix(in srgb, var(--ink-muted) 15%, transparent); color: var(--ink-muted); }
+.phase-status-badge--in_progress { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.phase-status-badge--completed  { background: color-mix(in srgb, var(--green, #22c55e) 15%, transparent); color: var(--green, #22c55e); }
+.phase-status-badge--skipped    { background: color-mix(in srgb, var(--warning, #f59e0b) 15%, transparent); color: var(--warning, #f59e0b); }
+
+.phase-header-trash {
+  color: var(--ink-muted) !important;
+}
+.phase-header-trash:hover {
+  color: var(--danger, #ef4444) !important;
+}
+
+/* ─── Task progress bar ─── */
+
+.task-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.task-progress__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-raised, #f3f4f6);
+  overflow: hidden;
+  display: flex;
+}
+
+.task-progress__segment {
+  height: 100%;
+  transition: width 0.3s;
+}
+.task-progress__segment--completed  { background: var(--green, #22c55e); }
+.task-progress__segment--in-progress { background: var(--accent); }
+.task-progress__segment--blocked    { background: var(--warning, #f59e0b); }
+.task-progress__segment--pending    { background: var(--border); }
+
+.task-progress__label {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ─── Task toolbar ─── */
+
+.task-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.task-toolbar__row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.task-toolbar__search {
+  flex: 1 1 100%;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--border) 150%, transparent);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+}
+.task-toolbar__search::placeholder { color: var(--ink-muted); opacity: 1; }
+.task-toolbar__search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.task-toolbar__select {
+  flex: 1;
+  padding: 7px 8px;
+  font-size: 0.88rem;
+  border: 1px solid color-mix(in srgb, var(--border) 150%, transparent);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
+/* ─── Task groups ─── */
+
+.task-group {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.task-group__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.1s;
+}
+.task-group__header:hover { background: var(--surface-hover); }
+
+.task-group__chevron { font-size: 1rem; line-height: 1; color: inherit; opacity: 0.7; flex-shrink: 0; }
+.task-group__label { flex: 1; }
+.task-group__count {
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 99px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.task-group--in-progress .task-group__header { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
+.task-group--blocked    .task-group__header { background: color-mix(in srgb, var(--warning, #f59e0b) 12%, var(--surface)); color: color-mix(in srgb, var(--warning, #f59e0b) 85%, #333); }
+.task-group--pending    .task-group__header { background: var(--surface-raised); color: var(--ink); }
+.task-group--completed  .task-group__header { background: color-mix(in srgb, var(--green, #22c55e) 10%, var(--surface)); color: color-mix(in srgb, var(--green, #22c55e) 85%, #000); }
+
+/* ─── Bulk action bar ─── */
+
+.task-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.task-bulk-bar__count {
+  font-weight: 600;
+  color: var(--accent);
+  margin-right: 4px;
+}
+
+/* ─── Expense budget card ─── */
+
+.expense-budget-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--surface-raised, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.expense-budget-card__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.expense-budget-card__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.expense-budget-card__value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.expense-budget-card__value--over {
+  color: var(--danger, #ef4444);
+}
+
+.expense-budget-card__bar-wrap {
+  flex: 1;
+  min-width: 80px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  align-self: center;
+}
+
+.expense-budget-card__bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+.expense-budget-card__bar--over { background: var(--danger, #ef4444); }
+
+/* ─── Expense ledger table ─── */
+
+.expense-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.expense-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.expense-table thead th {
+  padding: 7px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  background: var(--surface-raised, var(--surface));
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.expense-table__row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.expense-table__row:hover { background: var(--surface-hover); }
+.expense-table__row--expanded { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.expense-table__row + .expense-table__row { border-top: 1px solid var(--border); }
+
+.expense-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+.expense-table__date     { white-space: nowrap; color: var(--ink-muted); font-size: 0.8rem; }
+.expense-table__desc     { font-weight: 500; }
+.expense-table__cat      { color: var(--ink-muted); font-size: 0.8rem; }
+.expense-table__provider { color: var(--ink-muted); font-size: 0.8rem; }
+.expense-table__amount   { text-align: right; font-weight: 600; white-space: nowrap; }
+.expense-table__chevron  { color: var(--ink-muted); font-size: 0.9rem; }
+
+.expense-table__edit-row td { padding: 0; background: var(--surface-raised, var(--surface)); border-top: 1px solid var(--border); }
+
+.expense-table__total-row { border-top: 2px solid var(--border); }
+.expense-table__total-row td { padding: 8px 10px; }
+
+/* ─── Expense quick-add strip ─── */
+
+.expense-quick-add {
+  margin-top: 4px;
+}
+
+.expense-quick-add__form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.expense-quick-add__input {
+  flex: 1;
+  min-width: 120px;
+  padding: 5px 9px;
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+}
+.expense-quick-add__input--narrow { flex: 0 1 120px; min-width: 90px; }
+.expense-quick-add__input--amount { flex: 0 1 100px; min-width: 70px; }
+.expense-quick-add__input:focus { outline: none; border-color: var(--accent); }
 
 /* ─── Note Canvas ─── */
 
@@ -15197,6 +15634,26 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .phase-notes-editor--loading {
   height: 200px;
+}
+
+/* ─── Project Notes Editor ─── */
+
+.project-notes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-notes-editor__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 20px;
+}
+
+.project-notes-editor__status {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
 }
 
 @media (max-width: 768px) {
