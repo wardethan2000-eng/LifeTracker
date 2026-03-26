@@ -1,6 +1,6 @@
 "use client";
 
-import type { IdeaCanvasSummary, NoteFolder, NoteTemplate, Entry } from "@lifekeeper/types";
+import type { IdeaCanvasThumbnail, NoteFolder, NoteTemplate, Entry } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
@@ -26,7 +26,7 @@ type NotesHubProps = {
   initialFolders: FolderWithCounts[];
   initialEntries: Entry[];
   templates: NoteTemplate[];
-  canvases: IdeaCanvasSummary[];
+  canvases: IdeaCanvasThumbnail[];
 };
 
 export function NotesHub({ householdId, initialFolders, initialEntries, templates, canvases }: NotesHubProps): JSX.Element {

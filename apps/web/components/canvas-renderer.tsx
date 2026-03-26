@@ -2,6 +2,7 @@
 
 import type {
   CanvasEdgeStyle,
+  CanvasGuide,
   CanvasMode,
   CanvasNodeShape,
   CanvasObjectType,
@@ -39,6 +40,8 @@ import {
   updateCanvasNode,
   updateCanvasSettings,
 } from "../lib/api";
+import { exportCanvasToSVG, exportCanvasToPNG } from "../lib/canvas-export";
+import { useCanvasHistory, useCanvasViewport, useCanvasSync, useCanvasKeyboard } from "./canvas/hooks";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,13 +55,11 @@ type DragState =
   | { type: "resize"; nodeId: string; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startX2: number; startY2: number; startMouseCX: number; startMouseCY: number }
   | { type: "wall"; startCX: number; startCY: number; endCX: number; endCY: number; shiftKey: boolean }
   | { type: "measure"; startCX: number; startCY: number; endCX: number; endCY: number }
-  | { type: "freehand"; points: { x: number; y: number }[] };
+  | { type: "freehand"; points: { x: number; y: number }[] }
+  | { type: "guide"; guideId: string; axis: "horizontal" | "vertical"; startPosition: number }
+  | { type: "group-resize"; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startPositions: Record<string, { x: number; y: number; width: number; height: number }>; startMouseCX: number; startMouseCY: number };
 
 type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "line-start" | "line-end";
-
-type HistoryEntry = { nodes: IdeaCanvasNode[]; edges: IdeaCanvasEdge[] };
-
-const MAX_HISTORY = 50;
 
 type CanvasRendererProps = {
   householdId: string;
@@ -165,6 +166,79 @@ function snapToGrid(val: number, gridSize: number): number {
   return Math.round(val / gridSize) * gridSize;
 }
 
+// ─── Alignment snapping ──────────────────────────────────────────────────────
+
+type AlignGuide = { axis: "horizontal" | "vertical"; position: number };
+
+/** Find alignment snap guides for nodes being dragged */
+function computeAlignmentGuides(
+  draggedNodes: { x: number; y: number; width: number; height: number }[],
+  otherNodes: { x: number; y: number; width: number; height: number }[],
+  threshold: number,
+): { guides: AlignGuide[]; snapDx: number; snapDy: number } {
+  if (draggedNodes.length === 0 || otherNodes.length === 0) return { guides: [], snapDx: 0, snapDy: 0 };
+
+  // Bounding box of dragged nodes
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const n of draggedNodes) {
+    minX = Math.min(minX, n.x);
+    minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + n.width);
+    maxY = Math.max(maxY, n.y + n.height);
+  }
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  // Collect edges to test: left, center, right  /  top, center, bottom
+  const dragHoriz = [minX, cx, maxX]; // x values
+  const dragVert = [minY, cy, maxY]; // y values
+
+  const guides: AlignGuide[] = [];
+  let bestDx = Infinity, bestDy = Infinity;
+
+  for (const o of otherNodes) {
+    const ox = [o.x, o.x + o.width / 2, o.x + o.width];
+    const oy = [o.y, o.y + o.height / 2, o.y + o.height];
+
+    for (const dx of dragHoriz) {
+      for (const oxx of ox) {
+        const diff = oxx - dx;
+        if (Math.abs(diff) < threshold && Math.abs(diff) <= Math.abs(bestDx)) {
+          if (Math.abs(diff) < Math.abs(bestDx)) {
+            bestDx = diff;
+            // Clear any existing vertical guides with worse distance
+            for (let i = guides.length - 1; i >= 0; i--) {
+              if (guides[i].axis === "vertical") guides.splice(i, 1);
+            }
+          }
+          guides.push({ axis: "vertical", position: oxx });
+        }
+      }
+    }
+
+    for (const dy of dragVert) {
+      for (const oyy of oy) {
+        const diff = oyy - dy;
+        if (Math.abs(diff) < threshold && Math.abs(diff) <= Math.abs(bestDy)) {
+          if (Math.abs(diff) < Math.abs(bestDy)) {
+            bestDy = diff;
+            for (let i = guides.length - 1; i >= 0; i--) {
+              if (guides[i].axis === "horizontal") guides.splice(i, 1);
+            }
+          }
+          guides.push({ axis: "horizontal", position: oyy });
+        }
+      }
+    }
+  }
+
+  return {
+    guides,
+    snapDx: Math.abs(bestDx) < threshold ? bestDx : 0,
+    snapDy: Math.abs(bestDy) < threshold ? bestDy : 0,
+  };
+}
+
 // Snap (dx, dy) to nearest allowed wall angle.
 // Default: 0°/90°. With shiftKey: also 45°.
 function snapWallAngle(dx: number, dy: number, shiftKey: boolean): { dx: number; dy: number } {
@@ -186,9 +260,21 @@ export function CanvasRenderer({
 }: CanvasRendererProps): JSX.Element {
   const [nodes, setNodes] = useState<IdeaCanvasNode[]>(initialCanvas.nodes);
   const [edges, setEdges] = useState<IdeaCanvasEdge[]>(initialCanvas.edges);
-  const [zoom, setZoom] = useState(initialCanvas.zoom);
-  const [panX, setPanX] = useState(initialCanvas.panX);
-  const [panY, setPanY] = useState(initialCanvas.panY);
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const canvasId = initialCanvas.id;
+
+  const {
+    zoom, setZoom, panX, setPanX, panY, setPanY,
+    screenToCanvas, scheduleViewportSync, handleWheel, viewportTimerRef,
+  } = useCanvasViewport({
+    initialZoom: initialCanvas.zoom,
+    initialPanX: initialCanvas.panX,
+    initialPanY: initialCanvas.panY,
+    householdId,
+    canvasId,
+    svgRef,
+  });
 
   // Multi-select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -205,6 +291,10 @@ export function CanvasRenderer({
   const [showSettings, setShowSettings] = useState(false);
   const canvasMode: CanvasMode = (initialCanvas.canvasMode as CanvasMode) ?? "diagram";
   const [showDimensions, setShowDimensions] = useState(initialCanvas.showDimensions ?? true);
+  // Guides — persistent lines dragged from rulers
+  const [guides, setGuides] = useState<CanvasGuide[]>(initialCanvas.guides ?? []);
+  // Temporary alignment guides shown during node drag
+  const [alignGuides, setAlignGuides] = useState<AlignGuide[]>([]);
   // Wall chain: last completed wall endpoint (for chain drawing)
   const wallChainStartRef = useRef<{ cx: number; cy: number } | null>(null);
   // Wall preview endpoint (tracks mouse while wall tool is active and chain is started)
@@ -267,20 +357,42 @@ export function CanvasRenderer({
   // Clipboard for copy/paste
   const clipboardRef = useRef<IdeaCanvasNode[]>([]);
 
-  // Undo/redo
-  const historyRef = useRef<HistoryEntry[]>([{ nodes: initialCanvas.nodes, edges: initialCanvas.edges }]);
-  const historyIndexRef = useRef(0);
+  // Server sync (debounced batch updates)
+  const {
+    syncTimerRef, pendingNodeUpdates,
+    flushPendingPositions, scheduleSyncPositions,
+  } = useCanvasSync({ householdId, canvasId, viewportTimerRef });
 
-  const svgRef = useRef<SVGSVGElement>(null);
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const pendingNodeUpdates = useRef<Map<string, Partial<IdeaCanvasNode>>>(new Map());
-  const canvasId = initialCanvas.id;
+  // Undo/redo history
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  const onUndoSync = useCallback((restoredNodes: IdeaCanvasNode[]) => {
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(async () => {
+      const updates = restoredNodes.map((n) => ({ id: n.id, x: n.x, y: n.y, width: n.width, height: n.height, x2: n.x2, y2: n.y2 }));
+      if (updates.length > 0) {
+        await batchUpdateCanvasNodes(householdId, canvasId, { nodes: updates });
+      }
+    }, SYNC_DEBOUNCE_MS);
+  }, [householdId, canvasId, syncTimerRef]);
+  const { pushHistory, undo, redo } = useCanvasHistory({
+    initialNodes: initialCanvas.nodes,
+    initialEdges: initialCanvas.edges,
+    setNodes,
+    setEdges,
+    clearSelection,
+    onUndoSync,
+  });
 
   const nodeMap = useMemo(() => {
     const m = new Map<string, IdeaCanvasNode>();
     for (const n of nodes) m.set(n.id, n);
     return m;
   }, [nodes]);
+
+  const sortedNodes = useMemo(
+    () => [...nodes].sort((a, b) => a.sortOrder - b.sortOrder),
+    [nodes]
+  );
 
   // pixels per physical unit: 1 grid square = 1 unit
   const pixelsPerUnit = useMemo(() => {
@@ -294,102 +406,7 @@ export function CanvasRenderer({
     return m;
   }, [entries]);
 
-  // ─── History ──────────────────────────────────────────────────────────────
-
-  const pushHistory = useCallback((newNodes: IdeaCanvasNode[], newEdges: IdeaCanvasEdge[]) => {
-    const stack = historyRef.current;
-    const idx = historyIndexRef.current;
-    // Trim any redo states
-    stack.splice(idx + 1);
-    stack.push({ nodes: newNodes, edges: newEdges });
-    if (stack.length > MAX_HISTORY) stack.shift();
-    historyIndexRef.current = stack.length - 1;
-  }, []);
-
-  const undo = useCallback(() => {
-    const stack = historyRef.current;
-    const idx = historyIndexRef.current;
-    if (idx <= 0) return;
-    historyIndexRef.current = idx - 1;
-    const entry = stack[historyIndexRef.current];
-    setNodes(entry.nodes);
-    setEdges(entry.edges);
-    setSelectedIds(new Set());
-    // Sync to server after idle
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(async () => {
-      const updates = entry.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y, width: n.width, height: n.height, x2: n.x2, y2: n.y2 }));
-      if (updates.length > 0) {
-        await batchUpdateCanvasNodes(householdId, canvasId, { nodes: updates });
-      }
-    }, SYNC_DEBOUNCE_MS);
-  }, [householdId, canvasId]);
-
-  const redo = useCallback(() => {
-    const stack = historyRef.current;
-    const idx = historyIndexRef.current;
-    if (idx >= stack.length - 1) return;
-    historyIndexRef.current = idx + 1;
-    const entry = stack[historyIndexRef.current];
-    setNodes(entry.nodes);
-    setEdges(entry.edges);
-    setSelectedIds(new Set());
-  }, []);
-
-  // ─── Debounced sync ──────────────────────────────────────────────────────
-
-  const flushPendingPositions = useCallback(async () => {
-    const updates = Array.from(pendingNodeUpdates.current.entries()).map(
-      ([id, data]) => ({ id, ...data })
-    );
-    pendingNodeUpdates.current.clear();
-    if (updates.length === 0) return;
-    await batchUpdateCanvasNodes(householdId, canvasId, {
-      nodes: updates.map((u) => ({
-        id: u.id,
-        x: u.x,
-        y: u.y,
-        x2: u.x2,
-        y2: u.y2,
-        width: u.width,
-        height: u.height,
-      })),
-    });
-  }, [householdId, canvasId]);
-
-  const scheduleSyncPositions = useCallback(() => {
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(flushPendingPositions, SYNC_DEBOUNCE_MS);
-  }, [flushPendingPositions]);
-
-  const syncViewport = useCallback(async (z: number, px: number, py: number) => {
-    await updateCanvas(householdId, canvasId, { zoom: z, panX: px, panY: py });
-  }, [householdId, canvasId]);
-
-  const viewportTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const scheduleViewportSync = useCallback((z: number, px: number, py: number) => {
-    if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
-    viewportTimerRef.current = setTimeout(() => syncViewport(z, px, py), SYNC_DEBOUNCE_MS);
-  }, [syncViewport]);
-
-  useEffect(() => {
-    return () => {
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-      if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
-    };
-  }, []);
-
   // ─── SVG coordinate helpers ──────────────────────────────────────────────
-
-  const screenToCanvas = useCallback((clientX: number, clientY: number) => {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const rect = svg.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) / zoom - panX,
-      y: (clientY - rect.top) / zoom - panY,
-    };
-  }, [zoom, panX, panY]);
 
   const maybeSnap = useCallback((val: number) => {
     if (settings.snapToGrid && settings.gridSize) return snapToGrid(val, settings.gridSize);
@@ -606,18 +623,8 @@ export function CanvasRenderer({
           const minX = Math.min(...xs), minY = Math.min(...ys);
           const maxX = Math.max(...xs), maxY = Math.max(...ys);
           const w = maxX - minX || 1, h = maxY - minY || 1;
-          // Centroid for label positioning
-          const centroid = polygonCentroid(pts);
-          // Compute area label
-          let areaLabel = "";
-          if (pixelsPerUnit) {
-            const pxArea = Math.abs(polygonArea(pts));
-            const physArea = pxArea / (pixelsPerUnit * pixelsPerUnit);
-            const unit = settings.physicalUnit || "m";
-            areaLabel = `${physArea.toFixed(1)} ${unit}²`;
-          }
           createCanvasNode(householdId, canvasId, {
-            label: areaLabel,
+            label: "",
             x: minX, y: minY,
             width: w, height: h,
             objectType: "room",
@@ -630,6 +637,7 @@ export function CanvasRenderer({
             setNodes(newNodes);
             pushHistory(newNodes, edges);
             setSelectedIds(new Set([node.id]));
+            setEditingNodeId(node.id);
           });
           roomPointsRef.current = [];
           setRoomPreviewPoints([]);
@@ -737,12 +745,61 @@ export function CanvasRenderer({
     } else if (drag.type === "node") {
       const dx = (e.clientX - drag.startX) / zoom;
       const dy = (e.clientY - drag.startY) / zoom;
+
+      // Compute tentative positions first
+      const tentative: { id: string; x: number; y: number; width: number; height: number }[] = [];
+      for (const id of drag.nodeIds) {
+        const start = drag.startPositions[id];
+        const n = nodeMap.get(id);
+        if (!start || !n) continue;
+        tentative.push({ id, x: maybeSnap(start.x + dx), y: maybeSnap(start.y + dy), width: n.width, height: n.height });
+      }
+
+      // Smart alignment snapping: compare against non-dragged nodes
+      const dragSet = new Set(drag.nodeIds);
+      const otherNodes = nodes.filter(n => !dragSet.has(n.id));
+      const alignThreshold = 8 / zoom;
+      const align = computeAlignmentGuides(tentative, otherNodes, alignThreshold);
+
+      // Also snap to persistent guide lines
+      let guideDx = align.snapDx;
+      let guideDy = align.snapDy;
+      const guideLines: AlignGuide[] = [...align.guides];
+      if (tentative.length > 0) {
+        let tMinX = Infinity, tMinY = Infinity, tMaxX = -Infinity, tMaxY = -Infinity;
+        for (const t of tentative) { tMinX = Math.min(tMinX, t.x); tMinY = Math.min(tMinY, t.y); tMaxX = Math.max(tMaxX, t.x + t.width); tMaxY = Math.max(tMaxY, t.y + t.height); }
+        const tCx = (tMinX + tMaxX) / 2, tCy = (tMinY + tMaxY) / 2;
+        for (const g of guides) {
+          if (g.axis === "horizontal") {
+            for (const edge of [tMinY, tCy, tMaxY]) {
+              const diff = g.position - edge;
+              if (Math.abs(diff) < alignThreshold && (guideDy === 0 || Math.abs(diff) < Math.abs(guideDy))) {
+                guideDy = diff;
+                // Remove existing horizontal guide lines and add this one
+                for (let i = guideLines.length - 1; i >= 0; i--) { if (guideLines[i].axis === "horizontal") guideLines.splice(i, 1); }
+                guideLines.push({ axis: "horizontal", position: g.position });
+              }
+            }
+          } else {
+            for (const edge of [tMinX, tCx, tMaxX]) {
+              const diff = g.position - edge;
+              if (Math.abs(diff) < alignThreshold && (guideDx === 0 || Math.abs(diff) < Math.abs(guideDx))) {
+                guideDx = diff;
+                for (let i = guideLines.length - 1; i >= 0; i--) { if (guideLines[i].axis === "vertical") guideLines.splice(i, 1); }
+                guideLines.push({ axis: "vertical", position: g.position });
+              }
+            }
+          }
+        }
+      }
+      setAlignGuides(guideLines);
+
       setNodes((prev) => prev.map((n) => {
         if (!drag.nodeIds.includes(n.id)) return n;
         const start = drag.startPositions[n.id];
         if (!start) return n;
-        const newX = maybeSnap(start.x + dx);
-        const newY = maybeSnap(start.y + dy);
+        const newX = maybeSnap(start.x + dx) + guideDx;
+        const newY = maybeSnap(start.y + dy) + guideDy;
         if (n.objectType === "line") {
           const lineDX = n.x2 - n.x;
           const lineDY = n.y2 - n.y;
@@ -795,13 +852,46 @@ export function CanvasRenderer({
     } else if (drag.type === "freehand") {
       const cp = screenToCanvas(e.clientX, e.clientY);
       setDrag({ ...drag, points: [...drag.points, { x: cp.x, y: cp.y }] });
+    } else if (drag.type === "guide") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const pos = drag.axis === "horizontal" ? cp.y : cp.x;
+      setGuides(prev => prev.map(g => g.id === drag.guideId ? { ...g, position: pos } : g));
+    } else if (drag.type === "group-resize") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const dx = cp.x - drag.startMouseCX;
+      const dy = cp.y - drag.startMouseCY;
+      const b = drag.startBounds;
+      const h = drag.handle;
+
+      let newX = b.x, newY = b.y, newW = b.width, newH = b.height;
+      if (h.includes("w")) { newX = Math.min(b.x + dx, b.x + b.width - MIN_SIZE); newW = b.x + b.width - newX; }
+      if (h.includes("e")) { newW = Math.max(MIN_SIZE, b.width + dx); }
+      if (h.includes("n")) { newY = Math.min(b.y + dy, b.y + b.height - MIN_SIZE); newH = b.y + b.height - newY; }
+      if (h.includes("s")) { newH = Math.max(MIN_SIZE, b.height + dy); }
+
+      const scaleX = b.width > 0 ? newW / b.width : 1;
+      const scaleY = b.height > 0 ? newH / b.height : 1;
+
+      setNodes(prev => prev.map(n => {
+        const sp = drag.startPositions[n.id];
+        if (!sp) return n;
+        return {
+          ...n,
+          x: newX + (sp.x - b.x) * scaleX,
+          y: newY + (sp.y - b.y) * scaleY,
+          width: Math.max(MIN_SIZE, sp.width * scaleX),
+          height: Math.max(MIN_SIZE, sp.height * scaleY),
+        };
+      }));
     }
-  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit, activeTool, nodes]);
+  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit, activeTool, nodes, guides]);
 
   const handleMouseUp = useCallback(async () => {
     if (drag.type === "pan") {
       scheduleViewportSync(zoom, panX, panY);
     } else if (drag.type === "node") {
+      // Clear alignment guides
+      setAlignGuides([]);
       // Commit pending positions to history and server
       const currentNodes = nodes;
       pushHistory(currentNodes, edges);
@@ -939,31 +1029,39 @@ export function CanvasRenderer({
         pushHistory(newNodes, edges);
         setSelectedIds(new Set([node.id]));
       }
+    } else if (drag.type === "guide") {
+      // If guide was dragged outside the canvas area (back to ruler), remove it
+      const svg = svgRef.current;
+      if (svg) {
+        const rect = svg.getBoundingClientRect();
+        const rulerSize = 20;
+        const guide = guides.find(g => g.id === drag.guideId);
+        if (guide) {
+          const screenPos = drag.axis === "horizontal"
+            ? (guide.position + panY) * zoom
+            : (guide.position + panX) * zoom;
+          if (screenPos < rulerSize) {
+            // Dragged back to ruler — remove
+            const newGuides = guides.filter(g => g.id !== drag.guideId);
+            setGuides(newGuides);
+            updateCanvasSettings(householdId, canvasId, { guides: newGuides });
+          } else {
+            // Persist updated position
+            updateCanvasSettings(householdId, canvasId, { guides });
+          }
+        }
+      }
+    } else if (drag.type === "group-resize") {
+      // Commit group resize to history and server
+      pushHistory(nodes, edges);
+      for (const id of Object.keys(drag.startPositions)) {
+        const n = nodeMap.get(id);
+        if (n) pendingNodeUpdates.current.set(id, { x: n.x, y: n.y, width: n.width, height: n.height });
+      }
+      scheduleSyncPositions();
     }
     setDrag({ type: "none" });
-  }, [drag, zoom, panX, panY, scheduleViewportSync, nodes, edges, nodeMap, maybeSnap, pushHistory, householdId, canvasId, scheduleSyncPositions]);
-
-  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    // Scroll wheel and two-finger swipe both zoom toward the cursor position
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const mouseScreenX = e.clientX - rect.left;
-    const mouseScreenY = e.clientY - rect.top;
-    // Canvas-space point under mouse — stays fixed after zoom
-    const canvasX = mouseScreenX / zoom - panX;
-    const canvasY = mouseScreenY / zoom - panY;
-    const clampedDelta = Math.max(-50, Math.min(50, e.deltaY));
-    const factor = Math.exp(-clampedDelta * 0.008);
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
-    const newPanX = mouseScreenX / newZoom - canvasX;
-    const newPanY = mouseScreenY / newZoom - canvasY;
-    setZoom(newZoom);
-    setPanX(newPanX);
-    setPanY(newPanY);
-    scheduleViewportSync(newZoom, newPanX, newPanY);
-  }, [zoom, panX, panY, scheduleViewportSync]);
+  }, [drag, zoom, panX, panY, scheduleViewportSync, nodes, edges, nodeMap, guides, maybeSnap, pushHistory, householdId, canvasId, scheduleSyncPositions]);
 
   // ─── Node interactions ───────────────────────────────────────────────────
 
@@ -1094,6 +1192,53 @@ export function CanvasRenderer({
       setSelectedEdgeId(null);
     }
   }, [selectedIds, selectedEdgeId, householdId, canvasId, nodes, edges, pushHistory]);
+
+  const handleBringForward = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const sorted = [...nodes].sort((a, b) => a.sortOrder - b.sortOrder);
+    const newNodes = [...sorted];
+    // Walk from top down so swaps don't cascade
+    for (let i = newNodes.length - 2; i >= 0; i--) {
+      if (selectedIds.has(newNodes[i].id) && !selectedIds.has(newNodes[i + 1].id)) {
+        const tmp = newNodes[i];
+        newNodes[i] = newNodes[i + 1];
+        newNodes[i + 1] = tmp;
+      }
+    }
+    // Reassign sortOrder based on new positions
+    const updates: { id: string; sortOrder: number }[] = [];
+    const updated = newNodes.map((n, idx) => {
+      if (n.sortOrder !== idx) updates.push({ id: n.id, sortOrder: idx });
+      return { ...n, sortOrder: idx };
+    });
+    if (updates.length === 0) return;
+    setNodes(updated);
+    pushHistory(updated, edges);
+    await batchUpdateCanvasNodes(householdId, canvasId, { nodes: updates });
+  }, [selectedIds, nodes, edges, householdId, canvasId, pushHistory]);
+
+  const handleSendBackward = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const sorted = [...nodes].sort((a, b) => a.sortOrder - b.sortOrder);
+    const newNodes = [...sorted];
+    // Walk from bottom up so swaps don't cascade
+    for (let i = 1; i < newNodes.length; i++) {
+      if (selectedIds.has(newNodes[i].id) && !selectedIds.has(newNodes[i - 1].id)) {
+        const tmp = newNodes[i];
+        newNodes[i] = newNodes[i - 1];
+        newNodes[i - 1] = tmp;
+      }
+    }
+    const updates: { id: string; sortOrder: number }[] = [];
+    const updated = newNodes.map((n, idx) => {
+      if (n.sortOrder !== idx) updates.push({ id: n.id, sortOrder: idx });
+      return { ...n, sortOrder: idx };
+    });
+    if (updates.length === 0) return;
+    setNodes(updated);
+    pushHistory(updated, edges);
+    await batchUpdateCanvasNodes(householdId, canvasId, { nodes: updates });
+  }, [selectedIds, nodes, edges, householdId, canvasId, pushHistory]);
 
   const handleStartEdge = useCallback(() => {
     const firstId = Array.from(selectedIds)[0];
@@ -1472,56 +1617,50 @@ export function CanvasRenderer({
 
   // ─── Keyboard ─────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (editingNodeId || editingEdgeId || editingName || showSettings) return;
-      const active = document.activeElement;
-      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+  const handleEscape = useCallback(() => {
+    setDrag({ type: "none" });
+    setActiveTool("select");
+    setEditingNodeId(null);
+    setEditingEdgeId(null);
+    setPendingObjectPlacement(null);
+    wallChainStartRef.current = null;
+    setWallPreviewEnd(null);
+    setWallDimEdit(null);
+    arcWallRef.current = null;
+    setArcPreview(null);
+    roomPointsRef.current = [];
+    setRoomPreviewPoints([]);
+    setRoomPreviewCursor(null);
+  }, []);
 
-      if (e.key === "Delete" || e.key === "Backspace") {
-        handleDeleteSelected();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
-        e.preventDefault();
-        redo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        handleCopy();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        handlePaste();
-      } else if (e.key === "Escape") {
-        setDrag({ type: "none" });
-        setActiveTool("select");
-        setEditingNodeId(null);
-        setEditingEdgeId(null);
-        setPendingObjectPlacement(null);
-        wallChainStartRef.current = null; // cancel wall chain
-        setWallPreviewEnd(null);
-        setWallDimEdit(null);
-        arcWallRef.current = null; // cancel arc wall
-        setArcPreview(null);
-        roomPointsRef.current = []; // cancel room polygon
-        setRoomPreviewPoints([]);
-        setRoomPreviewCursor(null);
-      } else if (e.key === "Enter" && activeTool === "wall" && wallChainStartRef.current) {
-        // Finish wall chain but stay in wall mode for a new chain
-        wallChainStartRef.current = null;
-        setWallPreviewEnd(null);
-      } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setSelectedIds(new Set(nodes.map((n) => n.id)));
-      } else if (e.key === "s" && !e.ctrlKey && !e.metaKey) {
-        setActiveTool("select");
-      } else if (e.key === "p" && !e.ctrlKey && !e.metaKey) {
-        setActiveTool("freehand");
-      } else if (e.key === "w" && !e.ctrlKey && !e.metaKey) {
-        if (settings.physicalUnit) setActiveTool("wall");
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [editingNodeId, editingEdgeId, editingName, showSettings, handleDeleteSelected, undo, redo, handleCopy, handlePaste, nodes, activeTool, settings.physicalUnit]);
+  const handleFinishWallChain = useCallback(() => {
+    wallChainStartRef.current = null;
+    setWallPreviewEnd(null);
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(nodes.map((n) => n.id)));
+  }, [nodes]);
+
+  useCanvasKeyboard({
+    editingNodeId,
+    editingEdgeId,
+    editingName,
+    showSettings,
+    activeTool,
+    physicalUnit: settings.physicalUnit,
+    nodes,
+    hasWallChain: wallChainStartRef.current !== null,
+    onDelete: handleDeleteSelected,
+    onUndo: undo,
+    onRedo: redo,
+    onCopy: handleCopy,
+    onPaste: handlePaste,
+    onEscape: handleEscape,
+    onFinishWallChain: handleFinishWallChain,
+    onSelectAll: handleSelectAll,
+    setActiveTool,
+  });
 
   // ─── Derived ─────────────────────────────────────────────────────────────
 
@@ -1904,15 +2043,34 @@ export function CanvasRenderer({
     if (node.objectType === "room") {
       // Room polygon stored in maskJson as { type: "polygon", points: {x,y}[] } relative to node origin
       let pts = "";
+      let polyPoints: { x: number; y: number }[] = [];
       if (node.maskJson) {
         try {
           const mask = JSON.parse(node.maskJson) as { type: string; points: { x: number; y: number }[] };
-          if (mask.type === "polygon") pts = mask.points.map((p) => `${node.x + p.x},${node.y + p.y}`).join(" ");
+          if (mask.type === "polygon") {
+            polyPoints = mask.points.map((p) => ({ x: node.x + p.x, y: node.y + p.y }));
+            pts = polyPoints.map((p) => `${p.x},${p.y}`).join(" ");
+          }
         } catch { /* no-op */ }
       }
-      if (!pts) pts = `${node.x},${node.y} ${node.x + node.width},${node.y} ${node.x + node.width},${node.y + node.height} ${node.x},${node.y + node.height}`;
+      if (!pts) {
+        polyPoints = [
+          { x: node.x, y: node.y },
+          { x: node.x + node.width, y: node.y },
+          { x: node.x + node.width, y: node.y + node.height },
+          { x: node.x, y: node.y + node.height },
+        ];
+        pts = polyPoints.map((p) => `${p.x},${p.y}`).join(" ");
+      }
       const cx = node.x + node.width / 2;
       const cy = node.y + node.height / 2;
+      // Compute area dynamically from polygon geometry
+      let areaText = "";
+      if (pixelsPerUnit && settings.physicalUnit && polyPoints.length >= 3) {
+        const pxArea = polygonArea(polyPoints);
+        const physArea = pxArea / (pixelsPerUnit * pixelsPerUnit);
+        areaText = `${physArea % 1 === 0 ? physArea.toFixed(0) : physArea.toFixed(1)} ${settings.physicalUnit}²`;
+      }
       return (
         <g key={node.id}>
           <polygon points={pts}
@@ -1921,11 +2079,31 @@ export function CanvasRenderer({
             strokeWidth={isSelected ? 2 / zoom : 1 / zoom}
             strokeDasharray={`${4 / zoom},${2 / zoom}`}
             style={{ cursor }} {...nodeEvents} />
-          {node.label ? (
+          {isEditing ? (
+            <foreignObject x={node.x + 4} y={cy - 14} width={node.width - 8} height={28}
+              pointerEvents="auto">
+              <input
+                className="idea-canvas__node-label-input"
+                defaultValue={node.label}
+                placeholder="Room name"
+                autoFocus
+                onBlur={(e) => handleLabelCommit(node.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLabelCommit(node.id, (e.target as HTMLInputElement).value);
+                  if (e.key === "Escape") setEditingNodeId(null);
+                }}
+              />
+            </foreignObject>
+          ) : (node.label || areaText) ? (
             <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
               fontSize={13 / zoom} fill="var(--ink)"
               pointerEvents="none" style={{ userSelect: "none" }}>
-              {node.label}
+              {node.label ? (
+                <tspan x={cx} dy={areaText ? "-0.5em" : "0"} fontWeight="600">{node.label}</tspan>
+              ) : null}
+              {areaText ? (
+                <tspan x={cx} dy={node.label ? "1.2em" : "0"} fontSize={11 / zoom} opacity={0.7}>{areaText}</tspan>
+              ) : null}
             </text>
           ) : null}
           {isSelected && renderResizeHandles(node)}
@@ -2515,7 +2693,7 @@ export function CanvasRenderer({
       if (screenX < rulerSize || screenX > svgW) continue;
       const isMajor = Math.round(u / (unitStep * 5)) * (unitStep * 5) === Math.round(u * 1000) / 1000;
       hTicks.push(
-        <g key={`hx${u}`}>
+        <g key={`hx${u}`} pointerEvents="none">
           <line x1={screenX} y1={isMajor ? 0 : rulerSize / 2} x2={screenX} y2={rulerSize}
             stroke="var(--ink)" strokeWidth={isMajor ? 1 : 0.5} />
           {isMajor ? (
@@ -2530,7 +2708,7 @@ export function CanvasRenderer({
       if (screenY < rulerSize || screenY > svgH) continue;
       const isMajor = Math.round(u / (unitStep * 5)) * (unitStep * 5) === Math.round(u * 1000) / 1000;
       vTicks.push(
-        <g key={`vy${u}`}>
+        <g key={`vy${u}`} pointerEvents="none">
           <line x1={isMajor ? 0 : rulerSize / 2} y1={screenY} x2={rulerSize} y2={screenY}
             stroke="var(--ink)" strokeWidth={isMajor ? 1 : 0.5} />
           {isMajor ? (
@@ -2542,14 +2720,34 @@ export function CanvasRenderer({
     }
 
     return (
-      <g className="canvas-ruler" pointerEvents="none">
-        {/* Horizontal ruler */}
+      <g className="canvas-ruler">
+        {/* Horizontal ruler — draggable for horizontal guides */}
         <rect x={rulerSize} y={0} width={svgW - rulerSize} height={rulerSize}
-          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5} />
+          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5}
+          style={{ cursor: "s-resize" }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            const cp = screenToCanvas(e.clientX, e.clientY);
+            const id = `g_${Date.now()}`;
+            const newGuide: CanvasGuide = { id, axis: "horizontal", position: cp.y };
+            setGuides(prev => [...prev, newGuide]);
+            setDrag({ type: "guide", guideId: id, axis: "horizontal", startPosition: cp.y });
+          }}
+        />
         {hTicks}
-        {/* Vertical ruler */}
+        {/* Vertical ruler — draggable for vertical guides */}
         <rect x={0} y={rulerSize} width={rulerSize} height={svgH - rulerSize}
-          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5} />
+          fill="var(--surface)" stroke="var(--border)" strokeWidth={0.5}
+          style={{ cursor: "e-resize" }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            const cp = screenToCanvas(e.clientX, e.clientY);
+            const id = `g_${Date.now()}`;
+            const newGuide: CanvasGuide = { id, axis: "vertical", position: cp.x };
+            setGuides(prev => [...prev, newGuide]);
+            setDrag({ type: "guide", guideId: id, axis: "vertical", startPosition: cp.x });
+          }}
+        />
         {vTicks}
         {/* Corner box */}
         <rect x={0} y={0} width={rulerSize} height={rulerSize}
@@ -2584,6 +2782,36 @@ export function CanvasRenderer({
   };
 
   // ─── JSX ──────────────────────────────────────────────────────────────────
+
+  const handleExportSVG = useCallback(() => {
+    exportCanvasToSVG(nodes, edges, canvasName, {
+      showGrid: false,
+      showDimensions: !!settings.showDimensions,
+      physicalUnit: settings.physicalUnit,
+      pixelsPerUnit,
+      imageUrlMap: nodeImageUrls,
+    });
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls]);
+
+  const handleExportPNG = useCallback(() => {
+    exportCanvasToPNG(nodes, edges, canvasName, {
+      showGrid: false,
+      showDimensions: !!settings.showDimensions,
+      physicalUnit: settings.physicalUnit,
+      pixelsPerUnit,
+      imageUrlMap: nodeImageUrls,
+    });
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls]);
+
+  const handleExportPDF = useCallback(() => {
+    const url = `/api/v1/households/${householdId}/canvases/${canvasId}/export/pdf`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${canvasName || "canvas"}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, [householdId, canvasId, canvasName]);
 
   const svgCursor = drag.type === "pan" ? "grabbing"
     : activeTool === "pan" ? "grab"
@@ -2620,6 +2848,7 @@ export function CanvasRenderer({
         activeTool={activeTool}
         onToolChange={setActiveTool}
         hasPhysicalUnits={!!settings.physicalUnit}
+        canvasMode={canvasMode}
         onOpenSettings={() => setShowSettings((v) => !v)}
         selectedCount={selectedIds.size}
         selectedEdgeId={selectedEdgeId}
@@ -2660,6 +2889,11 @@ export function CanvasRenderer({
           setObjectPickerOpen(true);
         }}
         showSettings={showSettings}
+        onExportSVG={handleExportSVG}
+        onExportPNG={handleExportPNG}
+        onExportPDF={handleExportPDF}
+        onBringForward={handleBringForward}
+        onSendBackward={handleSendBackward}
       />
 
       {/* SVG Canvas */}
@@ -2763,13 +2997,102 @@ export function CanvasRenderer({
           })() : null}
 
           {/* Nodes */}
-          {nodes.map(renderNode)}
+          {sortedNodes.map(renderNode)}
 
           {/* Draw preview */}
           {renderDrawPreview()}
 
           {/* Auto parallel-wall dimension overlay */}
           {renderParallelWallDimensions()}
+
+          {/* Persistent guide lines */}
+          {guides.map((g) => (
+            <line
+              key={g.id}
+              x1={g.axis === "horizontal" ? -50000 : g.position}
+              y1={g.axis === "horizontal" ? g.position : -50000}
+              x2={g.axis === "horizontal" ? 50000 : g.position}
+              y2={g.axis === "horizontal" ? g.position : 50000}
+              stroke="#f472b6" strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom},${4 / zoom}`}
+              style={{ cursor: g.axis === "horizontal" ? "ns-resize" : "ew-resize" }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                setDrag({ type: "guide", guideId: g.id, axis: g.axis, startPosition: g.position });
+              }}
+            />
+          ))}
+
+          {/* Alignment guides (ephemeral, during drag) */}
+          {alignGuides.map((g, i) => (
+            <line
+              key={`align-${i}`}
+              x1={g.axis === "horizontal" ? -50000 : g.position}
+              y1={g.axis === "horizontal" ? g.position : -50000}
+              x2={g.axis === "horizontal" ? 50000 : g.position}
+              y2={g.axis === "horizontal" ? g.position : 50000}
+              stroke="#6366f1" strokeWidth={1 / zoom}
+              pointerEvents="none"
+            />
+          ))}
+
+          {/* Group selection bounding box with resize handles */}
+          {selectedIds.size > 1 && drag.type !== "group-resize" ? (() => {
+            let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
+            selectedIds.forEach(id => {
+              const n = nodeMap.get(id);
+              if (!n) return;
+              gMinX = Math.min(gMinX, n.x);
+              gMinY = Math.min(gMinY, n.y);
+              gMaxX = Math.max(gMaxX, n.x + n.width);
+              gMaxY = Math.max(gMaxY, n.y + n.height);
+            });
+            if (!isFinite(gMinX)) return null;
+            const pad = 6 / zoom;
+            const gx = gMinX - pad, gy = gMinY - pad;
+            const gw = gMaxX - gMinX + pad * 2, gh = gMaxY - gMinY + pad * 2;
+            const hSize = 8 / zoom;
+            const hHalf = hSize / 2;
+            const corners: { handle: ResizeHandle; cx: number; cy: number; cursor: string }[] = [
+              { handle: "nw", cx: gx, cy: gy, cursor: "nwse-resize" },
+              { handle: "ne", cx: gx + gw, cy: gy, cursor: "nesw-resize" },
+              { handle: "se", cx: gx + gw, cy: gy + gh, cursor: "nwse-resize" },
+              { handle: "sw", cx: gx, cy: gy + gh, cursor: "nesw-resize" },
+              { handle: "n", cx: gx + gw / 2, cy: gy, cursor: "ns-resize" },
+              { handle: "s", cx: gx + gw / 2, cy: gy + gh, cursor: "ns-resize" },
+              { handle: "e", cx: gx + gw, cy: gy + gh / 2, cursor: "ew-resize" },
+              { handle: "w", cx: gx, cy: gy + gh / 2, cursor: "ew-resize" },
+            ];
+            const startGroupResize = (e: React.MouseEvent, handle: ResizeHandle) => {
+              e.stopPropagation();
+              const cp = screenToCanvas(e.clientX, e.clientY);
+              const startPositions: Record<string, { x: number; y: number; width: number; height: number }> = {};
+              selectedIds.forEach(id => {
+                const n = nodeMap.get(id);
+                if (n) startPositions[id] = { x: n.x, y: n.y, width: n.width, height: n.height };
+              });
+              setDrag({
+                type: "group-resize",
+                handle,
+                startBounds: { x: gMinX, y: gMinY, width: gMaxX - gMinX, height: gMaxY - gMinY },
+                startPositions,
+                startMouseCX: cp.x,
+                startMouseCY: cp.y,
+              });
+            };
+            return (
+              <g pointerEvents="all">
+                <rect x={gx} y={gy} width={gw} height={gh}
+                  fill="none" stroke="var(--accent)" strokeWidth={1.5 / zoom} strokeDasharray={`${4 / zoom},${3 / zoom}`} pointerEvents="none" />
+                {corners.map(c => (
+                  <rect key={c.handle}
+                    x={c.cx - hHalf} y={c.cy - hHalf} width={hSize} height={hSize}
+                    fill="white" stroke="var(--accent)" strokeWidth={1.5 / zoom}
+                    style={{ cursor: c.cursor }}
+                    onMouseDown={(e) => startGroupResize(e, c.handle)} />
+                ))}
+              </g>
+            );
+          })() : null}
 
           {/* Rubber band */}
           {renderRubberBand()}

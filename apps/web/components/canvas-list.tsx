@@ -1,15 +1,16 @@
 "use client";
 
-import type { IdeaCanvasSummary } from "@lifekeeper/types";
+import type { IdeaCanvasThumbnail } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { createCanvas, deleteCanvas, getCanvases } from "../lib/api";
+import { createCanvas, deleteCanvas, getCanvasesWithGeometry } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
+import { CanvasThumbnail } from "./canvas-thumbnail";
 
 type CanvasListProps = {
   householdId: string;
-  initialCanvases: IdeaCanvasSummary[];
+  initialCanvases: IdeaCanvasThumbnail[];
 };
 
 type CanvasTemplate = "blank" | "floorplan" | "flowchart";
@@ -26,7 +27,7 @@ function templateToMode(t: CanvasTemplate): "diagram" | "floorplan" {
 
 export function CanvasList({ householdId, initialCanvases }: CanvasListProps): JSX.Element {
   const { formatDate } = useFormattedDate();
-  const [canvases, setCanvases] = useState<IdeaCanvasSummary[]>(initialCanvases);
+  const [canvases, setCanvases] = useState<IdeaCanvasThumbnail[]>(initialCanvases);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTemplate, setNewTemplate] = useState<CanvasTemplate>("blank");
@@ -35,7 +36,7 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
   const refreshCanvases = useCallback(async () => {
     setLoading(true);
     try {
-      const updated = await getCanvases(householdId);
+      const updated = await getCanvasesWithGeometry(householdId);
       setCanvases(updated);
     } finally {
       setLoading(false);
@@ -48,7 +49,7 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
     const load = async () => {
       setLoading(true);
       try {
-        const updated = await getCanvases(householdId);
+        const updated = await getCanvasesWithGeometry(householdId);
         if (!cancelled) {
           setCanvases(updated);
         }
@@ -135,15 +136,11 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
                 className="canvas-list__card-link"
               >
                 <div className="canvas-list__card-preview">
-                  <svg viewBox="0 0 200 120" className="canvas-list__card-svg">
-                    {/* Simple visual placeholder showing node/edge counts */}
-                    <rect x="30" y="20" width="50" height="30" rx="4" fill="var(--border)" opacity="0.5" />
-                    <rect x="120" y="20" width="50" height="30" rx="4" fill="var(--border)" opacity="0.5" />
-                    <rect x="75" y="70" width="50" height="30" rx="4" fill="var(--border)" opacity="0.5" />
-                    <line x1="80" y1="35" x2="120" y2="35" stroke="var(--ink-muted)" strokeWidth="1" opacity="0.4" />
-                    <line x1="100" y1="70" x2="80" y2="50" stroke="var(--ink-muted)" strokeWidth="1" opacity="0.4" />
-                    <line x1="100" y1="70" x2="145" y2="50" stroke="var(--ink-muted)" strokeWidth="1" opacity="0.4" />
-                  </svg>
+                  <CanvasThumbnail
+                    nodes={canvas.nodes}
+                    edges={canvas.edges}
+                    className="canvas-list__card-svg"
+                  />
                 </div>
                 <div className="canvas-list__card-info">
                   <strong className="canvas-list__card-name">{canvas.name}</strong>
@@ -151,7 +148,7 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
                     {canvas.canvasMode && canvas.canvasMode !== "diagram" ? (
                       <span className="canvas-list__card-mode-badge">{canvas.canvasMode}</span>
                     ) : null}
-                    {canvas.nodeCount} node{canvas.nodeCount !== 1 ? "s" : ""} · {canvas.edgeCount} edge{canvas.edgeCount !== 1 ? "s" : ""}
+                    {canvas.nodes.length} node{canvas.nodes.length !== 1 ? "s" : ""} · {canvas.edges.length} edge{canvas.edges.length !== 1 ? "s" : ""}
                   </span>
                   <time className="canvas-list__card-date">{formatDate(canvas.updatedAt)}</time>
                 </div>

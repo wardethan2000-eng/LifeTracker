@@ -316,7 +316,7 @@ interface WallEndpoint { x: number; y: number }
 /** Given a set of wall nodes, compute adjusted polygon points with miter joins at shared endpoints.
  *  Returns a Map from wall node ID → polygon points (4 corners, adjusted for miters). */
 export function computeWallPolygonsWithMiters(
-  walls: IdeaCanvasNode[],
+  walls: Pick<IdeaCanvasNode, "id" | "x" | "y" | "x2" | "y2" | "strokeWidth">[],
   snapRadius = 2,
 ): Map<string, { x: number; y: number }[]> {
   const result = new Map<string, { x: number; y: number }[]>();

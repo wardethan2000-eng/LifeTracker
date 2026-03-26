@@ -1,8 +1,8 @@
 "use client";
 
-import type { CanvasEdgeStyle, CanvasNodeShape, IdeaCanvasNode } from "@lifekeeper/types";
+import type { CanvasEdgeStyle, CanvasMode, CanvasNodeShape, IdeaCanvasNode } from "@lifekeeper/types";
 import type { ActiveTool } from "./canvas-tools/types";
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -12,6 +12,8 @@ export interface CanvasToolbarProps {
   /** Whether physical units are configured on this canvas */
   hasPhysicalUnits: boolean;
   onOpenSettings: () => void;
+  /** Canvas mode — controls which tool groups are expanded by default */
+  canvasMode: CanvasMode;
   // Selection state
   selectedCount: number;
   selectedEdgeId: string | null;
@@ -27,6 +29,9 @@ export interface CanvasToolbarProps {
   onChangeStrokeWidth: (width: number) => void;
   onChangeEdgeStyle: (style: CanvasEdgeStyle) => void;
   onDeleteSelected: () => void;
+  // Layer ordering
+  onBringForward?: () => void;
+  onSendBackward?: () => void;
   // Wall-specific actions
   onChangeWallHeight?: (height: number | null) => void;
   /** Physical unit string (e.g. "ft", "m") for displaying wall length */
@@ -72,6 +77,7 @@ const EDGE_STYLES: CanvasEdgeStyle[] = ["solid", "dashed", "dotted"];
 export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
   const {
     activeTool, onToolChange, hasPhysicalUnits, onOpenSettings,
+    canvasMode,
     selectedCount, selectedEdgeId, singleSelected, allFlowchartSelected, selectedEdge,
     onStartEdge, onChangeColor, onChangeShape, onChangeFillColor,
     onChangeStrokeColor, onChangeStrokeWidth, onChangeEdgeStyle, onDeleteSelected,
@@ -79,7 +85,12 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     onUndo, onRedo, zoom, onZoomIn, onZoomOut, onFitToView,
     objectPickerOpen, onToggleObjectPicker, showSettings,
     onExportSVG, onExportPNG, onExportPDF,
+    onBringForward, onSendBackward,
   } = props;
+
+  // Expand draw tools by default in diagram/freehand mode, building tools in floorplan
+  const [drawExpanded, setDrawExpanded] = useState(canvasMode !== "floorplan");
+  const [buildExpanded, setBuildExpanded] = useState(canvasMode === "floorplan");
 
   const btn = (tool: ActiveTool) =>
     `idea-canvas__tool-btn${activeTool === tool ? " idea-canvas__tool-btn--active" : ""}`;
@@ -90,8 +101,16 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     return cls;
   };
 
+  const modeLabel: Record<CanvasMode, string> = { diagram: "Diagram", floorplan: "Floorplan", freehand: "Freehand" };
+
   return (
     <div className="idea-canvas__toolbar">
+      {/* ── Mode badge ── */}
+      <span className="idea-canvas__mode-badge" title="Canvas mode (set in settings)">
+        {modeLabel[canvasMode]}
+      </span>
+      <div className="idea-canvas__toolbar-divider" />
+
       {/* ── Navigation ── */}
       <div className="idea-canvas__tool-group">
         <button type="button" className={btn("select")}
@@ -109,35 +128,53 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
 
       {/* ── Draw ── */}
       <div className="idea-canvas__tool-group">
-        <button type="button" className={btn("freehand")}
-          onClick={() => onToolChange("freehand")} title="Freehand pencil (P)">
-          ✏ Pencil
+        <button type="button" className="idea-canvas__group-toggle"
+          onClick={() => setDrawExpanded((v) => !v)}
+          title={drawExpanded ? "Collapse drawing tools" : "Expand drawing tools"}
+          aria-expanded={drawExpanded}>
+          {drawExpanded ? "▾" : "▸"} Draw
         </button>
-        <button type="button" className={btn("line")}
-          onClick={() => onToolChange("line")} title="Draw line">
-          ╱ Line
-        </button>
-        <button type="button" className={btn("rect")}
-          onClick={() => onToolChange("rect")} title="Draw rectangle">
-          ▭ Rect
-        </button>
-        <button type="button" className={btn("circle")}
-          onClick={() => onToolChange("circle")} title="Draw circle / ellipse">
-          ◯ Circle
-        </button>
-        <button type="button" className={btn("text")}
-          onClick={() => onToolChange("text")} title="Add text">
-          T Text
-        </button>
-        <button type="button" className={btn("node")}
-          onClick={() => onToolChange("node")} title="Add flowchart node">
-          ☐ Node
-        </button>
+        {drawExpanded ? (
+          <>
+            <button type="button" className={btn("freehand")}
+              onClick={() => onToolChange("freehand")} title="Freehand pencil (P)">
+              ✏ Pencil
+            </button>
+            <button type="button" className={btn("line")}
+              onClick={() => onToolChange("line")} title="Draw line">
+              ╱ Line
+            </button>
+            <button type="button" className={btn("rect")}
+              onClick={() => onToolChange("rect")} title="Draw rectangle">
+              ▭ Rect
+            </button>
+            <button type="button" className={btn("circle")}
+              onClick={() => onToolChange("circle")} title="Draw circle / ellipse">
+              ◯ Circle
+            </button>
+            <button type="button" className={btn("text")}
+              onClick={() => onToolChange("text")} title="Add text">
+              T Text
+            </button>
+            <button type="button" className={btn("node")}
+              onClick={() => onToolChange("node")} title="Add flowchart node">
+              ☐ Node
+            </button>
+          </>
+        ) : null}
       </div>
       <div className="idea-canvas__toolbar-divider" />
 
       {/* ── Building ── */}
       <div className="idea-canvas__tool-group">
+        <button type="button" className="idea-canvas__group-toggle"
+          onClick={() => setBuildExpanded((v) => !v)}
+          title={buildExpanded ? "Collapse building tools" : "Expand building tools"}
+          aria-expanded={buildExpanded}>
+          {buildExpanded ? "▾" : "▸"} Build
+        </button>
+        {buildExpanded ? (
+          <>
         <button type="button" className={buildingToolClass("wall")}
           onClick={() => {
             if (!hasPhysicalUnits) { onOpenSettings(); return; }
@@ -178,6 +215,8 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
           title={hasPhysicalUnits ? "Draw staircase" : "Set physical units first"}>
           ⊞ Stairs
         </button>
+          </>
+        ) : null}
       </div>
       <div className="idea-canvas__toolbar-divider" />
 
@@ -305,6 +344,13 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
           onClick={onDeleteSelected} title="Delete selected (Del)">
           🗑 Delete
         </button>
+      ) : null}
+      {selectedCount > 0 && (onBringForward || onSendBackward) ? (
+        <>
+          <div className="idea-canvas__toolbar-divider" />
+          {onBringForward ? <button type="button" className="idea-canvas__tool-btn" onClick={onBringForward} title="Bring forward">⬆</button> : null}
+          {onSendBackward ? <button type="button" className="idea-canvas__tool-btn" onClick={onSendBackward} title="Send backward">⬇</button> : null}
+        </>
       ) : null}
 
       <div className="idea-canvas__toolbar-spacer" />

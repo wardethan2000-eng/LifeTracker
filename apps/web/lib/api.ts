@@ -497,10 +497,12 @@ import {
   type DemoteToIdeaInput,
   ideaCanvasSchema,
   ideaCanvasSummarySchema,
+  ideaCanvasThumbnailSchema,
   ideaCanvasNodeSchema,
   ideaCanvasEdgeSchema,
   type IdeaCanvas,
   type IdeaCanvasSummary,
+  type IdeaCanvasThumbnail,
   type IdeaCanvasNode,
   type IdeaCanvasEdge,
   type CreateIdeaCanvasInput,
@@ -5954,6 +5956,13 @@ export const getCanvases = async (
   schema: z.array(ideaCanvasSummarySchema),
 });
 
+export const getCanvasesWithGeometry = async (
+  householdId: string
+): Promise<IdeaCanvasThumbnail[]> => apiRequest({
+  path: `/v1/households/${householdId}/canvases?include=geometry`,
+  schema: z.array(ideaCanvasThumbnailSchema),
+});
+
 export const getCanvasesByEntity = async (
   householdId: string,
   entityType: string,
@@ -5961,6 +5970,15 @@ export const getCanvasesByEntity = async (
 ): Promise<IdeaCanvasSummary[]> => apiRequest({
   path: `/v1/households/${householdId}/canvases?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}`,
   schema: z.array(ideaCanvasSummarySchema),
+});
+
+export const getCanvasesByEntityWithGeometry = async (
+  householdId: string,
+  entityType: string,
+  entityId: string
+): Promise<IdeaCanvasThumbnail[]> => apiRequest({
+  path: `/v1/households/${householdId}/canvases?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}&include=geometry`,
+  schema: z.array(ideaCanvasThumbnailSchema),
 });
 
 export const getCanvas = async (

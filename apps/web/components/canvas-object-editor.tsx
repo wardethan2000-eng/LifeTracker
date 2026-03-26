@@ -37,8 +37,8 @@ type MaskData =
 
 interface CanvasObjectEditorProps {
   householdId: string;
-  object?: CanvasObject;
-  initialCategory?: CanvasObjectCategory;
+  object?: CanvasObject | undefined;
+  initialCategory?: CanvasObjectCategory | undefined;
   onSave: (obj: CanvasObject) => void;
   onClose: () => void;
 }

@@ -548,6 +548,30 @@ export const buildHobbyLogEntryTags = (logType: string | null | undefined): stri
 
 export * from "./project-risk.js";
 
+// ─── Canvas geometry helpers ────────────────────────────────────────────────
+
+/** Shoelace formula — returns unsigned polygon area in pixel² */
+export function polygonAreaFromPoints(points: { x: number; y: number }[]): number {
+  let area = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i]!.x * points[j]!.y;
+    area -= points[j]!.x * points[i]!.y;
+  }
+  return Math.abs(area) / 2;
+}
+
+/** Convert pixel² area to physical area string, e.g. "25.3 ft²" */
+export function formatPhysicalArea(
+  pxArea: number,
+  pixelsPerUnit: number,
+  unit: string,
+): string {
+  const physArea = pxArea / (pixelsPerUnit * pixelsPerUnit);
+  return `${physArea % 1 === 0 ? physArea.toFixed(0) : physArea.toFixed(1)} ${unit}²`;
+}
+
 export interface UsageAnomalyResult {
   mean: number;
   stddev: number;

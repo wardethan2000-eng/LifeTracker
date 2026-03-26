@@ -29,6 +29,7 @@ import {
   generateComplianceAuditPdf,
   generateInventoryValuationPdf
 } from "../../lib/pdf-report.js";
+import { renderCanvasPage, type CanvasPdfInput } from "../../lib/pdf-canvas.js";
 import { toEntryBackedTimelineItem, toTimelineItem } from "../../lib/serializers/index.js";
 import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
 import { notFound } from "../../lib/errors.js";
@@ -1219,9 +1220,14 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, "Asset");
     }
 
-    const [timelineItems, costSummary] = await Promise.all([
+    const [timelineItems, costSummary, linkedCanvases] = await Promise.all([
       buildAssetTimeline(app.prisma, asset, range),
-      buildAssetCostSummary(app.prisma, asset.id, range)
+      buildAssetCostSummary(app.prisma, asset.id, range),
+      app.prisma.ideaCanvas.findMany({
+        where: { householdId: asset.householdId, entityType: "asset", entityId: asset.id, deletedAt: null },
+        include: { nodes: true, edges: true },
+        orderBy: { createdAt: "asc" },
+      }),
     ]);
     const doc = generateAssetHistoryPdf({
       asset: {
@@ -1237,6 +1243,52 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       dateRangeStart: query.since ? new Date(query.since) : null,
       dateRangeEnd: query.until ? new Date(query.until) : null
     });
+
+    // Append linked canvases as supplementary pages
+    for (const canvas of linkedCanvases) {
+      if (canvas.nodes.length === 0) continue;
+      const ppu = canvas.physicalUnit && canvas.gridSize
+        ? canvas.gridSize
+        : null;
+      renderCanvasPage(doc, {
+        name: canvas.name,
+        nodes: canvas.nodes.map(n => ({
+          id: n.id,
+          x: n.x,
+          y: n.y,
+          x2: n.x2,
+          y2: n.y2,
+          width: n.width,
+          height: n.height,
+          objectType: n.objectType,
+          shape: n.shape,
+          label: n.label,
+          color: n.color,
+          strokeColor: n.strokeColor,
+          fillColor: n.fillColor,
+          strokeWidth: n.strokeWidth,
+          rotation: n.rotation,
+          sortOrder: n.sortOrder,
+          maskJson: n.maskJson,
+          pointsJson: n.pointsJson,
+          pointAx: n.pointAx,
+          pointAy: n.pointAy,
+          pointBx: n.pointBx,
+          pointBy: n.pointBy,
+          wallThickness: n.wallThickness,
+        })),
+        edges: canvas.edges.map(e => ({
+          sourceNodeId: e.sourceNodeId,
+          targetNodeId: e.targetNodeId,
+          label: e.label,
+          style: e.style,
+        })),
+        canvasMode: canvas.canvasMode,
+        physicalUnit: canvas.physicalUnit,
+        pixelsPerUnit: ppu,
+        showDimensions: canvas.showDimensions,
+      });
+    }
     const assetFileTag = sanitizeFileSegment(asset.assetTag ?? asset.id);
 
     reply.hijack();
@@ -1685,7 +1737,11 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       hobbySessionIngredients,
       hobbySessionSteps,
       hobbyMetricDefinitions,
-      hobbyMetricReadings
+      hobbyMetricReadings,
+      ideaCanvases,
+      ideaCanvasNodes,
+      ideaCanvasEdges,
+      canvasObjects
     ] = await Promise.all([
       app.prisma.household.findMany({ where: { id: params.householdId } }),
       app.prisma.householdMember.findMany({
@@ -1743,7 +1799,11 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
       app.prisma.hobbySessionIngredient.findMany({ where: { session: { hobby: { householdId: params.householdId } } } }),
       app.prisma.hobbySessionStep.findMany({ where: { session: { hobby: { householdId: params.householdId } } } }),
       app.prisma.hobbyMetricDefinition.findMany({ where: { hobby: { householdId: params.householdId } } }),
-      app.prisma.hobbyMetricReading.findMany({ where: { metricDefinition: { hobby: { householdId: params.householdId } } } })
+      app.prisma.hobbyMetricReading.findMany({ where: { metricDefinition: { hobby: { householdId: params.householdId } } } }),
+      app.prisma.ideaCanvas.findMany({ where: { householdId: params.householdId } }),
+      app.prisma.ideaCanvasNode.findMany({ where: { canvas: { householdId: params.householdId } } }),
+      app.prisma.ideaCanvasEdge.findMany({ where: { canvas: { householdId: params.householdId } } }),
+      app.prisma.canvasObject.findMany({ where: { householdId: params.householdId } })
     ]);
 
     const exportPayload = householdDataExportSchema.parse({
@@ -1798,7 +1858,11 @@ export const exportRoutes: FastifyPluginAsync = async (app) => {
         hobbySessionIngredients: toExportRecords(hobbySessionIngredients),
         hobbySessionSteps: toExportRecords(hobbySessionSteps),
         hobbyMetricDefinitions: toExportRecords(hobbyMetricDefinitions),
-        hobbyMetricReadings: toExportRecords(hobbyMetricReadings)
+        hobbyMetricReadings: toExportRecords(hobbyMetricReadings),
+        ideaCanvases: toExportRecords(ideaCanvases),
+        ideaCanvasNodes: toExportRecords(ideaCanvasNodes),
+        ideaCanvasEdges: toExportRecords(ideaCanvasEdges),
+        canvasObjects: toExportRecords(canvasObjects)
       }
     });
 

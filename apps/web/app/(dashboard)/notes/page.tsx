@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { ApiError, getCanvases, getMe, getNoteFolders, getEntries, getNoteTemplates } from "../../../lib/api";
+import { ApiError, getCanvasesWithGeometry, getMe, getNoteFolders, getEntries, getNoteTemplates } from "../../../lib/api";
 import { NotesHub } from "../../../components/notes-hub";
 import { PageHeader } from "../../../components/page-header";
 
@@ -20,7 +20,7 @@ export default async function NotesPage(): Promise<JSX.Element> {
       getNoteFolders(household.id),
       getEntries(household.id, { entityType: "notebook", entityId: household.id }),
       getNoteTemplates(household.id),
-      getCanvases(household.id),
+      getCanvasesWithGeometry(household.id),
     ]);
 
     return (

@@ -8,7 +8,8 @@ import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
 import { AttachmentSection } from "./attachment-section";
 import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
-import type { ProjectPhaseProgress } from "@lifekeeper/types";
+import { CanvasThumbnail } from "./canvas-thumbnail";
+import type { ProjectPhaseProgress, IdeaCanvasThumbnail } from "@lifekeeper/types";
 import { useFormattedDate } from "../lib/formatted-date";
 
 type ProjectDashboardProps = {
@@ -39,6 +40,7 @@ type ProjectDashboardProps = {
   phaseProgress: ProjectPhaseProgress[];
   recentNote: NccNoteSummary | null;
   canvases: NccCanvasSummary[];
+  canvasThumbnails?: IdeaCanvasThumbnail[];
 };
 
 function formatCurrency(amount: number | null, fallback = "Not set"): string {
@@ -84,6 +86,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     phaseProgress,
     recentNote,
     canvases,
+    canvasThumbnails,
   } = props;
 
   const base = `/projects/${projectId}`;
@@ -248,6 +251,21 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     });
   }
 
+  if (canvasThumbnails) {
+    for (const canvas of canvasThumbnails) {
+      cards.push({
+        key: `canvas-${canvas.id}`,
+        title: canvas.name,
+        content: (
+          <div className="dashboard-card__canvas-preview">
+            <CanvasThumbnail nodes={canvas.nodes} edges={canvas.edges} className="dashboard-card__canvas-svg" />
+          </div>
+        ),
+        footerLink: { label: "Open canvas →", href: `/canvases/${canvas.id}${qs}` },
+      });
+    }
+  }
+
   const defaultLayout: LayoutItem[] = [
     { i: "tasks", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "phases", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
@@ -262,6 +280,14 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
 
   if (subProjectCount > 0) {
     defaultLayout.push({ i: "subprojects", x: 0, y: 9, w: 2, h: 2, minW: 1, minH: 2 });
+  }
+
+  if (canvasThumbnails) {
+    let yOffset = 12;
+    for (const canvas of canvasThumbnails) {
+      defaultLayout.push({ i: `canvas-${canvas.id}`, x: 0, y: yOffset, w: 2, h: 4, minW: 1, minH: 3 });
+      yOffset += 4;
+    }
   }
 
   return (

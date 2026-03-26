@@ -2347,6 +2347,7 @@ model IdeaCanvas {
   gridSize          Int               @default(24)
   canvasMode        CanvasMode        @default(diagram)
   showDimensions    Boolean           @default(true)
+  guides            Json?
   createdById       String
   deletedAt         DateTime?
   createdAt         DateTime          @default(now())

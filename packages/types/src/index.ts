@@ -5753,6 +5753,14 @@ export const ideaCanvasEdgeSchema = z.object({
 });
 export type IdeaCanvasEdge = z.infer<typeof ideaCanvasEdgeSchema>;
 
+export const canvasGuideSchema = z.object({
+  id: z.string(),
+  axis: z.enum(["horizontal", "vertical"]),
+  /** Position in canvas coords */
+  position: z.number(),
+});
+export type CanvasGuide = z.infer<typeof canvasGuideSchema>;
+
 export const ideaCanvasSchema = z.object({
   id: z.string(),
   householdId: z.string(),
@@ -5770,6 +5778,7 @@ export const ideaCanvasSchema = z.object({
   gridSize: z.number(),
   canvasMode: canvasModeSchema,
   showDimensions: z.boolean(),
+  guides: z.array(canvasGuideSchema).default([]),
   createdById: z.string(),
   nodes: z.array(ideaCanvasNodeSchema),
   edges: z.array(ideaCanvasEdgeSchema),
@@ -5791,6 +5800,57 @@ export const ideaCanvasSummarySchema = z.object({
   updatedAt: z.string(),
 });
 export type IdeaCanvasSummary = z.infer<typeof ideaCanvasSummarySchema>;
+
+export const ideaCanvasThumbnailNodeSchema = z.object({
+  id: z.string(),
+  x: z.number(),
+  y: z.number(),
+  x2: z.number(),
+  y2: z.number(),
+  width: z.number(),
+  height: z.number(),
+  objectType: canvasObjectTypeSchema,
+  shape: canvasNodeShapeSchema,
+  color: z.string().nullable(),
+  strokeColor: z.string().nullable(),
+  fillColor: z.string().nullable(),
+  strokeWidth: z.number(),
+  rotation: z.number(),
+  sortOrder: z.number(),
+  label: z.string(),
+  imageUrl: z.string().nullable().optional(),
+  maskJson: z.string().nullable().optional(),
+  pointsJson: z.string().nullable().optional(),
+  pointAx: z.number().nullable().optional(),
+  pointAy: z.number().nullable().optional(),
+  pointBx: z.number().nullable().optional(),
+  pointBy: z.number().nullable().optional(),
+  wallThickness: z.number().optional(),
+  wallAngle: z.number().nullable().optional(),
+});
+export type IdeaCanvasThumbnailNode = z.infer<typeof ideaCanvasThumbnailNodeSchema>;
+
+export const ideaCanvasThumbnailEdgeSchema = z.object({
+  id: z.string(),
+  sourceNodeId: z.string(),
+  targetNodeId: z.string(),
+  label: z.string().nullable(),
+  style: canvasEdgeStyleSchema,
+});
+export type IdeaCanvasThumbnailEdge = z.infer<typeof ideaCanvasThumbnailEdgeSchema>;
+
+export const ideaCanvasThumbnailSchema = z.object({
+  id: z.string(),
+  householdId: z.string(),
+  name: z.string(),
+  entityType: z.string().nullable(),
+  entityId: z.string().nullable(),
+  canvasMode: canvasModeSchema,
+  nodes: z.array(ideaCanvasThumbnailNodeSchema),
+  edges: z.array(ideaCanvasThumbnailEdgeSchema),
+  updatedAt: z.string(),
+});
+export type IdeaCanvasThumbnail = z.infer<typeof ideaCanvasThumbnailSchema>;
 
 export const createIdeaCanvasSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -5816,6 +5876,7 @@ export const updateCanvasSettingsSchema = z.object({
   snapToGrid: z.boolean().optional(),
   gridSize: z.number().int().min(8).max(200).optional(),
   showDimensions: z.boolean().optional(),
+  guides: z.array(canvasGuideSchema).optional(),
 });
 export type UpdateCanvasSettingsInput = z.infer<typeof updateCanvasSettingsSchema>;
 
@@ -5897,6 +5958,7 @@ export const batchUpdateCanvasNodesSchema = z.object({
     width: z.number().min(1).max(2000).optional(),
     height: z.number().min(1).max(2000).optional(),
     wallAngle: z.number().optional().nullable(),
+    sortOrder: z.number().int().optional(),
   })).min(1).max(200),
 });
 export type BatchUpdateCanvasNodesInput = z.infer<typeof batchUpdateCanvasNodesSchema>;
