@@ -110,6 +110,15 @@ export function CanvasSettingsPanel({
             )}
           </div>
         </div>
+        {resolvedBgUrl ? (
+          <div className="idea-canvas__settings-row">
+            <label>Image Opacity</label>
+            <input type="range" min={0} max={1} step={0.05}
+              value={local.backgroundImageOpacity ?? 0.5}
+              onChange={(e) => setLocal((p) => ({ ...p, backgroundImageOpacity: parseFloat(e.target.value) }))} />
+            <span className="idea-canvas__settings-value">{Math.round((local.backgroundImageOpacity ?? 0.5) * 100)}%</span>
+          </div>
+        ) : null}
       </div>
       <div className="idea-canvas__settings-footer">
         <button type="button" className="button button--ghost button--small" onClick={onClose}>Cancel</button>

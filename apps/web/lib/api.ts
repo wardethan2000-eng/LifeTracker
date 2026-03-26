@@ -500,11 +500,13 @@ import {
   ideaCanvasThumbnailSchema,
   ideaCanvasNodeSchema,
   ideaCanvasEdgeSchema,
+  ideaCanvasLayerSchema,
   type IdeaCanvas,
   type IdeaCanvasSummary,
   type IdeaCanvasThumbnail,
   type IdeaCanvasNode,
   type IdeaCanvasEdge,
+  type IdeaCanvasLayer,
   type CreateIdeaCanvasInput,
   type UpdateIdeaCanvasInput,
   type UpdateCanvasSettingsInput,
@@ -513,6 +515,9 @@ import {
   type BatchUpdateCanvasNodesInput,
   type CreateCanvasEdgeInput,
   type UpdateCanvasEdgeInput,
+  type CreateCanvasLayerInput,
+  type UpdateCanvasLayerInput,
+  type ReorderCanvasLayersInput,
   canvasObjectSchema,
   createCanvasObjectSchema,
   type CanvasObject,
@@ -6105,6 +6110,53 @@ export const updateCanvasSettings = async (
   input: UpdateCanvasSettingsInput
 ): Promise<IdeaCanvas> => apiRequest({
   path: `/v1/households/${householdId}/canvases/${canvasId}/settings`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasSchema,
+});
+
+// ─── Canvas Layers ──────────────────────────────────────────────────────────
+
+export const createCanvasLayer = async (
+  householdId: string,
+  canvasId: string,
+  input: CreateCanvasLayerInput
+): Promise<IdeaCanvasLayer> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/layers`,
+  method: "POST",
+  body: input,
+  schema: ideaCanvasLayerSchema,
+});
+
+export const updateCanvasLayer = async (
+  householdId: string,
+  canvasId: string,
+  layerId: string,
+  input: UpdateCanvasLayerInput
+): Promise<IdeaCanvasLayer> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/layers/${layerId}`,
+  method: "PATCH",
+  body: input,
+  schema: ideaCanvasLayerSchema,
+});
+
+export const deleteCanvasLayer = async (
+  householdId: string,
+  canvasId: string,
+  layerId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/canvases/${canvasId}/layers/${layerId}`,
+    method: "DELETE",
+  });
+};
+
+export const reorderCanvasLayers = async (
+  householdId: string,
+  canvasId: string,
+  input: ReorderCanvasLayersInput
+): Promise<IdeaCanvas> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/layers/reorder`,
   method: "PATCH",
   body: input,
   schema: ideaCanvasSchema,

@@ -26,6 +26,12 @@ export type CanvasRenderOptions = {
   imageUrlMap?: Map<string, string>;
   /** Background color for the SVG canvas (default: white) */
   backgroundColor?: string;
+  /** Resolved background image URL (data URI or HTTP URL) */
+  backgroundImageUrl?: string;
+  /** Opacity for the background image (0–1, default 0.5) */
+  backgroundImageOpacity?: number;
+  /** Natural pixel dimensions of the background image */
+  bgImageDims?: { w: number; h: number };
 };
 
 export type BoundingBox = {
@@ -546,6 +552,12 @@ export function renderCanvasToSVG(
 
   // Background
   body += `<rect x="${box.minX}" y="${box.minY}" width="${box.width}" height="${box.height}" fill="${bg}"/>`;
+
+  // Background image (if present)
+  if (opts.backgroundImageUrl && opts.bgImageDims) {
+    const imgOp = opts.backgroundImageOpacity ?? 0.5;
+    body += `<image href="${esc(opts.backgroundImageUrl)}" x="0" y="0" width="${opts.bgImageDims.w}" height="${opts.bgImageDims.h}" opacity="${imgOp}" preserveAspectRatio="none"/>`;
+  }
 
   // Grid
   if (opts.showGrid) {

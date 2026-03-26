@@ -2342,7 +2342,8 @@ model IdeaCanvas {
   physicalWidth     Float?
   physicalHeight    Float?
   physicalUnit      String?           @db.VarChar(10)
-  backgroundImageUrl String?          @db.VarChar(1000)
+  backgroundImageUrl    String?          @db.VarChar(1000)
+  backgroundImageOpacity Float          @default(0.5)
   snapToGrid        Boolean           @default(false)
   gridSize          Int               @default(24)
   canvasMode        CanvasMode        @default(diagram)
@@ -2356,6 +2357,7 @@ model IdeaCanvas {
   createdBy         User              @relation("IdeaCanvasCreator", fields: [createdById], references: [id], onDelete: Restrict)
   nodes             IdeaCanvasNode[]
   edges             IdeaCanvasEdge[]
+  layers            IdeaCanvasLayer[]
 
   @@index([householdId])
   @@index([householdId, entityType, entityId])
@@ -2396,15 +2398,35 @@ model IdeaCanvasNode {
   pointBy        Float?
   // Freehand / polyline data
   pointsJson     String?         @db.Text
+  // Layer assignment
+  layerId        String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   canvas         IdeaCanvas      @relation(fields: [canvasId], references: [id], onDelete: Cascade)
   entry          Entry?          @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  layer          IdeaCanvasLayer? @relation(fields: [layerId], references: [id], onDelete: SetNull)
   outEdges       IdeaCanvasEdge[] @relation("EdgeSource")
   inEdges        IdeaCanvasEdge[] @relation("EdgeTarget")
 
   @@index([canvasId])
   @@index([entryId])
+}
+
+// A named layer within an idea canvas for organizing nodes into groups.
+model IdeaCanvasLayer {
+  id         String           @id @default(cuid())
+  canvasId   String
+  name       String           @db.VarChar(100)
+  visible    Boolean          @default(true)
+  locked     Boolean          @default(false)
+  sortOrder  Int              @default(0)
+  opacity    Float            @default(1)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  canvas     IdeaCanvas       @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  nodes      IdeaCanvasNode[]
+
+  @@index([canvasId])
 }
 
 // A directed connection between two nodes on an idea canvas.

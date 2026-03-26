@@ -33,11 +33,15 @@ function absolutizeImageUrls(map?: Map<string, string>): Map<string, string> | u
 
 function buildExportOpts(opts: CanvasRenderOptions): CanvasRenderOptions {
   const absMap = absolutizeImageUrls(opts.imageUrlMap);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const result: CanvasRenderOptions = { ...opts };
   if (absMap) {
     result.imageUrlMap = absMap;
   } else {
     delete result.imageUrlMap;
+  }
+  if (result.backgroundImageUrl && origin && result.backgroundImageUrl.startsWith("/")) {
+    result.backgroundImageUrl = `${origin}${result.backgroundImageUrl}`;
   }
   return result;
 }

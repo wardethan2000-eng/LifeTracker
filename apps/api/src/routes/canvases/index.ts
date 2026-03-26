@@ -1,13 +1,17 @@
 ﻿import {
   batchUpdateCanvasNodesSchema,
   createCanvasEdgeSchema,
+  createCanvasLayerSchema,
   createCanvasNodeSchema,
   createIdeaCanvasSchema,
   ideaCanvasEdgeSchema,
+  ideaCanvasLayerSchema,
   ideaCanvasNodeSchema,
   ideaCanvasSchema,
   ideaCanvasSummarySchema,
+  reorderCanvasLayersSchema,
   updateCanvasEdgeSchema,
+  updateCanvasLayerSchema,
   updateCanvasNodeSchema,
   updateCanvasSettingsSchema,
   updateIdeaCanvasSchema,
@@ -25,10 +29,12 @@ import { householdParamsSchema as householdParams } from "../../lib/schemas.js";
 const canvasParams = householdParams.extend({ canvasId: z.string().cuid() });
 const nodeParams = canvasParams.extend({ nodeId: z.string().cuid() });
 const edgeParams = canvasParams.extend({ edgeId: z.string().cuid() });
+const layerParams = canvasParams.extend({ layerId: z.string().cuid() });
 
 const canvasInclude = {
   nodes: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
   edges: { orderBy: { createdAt: "asc" } },
+  layers: { orderBy: { sortOrder: "asc" } },
 } satisfies Prisma.IdeaCanvasInclude;
 
 function serializeNode(n: {
@@ -41,6 +47,7 @@ function serializeNode(n: {
   parentNodeId?: string | null;
   pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
   pointsJson?: string | null;
+  layerId?: string | null;
   createdAt: Date; updatedAt: Date;
 }) {
   return ideaCanvasNodeSchema.parse({
@@ -62,7 +69,7 @@ type CanvasWithRelations = {
   id: string; householdId: string; name: string; entityType: string | null; entityId: string | null;
   zoom: number; panX: number; panY: number;
   physicalWidth: number | null; physicalHeight: number | null; physicalUnit: string | null;
-  backgroundImageUrl: string | null; snapToGrid: boolean; gridSize: number;
+  backgroundImageUrl: string | null; backgroundImageOpacity: number; snapToGrid: boolean; gridSize: number;
   canvasMode: string; showDimensions: boolean;
   guides?: unknown;
   createdById: string; createdAt: Date; updatedAt: Date; deletedAt?: Date | null;
@@ -75,9 +82,11 @@ type CanvasWithRelations = {
     wallThickness?: number; wallAngle?: number | null; physicalLength?: number | null;
     parentNodeId?: string | null;
     pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
+    layerId?: string | null;
     createdAt: Date; updatedAt: Date;
   }>;
   edges: Array<{ id: string; canvasId: string; sourceNodeId: string; targetNodeId: string; label: string | null; style: string; createdAt: Date; updatedAt: Date }>;
+  layers: Array<{ id: string; canvasId: string; name: string; visible: boolean; locked: boolean; sortOrder: number; opacity: number; createdAt: Date; updatedAt: Date }>;
 };
 
 function serializeCanvas(c: CanvasWithRelations) {
@@ -86,6 +95,11 @@ function serializeCanvas(c: CanvasWithRelations) {
     guides: Array.isArray(c.guides) ? c.guides : [],
     nodes: c.nodes.map(serializeNode),
     edges: c.edges.map(serializeEdge),
+    layers: c.layers.map((l) => ideaCanvasLayerSchema.parse({
+      ...l,
+      createdAt: l.createdAt.toISOString(),
+      updatedAt: l.updatedAt.toISOString(),
+    })),
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   });
@@ -177,16 +191,27 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     return canvases.map(serializeSummary);
   });
 
-  // GET /v1/households/:householdId/canvases/:canvasId — get full canvas with nodes + edges
+  // GET /v1/households/:householdId/canvases/:canvasId — get full canvas with nodes + edges + layers
   app.get("/v1/households/:householdId/canvases/:canvasId", async (request, reply) => {
     const { householdId, canvasId } = canvasParams.parse(request.params);
     await assertMembership(app.prisma, householdId, request.auth.userId);
 
-    const canvas = await app.prisma.ideaCanvas.findFirst({
+    let canvas = await app.prisma.ideaCanvas.findFirst({
       where: { id: canvasId, householdId, deletedAt: null },
       include: canvasInclude,
     });
     if (!canvas) return notFound(reply, "Canvas");
+
+    // Backward-compat: auto-create a default layer if none exist
+    if (!canvas.layers || canvas.layers.length === 0) {
+      await app.prisma.ideaCanvasLayer.create({
+        data: { canvas: { connect: { id: canvasId } }, name: "Default", sortOrder: 0 },
+      });
+      canvas = await app.prisma.ideaCanvas.findFirst({
+        where: { id: canvasId },
+        include: canvasInclude,
+      }) as typeof canvas;
+    }
 
     return serializeCanvas(canvas as unknown as CanvasWithRelations);
   });
@@ -266,6 +291,9 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         entityType: input.entityType ?? null,
         entityId: input.entityId ?? null,
         canvasMode: (input.canvasMode ?? "diagram") as "diagram" | "floorplan" | "freehand",
+        layers: {
+          create: [{ name: "Default", sortOrder: 0 }],
+        },
       },
       include: canvasInclude,
     });
@@ -346,6 +374,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.physicalHeight !== undefined) data.physicalHeight = input.physicalHeight;
     if (input.physicalUnit !== undefined) data.physicalUnit = input.physicalUnit;
     if (input.backgroundImageUrl !== undefined) data.backgroundImageUrl = input.backgroundImageUrl;
+    if (input.backgroundImageOpacity !== undefined) data.backgroundImageOpacity = input.backgroundImageOpacity;
     if (input.snapToGrid !== undefined) data.snapToGrid = input.snapToGrid;
     if (input.gridSize !== undefined) data.gridSize = input.gridSize;
     if (input.showDimensions !== undefined) data.showDimensions = input.showDimensions;
@@ -404,6 +433,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         pointBx: input.pointBx ?? null,
         pointBy: input.pointBy ?? null,
         pointsJson: input.pointsJson ?? null,
+        ...(input.layerId ? { layer: { connect: { id: input.layerId } } } : {}),
       },
     });
 
@@ -451,6 +481,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.pointBy !== undefined) data.pointBy = input.pointBy;
     if (input.wallHeight !== undefined) data.wallHeight = input.wallHeight;
     if (input.pointsJson !== undefined) data.pointsJson = input.pointsJson;
+    if (input.layerId !== undefined) data.layerId = input.layerId;
 
     const updated = await app.prisma.ideaCanvasNode.update({
       where: { id: nodeId },
@@ -498,6 +529,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         if (n.height !== undefined) data.height = n.height;
         if (n.wallAngle !== undefined) data.wallAngle = n.wallAngle;
         if (n.sortOrder !== undefined) data.sortOrder = n.sortOrder;
+        if (n.layerId !== undefined) data.layerId = n.layerId;
         return app.prisma.ideaCanvasNode.updateMany({
           where: { id: n.id, canvasId },
           data,
@@ -592,6 +624,130 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (!edge) return notFound(reply, "Edge");
 
     await app.prisma.ideaCanvasEdge.delete({ where: { id: edgeId } });
+
+    reply.code(204);
+    return;
+  });
+
+  // ─── Layer CRUD ────────────────────────────────────────────────────────────
+
+  // POST /v1/households/:householdId/canvases/:canvasId/layers
+  app.post("/v1/households/:householdId/canvases/:canvasId/layers", async (request, reply) => {
+    const { householdId, canvasId } = canvasParams.parse(request.params);
+    await assertMembership(app.prisma, householdId, request.auth.userId);
+    const input = createCanvasLayerSchema.parse(request.body);
+
+    const canvas = await app.prisma.ideaCanvas.findFirst({
+      where: { id: canvasId, householdId, deletedAt: null },
+      include: { _count: { select: { layers: true } } },
+    });
+    if (!canvas) return notFound(reply, "Canvas");
+    if ((canvas as unknown as { _count: { layers: number } })._count.layers >= 20) {
+      return reply.code(400).send({ message: "Canvas cannot have more than 20 layers" });
+    }
+
+    const maxOrder = await app.prisma.ideaCanvasLayer.aggregate({
+      where: { canvasId },
+      _max: { sortOrder: true },
+    });
+    const nextOrder = input.sortOrder ?? ((maxOrder._max.sortOrder ?? -1) + 1);
+
+    const layer = await app.prisma.ideaCanvasLayer.create({
+      data: {
+        canvas: { connect: { id: canvasId } },
+        name: input.name,
+        visible: input.visible ?? true,
+        locked: input.locked ?? false,
+        sortOrder: nextOrder,
+        opacity: input.opacity ?? 1,
+      },
+    });
+
+    reply.code(201);
+    return ideaCanvasLayerSchema.parse({
+      ...layer,
+      createdAt: layer.createdAt.toISOString(),
+      updatedAt: layer.updatedAt.toISOString(),
+    });
+  });
+
+  // PATCH /v1/households/:householdId/canvases/:canvasId/layers/:layerId
+  app.patch("/v1/households/:householdId/canvases/:canvasId/layers/:layerId", async (request, reply) => {
+    const { householdId, canvasId, layerId } = layerParams.parse(request.params);
+    await assertMembership(app.prisma, householdId, request.auth.userId);
+    const input = updateCanvasLayerSchema.parse(request.body);
+
+    const layer = await app.prisma.ideaCanvasLayer.findFirst({
+      where: { id: layerId, canvas: { id: canvasId, householdId, deletedAt: null } },
+    });
+    if (!layer) return notFound(reply, "Layer");
+
+    const data: Record<string, unknown> = {};
+    if (input.name !== undefined) data.name = input.name;
+    if (input.visible !== undefined) data.visible = input.visible;
+    if (input.locked !== undefined) data.locked = input.locked;
+    if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
+    if (input.opacity !== undefined) data.opacity = input.opacity;
+
+    const updated = await app.prisma.ideaCanvasLayer.update({ where: { id: layerId }, data });
+    return ideaCanvasLayerSchema.parse({
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    });
+  });
+
+  // PATCH /v1/households/:householdId/canvases/:canvasId/layers/reorder
+  app.patch("/v1/households/:householdId/canvases/:canvasId/layers/reorder", async (request, reply) => {
+    const { householdId, canvasId } = canvasParams.parse(request.params);
+    await assertMembership(app.prisma, householdId, request.auth.userId);
+    const input = reorderCanvasLayersSchema.parse(request.body);
+
+    await app.prisma.$transaction(
+      input.layers.map((l) =>
+        app.prisma.ideaCanvasLayer.updateMany({
+          where: { id: l.id, canvasId },
+          data: { sortOrder: l.sortOrder },
+        })
+      )
+    );
+
+    const canvas = await app.prisma.ideaCanvas.findFirst({
+      where: { id: canvasId },
+      include: canvasInclude,
+    });
+    return serializeCanvas(canvas as unknown as CanvasWithRelations);
+  });
+
+  // DELETE /v1/households/:householdId/canvases/:canvasId/layers/:layerId
+  app.delete("/v1/households/:householdId/canvases/:canvasId/layers/:layerId", async (request, reply) => {
+    const { householdId, canvasId, layerId } = layerParams.parse(request.params);
+    await assertMembership(app.prisma, householdId, request.auth.userId);
+
+    const layer = await app.prisma.ideaCanvasLayer.findFirst({
+      where: { id: layerId, canvas: { id: canvasId, householdId, deletedAt: null } },
+    });
+    if (!layer) return notFound(reply, "Layer");
+
+    // Check that we're not deleting the last layer
+    const layerCount = await app.prisma.ideaCanvasLayer.count({ where: { canvasId } });
+    if (layerCount <= 1) {
+      return reply.code(400).send({ message: "Canvas must have at least one layer" });
+    }
+
+    // Reassign orphaned nodes to the lowest-sortOrder remaining layer
+    const remaining = await app.prisma.ideaCanvasLayer.findFirst({
+      where: { canvasId, id: { not: layerId } },
+      orderBy: { sortOrder: "asc" },
+    });
+    if (remaining) {
+      await app.prisma.ideaCanvasNode.updateMany({
+        where: { canvasId, layerId },
+        data: { layerId: remaining.id },
+      });
+    }
+
+    await app.prisma.ideaCanvasLayer.delete({ where: { id: layerId } });
 
     reply.code(204);
     return;

@@ -51,6 +51,9 @@ export interface CanvasToolbarProps {
   onToggleObjectPicker: () => void;
   // Settings
   showSettings: boolean;
+  // Layers
+  onToggleLayerPanel?: () => void;
+  showLayerPanel?: boolean;
   // Export
   onExportSVG?: () => void;
   onExportPNG?: () => void;
@@ -84,6 +87,7 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     onChangeWallHeight, physicalUnit, pixelsPerUnit,
     onUndo, onRedo, zoom, onZoomIn, onZoomOut, onFitToView,
     objectPickerOpen, onToggleObjectPicker, showSettings,
+    onToggleLayerPanel, showLayerPanel,
     onExportSVG, onExportPNG, onExportPDF,
     onBringForward, onSendBackward,
   } = props;
@@ -382,6 +386,12 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
         onClick={onOpenSettings} title="Canvas settings">
         ⚙
       </button>
+      {onToggleLayerPanel ? (
+        <button type="button" className={`idea-canvas__tool-btn${showLayerPanel ? " idea-canvas__tool-btn--active" : ""}`}
+          onClick={onToggleLayerPanel} title="Layers">
+          ☰
+        </button>
+      ) : null}
     </div>
   );
 }

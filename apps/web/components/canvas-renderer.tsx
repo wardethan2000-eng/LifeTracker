@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type {
   CanvasEdgeStyle,
@@ -8,6 +8,7 @@ import type {
   CanvasObjectType,
   IdeaCanvas,
   IdeaCanvasEdge,
+  IdeaCanvasLayer,
   IdeaCanvasNode,
   Entry,
   UpdateCanvasSettingsInput,
@@ -17,6 +18,7 @@ import { createPortal } from "react-dom";
 import CanvasObjectPicker, { type CanvasObjectPlacement } from "./canvas-object-picker";
 import { CanvasToolbar } from "./canvas/canvas-toolbar";
 import { CanvasSettingsPanel } from "./canvas/canvas-settings-panel";
+import { CanvasLayerPanel } from "./canvas/canvas-layer-panel";
 import type { ActiveTool } from "./canvas/canvas-tools/types";
 import { simplifyPoints, findNearestWallEndpoint, wallPolygonFromLine, fmtPhysical, computeWallPolygonsWithMiters, arcFromThreePoints, svgArcPath, arcLength, arcWallPolygonPath, polygonArea, polygonCentroid, projectPointOnWall } from "./canvas/canvas-tools/types";
 import {
@@ -30,13 +32,16 @@ import {
   batchUpdateCanvasNodes,
   confirmAttachmentUpload,
   createCanvasEdge,
+  createCanvasLayer,
   createCanvasNode,
   deleteCanvasEdge,
+  deleteCanvasLayer,
   deleteCanvasNode,
   getAttachmentDownloadUrl,
   requestAttachmentUpload,
   updateCanvas,
   updateCanvasEdge,
+  updateCanvasLayer,
   updateCanvasNode,
   updateCanvasSettings,
 } from "../lib/api";
@@ -260,6 +265,12 @@ export function CanvasRenderer({
 }: CanvasRendererProps): JSX.Element {
   const [nodes, setNodes] = useState<IdeaCanvasNode[]>(initialCanvas.nodes);
   const [edges, setEdges] = useState<IdeaCanvasEdge[]>(initialCanvas.edges);
+  const [layers, setLayers] = useState<IdeaCanvasLayer[]>(initialCanvas.layers ?? []);
+  // The active layer new nodes will be created on
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(
+    () => (initialCanvas.layers ?? []).find((l) => !l.locked)?.id ?? null
+  );
+  const [showLayerPanel, setShowLayerPanel] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasId = initialCanvas.id;
@@ -336,6 +347,7 @@ export function CanvasRenderer({
     physicalHeight: initialCanvas.physicalHeight,
     physicalUnit: (initialCanvas.physicalUnit as UpdateCanvasSettingsInput["physicalUnit"]) ?? null,
     backgroundImageUrl: initialCanvas.backgroundImageUrl,
+    backgroundImageOpacity: initialCanvas.backgroundImageOpacity ?? 0.5,
     snapToGrid: initialCanvas.snapToGrid,
     gridSize: initialCanvas.gridSize,
     showDimensions: initialCanvas.showDimensions ?? true,
@@ -389,10 +401,29 @@ export function CanvasRenderer({
     return m;
   }, [nodes]);
 
-  const sortedNodes = useMemo(
-    () => [...nodes].sort((a, b) => a.sortOrder - b.sortOrder),
-    [nodes]
+  const defaultLayerId = useMemo(
+    () => [...layers].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.id ?? null,
+    [layers]
   );
+
+  const visibleLayerIds = useMemo(
+    () => new Set(layers.filter((l) => l.visible).map((l) => l.id)),
+    [layers]
+  );
+
+  const sortedNodes = useMemo(() => {
+    return [...nodes]
+      .filter((n) => {
+        const lid = n.layerId ?? defaultLayerId;
+        return !lid || visibleLayerIds.has(lid);
+      })
+      .sort((a, b) => {
+        const layerA = layers.find((l) => l.id === (a.layerId ?? defaultLayerId))?.sortOrder ?? -1;
+        const layerB = layers.find((l) => l.id === (b.layerId ?? defaultLayerId))?.sortOrder ?? -1;
+        if (layerA !== layerB) return layerA - layerB;
+        return a.sortOrder - b.sortOrder;
+      });
+  }, [nodes, visibleLayerIds, layers, defaultLayerId]);
 
   // pixels per physical unit: 1 grid square = 1 unit
   const pixelsPerUnit = useMemo(() => {
@@ -440,7 +471,7 @@ export function CanvasRenderer({
     const x = maybeSnap(canvasX - defaultWidth / 2);
     const y = maybeSnap(canvasY - defaultHeight / 2);
 
-    const node = await createCanvasNode(householdId, canvasId, {
+    const node = await createNodeOnActiveLayer({
       label: placement.source === "preset" ? placement.preset.label : placement.object.name,
       x, y,
       width: defaultWidth,
@@ -488,7 +519,7 @@ export function CanvasRenderer({
       // Create flowchart node immediately
       const x = maybeSnap(cp.x - 80);
       const y = maybeSnap(cp.y - 40);
-      createCanvasNode(householdId, canvasId, {
+      createNodeOnActiveLayer({
         label: "",
         x, y,
         width: 160, height: 80,
@@ -528,7 +559,7 @@ export function CanvasRenderer({
           const angle = Math.atan2(dy, dx) * (180 / Math.PI);
           const wallStartCx = chain.cx;
           const wallStartCy = chain.cy;
-          createCanvasNode(householdId, canvasId, {
+          createNodeOnActiveLayer({
             label: "",
             x: chain.cx, y: chain.cy,
             x2: ex, y2: ey,
@@ -584,7 +615,7 @@ export function CanvasRenderer({
             { x: state.ex!, y: state.ey! },
           );
           if (arc) {
-            createCanvasNode(householdId, canvasId, {
+            createNodeOnActiveLayer({
               label: "",
               x: state.sx, y: state.sy,
               x2: state.ex!, y2: state.ey!,
@@ -623,7 +654,7 @@ export function CanvasRenderer({
           const minX = Math.min(...xs), minY = Math.min(...ys);
           const maxX = Math.max(...xs), maxY = Math.max(...ys);
           const w = maxX - minX || 1, h = maxY - minY || 1;
-          createCanvasNode(householdId, canvasId, {
+          createNodeOnActiveLayer({
             label: "",
             x: minX, y: minY,
             width: w, height: h,
@@ -653,7 +684,7 @@ export function CanvasRenderer({
       if (!proj) return;
       // Default opening width: 36 inches / 0.9m scaled to pixels
       const defaultWidthPx = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 3 : settings.physicalUnit === "in" ? 36 : 0.9) : 40;
-      createCanvasNode(householdId, canvasId, {
+      createNodeOnActiveLayer({
         label: "",
         x: proj.x, y: proj.y,
         width: defaultWidthPx,
@@ -674,7 +705,7 @@ export function CanvasRenderer({
       // Stairs: create rectangle at click point
       const defaultW = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 3 : settings.physicalUnit === "in" ? 36 : 0.9) : 60;
       const defaultH = pixelsPerUnit ? pixelsPerUnit * (settings.physicalUnit === "ft" ? 10 : settings.physicalUnit === "in" ? 120 : 3) : 120;
-      createCanvasNode(householdId, canvasId, {
+      createNodeOnActiveLayer({
         label: "",
         x: maybeSnap(cp.x) - defaultW / 2,
         y: maybeSnap(cp.y) - defaultH / 2,
@@ -963,7 +994,7 @@ export function CanvasRenderer({
         };
       }
 
-      const node = await createCanvasNode(householdId, canvasId, nodeData);
+      const node = await createNodeOnActiveLayer(nodeData);
       const newNodes = [...nodes, node];
       setNodes(newNodes);
       pushHistory(newNodes, edges);
@@ -983,7 +1014,7 @@ export function CanvasRenderer({
       const dx = endCX - startCX;
       const dy = endCY - startCY;
       if (Math.sqrt(dx * dx + dy * dy) >= 4) {
-        const node = await createCanvasNode(householdId, canvasId, {
+        const node = await createNodeOnActiveLayer({
           label: "",
           x: startCX, y: startCY,
           x2: endCX, y2: endCY,
@@ -1015,7 +1046,7 @@ export function CanvasRenderer({
         const w = Math.max(1, maxX - minX);
         const h = Math.max(1, maxY - minY);
         const pointsJson = JSON.stringify(simplified);
-        const node = await createCanvasNode(householdId, canvasId, {
+        const node = await createNodeOnActiveLayer({
           label: "",
           x: minX, y: minY,
           width: w, height: h,
@@ -1480,7 +1511,77 @@ export function CanvasRenderer({
     setBgImageDims(null);
   }, [householdId, canvasId, settings]);
 
-  // ─── Image object upload ──────────────────────────────────────────────────
+  // ─── Layer handlers ───────────────────────────────────────────────────────
+
+  const handleAddLayer = useCallback(async () => {
+    const nextOrder = layers.length > 0 ? Math.max(...layers.map((l) => l.sortOrder)) + 1 : 0;
+    const layer = await createCanvasLayer(householdId, canvasId, {
+      name: `Layer ${layers.length + 1}`,
+      sortOrder: nextOrder,
+    });
+    setLayers((prev) => [...prev, layer]);
+    setActiveLayerId(layer.id);
+  }, [householdId, canvasId, layers]);
+
+  const handleUpdateLayer = useCallback(async (layerId: string, patch: Parameters<typeof updateCanvasLayer>[3]) => {
+    const updated = await updateCanvasLayer(householdId, canvasId, layerId, patch);
+    setLayers((prev) => prev.map((l) => l.id === layerId ? updated : l));
+  }, [householdId, canvasId]);
+
+  const handleDeleteLayer = useCallback(async (layerId: string) => {
+    if (layers.length <= 1) return;
+    await deleteCanvasLayer(householdId, canvasId, layerId);
+    const remaining = layers.filter((l) => l.id !== layerId);
+    setLayers(remaining);
+    // Reassign nodes from the deleted layer to the default
+    const defaultLayer = [...remaining].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+    setNodes((prev) => prev.map((n) => n.layerId === layerId ? { ...n, layerId: defaultLayer?.id ?? null } : n));
+    if (activeLayerId === layerId) {
+      setActiveLayerId(defaultLayer?.id ?? null);
+    }
+  }, [householdId, canvasId, layers, activeLayerId]);
+
+  const handleMoveLayerUp = useCallback(async (layerId: string) => {
+    const sorted = [...layers].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((l) => l.id === layerId);
+    if (idx >= sorted.length - 1) return;
+    // Swap with next item (higher sortOrder = visually higher)
+    const next = sorted[idx + 1];
+    const cur = sorted[idx];
+    if (!cur || !next) return;
+    const newLayers = layers.map((l) => {
+      if (l.id === cur.id) return { ...l, sortOrder: next.sortOrder };
+      if (l.id === next.id) return { ...l, sortOrder: cur.sortOrder };
+      return l;
+    });
+    setLayers(newLayers);
+    await updateCanvasLayer(householdId, canvasId, cur.id, { sortOrder: next.sortOrder });
+    await updateCanvasLayer(householdId, canvasId, next.id, { sortOrder: cur.sortOrder });
+  }, [householdId, canvasId, layers]);
+
+  const handleMoveLayerDown = useCallback(async (layerId: string) => {
+    const sorted = [...layers].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((l) => l.id === layerId);
+    if (idx <= 0) return;
+    const prev = sorted[idx - 1];
+    const cur = sorted[idx];
+    if (!cur || !prev) return;
+    const newLayers = layers.map((l) => {
+      if (l.id === cur.id) return { ...l, sortOrder: prev.sortOrder };
+      if (l.id === prev.id) return { ...l, sortOrder: cur.sortOrder };
+      return l;
+    });
+    setLayers(newLayers);
+    await updateCanvasLayer(householdId, canvasId, cur.id, { sortOrder: prev.sortOrder });
+    await updateCanvasLayer(householdId, canvasId, prev.id, { sortOrder: cur.sortOrder });
+  }, [householdId, canvasId, layers]);
+
+  // Helper: create a node on the active layer
+  const createNodeOnActiveLayer = useCallback(
+    (input: Parameters<typeof createCanvasNode>[2]) =>
+      createCanvasNode(householdId, canvasId, { ...input, layerId: activeLayerId ?? undefined }),
+    [householdId, canvasId, activeLayerId]
+  );
 
   const handleImageObjectUpload = useCallback(async (file: File) => {
     setImgObjUploading(true);
@@ -1522,7 +1623,7 @@ export function CanvasRenderer({
       const x = maybeSnap(viewCX - w / 2);
       const y = maybeSnap(viewCY - h / 2);
 
-      const node = await createCanvasNode(householdId, canvasId, {
+      const node = await createNodeOnActiveLayer({
         label: file.name.replace(/\.[^.]+$/, ""),
         x, y, width: w, height: h,
         objectType: "image",
@@ -1562,7 +1663,7 @@ export function CanvasRenderer({
     const clip = clipboardRef.current;
     if (clip.length === 0) return;
     const created = await Promise.all(
-      clip.map((n) => createCanvasNode(householdId, canvasId, {
+      clip.map((n) => createNodeOnActiveLayer({
         label: n.label,
         x: n.x + 24, y: n.y + 24,
         x2: n.x2 + 24, y2: n.y2 + 24,
@@ -2790,8 +2891,11 @@ export function CanvasRenderer({
       physicalUnit: settings.physicalUnit,
       pixelsPerUnit,
       imageUrlMap: nodeImageUrls,
+      backgroundImageUrl: resolvedBgUrl ?? undefined,
+      backgroundImageOpacity: settings.backgroundImageOpacity,
+      bgImageDims: bgImageDims ?? undefined,
     });
-  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls]);
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, bgImageDims]);
 
   const handleExportPNG = useCallback(() => {
     exportCanvasToPNG(nodes, edges, canvasName, {
@@ -2800,8 +2904,11 @@ export function CanvasRenderer({
       physicalUnit: settings.physicalUnit,
       pixelsPerUnit,
       imageUrlMap: nodeImageUrls,
+      backgroundImageUrl: resolvedBgUrl ?? undefined,
+      backgroundImageOpacity: settings.backgroundImageOpacity,
+      bgImageDims: bgImageDims ?? undefined,
     });
-  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls]);
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, bgImageDims]);
 
   const handleExportPDF = useCallback(() => {
     const url = `/api/v1/households/${householdId}/canvases/${canvasId}/export/pdf`;
@@ -2889,6 +2996,8 @@ export function CanvasRenderer({
           setObjectPickerOpen(true);
         }}
         showSettings={showSettings}
+        onToggleLayerPanel={() => setShowLayerPanel((v) => !v)}
+        showLayerPanel={showLayerPanel}
         onExportSVG={handleExportSVG}
         onExportPNG={handleExportPNG}
         onExportPDF={handleExportPDF}
@@ -2937,7 +3046,7 @@ export function CanvasRenderer({
             <image href={resolvedBgUrl}
               x={0} y={0}
               width={bgImageDims?.w ?? 1920} height={bgImageDims?.h ?? 1080}
-              opacity={0.5} pointerEvents="none" preserveAspectRatio="none" />
+              opacity={settings.backgroundImageOpacity ?? 0.5} pointerEvents="none" preserveAspectRatio="none" />
           ) : null}
 
           {/* Scale labels */}
@@ -2996,8 +3105,24 @@ export function CanvasRenderer({
             );
           })() : null}
 
-          {/* Nodes */}
-          {sortedNodes.map(renderNode)}
+          {/* Nodes grouped by layer (visible layers in sortOrder, with per-layer opacity + lock) */}
+          {(() => {
+            const grouped = new Map<string, IdeaCanvasNode[]>();
+            for (const n of sortedNodes) {
+              const lid = n.layerId ?? defaultLayerId ?? "";
+              const grp = grouped.get(lid) ?? [];
+              grp.push(n);
+              grouped.set(lid, grp);
+            }
+            return [...layers]
+              .filter((l) => l.visible)
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((layer) => (
+                <g key={layer.id} opacity={layer.opacity} pointerEvents={layer.locked ? "none" : "all"}>
+                  {(grouped.get(layer.id) ?? []).map(renderNode)}
+                </g>
+              ));
+          })()}
 
           {/* Draw preview */}
           {renderDrawPreview()}
@@ -3145,6 +3270,24 @@ export function CanvasRenderer({
           onRemoveBgImage={handleRemoveBgImage}
           onUploadBgImage={handleBgImageUpload}
           onFitViewportToImage={fitViewportToImage}
+        />
+      ) : null}
+
+      {/* Layer panel */}
+      {showLayerPanel ? (
+        <CanvasLayerPanel
+          layers={layers}
+          activeLayerId={activeLayerId}
+          onSetActiveLayer={setActiveLayerId}
+          onToggleVisibility={(id) => handleUpdateLayer(id, { visible: !layers.find((l) => l.id === id)?.visible })}
+          onToggleLock={(id) => handleUpdateLayer(id, { locked: !layers.find((l) => l.id === id)?.locked })}
+          onRename={(id, name) => handleUpdateLayer(id, { name })}
+          onChangeOpacity={(id, opacity) => handleUpdateLayer(id, { opacity })}
+          onMoveUp={handleMoveLayerUp}
+          onMoveDown={handleMoveLayerDown}
+          onAdd={handleAddLayer}
+          onDelete={handleDeleteLayer}
+          onClose={() => setShowLayerPanel(false)}
         />
       ) : null}
 

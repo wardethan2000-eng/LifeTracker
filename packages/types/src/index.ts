@@ -5702,6 +5702,42 @@ export type CanvasMode = z.infer<typeof canvasModeSchema>;
 export const canvasPhysicalUnitSchema = z.enum(["ft", "m", "in", "cm"]);
 export type CanvasPhysicalUnit = z.infer<typeof canvasPhysicalUnitSchema>;
 
+export const ideaCanvasLayerSchema = z.object({
+  id: z.string(),
+  canvasId: z.string(),
+  name: z.string(),
+  visible: z.boolean(),
+  locked: z.boolean(),
+  sortOrder: z.number(),
+  opacity: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type IdeaCanvasLayer = z.infer<typeof ideaCanvasLayerSchema>;
+
+export const createCanvasLayerSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  visible: z.boolean().default(true),
+  locked: z.boolean().default(false),
+  sortOrder: z.number().int().optional(),
+  opacity: z.number().min(0).max(1).default(1),
+});
+export type CreateCanvasLayerInput = z.input<typeof createCanvasLayerSchema>;
+
+export const updateCanvasLayerSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  visible: z.boolean().optional(),
+  locked: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  opacity: z.number().min(0).max(1).optional(),
+});
+export type UpdateCanvasLayerInput = z.infer<typeof updateCanvasLayerSchema>;
+
+export const reorderCanvasLayersSchema = z.object({
+  layers: z.array(z.object({ id: z.string(), sortOrder: z.number().int() })).min(1).max(50),
+});
+export type ReorderCanvasLayersInput = z.infer<typeof reorderCanvasLayersSchema>;
+
 export const ideaCanvasNodeSchema = z.object({
   id: z.string(),
   canvasId: z.string(),
@@ -5736,6 +5772,8 @@ export const ideaCanvasNodeSchema = z.object({
   pointBy: z.number().nullable().optional(),
   // Freehand / polyline data
   pointsJson: z.string().nullable().optional(),
+  // Layer assignment
+  layerId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -5774,6 +5812,7 @@ export const ideaCanvasSchema = z.object({
   physicalHeight: z.number().nullable(),
   physicalUnit: z.string().nullable(),
   backgroundImageUrl: z.string().nullable(),
+  backgroundImageOpacity: z.number().default(0.5),
   snapToGrid: z.boolean(),
   gridSize: z.number(),
   canvasMode: canvasModeSchema,
@@ -5782,6 +5821,7 @@ export const ideaCanvasSchema = z.object({
   createdById: z.string(),
   nodes: z.array(ideaCanvasNodeSchema),
   edges: z.array(ideaCanvasEdgeSchema),
+  layers: z.array(ideaCanvasLayerSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -5873,6 +5913,7 @@ export const updateCanvasSettingsSchema = z.object({
   physicalHeight: z.number().positive().nullable().optional(),
   physicalUnit: canvasPhysicalUnitSchema.nullable().optional(),
   backgroundImageUrl: z.string().max(1000).nullable().optional(),
+  backgroundImageOpacity: z.number().min(0).max(1).optional(),
   snapToGrid: z.boolean().optional(),
   gridSize: z.number().int().min(8).max(200).optional(),
   showDimensions: z.boolean().optional(),
@@ -5899,6 +5940,7 @@ export const createCanvasNodeSchema = z.object({
   rotation: z.number().default(0),
   sortOrder: z.number().int().default(0),
   imageUrl: z.string().max(1000).optional().nullable(),
+  maskJson: z.string().max(50000).optional().nullable(),
   // Building / floorplan fields
   wallThickness: z.number().positive().optional(),
   wallAngle: z.number().optional().nullable(),
@@ -5911,6 +5953,8 @@ export const createCanvasNodeSchema = z.object({
   pointBy: z.number().optional().nullable(),
   // Freehand / polyline data
   pointsJson: z.string().max(50000).optional().nullable(),
+  // Layer assignment
+  layerId: z.string().optional().nullable(),
 });
 export type CreateCanvasNodeInput = z.input<typeof createCanvasNodeSchema>;
 
@@ -5945,6 +5989,8 @@ export const updateCanvasNodeSchema = z.object({
   pointBy: z.number().optional().nullable(),
   // Freehand / polyline data
   pointsJson: z.string().max(50000).optional().nullable(),
+  // Layer assignment
+  layerId: z.string().optional().nullable(),
 });
 export type UpdateCanvasNodeInput = z.infer<typeof updateCanvasNodeSchema>;
 
@@ -5959,6 +6005,7 @@ export const batchUpdateCanvasNodesSchema = z.object({
     height: z.number().min(1).max(2000).optional(),
     wallAngle: z.number().optional().nullable(),
     sortOrder: z.number().int().optional(),
+    layerId: z.string().optional().nullable(),
   })).min(1).max(200),
 });
 export type BatchUpdateCanvasNodesInput = z.infer<typeof batchUpdateCanvasNodesSchema>;
