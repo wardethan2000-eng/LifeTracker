@@ -168,6 +168,7 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
             <th>Category</th>
             <th>Visibility</th>
             <th>Status</th>
+            <th>Location</th>
             <th>Manufacturer</th>
             <th>Model</th>
             <th>Created</th>
@@ -226,6 +227,13 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
                   />
                 </td>
                 <td>{asset.isArchived ? "Archived" : "Active"}</td>
+                <td>
+                  {asset.spaceLocation ? (
+                    <span title={asset.spaceLocation.breadcrumb.map((b) => b.name).join(" › ")}>
+                      {asset.spaceLocation.name}
+                    </span>
+                  ) : <span style={{ color: "var(--ink-muted)" }}>—</span>}
+                </td>
                 <td>
                   <ClickToEdit
                     value={manufacturer ?? ""}

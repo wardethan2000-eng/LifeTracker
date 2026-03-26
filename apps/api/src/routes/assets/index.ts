@@ -1,4 +1,4 @@
-﻿import type { Prisma } from "@prisma/client";
+﻿import type { Prisma, SpaceType } from "@prisma/client";
 import {
   assetCategorySchema,
   assetLabelDataSchema,
@@ -115,13 +115,22 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
           where,
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           skip: query.offset,
-          take: query.limit
+          take: query.limit,
+          include: {
+            space: {
+              select: { id: true, name: true, shortCode: true, type: true }
+            }
+          }
         }),
         app.prisma.asset.count({ where })
       ]);
 
       return buildOffsetPage(
-        assets.map((asset) => toAssetResponse(asset)),
+        assets.map((asset) => toAssetResponse(asset, {
+          spaceLocation: asset.space
+            ? { ...asset.space, breadcrumb: [] }
+            : null
+        })),
         total,
         query
       );
@@ -277,16 +286,34 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
+    const exportInclude = {
+      parentAsset: { select: { name: true } },
+      space: { select: { name: true } },
+      _count: { select: { logs: true } },
+      logs: {
+        orderBy: { completedAt: "desc" as const },
+        take: 1,
+        select: { completedAt: true }
+      }
+    } as const;
+
     const assets = await app.prisma.asset.findMany({
       where: {
         householdId: query.householdId,
         deletedAt: null,
         ...personalAssetAccessWhere(request.auth.userId)
       },
-      orderBy: [{ category: "asc" }, { name: "asc" }]
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+      include: exportInclude
     });
 
-    const headers = ["assetTag", "name", "category", "visibility", "purchaseDate", "purchasePrice", "warrantyExpiration", "location"];
+    const headers = [
+      "assetTag", "name", "category", "assetType", "visibility",
+      "serialNumber", "manufacturer", "model", "conditionScore",
+      "purchaseDate", "purchasePrice", "warrantyExpiration",
+      "location", "assignedSpace", "parentAsset",
+      "maintenanceCount", "lastMaintenance"
+    ];
 
     const rows = assets.map((asset) => {
       const purchase = (asset.purchaseDetails as Record<string, unknown> | null) ?? {};
@@ -298,11 +325,20 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
         csvValue(asset.assetTag ?? `LK-${asset.id.slice(-8).toUpperCase()}`),
         csvValue(asset.name),
         csvValue(asset.category),
+        csvValue(asset.assetTypeLabel ?? null),
         csvValue(asset.visibility),
+        csvValue(asset.serialNumber ?? null),
+        csvValue(asset.manufacturer ?? null),
+        csvValue(asset.model ?? null),
+        csvValue(asset.conditionScore != null ? String(asset.conditionScore) : null),
         csvValue(asset.purchaseDate?.toISOString().split("T")[0] ?? null),
         csvValue(typeof purchase.price === "number" ? purchase.price : null),
         csvValue(typeof warranty.endDate === "string" ? warranty.endDate.split("T")[0] : null),
-        csvValue(locationStr || null)
+        csvValue(locationStr || null),
+        csvValue(asset.space?.name ?? null),
+        csvValue(asset.parentAsset?.name ?? null),
+        csvValue(String(asset._count.logs)),
+        csvValue(asset.logs[0]?.completedAt?.toISOString().split("T")[0] ?? null)
       ].join(",");
     });
 
@@ -361,6 +397,14 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     if (input.insuranceDetails !== undefined) data.insuranceDetails = toInputJsonValue(input.insuranceDetails);
     if (input.dispositionDetails !== undefined) data.dispositionDetails = toInputJsonValue(input.dispositionDetails);
     if (input.conditionScore !== undefined) data.conditionScore = input.conditionScore;
+
+    if (input.spaceId !== undefined && input.spaceId !== null) {
+      const space = await app.prisma.space.findFirst({ where: { id: input.spaceId, householdId: input.householdId, deletedAt: null } });
+      if (!space) return badRequest(reply, "Space not found or does not belong to this household.");
+      data.spaceId = input.spaceId;
+    } else if (input.spaceId === null) {
+      data.spaceId = null;
+    }
 
     const createdAsset = await app.prisma.asset.create({ data });
     const assetTag = await ensureAssetTag(app.prisma, createdAsset.id);
@@ -424,7 +468,17 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       },
       include: {
         parentAsset: { select: { id: true, name: true, category: true } },
-        childAssets: { select: { id: true, name: true, category: true } }
+        childAssets: { select: { id: true, name: true, category: true } },
+        space: {
+          select: {
+            id: true, name: true, shortCode: true, type: true,
+            parent: { select: { id: true, name: true, type: true,
+              parent: { select: { id: true, name: true, type: true,
+                parent: { select: { id: true, name: true, type: true } }
+              } }
+            } }
+          }
+        }
       }
     });
 
@@ -432,9 +486,19 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, "Asset");
     }
 
+    let spaceLocation = null;
+    if (asset.space) {
+      const chain: Array<{ id: string; name: string; type: SpaceType }> = [];
+      type SpaceNode = { id: string; name: string; type: SpaceType; parent?: SpaceNode | null };
+      let cur: SpaceNode | null = asset.space as SpaceNode;
+      while (cur) { chain.unshift({ id: cur.id, name: cur.name, type: cur.type }); cur = cur.parent ?? null; }
+      spaceLocation = { id: asset.space.id, name: asset.space.name, shortCode: asset.space.shortCode, type: asset.space.type, breadcrumb: chain };
+    }
+
     return toAssetResponse(asset, {
       parentAsset: asset.parentAsset,
-      childAssets: asset.childAssets
+      childAssets: asset.childAssets,
+      spaceLocation
     });
   });
 
@@ -488,6 +552,14 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
     if (input.insuranceDetails !== undefined) data.insuranceDetails = toInputJsonValue(input.insuranceDetails);
     if (input.dispositionDetails !== undefined) data.dispositionDetails = toInputJsonValue(input.dispositionDetails);
     if (input.conditionScore !== undefined) data.conditionScore = input.conditionScore;
+
+    if (input.spaceId !== undefined && input.spaceId !== null) {
+      const space = await app.prisma.space.findFirst({ where: { id: input.spaceId, householdId: existing.householdId, deletedAt: null } });
+      if (!space) return badRequest(reply, "Space not found or does not belong to this household.");
+      data.spaceId = input.spaceId;
+    } else if (input.spaceId === null) {
+      data.spaceId = null;
+    }
 
     const asset = await app.prisma.asset.update({
       where: { id: existing.id },

@@ -123,6 +123,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
           </div>
           <div className="page-header__actions">
             <SpaceQuickPlace householdId={household.id} spaces={spaces} initialSpaceId={space.id} triggerLabel="Quick Place Items" triggerClassName="button button--primary button--sm" />
+            <Link href={`/inventory/spaces/${spaceId}/label?householdId=${household.id}`} className="button button--ghost button--sm">Print Label</Link>
             <Link href={`/inventory?householdId=${household.id}&tab=spaces`} className="button button--ghost button--sm">← Spaces</Link>
           </div>
         </header>

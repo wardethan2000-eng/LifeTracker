@@ -664,6 +664,7 @@ export const createAssetSchema = z.object({
   serialNumber: z.string().max(120).optional(),
   purchaseDate: z.string().datetime().optional(),
   parentAssetId: z.string().cuid().optional(),
+  spaceId: z.string().cuid().nullable().optional(),
   purchaseDetails: z.lazy(() => purchaseDetailsSchema).optional(),
   warrantyDetails: z.lazy(() => warrantyDetailsSchema).optional(),
   locationDetails: z.lazy(() => locationDetailsSchema).optional(),
@@ -793,6 +794,14 @@ export const assetSchema = z.object({
   createdById: z.string().cuid(),
   ownerId: z.string().cuid().nullable().default(null),
   parentAssetId: z.string().cuid().nullable().default(null),
+  spaceId: z.string().cuid().nullable().default(null),
+  spaceLocation: z.object({
+    id: z.string().cuid(),
+    name: z.string(),
+    shortCode: z.string(),
+    type: spaceTypeSchema,
+    breadcrumb: z.array(z.object({ id: z.string(), name: z.string(), type: spaceTypeSchema }))
+  }).nullable().default(null),
   assetTag: assetTagSchema,
   name: z.string(),
   category: assetCategorySchema,
@@ -2216,12 +2225,49 @@ export const inventoryReorderForecastSchema = z.object({
   urgency: z.enum(["critical", "soon", "planned", "healthy"])
 });
 
+// Minimal project link shape for the asset detail response.
+// Full projectAssetSchema (with all fields) is defined later alongside other project types.
+export const assetProjectLinkSummarySchema = z.object({
+  id: z.string().cuid(),
+  projectId: z.string().cuid(),
+  relationship: projectAssetRelationshipSchema,
+  role: z.string().nullable(),
+  notes: z.string().nullable(),
+  project: z.object({
+    id: z.string().cuid(),
+    name: z.string(),
+    status: z.string(),
+    householdId: z.string().cuid()
+  }),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+// Minimal inventory link shape for the asset detail response.
+export const assetInventoryLinkSummarySchema = z.object({
+  id: z.string().cuid(),
+  assetId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  notes: z.string().nullable(),
+  recommendedQuantity: z.number().nullable(),
+  inventoryItem: z.object({
+    id: z.string().cuid(),
+    name: z.string(),
+    unit: z.string(),
+    quantityOnHand: z.number()
+  }),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
 export const assetDetailResponseSchema = z.object({
   asset: assetSchema,
   metrics: z.array(usageMetricResponseSchema),
   schedules: z.array(maintenanceScheduleSchema),
   recentLogs: z.array(maintenanceLogSchema),
   hobbyLinks: z.array(z.lazy(() => hobbyLinkSummarySchema)),
+  projectLinks: z.array(assetProjectLinkSummarySchema).default([]),
+  inventoryLinks: z.array(assetInventoryLinkSummarySchema).default([]),
   dueScheduleCount: z.number().int().min(0),
   overdueScheduleCount: z.number().int().min(0)
 });
@@ -3644,6 +3690,8 @@ export type DueWorkItem = z.infer<typeof dueWorkItemSchema>;
 export type HouseholdDashboardStats = z.infer<typeof householdDashboardStatsSchema>;
 export type HouseholdDashboard = z.infer<typeof householdDashboardSchema>;
 export type AssetDetailResponse = z.infer<typeof assetDetailResponseSchema>;
+export type AssetProjectLinkSummary = z.infer<typeof assetProjectLinkSummarySchema>;
+export type AssetInventoryLinkSummary = z.infer<typeof assetInventoryLinkSummarySchema>;
 export type CreateMaintenanceScheduleInput = z.infer<typeof createMaintenanceScheduleSchema>;
 export type UpdateMaintenanceScheduleInput = z.infer<typeof updateMaintenanceScheduleSchema>;
 export type MaintenanceSchedule = z.infer<typeof maintenanceScheduleSchema>;

@@ -342,6 +342,10 @@ import {
   usageMetricResponseSchema,
   barcodeLookupResultSchema,
   type BarcodeLookupResult,
+  assetInventoryLinkSummarySchema,
+  assetProjectLinkSummarySchema,
+  type AssetInventoryLinkSummary,
+  type AssetProjectLinkSummary,
   attachmentSchema,
   attachmentUploadResponseSchema,
   type Attachment,
@@ -1087,6 +1091,29 @@ export const getAssetDetail = async (assetId: string): Promise<AssetDetailRespon
   schema: assetDetailResponseSchema,
   cacheOptions: "no-store"
 });
+
+export const getAssetInventoryLinks = async (assetId: string): Promise<AssetInventoryLinkSummary[]> => apiRequest({
+  path: `/v1/assets/${assetId}/inventory`,
+  schema: z.array(assetInventoryLinkSummarySchema),
+  cacheOptions: "no-store"
+});
+
+export const addAssetInventoryLink = async (
+  assetId: string,
+  input: { inventoryItemId: string; notes?: string; recommendedQuantity?: number }
+): Promise<AssetInventoryLinkSummary> => apiRequest({
+  path: `/v1/assets/${assetId}/inventory`,
+  method: "POST",
+  body: input,
+  schema: assetInventoryLinkSummarySchema
+});
+
+export const removeAssetInventoryLink = async (assetId: string, inventoryItemId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/assets/${assetId}/inventory/${inventoryItemId}`,
+    method: "DELETE"
+  });
+};
 
 export const getAssetTransferHistory = async (assetId: string): Promise<AssetTransferList> => apiRequest({
   path: `/v1/assets/${assetId}/transfers`,

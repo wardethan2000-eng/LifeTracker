@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
 import { createAssetAction } from "../../../actions";
 import { AssetProfileWorkbench } from "../../../../components/asset-profile-workbench";
-import { ApiError, getHouseholdAssets, getHouseholdPresets, getLibraryPresets, getMe } from "../../../../lib/api";
+import { ApiError, getHouseholdAssets, getHouseholdPresets, getHouseholdSpacesTree, getLibraryPresets, getMe } from "../../../../lib/api";
 import Link from "next/link";
 
 type NewAssetPageProps = {
@@ -29,10 +29,11 @@ export default async function NewAssetPage({ searchParams }: NewAssetPageProps):
       );
     }
 
-    const [presets, customPresets, householdAssets] = await Promise.all([
+    const [presets, customPresets, householdAssets, spaces] = await Promise.all([
       getLibraryPresets(),
       getHouseholdPresets(household.id),
-      getHouseholdAssets(household.id)
+      getHouseholdAssets(household.id),
+      getHouseholdSpacesTree(household.id).catch(() => [])
     ]);
 
     const parentAsset = parentAssetId ? householdAssets.find((a) => a.id === parentAssetId) : undefined;
@@ -65,6 +66,7 @@ export default async function NewAssetPage({ searchParams }: NewAssetPageProps):
             libraryPresets={presets}
             customPresets={customPresets}
             initialParentAssetId={parentAssetId}
+            spaces={spaces}
           />
         </div>
       </>

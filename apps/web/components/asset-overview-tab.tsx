@@ -16,7 +16,6 @@ import { getDisplayPreferences } from "../lib/api";
 import {
   formatTimelineSourceLabel,
   formatTransferTypeLabel,
-  hobbyStatusBadgeClass,
   renderLogSummary,
   type AssetTimelineFeed
 } from "../app/(dashboard)/assets/[assetId]/shared";
@@ -90,31 +89,31 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
           </div>
         </section>
 
-        {detail.hobbyLinks.length > 0 ? (
+        {(detail.hobbyLinks.length > 0 || detail.projectLinks.length > 0 || detail.inventoryLinks.length > 0) ? (
           <section className="panel">
             <div className="panel__header">
-              <h2>Linked Hobbies</h2>
+              <h2>Relationships</h2>
+              <Link href={`/assets/${assetId}/relationships`} className="button button--ghost button--sm">
+                View all
+              </Link>
             </div>
             <div className="panel__body--padded">
-              <div style={{ display: "grid", gap: "12px" }}>
-                {detail.hobbyLinks.map((link) => (
-                  <div
-                    key={link.id}
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      alignItems: "center"
-                    }}
-                  >
-                    <Link href={`/hobbies/${link.hobbyId}`} className="text-link">
-                      {link.hobbyName}
-                    </Link>
-                    <span className={hobbyStatusBadgeClass(link.hobbyStatus)}>{link.hobbyStatus}</span>
-                    {link.hobbyType ? <span className="pill">{link.hobbyType}</span> : null}
-                    {link.role ? <span style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>role: {link.role}</span> : null}
-                  </div>
-                ))}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                {detail.hobbyLinks.length > 0 && (
+                  <span style={{ color: "var(--ink-muted)", fontSize: "0.92rem" }}>
+                    {detail.hobbyLinks.length} {detail.hobbyLinks.length === 1 ? "hobby" : "hobbies"}
+                  </span>
+                )}
+                {detail.projectLinks.length > 0 && (
+                  <span style={{ color: "var(--ink-muted)", fontSize: "0.92rem" }}>
+                    {detail.projectLinks.length} {detail.projectLinks.length === 1 ? "project" : "projects"}
+                  </span>
+                )}
+                {detail.inventoryLinks.length > 0 && (
+                  <span style={{ color: "var(--ink-muted)", fontSize: "0.92rem" }}>
+                    {detail.inventoryLinks.length} linked {detail.inventoryLinks.length === 1 ? "item" : "items"}
+                  </span>
+                )}
               </div>
             </div>
           </section>

@@ -56,6 +56,8 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
 
     const assetPage = await getHouseholdAssetsPaginated(household.id, { limit, offset, includeArchived, search: search || undefined, category: category || undefined });
 
+    const unlocatedCount = assetPage.items.filter((a) => !a.spaceId).length;
+
     return (
       <>
         <header className="page-header">
@@ -66,6 +68,12 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
         </header>
 
         <div className="page-body">
+          {unlocatedCount > 0 && !search && !category && (
+            <p className="note">
+              <strong>{unlocatedCount} asset{unlocatedCount === 1 ? " on this page doesn't" : "s on this page don't"} have a location assigned.</strong>{" "}
+              <Link href={`/inventory/spaces?householdId=${household.id}`} className="text-link">Set up spaces</Link> and assign assets to see where everything is.
+            </p>
+          )}
           <section className="panel">
             <div className="panel__header">
               <h2>{t("listTitle", { count: assetPage.total })}</h2>

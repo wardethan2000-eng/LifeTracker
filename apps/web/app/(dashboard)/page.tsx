@@ -5,7 +5,7 @@ import { getDashboardData } from "../../components/dashboard-data";
 import { HomeDashboard } from "../../components/home-dashboard";
 import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
-import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getEntries, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdLowStockInventory, getHouseholdProjectStatusCounts, getLayoutPreference, getMe, getQuickActionsPreference, getCanvasesWithGeometry } from "../../lib/api";
+import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getEntries, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdLowStockInventory, getHouseholdProjectStatusCounts, getHouseholdSpacesTree, getLayoutPreference, getMe, getQuickActionsPreference, getCanvasesWithGeometry } from "../../lib/api";
 import { OnboardingChecklistClient } from "../../components/onboarding-checklist";
 import { DashboardReminders } from "../../components/dashboard-reminders";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
@@ -68,7 +68,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, lowStockItems, onboardingPref, savedQuickActionIds, reminderWindowPref, entryProbe, pinnedNotes, canvases] = await Promise.all([
+    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, lowStockItems, onboardingPref, savedQuickActionIds, reminderWindowPref, entryProbe, pinnedNotes, canvases, spacesTree] = await Promise.all([
       getDashboardData(selectedHousehold.id),
       getDashboardPins().catch(() => []),
       getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
@@ -82,6 +82,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
       getEntries(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
       getEntries(selectedHousehold.id, { flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
       getCanvasesWithGeometry(selectedHousehold.id).catch(() => []),
+      getHouseholdSpacesTree(selectedHousehold.id).catch(() => []),
     ]);
 
     const reminderWindowDays = (reminderWindowPref as Array<{ value: number }> | null)?.[0]?.value ?? 7;
@@ -91,6 +92,11 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
       reminderBefore: reminderCutoff,
       limit: 20,
     }).catch(() => ({ items: [], nextCursor: null }));
+
+    const countAllSpaces = (nodes: typeof spacesTree): number =>
+      nodes.reduce((sum, n) => sum + 1 + countAllSpaces(n.children ?? []), 0);
+    const rootSpaceCount = spacesTree.length;
+    const totalSpaceCount = countAllSpaces(spacesTree);
 
     const projectCount = projectStatusCounts.reduce((sum, s) => sum + s.count, 0);
     const hobbyCount = hobbyData.items.length;
@@ -209,6 +215,8 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             inventoryTotalCount={inventoryCount}
             lowStockCount={lowStockCount}
             outOfStockCount={outOfStockCount}
+            spaceTotalCount={totalSpaceCount}
+            rootSpaceCount={rootSpaceCount}
             ideas={recentIdeas.map((idea) => ({
               id: idea.id,
               title: idea.title,

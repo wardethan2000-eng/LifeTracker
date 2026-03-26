@@ -31,6 +31,8 @@ type InventoryEditableRowProps = {
   defaultOpen?: boolean;
   analytics?: InventoryItemConsumption | null;
   columnCount?: number;
+  onConsumeOne?: () => void;
+  onRestockToTarget?: () => void;
   children: ReactNode;
 };
 
@@ -42,7 +44,7 @@ const formatConsumptionRate = (value: number | null, unit: string): string => {
   return `~${value.toFixed(1)} ${unit}/month`;
 };
 
-export function InventoryEditableRow({ householdId, item, className, defaultOpen = false, analytics = null, columnCount = 6, children }: InventoryEditableRowProps): JSX.Element {
+export function InventoryEditableRow({ householdId, item, className, defaultOpen = false, analytics = null, columnCount = 6, onConsumeOne, onRestockToTarget, children }: InventoryEditableRowProps): JSX.Element {
   const [open, setOpen] = useState(defaultOpen);
 
   const handleClick = useCallback((event: MouseEvent<HTMLTableRowElement>) => {
@@ -139,7 +141,19 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
                 {item.notes && (
                   <p className="inventory-row-expand__notes">{item.notes.length > 120 ? `${item.notes.slice(0, 120)}…` : item.notes}</p>
                 )}
-                <Link href={`/inventory/${item.id}?householdId=${householdId}`} className="button button--ghost button--sm" style={{ marginTop: 8 }}>Open full editor →</Link>
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <Link href={`/inventory/${item.id}?householdId=${householdId}`} className="button button--ghost button--sm">Open full editor →</Link>
+                  {onConsumeOne && item.quantityOnHand > 0 && (
+                    <button type="button" className="button button--ghost button--sm" onClick={onConsumeOne}>
+                      − Use 1
+                    </button>
+                  )}
+                  {onRestockToTarget && (
+                    <button type="button" className="button button--ghost button--sm" onClick={onRestockToTarget}>
+                      + Restock
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

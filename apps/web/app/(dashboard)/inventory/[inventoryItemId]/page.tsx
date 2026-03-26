@@ -114,6 +114,12 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
               details={[item.name, ...(item.partNumber ? [`Part ${item.partNumber}`] : [])]}
               copyValue={item.scanTag ?? item.id}
             />
+            <Link
+              href={`/inventory/${item.id}/label?householdId=${household.id}`}
+              className="button button--ghost button--sm"
+            >
+              Print Label
+            </Link>
             <Link href={backHref} className="button button--ghost button--sm">← Inventory</Link>
           </div>
         </header>

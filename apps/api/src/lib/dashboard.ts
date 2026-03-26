@@ -300,6 +300,25 @@ export const buildAssetDetail = async (
           }
         }
       },
+      projectAssets: {
+        include: {
+          project: {
+            select: { id: true, name: true, status: true, householdId: true }
+          }
+        },
+        orderBy: { createdAt: "desc" }
+      },
+      inventoryLinks: {
+        where: {
+          inventoryItem: { deletedAt: null }
+        },
+        include: {
+          inventoryItem: {
+            select: { id: true, name: true, unit: true, quantityOnHand: true }
+          }
+        },
+        orderBy: { createdAt: "desc" }
+      },
       usageMetrics: {
         orderBy: { createdAt: "asc" }
       },
@@ -344,6 +363,36 @@ export const buildAssetDetail = async (
       hobbyStatus: link.hobby.status,
       role: link.role ?? null,
       notes: link.notes ?? null
+    })),
+    projectLinks: detail.projectAssets.map((pa) => ({
+      id: pa.id,
+      projectId: pa.projectId,
+      relationship: pa.relationship,
+      role: pa.role ?? null,
+      notes: pa.notes ?? null,
+      project: {
+        id: pa.project.id,
+        name: pa.project.name,
+        status: pa.project.status,
+        householdId: pa.project.householdId
+      },
+      createdAt: pa.createdAt.toISOString(),
+      updatedAt: pa.updatedAt.toISOString()
+    })),
+    inventoryLinks: detail.inventoryLinks.map((link) => ({
+      id: link.id,
+      assetId: link.assetId,
+      inventoryItemId: link.inventoryItemId,
+      notes: link.notes ?? null,
+      recommendedQuantity: link.recommendedQuantity ?? null,
+      inventoryItem: {
+        id: link.inventoryItem.id,
+        name: link.inventoryItem.name,
+        unit: link.inventoryItem.unit,
+        quantityOnHand: link.inventoryItem.quantityOnHand
+      },
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString()
     })),
     dueScheduleCount: schedules.filter((schedule) => schedule.status === "due").length,
     overdueScheduleCount: schedules.filter((schedule) => schedule.status === "overdue").length

@@ -182,9 +182,17 @@ export function InventoryListWorkspace({
                         householdId={householdId}
                         item={item}
                         columnCount={6}
-                        className={[item.lowStock ? "row--due" : null, item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ") || ""}
+                        className={[
+                          quantityOnHand <= 0 ? "row--overdue" : item.lowStock ? "row--due" : null,
+                          item.id === highlightId ? "row--highlight" : null,
+                        ].filter(Boolean).join(" ") || ""}
                         defaultOpen={item.id === highlightId && highlightedAnalytics !== null}
                         analytics={item.id === highlightId ? highlightedAnalytics : null}
+                        onConsumeOne={() => { void handleSave(item.id, "quantityOnHand", Math.max(0, quantityOnHand - 1)); }}
+                        onRestockToTarget={() => {
+                          const target = item.reorderQuantity ?? (item.reorderThreshold !== null ? item.reorderThreshold + 1 : quantityOnHand + 1);
+                          void handleSave(item.id, "quantityOnHand", target);
+                        }}
                       >
                         <td>
                           <input
@@ -217,8 +225,8 @@ export function InventoryListWorkspace({
                           />
                         </td>
                         <td>
-                          <span className={`status-chip status-chip--${item.lowStock ? "due" : "upcoming"}`}>
-                            {item.lowStock ? "Low" : "OK"}
+                          <span className={`status-chip status-chip--${quantityOnHand <= 0 ? "overdue" : item.lowStock ? "due" : "upcoming"}`}>
+                            {quantityOnHand <= 0 ? "Out" : item.lowStock ? "Low" : "OK"}
                           </span>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>

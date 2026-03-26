@@ -448,6 +448,7 @@ model Space {
   generalItems   SpaceGeneralItem[]
   itemHistory    SpaceItemHistory[]
   scanLogs       SpaceScanLog[]
+  assets         Asset[]
 
   @@unique([householdId, shortCode])
   @@index([householdId, parentSpaceId])
@@ -481,6 +482,7 @@ model Asset {
   createdById          String
   ownerId              String?
   parentAssetId        String?               // Optional parent for nested asset hierarchies
+  spaceId              String?               // Optional assigned storage space
   assetTag             String?               @unique
   name                 String
   category             AssetCategory
@@ -513,6 +515,7 @@ model Asset {
   owner                User?                 @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   parentAsset          Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id], onDelete: SetNull)
   childAssets          Asset[]               @relation("AssetHierarchy")
+  space                Space?                @relation(fields: [spaceId], references: [id], onDelete: SetNull)
   usageMetrics         UsageMetric[]
   schedules            MaintenanceSchedule[]
   logs                 MaintenanceLog[]
@@ -529,6 +532,7 @@ model Asset {
   @@index([ownerId])
   @@index([category])
   @@index([parentAssetId])
+  @@index([spaceId])
 }
 
 // Audit record for moving an asset between users or households.

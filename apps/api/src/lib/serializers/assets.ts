@@ -1,4 +1,4 @@
-import type { Asset, AssetTransfer, User } from "@prisma/client";
+import type { Asset, AssetTransfer, SpaceType, User } from "@prisma/client";
 import {
   assetFieldDefinitionsSchema,
   assetSchema,
@@ -6,11 +6,20 @@ import {
 } from "@lifekeeper/types";
 import { toShallowUserResponse } from "./users.js";
 
+type SpaceLocationRelation = {
+  id: string;
+  name: string;
+  shortCode: string;
+  type: SpaceType;
+  breadcrumb: Array<{ id: string; name: string; type: SpaceType }>;
+} | null;
+
 export const toAssetResponse = (
-  asset: Pick<Asset, "id" | "householdId" | "createdById" | "ownerId" | "parentAssetId" | "assetTag" | "name" | "category" | "visibility" | "description" | "manufacturer" | "model" | "serialNumber" | "purchaseDate" | "purchaseDetails" | "warrantyDetails" | "locationDetails" | "insuranceDetails" | "dispositionDetails" | "conditionScore" | "conditionHistory" | "assetTypeKey" | "assetTypeLabel" | "assetTypeDescription" | "assetTypeSource" | "assetTypeVersion" | "fieldDefinitions" | "customFields" | "isArchived" | "deletedAt" | "createdAt" | "updatedAt">,
+  asset: Pick<Asset, "id" | "householdId" | "createdById" | "ownerId" | "parentAssetId" | "spaceId" | "assetTag" | "name" | "category" | "visibility" | "description" | "manufacturer" | "model" | "serialNumber" | "purchaseDate" | "purchaseDetails" | "warrantyDetails" | "locationDetails" | "insuranceDetails" | "dispositionDetails" | "conditionScore" | "conditionHistory" | "assetTypeKey" | "assetTypeLabel" | "assetTypeDescription" | "assetTypeSource" | "assetTypeVersion" | "fieldDefinitions" | "customFields" | "isArchived" | "deletedAt" | "createdAt" | "updatedAt">,
   relations?: {
     parentAsset?: { id: string; name: string; category: string } | null;
     childAssets?: { id: string; name: string; category: string }[];
+    spaceLocation?: SpaceLocationRelation;
   }
 ) => assetSchema.parse({
   ...asset,
@@ -25,6 +34,8 @@ export const toAssetResponse = (
   dispositionDetails: asset.dispositionDetails ?? null,
   conditionScore: asset.conditionScore ?? null,
   conditionHistory: asset.conditionHistory ?? [],
+  spaceId: asset.spaceId ?? null,
+  spaceLocation: relations?.spaceLocation ?? null,
   parentAssetId: asset.parentAssetId ?? null,
   parentAsset: relations?.parentAsset ?? null,
   childAssets: relations?.childAssets ?? [],

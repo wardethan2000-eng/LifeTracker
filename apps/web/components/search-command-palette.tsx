@@ -100,6 +100,13 @@ const resultMeta = (result: SearchResult, timezone?: string): string[] => {
     parts.push(result.parentEntityName);
   }
 
+  if (result.entityType === "asset") {
+    const spaceName = typeof result.entityMeta?.spaceName === "string" ? result.entityMeta.spaceName : null;
+    if (spaceName) {
+      parts.push(`📍 ${spaceName}`);
+    }
+  }
+
   if (result.entityType === "log") {
     const completedAt = typeof result.entityMeta?.completedAt === "string"
       ? formatDateTime(result.entityMeta.completedAt, timezone)

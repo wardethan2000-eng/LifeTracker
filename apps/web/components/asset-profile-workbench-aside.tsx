@@ -1,9 +1,10 @@
 "use client";
 
-import type { Asset } from "@lifekeeper/types";
+import type { Asset, SpaceResponse } from "@lifekeeper/types";
 import type { JSX } from "react";
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import type { AssetProfileFormValues } from "../lib/validation/forms";
+import { useState } from "react";
 import {
   conditionSummary,
   dispositionSummary,
@@ -15,6 +16,7 @@ import {
 import { Card } from "./card";
 import { CollapsibleCard } from "./collapsible-card";
 import { InlineError } from "./inline-error";
+import { SpacePickerField } from "./space-picker-field";
 import { useTimezone } from "../lib/timezone-context";
 
 type AssetWorkbenchAsideProps = {
@@ -26,6 +28,7 @@ type AssetWorkbenchAsideProps = {
   register: UseFormRegister<AssetProfileFormValues>;
   errors: FieldErrors<AssetProfileFormValues>;
   onSaveAsPresetChange: (value: boolean) => void;
+  spaces?: SpaceResponse[];
 };
 
 export function AssetProfileWorkbenchAside({
@@ -37,8 +40,10 @@ export function AssetProfileWorkbenchAside({
   register,
   errors,
   onSaveAsPresetChange,
+  spaces = [],
 }: AssetWorkbenchAsideProps): JSX.Element {
   const { timezone } = useTimezone();
+  const [spaceId, setSpaceId] = useState<string>(initialAsset?.spaceId ?? "");
   return (
     <div className="resource-layout__aside">
       <Card title="Visibility">
@@ -105,6 +110,17 @@ export function AssetProfileWorkbenchAside({
 
           <CollapsibleCard title="Location Details" summary={locationSummary(initialAsset)}>
             <div className="workbench-grid">
+              <input type="hidden" name="spaceId" value={spaceId} />
+              {spaces.length > 0 && (
+                <SpacePickerField
+                  label="Assigned Space"
+                  spaces={spaces}
+                  value={spaceId}
+                  onChange={setSpaceId}
+                  placeholder="No space assigned"
+                  fullWidth
+                />
+              )}
               <label className="field"><span>Property</span><input type="text" name="locationDetails.propertyName" defaultValue={initialAsset.locationDetails?.propertyName ?? ""} /></label>
               <label className="field"><span>Building</span><input type="text" name="locationDetails.building" defaultValue={initialAsset.locationDetails?.building ?? ""} /></label>
               <label className="field"><span>Room / Area</span><input type="text" name="locationDetails.room" defaultValue={initialAsset.locationDetails?.room ?? ""} /></label>

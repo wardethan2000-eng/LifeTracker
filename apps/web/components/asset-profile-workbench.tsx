@@ -10,7 +10,8 @@ import type {
   CustomPresetProfile,
   LibraryPreset,
   PresetScheduleTemplate,
-  PresetUsageMetricTemplate
+  PresetUsageMetricTemplate,
+  SpaceResponse
 } from "@lifekeeper/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
@@ -39,6 +40,7 @@ type AssetProfileWorkbenchProps = {
   customPresets: CustomPresetProfile[];
   initialAsset?: Asset;
   initialParentAssetId?: string;
+  spaces?: SpaceResponse[];
 };
 
 type Blueprint = {
@@ -983,6 +985,7 @@ export function AssetProfileWorkbench({
   customPresets,
   initialAsset,
   initialParentAssetId,
+  spaces = [],
 }: AssetProfileWorkbenchProps): JSX.Element {
   const { timezone } = useTimezone();
   const toLocalDateTimeValue = (v: string | undefined) => toHouseholdDateTimeInputValue(v, timezone);
@@ -1633,6 +1636,7 @@ export function AssetProfileWorkbench({
           register={register}
           errors={errors}
           onSaveAsPresetChange={setSaveAsPreset}
+          spaces={spaces}
         />
       </div>
     </form>

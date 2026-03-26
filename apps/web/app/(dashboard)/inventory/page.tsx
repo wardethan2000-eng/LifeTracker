@@ -184,6 +184,18 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     const categories = new Set(items.map((item) => item.category).filter(Boolean)).size;
     const outOfStockCount = items.filter((item) => item.quantityOnHand <= 0).length;
 
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const expiringItems = items.filter((item) => {
+      if (!item.expiresAt) return false;
+      const expiresMs = new Date(item.expiresAt).getTime();
+      return expiresMs > now && expiresMs <= now + thirtyDaysMs;
+    });
+    const expiredItems = items.filter((item) => {
+      if (!item.expiresAt) return false;
+      return new Date(item.expiresAt).getTime() <= now;
+    });
+
     return (
       <>
         <RealtimeRefreshBoundary householdId={household.id} eventTypes={["inventory.changed"]} />
@@ -201,6 +213,27 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         </header>
 
         <div className="page-body">
+          {(outOfStockCount > 0 || expiredItems.length > 0 || expiringItems.length > 0) && (
+            <div style={{ display: "grid", gap: 8, marginBottom: 4 }}>
+              {outOfStockCount > 0 && (
+                <p className="note" style={{ background: "var(--danger-bg)", borderColor: "var(--danger-border)", color: "var(--danger)" }}>
+                  <strong>{outOfStockCount} item{outOfStockCount === 1 ? "" : "s"} out of stock.</strong> Review the reorder watchlist below to resupply.
+                </p>
+              )}
+              {expiredItems.length > 0 && (
+                <p className="note" style={{ background: "var(--danger-bg)", borderColor: "var(--danger-border)", color: "var(--danger)" }}>
+                  <strong>{expiredItems.length} item{expiredItems.length === 1 ? " has" : "s have"} expired:</strong>{" "}
+                  {expiredItems.slice(0, 3).map((item) => item.name).join(", ")}{expiredItems.length > 3 ? ` and ${expiredItems.length - 3} more` : ""}.
+                </p>
+              )}
+              {expiringItems.length > 0 && (
+                <p className="note" style={{ background: "var(--warning-bg)", borderColor: "var(--warning-border)", color: "var(--warning)" }}>
+                  <strong>{expiringItems.length} item{expiringItems.length === 1 ? "" : "s"} expire within 30 days:</strong>{" "}
+                  {expiringItems.slice(0, 3).map((item) => item.name).join(", ")}{expiringItems.length > 3 ? ` and ${expiringItems.length - 3} more` : ""}.
+                </p>
+              )}
+            </div>
+          )}
           <section className="stats-row">
             <div className="stat-card stat-card--accent">
               <span className="stat-card__label">Tracked Items</span>

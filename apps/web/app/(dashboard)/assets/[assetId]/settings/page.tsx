@@ -6,6 +6,7 @@ import {
   getHouseholdAssets,
   getHouseholdMembers,
   getHouseholdPresets,
+  getHouseholdSpacesTree,
   getLibraryPresets
 } from "../../../../../lib/api";
 
@@ -20,10 +21,11 @@ export default async function AssetSettingsPage({ params }: AssetSettingsPagePro
     getLibraryPresets(),
     getAssetTransferHistory(assetId)
   ]);
-  const [customPresets, householdAssets, householdMembers] = await Promise.all([
+  const [customPresets, householdAssets, householdMembers, spaces] = await Promise.all([
     getHouseholdPresets(detail.asset.householdId),
     getHouseholdAssets(detail.asset.householdId),
-    getHouseholdMembers(detail.asset.householdId)
+    getHouseholdMembers(detail.asset.householdId),
+    getHouseholdSpacesTree(detail.asset.householdId).catch(() => [])
   ]);
 
   return (
@@ -35,6 +37,7 @@ export default async function AssetSettingsPage({ params }: AssetSettingsPagePro
       householdAssets={householdAssets}
       householdMembers={householdMembers}
       transferHistory={transferHistory}
+      spaces={spaces}
     />
   );
 }

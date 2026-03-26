@@ -74,6 +74,8 @@ type HomeDashboardProps = {
   inventoryTotalCount?: number;
   lowStockCount?: number;
   outOfStockCount?: number;
+  spaceTotalCount?: number;
+  rootSpaceCount?: number;
   pinnedNotes?: Entry[];
   canvases?: IdeaCanvasThumbnail[];
 };
@@ -87,6 +89,7 @@ const AVAILABLE_QUICK_ACTIONS: Array<{ id: string; label: string; href: string }
   { id: "add-project", label: "New Project", href: "/projects/new" },
   { id: "browse-ideas", label: "Browse Ideas", href: "/ideas" },
   { id: "inventory", label: "Inventory", href: "/inventory" },
+  { id: "spaces", label: "Spaces", href: "/spaces" },
   { id: "add-hobby", label: "Log a Hobby", href: "/hobbies" },
 ];
 
@@ -113,6 +116,8 @@ export function HomeDashboard(props: HomeDashboardProps) {
     inventoryTotalCount = 0,
     lowStockCount = 0,
     outOfStockCount = 0,
+    spaceTotalCount = 0,
+    rootSpaceCount = 0,
     pinnedNotes = [],
     canvases = [],
   } = props;
@@ -431,6 +436,18 @@ export function HomeDashboard(props: HomeDashboardProps) {
     footerLink: { label: "View inventory →", href: `/inventory?householdId=${householdId}` },
   });
 
+  cards.push({
+    key: "spaces",
+    title: "📍 Spaces",
+    content: (
+      <dl className="dashboard-card__kv">
+        <div><dt>Total Spaces</dt><dd>{spaceTotalCount}</dd></div>
+        <div><dt>Top-Level</dt><dd>{rootSpaceCount}</dd></div>
+      </dl>
+    ),
+    footerLink: { label: "View spaces →", href: `/spaces?householdId=${householdId}` },
+  });
+
   const defaultLayout: LayoutItem[] = [
     { i: "stats", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "duework", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
@@ -443,10 +460,11 @@ export function HomeDashboard(props: HomeDashboardProps) {
     { i: "canvases", x: pinnedNotes.length > 0 ? 1 : 0, y: 7, w: pinnedNotes.length > 0 ? 1 : 2, h: 4, minW: 1, minH: 2 },
     ...(ideas.length > 0 ? [{ i: "ideas", x: pinnedNotes.length > 0 ? 2 : 2, y: 7, w: 1, h: 3, minW: 1, minH: 2 }] : []),
     { i: "inventory", x: 3, y: 7, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "spaces", x: 0, y: 10, w: 1, h: 3, minW: 1, minH: 2 },
     ...pins.map((pin, i) => ({
       i: `pin-${pin.entityType}-${pin.entityId}`,
       x: i % 4,
-      y: 7 + Math.floor(i / 4) * 3,
+      y: 10 + Math.floor(i / 4) * 3,
       w: 1,
       h: 3,
       minW: 1,

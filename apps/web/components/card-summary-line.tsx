@@ -38,6 +38,11 @@ export function warrantySummary(asset: Asset, timezone?: string): string {
 
 /** Format a location summary line. */
 export function locationSummary(asset: Asset): string {
+  const space = asset.spaceLocation;
+  if (space) {
+    const path = space.breadcrumb.map((b) => b.name).join(" › ");
+    return path || space.name;
+  }
   const l = asset.locationDetails;
   if (!l) return "Not configured";
   const parts: string[] = [];

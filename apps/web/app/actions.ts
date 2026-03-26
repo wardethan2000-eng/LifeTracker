@@ -230,6 +230,10 @@ import {
   createProjectDependency,
   updateProjectDependency,
   deleteProjectDependency,
+  addProjectAsset,
+  removeProjectAsset,
+  addAssetInventoryLink,
+  removeAssetInventoryLink,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
@@ -794,6 +798,7 @@ const buildStructuredAssetInput = (formData: FormData): Partial<CreateAssetInput
   const locationLatitude = getOptionalNumber(formData, "locationDetails.latitude");
   const locationLongitude = getOptionalNumber(formData, "locationDetails.longitude");
   const locationNotes = getOptionalString(formData, "locationDetails.notes");
+  const spaceId = getOptionalString(formData, "spaceId");
 
   const insuranceProvider = getOptionalString(formData, "insuranceDetails.provider");
   const insurancePolicyNumber = getOptionalString(formData, "insuranceDetails.policyNumber");
@@ -900,6 +905,11 @@ const buildStructuredAssetInput = (formData: FormData): Partial<CreateAssetInput
       ...(dispositionBuyerInfo ? { buyerInfo: dispositionBuyerInfo } : {}),
       ...(dispositionNotes ? { notes: dispositionNotes } : {})
     };
+  }
+
+  // spaceId: pass as-is (empty string means "no space", non-empty string means "assign to this space")
+  if (spaceId !== undefined) {
+    input.spaceId = spaceId.trim() === "" ? null : spaceId.trim();
   }
 
   return input;
@@ -3814,4 +3824,55 @@ export async function updateDisplayPreferencesAction(input: UpdateDisplayPrefere
 export async function deleteAccountAction(): Promise<void> {
   await deleteAccount();
   redirect("/sign-in");
+}
+
+export async function addAssetToProjectAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const assetId = getRequiredString(formData, "assetId");
+  const projectId = getRequiredString(formData, "projectId");
+  const relationship = getOptionalString(formData, "relationship") ?? "target";
+  const role = getOptionalString(formData, "role");
+  const notes = getOptionalString(formData, "notes");
+
+  await addProjectAsset(householdId, projectId, {
+    assetId,
+    relationship: relationship as "target" | "produces" | "consumes" | "supports",
+    ...(role ? { role } : {}),
+    ...(notes ? { notes } : {})
+  });
+  revalidatePath(`/assets/${assetId}`, "layout");
+  revalidatePath(`/projects/${projectId}`, "layout");
+}
+
+export async function removeAssetFromProjectAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const assetId = getRequiredString(formData, "assetId");
+  const projectId = getRequiredString(formData, "projectId");
+  const projectAssetId = getRequiredString(formData, "projectAssetId");
+
+  await removeProjectAsset(householdId, projectId, projectAssetId);
+  revalidatePath(`/assets/${assetId}`, "layout");
+  revalidatePath(`/projects/${projectId}`, "layout");
+}
+
+export async function addAssetInventoryLinkAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+  const notes = getOptionalString(formData, "notes");
+  const recommendedQuantity = getOptionalNumber(formData, "recommendedQuantity");
+
+  await addAssetInventoryLink(assetId, {
+    inventoryItemId,
+    ...(notes ? { notes } : {}),
+    ...(recommendedQuantity !== undefined ? { recommendedQuantity } : {})
+  });
+  revalidatePath(`/assets/${assetId}`, "layout");
+}
+
+export async function removeAssetInventoryLinkAction(formData: FormData): Promise<void> {
+  const assetId = getRequiredString(formData, "assetId");
+  const inventoryItemId = getRequiredString(formData, "inventoryItemId");
+
+  await removeAssetInventoryLink(assetId, inventoryItemId);
+  revalidatePath(`/assets/${assetId}`, "layout");
 }

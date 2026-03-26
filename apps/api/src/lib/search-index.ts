@@ -801,6 +801,13 @@ export const syncAssetToSearchIndex = (prisma: SearchPrisma, assetId: string): P
         deletedAt: true,
         isArchived: true,
         category: true,
+        space: {
+          select: {
+            id: true,
+            name: true,
+            shortCode: true
+          }
+        },
         hobbyLinks: {
           select: {
             hobby: {
@@ -836,7 +843,9 @@ export const syncAssetToSearchIndex = (prisma: SearchPrisma, assetId: string): P
       entityUrl: `/assets/${asset.id}`,
       entityMeta: {
         category: asset.category,
-        isArchived: asset.isArchived
+        isArchived: asset.isArchived,
+        spaceName: asset.space?.name ?? null,
+        spaceShortCode: asset.space?.shortCode ?? null
       }
     }];
   });

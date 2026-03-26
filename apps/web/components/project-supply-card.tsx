@@ -146,6 +146,9 @@ export function ProjectSupplyCard({
           <span className="supply-row__cost">{formatCurrency(estimatedRemainingCost, "-")}</span>
         ) : null}
         {supply.supplier ? <span className="supply-row__supplier">{supply.supplier}</span> : null}
+        {linkedInventoryItem?.storageLocation ? (
+          <span className="supply-row__supplier" title="Storage location">📍 {linkedInventoryItem.storageLocation}</span>
+        ) : null}
         <div className="supply-row__actions">
           <select
             className="supply-row__category-select"

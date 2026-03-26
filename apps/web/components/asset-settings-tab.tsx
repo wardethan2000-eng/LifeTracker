@@ -4,7 +4,8 @@ import type {
   AssetTransferList,
   CustomPresetProfile,
   HouseholdMember,
-  LibraryPreset
+  LibraryPreset,
+  SpaceResponse
 } from "@lifekeeper/types";
 import type { JSX } from "react";
 import {
@@ -31,6 +32,7 @@ type AssetSettingsTabProps = {
   householdAssets: Asset[];
   householdMembers: HouseholdMember[];
   transferHistory: AssetTransferList;
+  spaces?: SpaceResponse[];
 };
 
 export async function AssetSettingsTab({
@@ -40,7 +42,8 @@ export async function AssetSettingsTab({
   customPresets,
   householdAssets,
   householdMembers,
-  transferHistory
+  transferHistory,
+  spaces = [],
 }: AssetSettingsTabProps): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
   const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
@@ -152,6 +155,7 @@ export async function AssetSettingsTab({
           libraryPresets={visiblePresets}
           customPresets={customPresets}
           initialAsset={detail.asset}
+          spaces={spaces}
         />
       </ExpandableCard>
 

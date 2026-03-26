@@ -91,6 +91,10 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
         </div>
         <div className="panel__body--padded">
           <dl className="data-list">
+            {detail.asset.spaceLocation ? renderMetaRow(
+              "Assigned Space",
+              detail.asset.spaceLocation.breadcrumb.map((b) => b.name).join(" › ")
+            ) : null}
             {renderMetaRow("Property", detail.asset.locationDetails?.propertyName)}
             {renderMetaRow("Building", detail.asset.locationDetails?.building)}
             {renderMetaRow("Room", detail.asset.locationDetails?.room)}
