@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createEntry, getEntries, updateEntry } from "../lib/api";
+import { RichEditor } from "./rich-editor";
 
 type DashboardNotepadProps = {
   householdId: string;
@@ -20,11 +21,7 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
   const [entryId, setEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestBody = useRef(body);
-
-  useEffect(() => { latestBody.current = body; }, [body]);
 
   // Load existing notepad entry
   useEffect(() => {
@@ -62,7 +59,7 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
             entityId,
             title: "Dashboard Notepad",
             body: text,
-            bodyFormat: "plain_text",
+            bodyFormat: "html",
             entryType: "note",
             entryDate: new Date().toISOString(),
             tags: [NOTEPAD_TAG],
@@ -79,18 +76,6 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
     [entryId, householdId, entityType, entityId]
   );
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const text = e.target.value;
-      setBody(text);
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        persistNote(text).catch(() => {});
-      }, SAVE_DEBOUNCE_MS);
-    },
-    [persistNote]
-  );
-
   if (loading) {
     return <div className="dashboard-card__empty">Loading…</div>;
   }
@@ -103,11 +88,12 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
 
   return (
     <div className="dashboard-notepad">
-      <textarea
-        value={body}
-        onChange={handleChange}
+      <RichEditor
+        content={body}
+        onChange={(html) => persistNote(html).catch(() => {})}
         placeholder="Quick notes…"
-        aria-label="Dashboard notepad"
+        compact
+        debounceMs={SAVE_DEBOUNCE_MS}
       />
       <div className={`dashboard-notepad__status dashboard-notepad__status--${saveStatus}`}>
         {statusLabel}

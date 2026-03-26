@@ -11165,6 +11165,16 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex-wrap: wrap;
 }
 
+.rich-editor__toolbar--compact {
+  padding: 4px 6px;
+  gap: 1px;
+  flex-wrap: nowrap;
+}
+
+.rich-editor--compact .rich-editor__content {
+  font-size: 0.875rem;
+}
+
 .rich-editor__group {
   display: flex;
   align-items: center;
@@ -15580,6 +15590,18 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex-shrink: 0;
 }
 
+/* Canvas renderer embedded inside the dashboard preview modal */
+.canvas-modal__body .idea-canvas {
+  height: 100%;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.canvas-modal__body .idea-canvas__header {
+  display: none;
+}
+
 .dashboard-card__footer-link {
   display: block;
   padding: 10px 16px;
@@ -15618,6 +15640,35 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+/* RichEditor sizing inside the notepad dashboard card */
+.dashboard-notepad .rich-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-notepad .rich-editor:focus-within {
+  border: none;
+  box-shadow: none;
+}
+
+.dashboard-notepad .rich-editor__content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.dashboard-notepad .rich-editor__content .ProseMirror {
+  min-height: 60px;
+  height: 100%;
 }
 
 .dashboard-notepad__status {

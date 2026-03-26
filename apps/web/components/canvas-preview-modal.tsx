@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { IdeaCanvasThumbnailNode, IdeaCanvasThumbnailEdge } from "@lifekeeper/types";
+import type { IdeaCanvas, IdeaCanvasThumbnailNode, IdeaCanvasThumbnailEdge } from "@lifekeeper/types";
+import { getCanvas } from "../lib/api";
 import { CanvasThumbnail } from "./canvas-thumbnail";
+import { CanvasRenderer } from "./canvas-renderer";
 
 type CanvasPreviewModalProps = {
   householdId: string;
@@ -23,6 +25,15 @@ export function CanvasPreviewModal({
   onClose,
 }: CanvasPreviewModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const [fullCanvas, setFullCanvas] = useState<IdeaCanvas | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCanvas(householdId, canvasId)
+      .then((c) => { if (!cancelled) setFullCanvas(c); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [householdId, canvasId]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -70,11 +81,17 @@ export function CanvasPreviewModal({
           </div>
         </div>
         <div className="canvas-modal__body">
-          <CanvasThumbnail nodes={nodes} edges={edges} className="canvas-modal__svg" />
+          {fullCanvas ? (
+            <CanvasRenderer householdId={householdId} canvas={fullCanvas} simplified />
+          ) : (
+            <CanvasThumbnail nodes={nodes} edges={edges} className="canvas-modal__svg" />
+          )}
         </div>
-        <div className="canvas-modal__footer">
-          {nodes.length} node{nodes.length !== 1 ? "s" : ""} · {edges.length} edge{edges.length !== 1 ? "s" : ""}
-        </div>
+        {!fullCanvas && (
+          <div className="canvas-modal__footer">
+            {nodes.length} node{nodes.length !== 1 ? "s" : ""} · {edges.length} edge{edges.length !== 1 ? "s" : ""}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -58,6 +58,8 @@ export interface CanvasToolbarProps {
   onExportSVG?: () => void;
   onExportPNG?: () => void;
   onExportPDF?: () => void;
+  /** Simplified mode: hides advanced tools for embedded use */
+  simplified?: boolean;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -90,6 +92,7 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     onToggleLayerPanel, showLayerPanel,
     onExportSVG, onExportPNG, onExportPDF,
     onBringForward, onSendBackward,
+    simplified = false,
   } = props;
 
   // Expand draw tools by default in diagram/freehand mode, building tools in floorplan
@@ -110,10 +113,14 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
   return (
     <div className="idea-canvas__toolbar">
       {/* ── Mode badge ── */}
-      <span className="idea-canvas__mode-badge" title="Canvas mode (set in settings)">
-        {modeLabel[canvasMode]}
-      </span>
-      <div className="idea-canvas__toolbar-divider" />
+      {!simplified && (
+        <>
+          <span className="idea-canvas__mode-badge" title="Canvas mode (set in settings)">
+            {modeLabel[canvasMode]}
+          </span>
+          <div className="idea-canvas__toolbar-divider" />
+        </>
+      )}
 
       {/* ── Navigation ── */}
       <div className="idea-canvas__tool-group">
@@ -132,30 +139,36 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
 
       {/* ── Draw ── */}
       <div className="idea-canvas__tool-group">
-        <button type="button" className="idea-canvas__group-toggle"
-          onClick={() => setDrawExpanded((v) => !v)}
-          title={drawExpanded ? "Collapse drawing tools" : "Expand drawing tools"}
-          aria-expanded={drawExpanded}>
-          {drawExpanded ? "▾" : "▸"} Draw
-        </button>
-        {drawExpanded ? (
+        {!simplified && (
+          <button type="button" className="idea-canvas__group-toggle"
+            onClick={() => setDrawExpanded((v) => !v)}
+            title={drawExpanded ? "Collapse drawing tools" : "Expand drawing tools"}
+            aria-expanded={drawExpanded}>
+            {drawExpanded ? "▾" : "▸"} Draw
+          </button>
+        )}
+        {(simplified || drawExpanded) ? (
           <>
-            <button type="button" className={btn("freehand")}
-              onClick={() => onToolChange("freehand")} title="Freehand pencil (P)">
-              ✏ Pencil
-            </button>
-            <button type="button" className={btn("line")}
-              onClick={() => onToolChange("line")} title="Draw line">
-              ╱ Line
-            </button>
-            <button type="button" className={btn("rect")}
-              onClick={() => onToolChange("rect")} title="Draw rectangle">
-              ▭ Rect
-            </button>
-            <button type="button" className={btn("circle")}
-              onClick={() => onToolChange("circle")} title="Draw circle / ellipse">
-              ◯ Circle
-            </button>
+            {!simplified && (
+              <>
+                <button type="button" className={btn("freehand")}
+                  onClick={() => onToolChange("freehand")} title="Freehand pencil (P)">
+                  ✏ Pencil
+                </button>
+                <button type="button" className={btn("line")}
+                  onClick={() => onToolChange("line")} title="Draw line">
+                  ╱ Line
+                </button>
+                <button type="button" className={btn("rect")}
+                  onClick={() => onToolChange("rect")} title="Draw rectangle">
+                  ▭ Rect
+                </button>
+                <button type="button" className={btn("circle")}
+                  onClick={() => onToolChange("circle")} title="Draw circle / ellipse">
+                  ◯ Circle
+                </button>
+              </>
+            )}
             <button type="button" className={btn("text")}
               onClick={() => onToolChange("text")} title="Add text">
               T Text
@@ -169,6 +182,8 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
       </div>
       <div className="idea-canvas__toolbar-divider" />
 
+      {!simplified && (
+        <>
       {/* ── Building ── */}
       <div className="idea-canvas__tool-group">
         <button type="button" className="idea-canvas__group-toggle"
@@ -223,7 +238,11 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
         ) : null}
       </div>
       <div className="idea-canvas__toolbar-divider" />
+        </>
+      )}
 
+      {!simplified && (
+        <>
       {/* ── Annotations ── */}
       <div className="idea-canvas__tool-group">
         <button type="button" className={buildingToolClass("measure")}
@@ -253,6 +272,8 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
         🧩 Object
       </button>
       <div className="idea-canvas__toolbar-divider" />
+        </>
+      )}
 
       {/* ── Connect (flowchart) ── */}
       {allFlowchartSelected ? (
@@ -365,7 +386,7 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
       <div className="idea-canvas__toolbar-divider" />
 
       {/* ── Export ── */}
-      {(onExportSVG || onExportPNG || onExportPDF) ? (
+      {(!simplified && (onExportSVG || onExportPNG || onExportPDF)) ? (
         <>
           <div className="idea-canvas__tool-group idea-canvas__export-group">
             {onExportSVG ? <button type="button" className="idea-canvas__tool-btn" onClick={onExportSVG} title="Download as SVG">SVG</button> : null}
@@ -382,16 +403,20 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
       <button type="button" className="idea-canvas__tool-btn" onClick={onZoomIn} title="Zoom in">+</button>
       <button type="button" className="idea-canvas__tool-btn" onClick={onFitToView} title="Fit all to view">Fit</button>
       <div className="idea-canvas__toolbar-divider" />
-      <button type="button" className={`idea-canvas__tool-btn${showSettings ? " idea-canvas__tool-btn--active" : ""}`}
-        onClick={onOpenSettings} title="Canvas settings">
-        ⚙
-      </button>
-      {onToggleLayerPanel ? (
-        <button type="button" className={`idea-canvas__tool-btn${showLayerPanel ? " idea-canvas__tool-btn--active" : ""}`}
-          onClick={onToggleLayerPanel} title="Layers">
-          ☰
-        </button>
-      ) : null}
+      {!simplified && (
+        <>
+          <button type="button" className={`idea-canvas__tool-btn${showSettings ? " idea-canvas__tool-btn--active" : ""}`}
+            onClick={onOpenSettings} title="Canvas settings">
+            ⚙
+          </button>
+          {onToggleLayerPanel ? (
+            <button type="button" className={`idea-canvas__tool-btn${showLayerPanel ? " idea-canvas__tool-btn--active" : ""}`}
+              onClick={onToggleLayerPanel} title="Layers">
+              ☰
+            </button>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

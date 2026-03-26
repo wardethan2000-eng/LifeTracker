@@ -19,6 +19,8 @@ type RichEditorProps = {
   editable?: boolean;
   autoFocus?: boolean;
   debounceMs?: number;
+  /** Compact mode: renders a simplified 5-button toolbar for embedded use */
+  compact?: boolean;
 };
 
 const COLOR_PALETTE = [
@@ -33,6 +35,7 @@ export function RichEditor({
   editable = true,
   autoFocus = false,
   debounceMs = 800,
+  compact = false,
 }: RichEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,8 +82,8 @@ export function RichEditor({
   if (!editor) return null;
 
   return (
-    <div className={`rich-editor ${!editable ? "rich-editor--readonly" : ""}`}>
-      {editable && <Toolbar editor={editor} />}
+    <div className={`rich-editor ${!editable ? "rich-editor--readonly" : ""}${compact ? " rich-editor--compact" : ""}`}>
+      {editable && <Toolbar editor={editor} compact={compact} />}
       <EditorContent editor={editor} className="rich-editor__content" />
     </div>
   );
@@ -88,7 +91,7 @@ export function RichEditor({
 
 /* ── Toolbar ────────────────────────────────────────────── */
 
-function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function Toolbar({ editor, compact = false }: { editor: ReturnType<typeof useEditor>; compact?: boolean }) {
   if (!editor) return null;
 
   const setLink = useCallback(() => {
@@ -118,6 +121,23 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       {label}
     </button>
   );
+
+  if (compact) {
+    return (
+      <div className="rich-editor__toolbar rich-editor__toolbar--compact" role="toolbar" aria-label="Formatting options">
+        <div className="rich-editor__group">
+          {btn("B", () => editor.chain().focus().toggleBold().run(), editor.isActive("bold"), "Bold")}
+          {btn("I", () => editor.chain().focus().toggleItalic().run(), editor.isActive("italic"), "Italic")}
+          {btn("U", () => editor.chain().focus().toggleUnderline().run(), editor.isActive("underline"), "Underline")}
+        </div>
+        <span className="rich-editor__sep" />
+        <div className="rich-editor__group">
+          {btn("•", () => editor.chain().focus().toggleBulletList().run(), editor.isActive("bulletList"), "Bullet list")}
+          {btn("☑", () => editor.chain().focus().toggleTaskList().run(), editor.isActive("taskList"), "Task list")}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rich-editor__toolbar" role="toolbar" aria-label="Formatting options">

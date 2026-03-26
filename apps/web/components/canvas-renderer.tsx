@@ -71,6 +71,7 @@ type CanvasRendererProps = {
   canvas: IdeaCanvas;
   entries?: Entry[];
   onNavigateToNote?: (entryId: string) => void;
+  simplified?: boolean;
 };
 
 const NODE_COLORS = [
@@ -262,6 +263,7 @@ export function CanvasRenderer({
   canvas: initialCanvas,
   entries = [],
   onNavigateToNote,
+  simplified = false,
 }: CanvasRendererProps): JSX.Element {
   const [nodes, setNodes] = useState<IdeaCanvasNode[]>(initialCanvas.nodes);
   const [edges, setEdges] = useState<IdeaCanvasEdge[]>(initialCanvas.edges);
@@ -3003,6 +3005,7 @@ export function CanvasRenderer({
         onExportPDF={handleExportPDF}
         onBringForward={handleBringForward}
         onSendBackward={handleSendBackward}
+        simplified={simplified}
       />
 
       {/* SVG Canvas */}

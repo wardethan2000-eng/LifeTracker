@@ -125,6 +125,7 @@ export function DashboardGrid({
         cols={COLS}
         rowHeight={ROW_HEIGHT}
         dragConfig={{ handle: ".dashboard-card__header" }}
+        resizeHandles={["s", "w", "e", "n", "sw", "nw", "se", "ne"]}
         onLayoutChange={handleLayoutChange}
         margin={[16, 16]}
         containerPadding={[0, 0]}
