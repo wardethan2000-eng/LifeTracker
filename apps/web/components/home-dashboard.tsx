@@ -8,7 +8,9 @@ import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { EntryActionableList } from "./entry-system";
 import { removeDashboardPin, saveQuickActionsPreference } from "../lib/api";
-import type { DashboardPin } from "@lifekeeper/types";
+import { PinnedNotesCard } from "./pinned-notes-card";
+import { CanvasDashboardCard } from "./canvas-preview-modal";
+import type { DashboardPin, Entry, IdeaCanvasThumbnail } from "@lifekeeper/types";
 
 /* LaunchPad actions moved back to <LaunchPad /> rendered outside the grid */
 
@@ -72,6 +74,8 @@ type HomeDashboardProps = {
   inventoryTotalCount?: number;
   lowStockCount?: number;
   outOfStockCount?: number;
+  pinnedNotes?: Entry[];
+  canvases?: IdeaCanvasThumbnail[];
 };
 
 const AVAILABLE_QUICK_ACTIONS: Array<{ id: string; label: string; href: string }> = [
@@ -109,6 +113,8 @@ export function HomeDashboard(props: HomeDashboardProps) {
     inventoryTotalCount = 0,
     lowStockCount = 0,
     outOfStockCount = 0,
+    pinnedNotes = [],
+    canvases = [],
   } = props;
 
   const [editingQuickActions, setEditingQuickActions] = useState(false);
@@ -382,6 +388,36 @@ export function HomeDashboard(props: HomeDashboardProps) {
     });
   }
 
+  if (pinnedNotes.length > 0) {
+    cards.push({
+      key: "pinned-notes",
+      title: "📌 Pinned Notes",
+      content: (
+        <PinnedNotesCard householdId={householdId} entries={pinnedNotes} />
+      ),
+      footerLink: { label: "Open notes →", href: `/notes?householdId=${householdId}` },
+    });
+  }
+
+  cards.push({
+    key: "canvases",
+    title: "🎨 Canvases",
+    content: canvases.length > 0 ? (
+      <div className="canvas-dash-list">
+        {canvases.slice(0, 6).map((canvas) => (
+          <CanvasDashboardCard
+            key={canvas.id}
+            householdId={householdId}
+            canvas={canvas}
+          />
+        ))}
+      </div>
+    ) : (
+      <p className="dashboard-card__empty">No canvases yet</p>
+    ),
+    footerLink: { label: "View canvases →", href: `/notes?householdId=${householdId}&tab=canvases` },
+  });
+
   cards.push({
     key: "inventory",
     title: "📦 Inventory",
@@ -403,8 +439,10 @@ export function HomeDashboard(props: HomeDashboardProps) {
     { i: "quickactions", x: 0, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "actionitems", x: 1, y: 3, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "notepad", x: 2, y: 3, w: 2, h: 4, minW: 1, minH: 3 },
-    ...(ideas.length > 0 ? [{ i: "ideas", x: 0, y: 7, w: 1, h: 3, minW: 1, minH: 2 }] : []),
-    { i: "inventory", x: 1, y: 7, w: 1, h: 3, minW: 1, minH: 2 },
+    ...(pinnedNotes.length > 0 ? [{ i: "pinned-notes", x: 0, y: 7, w: 1, h: 3, minW: 1, minH: 2 }] : []),
+    { i: "canvases", x: pinnedNotes.length > 0 ? 1 : 0, y: 7, w: pinnedNotes.length > 0 ? 1 : 2, h: 4, minW: 1, minH: 2 },
+    ...(ideas.length > 0 ? [{ i: "ideas", x: pinnedNotes.length > 0 ? 2 : 2, y: 7, w: 1, h: 3, minW: 1, minH: 2 }] : []),
+    { i: "inventory", x: 3, y: 7, w: 1, h: 3, minW: 1, minH: 2 },
     ...pins.map((pin, i) => ({
       i: `pin-${pin.entityType}-${pin.entityId}`,
       x: i % 4,

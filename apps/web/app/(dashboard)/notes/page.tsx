@@ -3,7 +3,10 @@ import { ApiError, getCanvasesWithGeometry, getMe, getNoteFolders, getEntries, g
 import { NotesHub } from "../../../components/notes-hub";
 import { PageHeader } from "../../../components/page-header";
 
-export default async function NotesPage(): Promise<JSX.Element> {
+export default async function NotesPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }): Promise<JSX.Element> {
+  const params = searchParams ? await searchParams : {};
+  const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const initialTab = tabParam === "canvases" ? "canvases" : "notes";
   try {
     const me = await getMe();
     const household = me.households[0];
@@ -37,6 +40,7 @@ export default async function NotesPage(): Promise<JSX.Element> {
             initialEntries={entries.items}
             templates={templates}
             canvases={canvases}
+            initialTab={initialTab}
           />
         </div>
       </>

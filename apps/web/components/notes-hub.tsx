@@ -27,10 +27,11 @@ type NotesHubProps = {
   initialEntries: Entry[];
   templates: NoteTemplate[];
   canvases: IdeaCanvasThumbnail[];
+  initialTab?: "notes" | "canvases";
 };
 
-export function NotesHub({ householdId, initialFolders, initialEntries, templates, canvases }: NotesHubProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<"notes" | "canvases">("notes");
+export function NotesHub({ householdId, initialFolders, initialEntries, templates, canvases, initialTab = "notes" }: NotesHubProps): JSX.Element {
+  const [activeTab, setActiveTab] = useState<"notes" | "canvases">(initialTab);
   const [folders, setFolders] = useState<FolderWithCounts[]>(initialFolders);
   const [entries, setEntries] = useState<Entry[]>(initialEntries);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
