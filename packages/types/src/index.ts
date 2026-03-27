@@ -1421,6 +1421,7 @@ export const inventoryItemSchema = z.object({
   unitCost: z.number().nullable(),
   storageLocation: z.string().nullable(),
   notes: z.string().nullable(),
+  imageUrl: z.string().nullable(),
   expiresAt: z.string().datetime().nullable().default(null),
   deletedAt: z.string().datetime().nullable().default(null),
   createdAt: z.string().datetime(),
@@ -1444,6 +1445,7 @@ export const createInventoryItemSchema = z.object({
   unitCost: z.number().min(0).optional(),
   storageLocation: z.string().max(200).optional(),
   notes: z.string().max(4000).optional(),
+  imageUrl: z.string().url().max(1000).nullable().optional(),
   expiresAt: z.string().datetime().nullable().optional()
 });
 
@@ -2517,6 +2519,7 @@ export const projectPhaseSupplySchema = z.object({
   inventoryItem: projectPhaseSupplyInventoryItemSchema.nullable().default(null),
   activePurchaseRequest: projectSupplyPurchaseRequestSchema.nullable().default(null),
   notes: z.string().nullable(),
+  imageUrl: z.string().nullable(),
   sortOrder: z.number().int().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
@@ -2537,6 +2540,7 @@ export const createProjectPhaseSupplySchema = z.object({
   isStaged: z.boolean().default(false),
   inventoryItemId: z.string().cuid().optional(),
   notes: z.string().max(2000).optional(),
+  imageUrl: z.string().url().max(1000).nullable().optional(),
   sortOrder: z.number().int().optional()
 });
 
@@ -2550,6 +2554,7 @@ export const updateProjectPhaseSupplySchema = createProjectPhaseSupplySchema.par
   supplierUrl: z.string().url().max(2000).nullable().optional(),
   inventoryItemId: z.string().cuid().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  imageUrl: z.string().url().max(1000).nullable().optional(),
   sortOrder: z.number().int().nullable().optional(),
   procuredAt: z.string().datetime().nullable().optional(),
   stagedAt: z.string().datetime().nullable().optional()

@@ -66,6 +66,7 @@ type InventorySummaryRecord = Pick<
   | "unitCost"
   | "storageLocation"
   | "notes"
+  | "imageUrl"
   | "expiresAt"
   | "createdAt"
   | "updatedAt"
@@ -179,6 +180,7 @@ export const toInventoryItemSummaryResponse = (item: InventorySummaryRecord) => 
   unitCost: item.unitCost ?? null,
   storageLocation: item.storageLocation ?? null,
   notes: item.notes ?? null,
+  imageUrl: item.imageUrl ?? null,
   expiresAt: item.expiresAt?.toISOString() ?? null,
   totalValue: calculateInventoryTotalValue(item.quantityOnHand, item.unitCost),
   lowStock: isInventoryLowStock(item.quantityOnHand, item.reorderThreshold),

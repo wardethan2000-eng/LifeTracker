@@ -143,6 +143,7 @@ export const inventoryItemFormSchema = updateInventoryItemSchema.extend({
   unitCost: optionalNumberInput(createInventoryItemSchema.shape.unitCost.unwrap()),
   storageLocation: optionalTrimmedText(createInventoryItemSchema.shape.storageLocation.unwrap()),
   notes: optionalTrimmedText(createInventoryItemSchema.shape.notes.unwrap()),
+  imageUrl: normalizedUrlInput,
   expiresAt: z.string().default("").transform((v) => v.trim() || null)
 }).superRefine((value, context) => {
   if (!value.name) {

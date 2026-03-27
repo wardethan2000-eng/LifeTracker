@@ -938,6 +938,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
           stagedAt: input.isStaged ? new Date() : null,
           inventoryItemId: input.inventoryItemId ?? null,
           notes: input.notes ?? null,
+          imageUrl: input.imageUrl ?? null,
           sortOrder
         }
       });
@@ -1026,6 +1027,7 @@ export const projectPhaseRoutes: FastifyPluginAsync = async (app) => {
     if (input.supplierUrl !== undefined) data.supplierUrl = input.supplierUrl ?? null;
     if (input.inventoryItemId !== undefined) data.inventoryItemId = input.inventoryItemId ?? null;
     if (input.notes !== undefined) data.notes = input.notes ?? null;
+    if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl ?? null;
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder ?? null;
 
     let procuredBecameTrue = false;

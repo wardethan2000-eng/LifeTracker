@@ -1083,6 +1083,7 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
   const unitCost = getOptionalNumber(formData, "unitCost");
   const storageLocation = getOptionalString(formData, "storageLocation");
   const notes = getOptionalString(formData, "notes");
+  const imageUrl = getOptionalNormalizedUrl(formData, "imageUrl");
 
   if (itemType === "consumable" || itemType === "equipment") {
     input.itemType = itemType;
@@ -1132,6 +1133,10 @@ export async function createInventoryItemAction(formData: FormData): Promise<voi
     input.notes = notes;
   }
 
+  if (imageUrl) {
+    input.imageUrl = imageUrl;
+  }
+
   const item = await createInventoryItem(householdId, input);
   await emitRealtimeEvent(householdId, "inventory.changed", item.id);
   revalidateInventoryPaths(householdId);
@@ -1159,6 +1164,7 @@ export async function updateInventoryItemAction(formData: FormData): Promise<voi
   const storageLocation = formData.has("storageLocation") ? getNullableString(formData, "storageLocation") : undefined;
   const unitCost = formData.has("unitCost") ? getNullableNumber(formData, "unitCost") : undefined;
   const notes = formData.has("notes") ? getNullableString(formData, "notes") : undefined;
+  const imageUrl = formData.has("imageUrl") ? (getOptionalNormalizedUrl(formData, "imageUrl") ?? null) : undefined;
 
   if (name) {
     input.name = name;
@@ -1218,6 +1224,10 @@ export async function updateInventoryItemAction(formData: FormData): Promise<voi
 
   if (notes !== undefined) {
     input.notes = notes ?? undefined;
+  }
+
+  if (imageUrl !== undefined) {
+    input.imageUrl = imageUrl ?? undefined;
   }
 
   if (supplierUrl !== undefined) {
@@ -3205,6 +3215,7 @@ export async function createProjectPhaseSupplyAction(formData: FormData): Promis
   const isStaged = getOptionalBoolean(formData, "isStaged");
   const inventoryItemId = getOptionalString(formData, "inventoryItemId");
   const notes = getOptionalString(formData, "notes");
+  const imageUrl = getOptionalNormalizedUrl(formData, "imageUrl");
   const sortOrder = getOptionalNumber(formData, "sortOrder");
 
   if (category) input.category = category;
@@ -3219,6 +3230,7 @@ export async function createProjectPhaseSupplyAction(formData: FormData): Promis
   if (isStaged !== undefined) input.isStaged = isStaged;
   if (inventoryItemId) input.inventoryItemId = inventoryItemId;
   if (notes) input.notes = notes;
+  if (imageUrl) input.imageUrl = imageUrl;
   if (sortOrder !== undefined) input.sortOrder = sortOrder;
 
   await createProjectPhaseSupply(householdId, projectId, phaseId, input);
@@ -3245,6 +3257,7 @@ export async function updateProjectPhaseSupplyAction(formData: FormData): Promis
     isStaged: getOptionalBoolean(formData, "isStaged"),
     inventoryItemId: getOptionalString(formData, "inventoryItemId"),
     notes: getNullableString(formData, "notes"),
+    imageUrl: getNullableString(formData, "imageUrl"),
     sortOrder: getOptionalNumber(formData, "sortOrder")
   };
 

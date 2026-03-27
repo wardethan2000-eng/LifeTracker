@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { createProjectPhaseSupplyAction } from "../app/actions";
 import { formatCurrency, formatQuantity } from "../lib/formatters";
 import { Card } from "./card";
+import { LinkPreviewDialog } from "./link-preview-dialog";
 import { ProjectSupplyCard } from "./project-supply-card";
 
 type WorkspacePhase = {
@@ -78,6 +79,9 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showLinkPreview, setShowLinkPreview] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<{ name?: string; description?: string; estimatedUnitCost?: string; supplier?: string; supplierUrl?: string; imageUrl?: string }>({});
+  const [createPrefillKey, setCreatePrefillKey] = useState(0);
 
   const categorySuggestions = useMemo(() => Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories])).sort((left, right) => left.localeCompare(right)), [customCategories]);
 
@@ -348,64 +352,102 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         ) : null}
 
         {showCreateForm ? (
-          <form action={createProjectPhaseSupplyAction} className="supply-create-form">
-            <input type="hidden" name="householdId" value={householdId} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <div className="supply-create-form__grid">
-              <label className="field">
-                <span>Phase</span>
-                <select name="phaseId" required defaultValue={phases[0]?.id ?? ""}>
-                  {phases.map((phase) => (
-                    <option key={phase.id} value={phase.id}>{phase.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field field--span-2">
-                <span>Supply Name</span>
-                <input name="name" placeholder="Joint compound, screws, vapor barrier" required />
-              </label>
-              <label className="field">
-                <span>Category</span>
-                <>
-                  <input name="category" list="project-supplies-categories" placeholder="Materials, hardware" />
-                  <datalist id="project-supplies-categories">
-                    {categorySuggestions.map((category) => (
-                      <option key={category} value={category} />
+          <div>
+            {showLinkPreview && (
+              <LinkPreviewDialog
+                householdId={householdId}
+                onConfirm={(data) => {
+                  const priceRaw = data.fields.price?.replace(/[^\d.]/g, "") ?? "";
+                  setCreatePrefill({
+                    name: data.fields.name ?? "",
+                    description: data.fields.description ?? "",
+                    estimatedUnitCost: priceRaw,
+                    supplier: data.retailer ?? "",
+                    supplierUrl: data.sourceUrl ?? "",
+                    imageUrl: data.imageUrl ?? "",
+                  });
+                  setCreatePrefillKey((k) => k + 1);
+                  setShowLinkPreview(false);
+                }}
+                onCancel={() => setShowLinkPreview(false)}
+              />
+            )}
+            <form action={createProjectPhaseSupplyAction} className="supply-create-form" key={createPrefillKey}>
+              <input type="hidden" name="householdId" value={householdId} />
+              <input type="hidden" name="projectId" value={projectId} />
+              <div className="supply-create-form__grid">
+                <label className="field">
+                  <span>Phase</span>
+                  <select name="phaseId" required defaultValue={phases[0]?.id ?? ""}>
+                    {phases.map((phase) => (
+                      <option key={phase.id} value={phase.id}>{phase.name}</option>
                     ))}
-                  </datalist>
-                </>
-              </label>
-              <label className="field">
-                <span>Qty Needed</span>
-                <input name="quantityNeeded" type="number" min="0" step="1" defaultValue="1" required />
-              </label>
-              <label className="field">
-                <span>Unit</span>
-                <input name="unit" defaultValue="each" />
-              </label>
-              <label className="field">
-                <span>Est. Unit Cost</span>
-                <input name="estimatedUnitCost" type="number" min="0" step="0.01" />
-              </label>
-              <label className="field">
-                <span>Supplier</span>
-                <input name="supplier" />
-              </label>
-              <label className="field">
-                <span>Linked Inventory</span>
-                <select name="inventoryItemId" defaultValue="">
-                  <option value="">None</option>
-                  {inventoryItems.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name} · {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="inline-actions" style={{ marginTop: 12 }}>
-              <button type="submit" className="button button--sm">Add Supply</button>
-              <button type="button" className="button button--ghost button--sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
-            </div>
-          </form>
+                  </select>
+                </label>
+                <label className="field field--span-2">
+                  <span>Supply Name</span>
+                  <input name="name" placeholder="Joint compound, screws, vapor barrier" required defaultValue={createPrefill.name ?? ""} />
+                </label>
+                <label className="field">
+                  <span>Description</span>
+                  <textarea name="description" rows={2} placeholder="Brand preference, sizing, or substitution notes" defaultValue={createPrefill.description ?? ""} />
+                </label>
+                <label className="field">
+                  <span>Category</span>
+                  <>
+                    <input name="category" list="project-supplies-categories" placeholder="Materials, hardware" />
+                    <datalist id="project-supplies-categories">
+                      {categorySuggestions.map((category) => (
+                        <option key={category} value={category} />
+                      ))}
+                    </datalist>
+                  </>
+                </label>
+                <label className="field">
+                  <span>Qty Needed</span>
+                  <input name="quantityNeeded" type="number" min="0" step="1" defaultValue="1" required />
+                </label>
+                <label className="field">
+                  <span>Unit</span>
+                  <input name="unit" defaultValue="each" />
+                </label>
+                <label className="field">
+                  <span>Est. Unit Cost</span>
+                  <input name="estimatedUnitCost" type="number" min="0" step="0.01" defaultValue={createPrefill.estimatedUnitCost ?? ""} />
+                </label>
+                <label className="field">
+                  <span>Supplier</span>
+                  <input name="supplier" defaultValue={createPrefill.supplier ?? ""} />
+                </label>
+                <label className="field">
+                  <span>Supplier URL</span>
+                  <input name="supplierUrl" type="url" defaultValue={createPrefill.supplierUrl ?? ""} />
+                </label>
+                <label className="field">
+                  <span>Image URL</span>
+                  <input name="imageUrl" type="url" placeholder="https://..." defaultValue={createPrefill.imageUrl ?? ""} />
+                </label>
+                <label className="field">
+                  <span>Linked Inventory</span>
+                  <select name="inventoryItemId" defaultValue="">
+                    <option value="">None</option>
+                    {inventoryItems.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name} · {formatQuantity(item.quantityOnHand, item.unit)} on hand</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field field--full">
+                  <span>Notes</span>
+                  <textarea name="notes" rows={2} placeholder="Substitutions, source notes, brand preferences" />
+                </label>
+              </div>
+              <div className="inline-actions" style={{ marginTop: 12 }}>
+                <button type="button" className="button button--ghost button--sm" onClick={() => setShowLinkPreview(true)}>Add from Link</button>
+                <button type="submit" className="button button--sm">Add Supply</button>
+                <button type="button" className="button button--ghost button--sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
         ) : null}
       </Card>
 

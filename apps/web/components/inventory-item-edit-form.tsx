@@ -51,6 +51,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
       unitCost: item.unitCost !== null && item.unitCost !== undefined ? String(item.unitCost) : "",
       storageLocation: item.storageLocation ?? "",
       notes: item.notes ?? "",
+      imageUrl: item.imageUrl ?? "",
       expiresAt: item.expiresAt ? item.expiresAt.slice(0, 10) : ""
     }
   });
@@ -105,6 +106,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
     if (values.unitCost !== undefined) input.unitCost = values.unitCost;
     if (values.storageLocation !== undefined) input.storageLocation = values.storageLocation;
     if (values.notes !== undefined) input.notes = values.notes;
+    if (values.imageUrl !== undefined) input.imageUrl = values.imageUrl || null;
     if (values.expiresAt !== undefined) input.expiresAt = values.expiresAt ? new Date(values.expiresAt).toISOString() : null;
 
     try {
@@ -128,6 +130,7 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
       formData.set("unitCost", values.unitCost === undefined ? "" : String(values.unitCost));
       formData.set("storageLocation", values.storageLocation ?? "");
       formData.set("notes", values.notes ?? "");
+      formData.set("imageUrl", values.imageUrl ?? "");
       formData.set("expiresAt", values.expiresAt ?? "");
 
       await updateInventoryItemAction(formData);
@@ -224,6 +227,11 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
         <span>Supplier Link</span>
         <input type="text" {...register("supplierUrl")} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
         <InlineError message={errors.supplierUrl?.message} size="sm" />
+      </label>
+      <label className="field field--full">
+        <span>Image URL</span>
+        <input type="url" {...register("imageUrl")} placeholder="https://example.com/product-image.jpg" />
+        <InlineError message={errors.imageUrl?.message} size="sm" />
       </label>
       <label className="field field--full">
         <span>Storage Location</span>

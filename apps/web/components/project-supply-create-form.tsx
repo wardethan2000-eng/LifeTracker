@@ -21,9 +21,10 @@ type SupplyPrefill = {
   estimatedUnitCost: string;
   supplier: string;
   supplierUrl: string;
+  imageUrl: string;
 };
 
-const emptyPrefill: SupplyPrefill = { name: "", description: "", estimatedUnitCost: "", supplier: "", supplierUrl: "" };
+const emptyPrefill: SupplyPrefill = { name: "", description: "", estimatedUnitCost: "", supplier: "", supplierUrl: "", imageUrl: "" };
 
 export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inventoryItems, categorySuggestions = [] }: Props): JSX.Element {
   const [prefill, setPrefill] = useState<SupplyPrefill>(emptyPrefill);
@@ -44,6 +45,7 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
               estimatedUnitCost: priceRaw,
               supplier: data.retailer ?? "",
               supplierUrl: data.sourceUrl ?? "",
+              imageUrl: data.imageUrl ?? "",
             });
             setPrefillKey((k) => k + 1);
             setShowLinkPreview(false);
@@ -96,6 +98,10 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
           <label className="field">
             <span>Supplier URL</span>
             <input name="supplierUrl" type="url" defaultValue={prefill.supplierUrl ?? ""} />
+          </label>
+          <label className="field field--full">
+            <span>Image URL</span>
+            <input name="imageUrl" type="url" defaultValue={prefill.imageUrl ?? ""} placeholder="https://example.com/product-image.jpg" />
           </label>
           <label className="field">
             <span>Linked Inventory Item</span>

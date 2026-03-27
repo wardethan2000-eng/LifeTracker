@@ -139,6 +139,7 @@ type InventoryMetadataSnapshot = {
   supplierUrl: string | null;
   storageLocation: string | null;
   notes: string | null;
+  imageUrl: string | null;
   unitCost: number | null;
   expiresAt: Date | null;
 };
@@ -166,6 +167,7 @@ const inventoryRevisionFields: Array<{
   { field: "supplierUrl", label: "Supplier Link" },
   { field: "storageLocation", label: "Storage Location" },
   { field: "notes", label: "Notes" },
+  { field: "imageUrl", label: "Image" },
   { field: "unitCost", label: "Last Price" },
   { field: "expiresAt", label: "Expiration Date" }
 ];
@@ -230,7 +232,8 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           supplierUrl: input.supplierUrl ?? null,
           unitCost: input.unitCost ?? null,
           storageLocation: input.storageLocation ?? null,
-          notes: input.notes ?? null
+          notes: input.notes ?? null,
+          imageUrl: input.imageUrl ?? null
         }
       });
 
@@ -812,6 +815,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
           ...(input.supplierUrl !== undefined ? { supplierUrl: input.supplierUrl ?? null } : {}),
           ...(input.storageLocation !== undefined ? { storageLocation: input.storageLocation ?? null } : {}),
           ...(input.notes !== undefined ? { notes: input.notes ?? null } : {}),
+          ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl ?? null } : {}),
           ...(input.unitCost !== undefined ? { unitCost: input.unitCost ?? null } : {}),
           ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } : {})
         }

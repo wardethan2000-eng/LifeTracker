@@ -15,6 +15,7 @@ type InventoryPrefill = {
   unitCost?: string | undefined;
   preferredSupplier?: string | undefined;
   supplierUrl?: string | undefined;
+  imageUrl?: string | undefined;
 };
 
 type InventoryAddDrawerProps = {
@@ -172,6 +173,7 @@ export function InventoryAddDrawer({ householdId, categoryOptions, open, onClose
                 unitCost: priceRaw || undefined,
                 preferredSupplier: data.retailer ?? "",
                 supplierUrl: nextSupplierUrl,
+                imageUrl: data.imageUrl ?? "",
               });
               setSupplierUrlInput(nextSupplierUrl);
               setPrefillKey((k) => k + 1);
@@ -305,6 +307,11 @@ export function InventoryAddDrawer({ householdId, categoryOptions, open, onClose
                   </button>
                 </div>
                 <small>Paste a product URL here, then import the product details.</small>
+              </label>
+              <label className="field field--full">
+                <span>Image URL</span>
+                <input type="url" name="imageUrl" placeholder="https://example.com/product-image.jpg" defaultValue={prefill.imageUrl ?? ""} />
+                <small>Optional product or packaging photo URL.</small>
               </label>
               <label className="field field--full">
                 <span>Storage Location</span>

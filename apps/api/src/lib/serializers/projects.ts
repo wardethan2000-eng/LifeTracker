@@ -542,6 +542,7 @@ export const toProjectPhaseSupplyResponse = (supply: {
   stagedAt: Date | null;
   inventoryItemId: string | null;
   notes: string | null;
+  imageUrl: string | null;
   sortOrder: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -606,6 +607,7 @@ export const toProjectPhaseSupplyResponse = (supply: {
       }
     : null,
   notes: supply.notes,
+  imageUrl: supply.imageUrl,
   sortOrder: supply.sortOrder,
   createdAt: supply.createdAt.toISOString(),
   updatedAt: supply.updatedAt.toISOString()

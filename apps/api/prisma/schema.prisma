@@ -937,6 +937,7 @@ model InventoryItem {
   unitCost           Float?
   storageLocation    String?
   notes              String?
+  imageUrl           String?                 @db.VarChar(1000)
   expiresAt          DateTime?
   deletedAt          DateTime?
   createdAt          DateTime                @default(now())
@@ -1380,6 +1381,7 @@ model ProjectPhaseSupply {
   stagedAt          DateTime?
   inventoryItemId   String?        // Optional inventory item backing this supply line
   notes             String?
+  imageUrl          String?        @db.VarChar(1000)
   sortOrder         Int?
   deletedAt         DateTime?
   createdAt         DateTime       @default(now())

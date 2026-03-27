@@ -146,6 +146,11 @@ export function ProjectSupplyCard({
           <span className="supply-row__cost">{formatCurrency(estimatedRemainingCost, "-")}</span>
         ) : null}
         {supply.supplier ? <span className="supply-row__supplier">{supply.supplier}</span> : null}
+        {supply.imageUrl ? (
+          <a href={supply.imageUrl} target="_blank" rel="noopener noreferrer" className="supply-row__image-link" title="View product image">
+            <img src={supply.imageUrl} alt={supply.name} className="supply-row__image" />
+          </a>
+        ) : null}
         {linkedInventoryItem?.storageLocation ? (
           <span className="supply-row__supplier" title="Storage location">📍 {linkedInventoryItem.storageLocation}</span>
         ) : null}
@@ -251,6 +256,10 @@ export function ProjectSupplyCard({
               <label className="field field--full">
                 <span>Notes</span>
                 <textarea name="notes" rows={2} defaultValue={supply.notes ?? ""} />
+              </label>
+              <label className="field field--full">
+                <span>Image URL</span>
+                <input name="imageUrl" type="url" defaultValue={supply.imageUrl ?? ""} placeholder="https://example.com/product-image.jpg" />
               </label>
             </div>
             <div className="inline-actions" style={{ marginTop: 12 }}>
