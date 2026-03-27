@@ -1797,6 +1797,11 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     if (input.scheduleId !== undefined) data.scheduleId = input.scheduleId ?? null;
     if (input.taskType !== undefined) data.taskType = input.taskType;
 
+    // Handle startedAt (explicit override or auto-set)
+    if (input.startedAt !== undefined) {
+      data.startedAt = input.startedAt ? new Date(input.startedAt) : null;
+    }
+
     // Handle isCompleted toggle (quick to-dos) — sync status and completedAt
     if (input.isCompleted !== undefined) {
       data.isCompleted = input.isCompleted;
@@ -1811,9 +1816,13 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
     const effectiveScheduleId = input.scheduleId !== undefined ? input.scheduleId : existing.scheduleId;
 
-    // Handle status change to completed
+    // Handle status change — auto-set startedAt on first in_progress transition
     if (input.status !== undefined) {
       data.status = input.status;
+
+      if (input.status === "in_progress" && !existing.startedAt && input.startedAt === undefined) {
+        data.startedAt = new Date();
+      }
 
       if (input.status === "completed" && existing.status !== "completed") {
         data.completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
@@ -2734,31 +2743,38 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
       return new Date(Math.max(...predecessorDueDates.map((d) => d.getTime()))).toISOString();
     };
 
-    const mapPhase = (phase: typeof phases[number]) => ({
-      id: phase.id,
-      name: phase.name,
-      status: phase.status,
-      startDate: phase.startDate?.toISOString() ?? null,
-      targetEndDate: phase.targetEndDate?.toISOString() ?? null,
-      actualEndDate: phase.actualEndDate?.toISOString() ?? null,
-      tasks: phase.tasks.map((task) => {
-        const graphNode = graphSummary.byTaskId.get(task.id);
-        return {
-          id: task.id,
-          title: task.title,
-          status: task.status,
-          dueDate: task.dueDate?.toISOString() ?? null,
-          derivedStartDate: buildDerivedStartDate(task, phase.startDate),
-          estimatedHours: task.estimatedHours ?? null,
-          assignedToId: task.assignedToId,
-          assigneeName: task.assignedTo?.displayName ?? null,
-          isCriticalPath: graphNode?.isCriticalPath ?? false,
-          isBlocked: graphNode?.isBlocked ?? false,
-          predecessorTaskIds: task.predecessorLinks.map((link) => link.predecessorTaskId),
-          successorTaskIds: task.successorLinks.map((link) => link.successorTaskId)
-        };
-      })
-    });
+    const mapPhase = (phase: typeof phases[number]) => {
+      const completedTaskCount = phase.tasks.filter((t) => t.status === "completed" || t.status === "skipped").length;
+      return {
+        id: phase.id,
+        name: phase.name,
+        status: phase.status,
+        startDate: phase.startDate?.toISOString() ?? null,
+        targetEndDate: phase.targetEndDate?.toISOString() ?? null,
+        actualEndDate: phase.actualEndDate?.toISOString() ?? null,
+        completedTaskCount,
+        totalTaskCount: phase.tasks.length,
+        tasks: phase.tasks.map((task) => {
+          const graphNode = graphSummary.byTaskId.get(task.id);
+          return {
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            dueDate: task.dueDate?.toISOString() ?? null,
+            startedAt: task.startedAt?.toISOString() ?? null,
+            completedAt: task.completedAt?.toISOString() ?? null,
+            derivedStartDate: buildDerivedStartDate(task, phase.startDate),
+            estimatedHours: task.estimatedHours ?? null,
+            assignedToId: task.assignedToId,
+            assigneeName: task.assignedTo?.displayName ?? null,
+            isCriticalPath: graphNode?.isCriticalPath ?? false,
+            isBlocked: graphNode?.isBlocked ?? false,
+            predecessorTaskIds: task.predecessorLinks.map((link) => link.predecessorTaskId),
+            successorTaskIds: task.successorLinks.map((link) => link.successorTaskId)
+          };
+        })
+      };
+    };
 
     const scheduledPhases = phases
       .filter((phase) => phase.startDate !== null || phase.targetEndDate !== null)
@@ -2767,6 +2783,116 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
     const unscheduledPhases = phases
       .filter((phase) => phase.startDate === null && phase.targetEndDate === null)
       .map(mapPhase);
+
+    // ── Gather timeline events ──────────────────────────────────────
+
+    // 1. Task completions
+    const taskCompletionEvents = allTasks
+      .filter((t) => t.completedAt !== null)
+      .map((t) => ({
+        id: `tc-${t.id}`,
+        type: "task_completed" as const,
+        date: t.completedAt!.toISOString(),
+        title: t.title,
+        description: null,
+        phaseId: t.phaseId,
+        taskId: t.id,
+        entryType: null,
+        flags: [] as string[],
+        thumbnailUrl: null,
+        attachmentCount: 0
+      }));
+
+    // 2. Phase status changes from activity log
+    const phaseActivities = await app.prisma.activityLog.findMany({
+      where: {
+        householdId: params.householdId,
+        entityType: "project_phase",
+        entityId: { in: phases.map((p) => p.id) },
+        action: "project.phase.status_changed"
+      },
+      orderBy: { createdAt: "asc" }
+    });
+
+    const phaseStatusEvents = phaseActivities.map((a) => {
+      const meta = a.metadata as Record<string, unknown> | null;
+      return {
+        id: `ps-${a.id}`,
+        type: "phase_status_changed" as const,
+        date: a.createdAt.toISOString(),
+        title: `${String(meta?.phaseName ?? "Phase")} → ${String(meta?.newStatus ?? "unknown")}`,
+        description: null,
+        phaseId: a.entityId,
+        taskId: null,
+        entryType: null,
+        flags: [] as string[],
+        thumbnailUrl: null,
+        attachmentCount: 0
+      };
+    });
+
+    // 3. Entry records (project-level and phase-level)
+    const phaseIds = phases.map((p) => p.id);
+    const entries = await app.prisma.entry.findMany({
+      where: {
+        householdId: params.householdId,
+        OR: [
+          { entityType: "project", entityId: params.projectId },
+          ...(phaseIds.length > 0 ? [{ entityType: "project_phase", entityId: { in: phaseIds } }] : [])
+        ]
+      },
+      include: {
+        flags: { select: { flag: true } }
+      },
+      orderBy: { entryDate: "asc" }
+    });
+
+    // Get attachment counts for entries in one query
+    const entryIds = entries.map((e) => e.id);
+    const attachmentCounts = entryIds.length > 0
+      ? await app.prisma.attachment.groupBy({
+          by: ["entityId"],
+          where: { entityType: "entry", entityId: { in: entryIds }, confirmedAt: { not: null } },
+          _count: { id: true }
+        })
+      : [];
+    const attachmentCountMap = new Map(attachmentCounts.map((a) => [a.entityId, a._count.id]));
+
+    // Get first image attachment per entry for thumbnail
+    const firstImages = entryIds.length > 0
+      ? await app.prisma.attachment.findMany({
+          where: {
+            entityType: "entry",
+            entityId: { in: entryIds },
+            confirmedAt: { not: null },
+            mimeType: { startsWith: "image/" }
+          },
+          orderBy: { sortOrder: "asc" },
+          distinct: ["entityId"],
+          select: { entityId: true, id: true }
+        })
+      : [];
+    const thumbnailAttachmentMap = new Map(firstImages.map((a) => [a.entityId, a.id]));
+
+    const entryEvents = entries.map((e) => ({
+      id: `en-${e.id}`,
+      type: "entry" as const,
+      date: e.entryDate.toISOString(),
+      title: e.title ?? e.entryType,
+      description: e.body.length > 120 ? e.body.slice(0, 120) + "…" : e.body,
+      phaseId: e.entityType === "project_phase" ? e.entityId : null,
+      taskId: null,
+      entryType: e.entryType,
+      flags: e.flags.map((f) => f.flag),
+      thumbnailUrl: thumbnailAttachmentMap.has(e.id)
+        ? `/v1/households/${params.householdId}/attachments/${thumbnailAttachmentMap.get(e.id)}/download`
+        : null,
+      attachmentCount: attachmentCountMap.get(e.id) ?? 0
+    }));
+
+    // Merge and sort all events by date
+    const events = [...taskCompletionEvents, ...phaseStatusEvents, ...entryEvents]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return reply.send({
       projectId: project.id,
@@ -2781,6 +2907,7 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
         lagDays: dep.lagDays
       })),
       criticalPathTaskIds: graphSummary.criticalPathTaskIds,
+      events,
       projectStartDate: project.startDate?.toISOString() ?? null,
       projectTargetEndDate: project.targetEndDate?.toISOString() ?? null
     });

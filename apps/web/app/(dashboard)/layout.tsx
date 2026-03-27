@@ -8,6 +8,8 @@ import { RealtimeStatusIndicator } from "../../components/realtime-status-indica
 import { SidebarNav, type SidebarNavGroup } from "../../components/sidebar-nav";
 import { TimezoneProvider } from "../../lib/timezone-context";
 import { DisplayPreferencesProvider } from "../../components/display-preferences-context";
+import { CompletionSlideOverProvider } from "../../components/completion-slide-over-context";
+import { CompletionSlideOver } from "../../components/completion-slide-over";
 
 type NavItemDef = {
   href: string;
@@ -145,7 +147,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         </div>
         <TimezoneProvider timezone={householdTimezone}>
             <DisplayPreferencesProvider initialPreferences={resolvedDisplayPreferences}>
-              {children}
+              <CompletionSlideOverProvider>
+                {children}
+                <CompletionSlideOver />
+              </CompletionSlideOverProvider>
             </DisplayPreferencesProvider>
           </TimezoneProvider>
       </div>

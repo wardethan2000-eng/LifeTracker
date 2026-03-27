@@ -1716,6 +1716,86 @@ export const deleteInventoryComment = async (
   });
 };
 
+export const getHobbyComments = async (householdId: string, hobbyId: string): Promise<ThreadedComment[]> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/comments`,
+  schema: threadedCommentListSchema,
+  revalidate: 15,
+});
+
+export const createHobbyComment = async (
+  householdId: string,
+  hobbyId: string,
+  input: CreateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/comments`,
+  method: "POST",
+  body: input,
+  schema: commentWithRepliesSchema,
+});
+
+export const updateHobbyComment = async (
+  householdId: string,
+  hobbyId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/hobbies/${hobbyId}/comments/${commentId}`,
+  method: "PATCH",
+  body: input,
+  schema: commentWithRepliesSchema,
+});
+
+export const deleteHobbyComment = async (
+  householdId: string,
+  hobbyId: string,
+  commentId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/hobbies/${hobbyId}/comments/${commentId}`,
+    method: "DELETE",
+  });
+};
+
+export const getProjectComments = async (householdId: string, projectId: string): Promise<ThreadedComment[]> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/comments`,
+  schema: threadedCommentListSchema,
+  revalidate: 15,
+});
+
+export const createProjectComment = async (
+  householdId: string,
+  projectId: string,
+  input: CreateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/comments`,
+  method: "POST",
+  body: input,
+  schema: commentWithRepliesSchema,
+});
+
+export const updateProjectComment = async (
+  householdId: string,
+  projectId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/projects/${projectId}/comments/${commentId}`,
+  method: "PATCH",
+  body: input,
+  schema: commentWithRepliesSchema,
+});
+
+export const deleteProjectComment = async (
+  householdId: string,
+  projectId: string,
+  commentId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/projects/${projectId}/comments/${commentId}`,
+    method: "DELETE",
+  });
+};
+
 export const getAssetTimeline = async (
   assetId: string,
   query?: Partial<AssetTimelineQuery>

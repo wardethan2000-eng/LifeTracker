@@ -25,7 +25,13 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
   const allSelected = items.length > 0 && selectedCount === items.length;
 
   if (items.length === 0) {
-    return <p className="panel__empty">No due work. All schedules are up to date.</p>;
+    return (
+      <div className="empty-state">
+        <div className="empty-state__icon" aria-hidden="true">✓</div>
+        <h3 className="empty-state__title">All caught up</h3>
+        <p className="empty-state__body">No maintenance work is currently due. Keep up the good work!</p>
+      </div>
+    );
   }
 
   return (

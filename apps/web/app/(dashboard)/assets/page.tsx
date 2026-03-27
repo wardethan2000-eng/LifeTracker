@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
-import { ApiError, getDisplayPreferences, getHouseholdAssetsPaginated, getMe } from "../../../lib/api";
+import { ApiError, getDisplayPreferences, getHouseholdAssetsPaginated, getHouseholdDueWork, getMe } from "../../../lib/api";
 import { AssetListWorkspace } from "../../../components/asset-list-workspace";
 import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
@@ -54,7 +54,18 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
       );
     }
 
-    const assetPage = await getHouseholdAssetsPaginated(household.id, { limit, offset, includeArchived, search: search || undefined, category: category || undefined });
+    const [assetPage, dueWork] = await Promise.all([
+      getHouseholdAssetsPaginated(household.id, { limit, offset, includeArchived, search: search || undefined, category: category || undefined }),
+      getHouseholdDueWork(household.id, { limit: 500 }),
+    ]);
+
+    const scheduleCountsByAssetId = new Map<string, { overdue: number; due: number }>();
+    for (const item of dueWork) {
+      const counts = scheduleCountsByAssetId.get(item.assetId) ?? { overdue: 0, due: 0 };
+      if (item.status === "overdue") counts.overdue++;
+      else if (item.status === "due") counts.due++;
+      scheduleCountsByAssetId.set(item.assetId, counts);
+    }
 
     const unlocatedCount = assetPage.items.filter((a) => !a.spaceId).length;
 
@@ -79,7 +90,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps): Pro
               <h2>{t("listTitle", { count: assetPage.total })}</h2>
             </div>
             <div className="panel__body">
-              <AssetListWorkspace householdId={household.id} assets={assetPage.items} totalAssets={assetPage.total} includeArchived={includeArchived} currentSearch={search} currentCategory={category} />
+              <AssetListWorkspace householdId={household.id} assets={assetPage.items} totalAssets={assetPage.total} includeArchived={includeArchived} currentSearch={search} currentCategory={category} scheduleCountsByAssetId={scheduleCountsByAssetId} />
             </div>
           </section>
 

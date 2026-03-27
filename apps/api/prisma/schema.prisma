@@ -1218,6 +1218,7 @@ model ProjectTask {
   isCompleted   Boolean              @default(false)
   assignedToId  String?
   dueDate       DateTime?
+  startedAt     DateTime?
   completedAt   DateTime?
   estimatedCost Float?
   actualCost    Float?

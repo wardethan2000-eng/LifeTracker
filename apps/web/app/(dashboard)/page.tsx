@@ -8,6 +8,7 @@ import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-bound
 import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getEntries, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdLowStockInventory, getHouseholdProjectStatusCounts, getHouseholdSpacesTree, getLayoutPreference, getMe, getQuickActionsPreference, getCanvasesWithGeometry } from "../../lib/api";
 import { OnboardingChecklistClient } from "../../components/onboarding-checklist";
 import { DashboardReminders } from "../../components/dashboard-reminders";
+import { DashboardAttentionQueue } from "../../components/dashboard-attention-queue";
 import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
 
 type HomePageProps = {
@@ -183,6 +184,10 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             householdId={selectedHousehold.id}
             entries={reminderEntries.items}
             windowDays={reminderWindowDays}
+          />
+          <DashboardAttentionQueue
+            overdueItems={dueWork.filter((i) => i.status === "overdue")}
+            dueItems={dueWork.filter((i) => i.status === "due")}
           />
           {!onboardingDismissed && (
             <OnboardingChecklistClient

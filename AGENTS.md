@@ -58,6 +58,81 @@ Run `pnpm db:generate` after every Prisma schema change before writing code that
 - **Workbench screens** (asset create/edit, project create/settings) use the flat form paradigm with `.workbench-*` classes: `.workbench-form`, `.workbench-section`, `.workbench-grid`, `.workbench-table`, `.workbench-details`, `.workbench-bar`.
 - ExpandableCard sections (Custom Fields, Maintenance Schedules, Usage Metrics, and similar dense editing sections on workbench surfaces) use inline collapse/expand — clicking the header toggle slides the full editing UI open directly in the page flow, pushing content below it down. They do not use modals. The ExpandModal component exists in the codebase but is not the active pattern for workbench surfaces. When collapsed, these cards show a compact preview summary. When expanded, they render the same workbench-table and workbench-grid content inline.
 - Workbench surfaces use Card, CollapsibleCard, and ExpandableCard components as section containers. These are thin-bordered grouping containers, not decorative boxes. Card is always-open for primary field groups like Core Identity. CollapsibleCard is used in the aside column for secondary metadata (Purchase Details, Warranty, Location, etc.) that defaults to collapsed. ExpandableCard is used for dense editing sections that show a compact preview when collapsed and slide open inline when expanded.
+- **Inline editing on reading panels:** Panels on reading-surface tabs that display metadata (purchase details, warranty, location, insurance, etc.) must support inline editing — they must NOT be read-only. Each panel renders a `<dl>` in read mode with an "Edit" button (`button--ghost button--xs`) in the panel header. Clicking it switches the panel to a form (`.workbench-grid`) with Save/Cancel. On save, call a server action directly via `useTransition`. Reference implementation: `apps/web/components/asset-details-cards.tsx`. Do not build read-only metadata panels — if the user needs to update the data, the panel itself should be the editing surface.
+- **Click-to-edit for identity fields:** Key entity identity fields displayed in page headers (name, manufacturer, model, description) must use the `ClickToEdit` component (`apps/web/components/click-to-edit.tsx`) rather than a separate edit form. `ClickToEdit` renders as display text; clicking activates an input that saves on blur/Enter via `updateAssetFieldAction` or equivalent. Reference implementation: `apps/web/components/asset-hero-editor.tsx`. Never put a prominent "Edit" button on a detail page header when `ClickToEdit` suffices.
+- **Drag-and-drop reordering:** Any ordered list (maintenance schedules, custom fields, project phases, tasks) must support drag-to-reorder. Use HTML5 drag events or a lightweight hook — no heavy libraries. Saves the new order immediately on drop via a `{ orderedIds: string[] }` server action. Never require a separate "Save Order" button. Drag handle class is `.drag-handle`; dragging row gets class `.dragging`; drop target gets `.drag-over`.
+- **No unnecessary text:** The UI must not explain itself. Evaluate every rendered string: is it inferable from context? Use placeholder text over labels when context is clear. Widget headings provide field context — do not repeat section names in field labels. Contextual language rule: "Recently Deleted" not "Deleted," "No schedules yet" not "No records found," "Add schedule" not "Create new record." Never use "Submit," "OK," or "Confirm" as standalone button labels — attach the verb to the object ("Delete Asset," "Archive Project"). Empty state copy is title + one sentence only — no filler phrases ("It looks like…," "There are currently no…").
+- **Not a form-filling application:** Never navigate the user to a separate page solely to edit an existing field on an entity. All entity metadata editing happens inline on the entity's own tab/panel. Dedicated creation pages (e.g. `/assets/new`) are acceptable because the entity does not yet exist. A "Settings" or "Edit" page that merely replicates the detail page fields in form format is always wrong.
+
+## Navigation architecture (web)
+
+- **Tab navigation systems:** There are exactly two tab navigation systems in the web app. Use the correct one — never invent a third.
+  - `WorkspaceLayout` (`apps/web/components/workspace-layout.tsx`) — used by Projects, Hobbies, and Ideas. Renders pill-style tabs. All new domain tools must use this component.
+  - `AssetTabNav` (`apps/web/components/asset-tab-nav.tsx`) — Assets only. Renders underline-style tabs inside the `detail-topbar`/`detail-hero` layout. Do not move Assets to `WorkspaceLayout` and do not use `AssetTabNav` for any non-asset domain.
+- **Sidebar nav groups:** The sidebar is divided into fixed groups. New domain tools go in **Manage** (`/assets`, `/inventory`, `/projects`, `/hobbies`, `/maintenance`). New reporting/analytics tools go in **Insights**. Do not add top-level nav items to **Capture** or **Insights** without explicit instruction.
+
+## Domain overview page template
+
+Every domain entity overview page (the root tab for Assets, Projects, Hobbies, Ideas) must follow this required top-of-page pattern before any domain-specific content:
+
+1. **`IdeaProvenanceBar`** — rendered only if the entity was promoted from an Idea (`sourceIdeaId !== null`).
+2. **`PinnedNotesCard`** — rendered only if pinned entries exist for this entity.
+3. Domain-specific overview content (stats, recent activity, related entities).
+
+Never omit these checks from an overview page. See `apps/web/components/idea-provenance-bar.tsx` and `apps/web/components/pinned-notes-card.tsx`.
+
+## Empty states
+
+Every list, table, grid, or collection that can have zero items **must** have an explicit empty state. A blank container or silent `null` is never acceptable.
+
+CSS pattern: `.empty-state` > `.empty-state__icon` (emoji) + `.empty-state__title` + `.empty-state__body` + optional `.empty-state__actions`.
+
+```tsx
+<div className="empty-state">
+  <p className="empty-state__icon">📦</p>
+  <p className="empty-state__title">No inventory items linked</p>
+  <p className="empty-state__body">Link consumables and spare parts that belong to this asset.</p>
+</div>
+```
+
+For empty rows inside a `workbench-table`, use `<tr className="workbench-table__empty"><td colSpan={N}><div className="empty-state">…</div></td></tr>`. For panel-level empty states use `<div className="panel__empty">…</div>` (renders as muted italic text).
+
+## Status pills
+
+Entity status values must always be displayed using `.pill` + variant class, never as raw text.
+
+Standard variant mapping:
+
+| Domain | Status | Pill class |
+|--------|--------|------------|
+| Project | `active` | `pill--success` |
+| Project | `on_hold` | `pill--warning` |
+| Project | `planning` | `pill--info` |
+| Project | `completed` | `pill--muted` |
+| Project | `cancelled` | `pill--danger` |
+| Hobby | `active` | `pill--success` |
+| Hobby | `paused` | `pill--warning` |
+| Hobby | `archived` | `pill--muted` |
+| Idea | `spark` | `pill--warning` |
+| Idea | `developing` | `pill--info` |
+| Idea | `ready` | `pill--success` |
+| Idea (archived) | `archivedAt !== null` | `pill--muted` |
+
+When passing `statusVariant` to `WorkspaceLayout`, use the string variants: `"success"`, `"warning"`, `"info"`, `"muted"`, `"danger"`. These map to the same pill classes.
+
+## Destructive actions
+
+- **Soft delete (archive/trash):** No confirmation required. Execute immediately with an undo option visible for ~5 seconds. Use `button--ghost` or `button--subtle`.
+- **Hard delete:** Always requires an explicit confirmation step. Render the confirmation inline below the trigger button (not a modal). The confirmation message must name what data will be permanently lost. Use `button--danger` for the confirm action and `button--ghost` for cancel.
+- Never use `button--primary` for destructive actions.
+- Group all destructive actions for an entity in a "Danger Zone" section at the bottom of the entity's Settings tab, visually separated from other content.
+
+## Error and loading feedback
+
+- **Server action errors:** Render inline below the form that triggered the action using `<p style={{ color: "var(--tone-danger, red)" }}>`. Never use global toasts or banners for form submission errors.
+- **Loading state:** While a `useTransition` action is pending, `disabled={isPending}` all interactive elements and change the submit label to `"Saving…"` / `"Deleting…"`. No spinner overlays for button-level actions.
+- **Page-level loading:** Add a `loading.tsx` to every dynamic route under `(dashboard)/`. Render a minimal `.panel` skeleton.
+- **API error fallback:** In page server components, catch `ApiError` and render a fallback `.panel` with the error message. Re-throw unexpected (non-API) errors.
 
 ## Shared types contract
 
@@ -100,6 +175,40 @@ The onboarding checklist lives in `apps/web/components/onboarding-checklist.tsx`
 **CSS styles** for the checklist are in `apps/web/app/globals.css` under the `/* Onboarding Checklist */` comment in section 56.
 
 **Keep it lightweight** — the checklist must not make its own API calls. All data is passed as props from the server component in `page.tsx`. Add new fetches there, not inside the component.
+
+## Domain tool feature parity — REQUIRED
+
+Every primary domain workspace tool (Assets, Projects, Hobbies, Ideas) **must** expose the same set of common tabs and routes. Never remove or omit these features when building or modifying a domain tool's tab navigation.
+
+**Required tab matrix:**
+
+| Feature | Tab label | Route segment | Web component | Notes |
+|---------|-----------|---------------|---------------|-------|
+| Notes / Journal | "Notes" or "Journal" | `/[entityId]/notes` or `/[entityId]/entries` | `EntryTimeline` (`entityType=<domain>`) | Assets → `"asset"`, Projects → notepad, Hobbies → entries, Ideas → `"idea"` |
+| Canvas | "Canvas" | `/[entityId]/canvas` | `EntityCanvasList` (`entityType=<domain>`) | Generic component in `apps/web/components/entity-canvas-list.tsx` |
+| Comments | "Comments" | `/[entityId]/comments` | `EntityComments` + domain-specific actions | Generic component in `apps/web/components/entity-comments.tsx`; needs API comment route per domain |
+| Activity / History | "Activity" or "History" | `/[entityId]/activity` or `/[entityId]/history` | `getHouseholdActivity` filtered by `entityId` | Existing pattern in Projects (`/timeline`), Assets (`/history`), Hobbies (`/activity`), Ideas (`/activity`) |
+| **Inventory** | "Inventory" | `/[entityId]/inventory` | Domain-specific inventory links component | Assets → `AssetInventoryLinks`; Hobbies → `HobbyLinksManager`; Projects → supply tab. **Ideas do not have inventory.** |
+
+**Current status (update when extending):**
+
+| Feature | Assets | Projects | Hobbies | Ideas |
+|---------|--------|----------|---------|-------|
+| Notes | ✅ `/notes` | ✅ `/notepad` | ✅ `/entries` | ✅ `/notes` |
+| Canvas | ✅ `/canvas` | ✅ `/canvas` | ✅ `/canvas` | ✅ `/canvas` |
+| Comments | ✅ `/comments` | ✅ `/comments` | ✅ `/comments` | ❌ no API yet |
+| Activity | ✅ `/history` | ✅ `/timeline` | ✅ `/activity` | ✅ `/activity` |
+| Inventory | ✅ `/inventory` | ✅ `/supplies` | ✅ `/inventory` | N/A |
+
+**When adding a new domain tool**, include all four feature areas from the start — do not defer them as "future work".
+
+**When modifying existing tab navigation** (e.g. updating a layout file or tab-nav component), verify that all four feature areas are preserved before and after the change.
+
+**Implementation notes:**
+- `EntityCanvasList` (`apps/web/components/entity-canvas-list.tsx`) — generic canvas CRUD client component; pass `entityType` and `entityId` props.
+- `EntityComments` (`apps/web/components/entity-comments.tsx`) — generic threaded comments server component; pass `comments` array and a `config` object with `hiddenFields`, `createAction`, `updateAction`, `deleteAction`.
+- Comments require: (a) API route for the domain, (b) `getXxxComments` / `createXxxComment` / `updateXxxComment` / `deleteXxxComment` methods in `apps/web/lib/api.ts`, (c) corresponding server actions in `apps/web/app/actions.ts`.
+- For `attachments` to work on a domain entity, its entity type string must be present in `attachmentEntityTypeValues` (`packages/types/src/index.ts`) and have a `validateEntityOwnership` case in `apps/api/src/routes/attachments/index.ts`.
 
 ## Things to avoid
 

@@ -26,6 +26,7 @@ type AssetListWorkspaceProps = {
   includeArchived: boolean;
   currentSearch?: string;
   currentCategory?: string;
+  scheduleCountsByAssetId?: Map<string, { overdue: number; due: number }>;
 };
 
 const CATEGORY_OPTIONS = assetCategoryValues.map((v) => ({
@@ -38,7 +39,7 @@ const VISIBILITY_OPTIONS = assetVisibilityValues.map((v) => ({
   label: formatVisibilityLabel(v as AssetVisibility),
 }));
 
-export function AssetListWorkspace({ householdId, assets, totalAssets, includeArchived, currentSearch = "", currentCategory = "" }: AssetListWorkspaceProps): JSX.Element {
+export function AssetListWorkspace({ householdId, assets, totalAssets, includeArchived, currentSearch = "", currentCategory = "", scheduleCountsByAssetId }: AssetListWorkspaceProps): JSX.Element {
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
   const { pushToast } = useToast();
   const { formatDate } = useDisplayPreferences();
@@ -100,10 +101,12 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
 
   if (assets.length === 0 && !currentSearch && !currentCategory) {
     return (
-      <p className="panel__empty">
-        No assets found.{" "}
-        <Link href="/assets/new" className="text-link">Add your first asset</Link> to get started.
-      </p>
+      <div className="empty-state">
+        <div className="empty-state__icon" aria-hidden="true">📦</div>
+        <h3 className="empty-state__title">No assets yet</h3>
+        <p className="empty-state__body">Start tracking your home&apos;s assets — appliances, vehicles, tools, and more.</p>
+        <Link href="/assets/new" className="button button--primary">Add your first asset</Link>
+      </div>
     );
   }
 
@@ -168,6 +171,7 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
             <th>Category</th>
             <th>Visibility</th>
             <th>Status</th>
+            <th>Due</th>
             <th>Location</th>
             <th>Manufacturer</th>
             <th>Model</th>
@@ -227,6 +231,18 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
                   />
                 </td>
                 <td>{asset.isArchived ? "Archived" : "Active"}</td>
+                <td>
+                  {(() => {
+                    const counts = scheduleCountsByAssetId?.get(asset.id);
+                    if (!counts || (counts.overdue === 0 && counts.due === 0)) return <span style={{ color: "var(--ink-muted)" }}>—</span>;
+                    return (
+                      <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {counts.overdue > 0 && <span className="pill pill--danger" title={`${counts.overdue} overdue`}>{counts.overdue} overdue</span>}
+                        {counts.due > 0 && <span className="pill pill--warning" title={`${counts.due} due`}>{counts.due} due</span>}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td>
                   {asset.spaceLocation ? (
                     <span title={asset.spaceLocation.breadcrumb.map((b) => b.name).join(" › ")}>

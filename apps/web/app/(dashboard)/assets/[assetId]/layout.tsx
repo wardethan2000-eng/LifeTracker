@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AssetDangerActions } from "../../../../components/asset-danger-actions";
 import { RealtimeRefreshBoundary } from "../../../../components/realtime-refresh-boundary";
 import { AssetTabNav } from "../../../../components/asset-tab-nav";
+import { AssetHeroEditor } from "../../../../components/asset-hero-editor";
 import {
   ApiError,
   getAssetDetail
@@ -52,7 +53,17 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
           <section className="detail-hero">
             <div className="detail-hero__info">
               <p className="eyebrow">{formatCategoryLabel(detail.asset.category)}</p>
-              <h1>{detail.asset.name}</h1>
+              <AssetHeroEditor
+                asset={{
+                  id: detail.asset.id,
+                  householdId: detail.asset.householdId,
+                  name: detail.asset.name,
+                  manufacturer: detail.asset.manufacturer ?? null,
+                  model: detail.asset.model ?? null,
+                  description: detail.asset.description ?? null,
+                  serialNumber: detail.asset.serialNumber ?? null,
+                }}
+              />
             </div>
             <dl className="detail-hero__meta">
               <div className="detail-hero__meta-item"><dt>Visibility</dt><dd>{formatVisibilityLabel(detail.asset.visibility)}</dd></div>

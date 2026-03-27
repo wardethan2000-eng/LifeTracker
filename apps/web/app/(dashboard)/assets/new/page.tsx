@@ -1,9 +1,8 @@
 import type { JSX } from "react";
-import { getTranslations } from "next-intl/server";
-import { createAssetAction } from "../../../actions";
-import { AssetProfileWorkbench } from "../../../../components/asset-profile-workbench";
-import { ApiError, getHouseholdAssets, getHouseholdPresets, getHouseholdSpacesTree, getLibraryPresets, getMe } from "../../../../lib/api";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { AssetCreationWizard } from "../../../../components/asset-creation-wizard";
+import { ApiError, getHouseholdPresets, getLibraryPresets, getMe } from "../../../../lib/api";
 
 type NewAssetPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -29,14 +28,10 @@ export default async function NewAssetPage({ searchParams }: NewAssetPageProps):
       );
     }
 
-    const [presets, customPresets, householdAssets, spaces] = await Promise.all([
+    const [presets, customPresets] = await Promise.all([
       getLibraryPresets(),
       getHouseholdPresets(household.id),
-      getHouseholdAssets(household.id),
-      getHouseholdSpacesTree(household.id).catch(() => [])
     ]);
-
-    const parentAsset = parentAssetId ? householdAssets.find((a) => a.id === parentAssetId) : undefined;
 
     return (
       <>
@@ -47,26 +42,18 @@ export default async function NewAssetPage({ searchParams }: NewAssetPageProps):
         </header>
 
         <div className="page-body">
-          {parentAsset && (
+          {parentAssetId && (
             <div className="info-bar" style={{ marginBottom: "16px" }}>
               <span>
-                Creating a component of{" "}
-                <Link href={`/assets/${parentAsset.id}`} className="text-link">
-                  {parentAsset.name}
-                </Link>
-                . The parent asset will be pre-selected below.
+                Creating a component of an asset. Fill in the details below.
               </span>
             </div>
           )}
-          <AssetProfileWorkbench
-            action={createAssetAction}
+          <AssetCreationWizard
             householdId={household.id}
-            householdAssets={householdAssets}
-            submitLabel="Create Asset"
             libraryPresets={presets}
             customPresets={customPresets}
             initialParentAssetId={parentAssetId}
-            spaces={spaces}
           />
         </div>
       </>

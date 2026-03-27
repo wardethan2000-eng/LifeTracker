@@ -166,6 +166,7 @@ export const toProjectTaskResponse = (task: {
   isCompleted?: boolean | null;
   assignedToId: string | null;
   dueDate: Date | null;
+  startedAt: Date | null;
   completedAt: Date | null;
   estimatedCost: number | null;
   actualCost: number | null;
@@ -208,6 +209,7 @@ taskGraphNode?: TaskGraphDisplayNode) => {
   assignedToId: task.assignedToId,
   assignee: task.assignedTo ? toShallowUserResponse(task.assignedTo) : null,
   dueDate: task.dueDate?.toISOString() ?? null,
+  startedAt: task.startedAt?.toISOString() ?? null,
   completedAt: task.completedAt?.toISOString() ?? null,
   estimatedCost: task.estimatedCost,
   actualCost: task.actualCost,

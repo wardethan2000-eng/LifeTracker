@@ -29,6 +29,27 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: "new-inventory", label: "New Inventory Item", description: "Add a new item to your inventory", href: "/inventory/items/new" },
 ];
 
+type NavCommand = {
+  id: string;
+  label: string;
+  href: string;
+};
+
+const NAVIGATION_COMMANDS: NavCommand[] = [
+  { id: "nav-dashboard", label: "Dashboard", href: "/" },
+  { id: "nav-assets", label: "Assets", href: "/assets" },
+  { id: "nav-maintenance", label: "Maintenance", href: "/maintenance" },
+  { id: "nav-projects", label: "Projects", href: "/projects" },
+  { id: "nav-hobbies", label: "Hobbies", href: "/hobbies" },
+  { id: "nav-inventory", label: "Inventory", href: "/inventory" },
+  { id: "nav-ideas", label: "Ideas", href: "/ideas" },
+  { id: "nav-notes", label: "Notes", href: "/notes" },
+  { id: "nav-analytics", label: "Analytics", href: "/analytics" },
+  { id: "nav-providers", label: "Service Providers", href: "/service-providers" },
+  { id: "nav-activity", label: "Activity Log", href: "/activity" },
+  { id: "nav-settings", label: "User Settings", href: "/settings" },
+];
+
 const FILTER_OPTIONS: Array<{ value: SearchFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "items", label: "Items" },
@@ -175,17 +196,31 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
   const householdId = searchParams.get("householdId") ?? fallbackHouseholdId;
   const normalizedCodeQuery = query.trim().toUpperCase();
   const trimmedQuery = query.trim().toLowerCase();
+  const isGoCommand = trimmedQuery.startsWith("go ");
+  const isCreateCommand = trimmedQuery.startsWith("create ");
   const canLookupSpaceCode = Boolean(householdId) && /^[A-Z0-9]{4,6}$/.test(normalizedCodeQuery);
   const matchedQuickActions = useMemo(() => {
     if (!householdId) return [];
-    if (!trimmedQuery) return QUICK_ACTIONS;
+    if (isGoCommand) return [];
+    if (!trimmedQuery || isCreateCommand) return QUICK_ACTIONS;
+    const q = isCreateCommand ? trimmedQuery.slice(7).trim() : trimmedQuery;
     return QUICK_ACTIONS.filter((a) =>
-      a.label.toLowerCase().includes(trimmedQuery) || a.description.toLowerCase().includes(trimmedQuery)
+      a.label.toLowerCase().includes(q) || a.description.toLowerCase().includes(q)
     );
-  }, [householdId, trimmedQuery]);
+  }, [householdId, trimmedQuery, isGoCommand, isCreateCommand]);
+  const matchedNavCommands = useMemo(() => {
+    if (!householdId) return [];
+    if (!trimmedQuery || isGoCommand) {
+      const navQ = isGoCommand ? trimmedQuery.slice(3).trim() : "";
+      if (!navQ) return NAVIGATION_COMMANDS;
+      return NAVIGATION_COMMANDS.filter((n) => n.label.toLowerCase().includes(navQ));
+    }
+    return [];
+  }, [householdId, trimmedQuery, isGoCommand]);
   const spaceCodeActionCount = canLookupSpaceCode ? 1 : 0;
+  const navCommandCount = matchedNavCommands.length;
   const quickActionCount = (!debouncedQuery || matchedQuickActions.length > 0) ? matchedQuickActions.length : 0;
-  const actionCount = spaceCodeActionCount + quickActionCount;
+  const actionCount = spaceCodeActionCount + navCommandCount + quickActionCount;
   const visibleGroups = useMemo(() => groups.filter((group) => {
     if (filter === "historical") {
       return group.entityType === "historical_inventory_item";
@@ -392,7 +427,17 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
         return;
       }
 
-      const quickActionIndex = activeIndex - spaceCodeActionCount;
+      const navCommandIndex = activeIndex - spaceCodeActionCount;
+      if (navCommandIndex >= 0 && navCommandIndex < navCommandCount) {
+        const navCmd = matchedNavCommands[navCommandIndex];
+        if (navCmd) {
+          close();
+          router.push(navCmd.href);
+          return;
+        }
+      }
+
+      const quickActionIndex = activeIndex - spaceCodeActionCount - navCommandCount;
       if (quickActionIndex >= 0 && quickActionIndex < quickActionCount) {
         const action = matchedQuickActions[quickActionIndex];
         if (action) {
@@ -537,12 +582,39 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                 </section>
               ) : null}
 
+              {navCommandCount > 0 ? (
+                <section className="search-palette__group">
+                  <div className="search-palette__section-title">Pages</div>
+                  <div className="search-palette__results">
+                    {matchedNavCommands.map((cmd, index) => {
+                      const absoluteIndex = spaceCodeActionCount + index;
+                      return (
+                        <button
+                          key={cmd.id}
+                          type="button"
+                          className={`search-palette__result${activeIndex === absoluteIndex ? " search-palette__result--active" : ""}`}
+                          onClick={() => {
+                            close();
+                            router.push(cmd.href);
+                          }}
+                          onMouseEnter={() => setActiveIndex(absoluteIndex)}
+                        >
+                          <span className="search-palette__result-heading">
+                            <span className="search-palette__result-title">{cmd.label}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
               {quickActionCount > 0 ? (
                 <section className="search-palette__group">
                   <div className="search-palette__section-title">Create</div>
                   <div className="search-palette__results">
                     {matchedQuickActions.map((action, index) => {
-                      const absoluteIndex = spaceCodeActionCount + index;
+                      const absoluteIndex = spaceCodeActionCount + navCommandCount + index;
                       return (
                         <button
                           key={action.id}

@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { getTranslations } from "next-intl/server";
 import { ApiError, getDisplayPreferences, getHouseholdDueWork, getMe } from "../../../lib/api";
 import { formatCategoryLabel } from "../../../lib/formatters";
+import { MaintenanceCalendar } from "../../../components/maintenance-calendar";
 import { MaintenanceListWorkspace } from "../../../components/maintenance-list-workspace";
 import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
@@ -12,6 +13,7 @@ type MaintenancePageProps = {
 
 const sortOptions = ["priority", "asset", "category", "schedule"] as const;
 const statusOptions = ["all", "overdue", "due"] as const;
+const viewOptions = ["list", "calendar"] as const;
 const limitOptions = [25, 50, 100] as const;
 
 const getSortRank = (status: string): number => {
@@ -38,6 +40,9 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
   const sort = typeof params.sort === "string" && sortOptions.includes(params.sort as (typeof sortOptions)[number])
     ? params.sort as (typeof sortOptions)[number]
     : "priority";
+  const view = typeof params.view === "string" && viewOptions.includes(params.view as (typeof viewOptions)[number])
+    ? params.view as (typeof viewOptions)[number]
+    : "list";
   const rawLimit = typeof params.limit === "string" ? parseInt(params.limit, 10) : prefs.pageSize;
   const limit = (limitOptions as readonly number[]).includes(rawLimit) ? rawLimit : prefs.pageSize;
   const offset = typeof params.offset === "string" ? Math.max(0, parseInt(params.offset, 10)) : 0;
@@ -91,6 +96,7 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         sort: sort !== "priority" ? sort : undefined,
+        view: view !== "list" ? view : undefined,
         limit: limit !== 25 ? limit : undefined,
         offset: offset !== 0 ? offset : undefined,
         ...updates
@@ -176,20 +182,38 @@ export default async function MaintenancePage({ searchParams }: MaintenancePageP
             <div className="panel__header">
               <h2>{t("allWorkTitle")}</h2>
               <span className="pill">{filteredDueWork.length} visible</span>
+              <div className="view-toggle" role="group" aria-label="View mode">
+                <Link
+                  href={buildMaintenanceHref({ view: undefined, offset: 0 })}
+                  className={`view-toggle__btn${view === "list" ? " view-toggle__btn--active" : ""}`}
+                  aria-current={view === "list" ? "page" : undefined}
+                >List</Link>
+                <Link
+                  href={buildMaintenanceHref({ view: "calendar", offset: 0 })}
+                  className={`view-toggle__btn${view === "calendar" ? " view-toggle__btn--active" : ""}`}
+                  aria-current={view === "calendar" ? "page" : undefined}
+                >Calendar</Link>
+              </div>
             </div>
             <div className="panel__body">
-              <MaintenanceListWorkspace householdId={household.id} items={pagedDueWork} />
+              {view === "calendar" ? (
+                <MaintenanceCalendar items={filteredDueWork} />
+              ) : (
+                <MaintenanceListWorkspace householdId={household.id} items={pagedDueWork} />
+              )}
             </div>
           </section>
 
-          <OffsetPaginationControls
-            total={filteredDueWork.length}
-            limit={limit}
-            offset={offset}
-            hasMore={offset + limit < filteredDueWork.length}
-            entityLabel="work items"
-            buildHref={(updates) => buildMaintenanceHref(updates)}
-          />
+          {view === "list" && (
+            <OffsetPaginationControls
+              total={filteredDueWork.length}
+              limit={limit}
+              offset={offset}
+              hasMore={offset + limit < filteredDueWork.length}
+              entityLabel="work items"
+              buildHref={(updates) => buildMaintenanceHref(updates)}
+            />
+          )}
         </div>
       </>
     );

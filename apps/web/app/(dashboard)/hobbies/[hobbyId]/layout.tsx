@@ -50,6 +50,9 @@ export default async function HobbyLayout({ params, children }: HobbyLayoutProps
     { id: "metrics", label: "Metrics", href: `${base}/metrics` },
     { id: "inventory", label: "Inventory", href: `${base}/inventory` },
     { id: "entries", label: "Journal", href: `${base}/entries` },
+    { id: "canvas", label: "Canvas", href: `${base}/canvas` },
+    { id: "comments", label: "Comments", href: `${base}/comments` },
+    { id: "activity", label: "Activity", href: `${base}/activity` },
     { id: "settings", label: "Settings", href: `${base}/settings` },
   ];
 

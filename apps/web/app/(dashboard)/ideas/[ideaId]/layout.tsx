@@ -44,6 +44,8 @@ export default async function IdeaLayout({ params, children }: IdeaLayoutProps):
 
   const tabs: WorkspaceTab[] = [
     { id: "overview", label: "Overview", href: base },
+    { id: "notes", label: "Notes", href: `${base}/notes` },
+    { id: "canvas", label: "Canvas", href: `${base}/canvas` },
     { id: "activity", label: "Activity", href: `${base}/activity` },
     { id: "settings", label: "Settings", href: `${base}/settings` },
   ];

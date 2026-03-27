@@ -111,6 +111,8 @@ import {
   completeSchedule,
   createComment,
   createInventoryComment,
+  createHobbyComment,
+  createProjectComment,
   createEntry,
   createAssetTimelineEntry,
   createInvitation,
@@ -148,6 +150,8 @@ import {
   deleteComment,
   deleteEntry,
   deleteInventoryComment,
+  deleteHobbyComment,
+  deleteProjectComment,
   deleteAssetTimelineEntry,
   deleteHobby,
   deleteHobbyRecipe,
@@ -183,6 +187,8 @@ import {
   updateSpace as updateSpaceRequest,
   updateComment,
   updateInventoryComment,
+  updateHobbyComment,
+  updateProjectComment,
   updateEntry,
   updateAssetTimelineEntry,
   updateHobby,
@@ -1968,6 +1974,72 @@ export async function deleteInventoryCommentAction(formData: FormData): Promise<
   await deleteInventoryComment(householdId, inventoryItemId, commentId);
   revalidateInventoryDetailPath(inventoryItemId);
   revalidateInventoryPaths(householdId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function createHobbyCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const input: CreateCommentInput = { body: getRequiredString(formData, "body") };
+  const parentCommentId = getOptionalString(formData, "parentCommentId");
+  if (parentCommentId) input.parentCommentId = parentCommentId;
+
+  await createHobbyComment(householdId, hobbyId, input);
+  revalidateHobbyPaths(hobbyId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function updateHobbyCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const commentId = getRequiredString(formData, "commentId");
+  const input: UpdateCommentInput = { body: getRequiredString(formData, "body") };
+
+  await updateHobbyComment(householdId, hobbyId, commentId, input);
+  revalidateHobbyPaths(hobbyId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function deleteHobbyCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const hobbyId = getRequiredString(formData, "hobbyId");
+  const commentId = getRequiredString(formData, "commentId");
+
+  await deleteHobbyComment(householdId, hobbyId, commentId);
+  revalidateHobbyPaths(hobbyId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function createProjectCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const input: CreateCommentInput = { body: getRequiredString(formData, "body") };
+  const parentCommentId = getOptionalString(formData, "parentCommentId");
+  if (parentCommentId) input.parentCommentId = parentCommentId;
+
+  await createProjectComment(householdId, projectId, input);
+  revalidateProjectPaths(householdId, projectId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function updateProjectCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const commentId = getRequiredString(formData, "commentId");
+  const input: UpdateCommentInput = { body: getRequiredString(formData, "body") };
+
+  await updateProjectComment(householdId, projectId, commentId, input);
+  revalidateProjectPaths(householdId, projectId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function deleteProjectCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const projectId = getRequiredString(formData, "projectId");
+  const commentId = getRequiredString(formData, "commentId");
+
+  await deleteProjectComment(householdId, projectId, commentId);
+  revalidateProjectPaths(householdId, projectId);
   revalidateActivityPaths(householdId);
 }
 

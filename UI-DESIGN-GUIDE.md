@@ -1,6 +1,6 @@
 # LifeKeeper UI Design Guide
 
-**Version 1.0 — March 2026**
+**Version 2.0 — March 2026**
 **Status: Active — all new UI work must follow this guide**
 
 This document is the single source of truth for LifeKeeper's UI architecture, layout patterns, component behavior, and visual language. It is written for GitHub Copilot and human developers alike. Every screen, component, and interaction pattern in the web application is covered here.
@@ -18,6 +18,12 @@ This document is the single source of truth for LifeKeeper's UI architecture, la
 7. [Spacing and density](#7-spacing-and-density)
 8. [Responsive behavior](#8-responsive-behavior)
 9. [Implementation phases](#9-implementation-phases)
+10. [Navigation architecture](#10-navigation-architecture)
+11. [Universal page and overview templates](#11-universal-page-and-overview-templates)
+12. [Empty states](#12-empty-states)
+13. [Destructive actions and confirmations](#13-destructive-actions-and-confirmations)
+14. [Error and loading feedback](#14-error-and-loading-feedback)
+15. [Component selection guide](#15-component-selection-guide)
 
 ---
 
@@ -25,22 +31,139 @@ This document is the single source of truth for LifeKeeper's UI architecture, la
 
 ### Core principles
 
-LifeKeeper is a data-dense application that manages complex maintenance schedules, multi-field asset profiles, project phases, inventory tracking, and household coordination. The UI must balance two competing needs: information density (users need to see and edit a lot of data) and approachability (users should never feel overwhelmed or lost).
+LifeKeeper is **not a form-filling application.** Users do not want to navigate to a separate "edit" page, fill out a long form, and click Save just to change an asset's location or a project's status. Every piece of data in the system should be editable where it is read — in the same card, in the same panel, without changing pages.
 
-The design system draws from Shopify's admin patterns — specifically their resource detail layout, card-based content grouping, collapsible sections, and inline expand/collapse editing for dense sections — adapted to LifeKeeper's domain-specific needs.
+The product manages genuinely complex data: maintenance schedules, multi-field asset profiles, project phases, inventory, household coordination. Handling that complexity well requires two things that must be kept in constant balance:
+
+**Beauty and intuitiveness.** The interface should feel immediate and responsive. A new user should understand how to navigate it without reading documentation. Visual hierarchy guides the eye: important things are prominent, secondary things are accessible but not in the way. Whitespace and restraint matter as much as information density.
+
+**High customizability.** LifeKeeper users configure everything — custom fields, maintenance schedules, metric templates, project phases, reorder rules. The UI must make customization feel frictionless, not bureaucratic. Inline editing, drag-and-drop reordering, and click-to-edit fields are the primary vehicles for customization. Users should feel like they are directly manipulating data, not submitting forms.
+
+**Edit where you read.** This is the single most important UX principle in the product. When a user looks at an asset's purchase details, location, or maintenance schedule, they should be able to click into any value and change it without leaving the screen. Navigating to a separate page to edit a metadata field is always wrong. Forms are appropriate only when creating something new from scratch.
+
+**Progressive disclosure.** Not all information is needed at once. Collapsible cards, expandable sections, and tabbed navigation exist to reveal detail progressively as the user needs it — not to hide information, but to prevent cognitive overload on first view. The overview is clean. The details expand on demand.
 
 **Density without clutter.** Every piece of information earns its screen space. Cards group related fields so users can scan section headers to find what they need. Collapsible cards hide secondary metadata until needed. Inline expand/collapse gives complex editors (schedules, custom fields) the full-width breathing room they require without bloating the parent page.
 
-**Two surface types.** The application has two fundamentally different surface types, and each gets a different UI treatment:
+**Cards are containers, not decorations.** Cards exist to group related fields under a scannable heading. They are thin-bordered containers with tight internal spacing — not standalone decorative boxes with heavy shadows and excessive padding.
 
-- **Reading surfaces** (dashboard, asset list, project list, inventory list, maintenance queue): Card-based browsing layouts optimized for scanning. These use the existing panel/card patterns with stat rows, data tables, and status indicators.
-- **Working surfaces** (asset creation, asset editing, project creation, project detail/settings, service provider management): Dense form-based layouts using the two-column card system described in this guide.
+### Two disclosure levels
 
-**Cards are containers, not decorations.** Cards exist to group related fields under a scannable heading. They are thin-bordered containers with tight internal spacing — not standalone decorative boxes with heavy shadows and excessive padding. A card's job is to answer the question "where do I find the fields for X?" at a glance.
+The application uses two levels of information presentation, not two rigid "surface types":
+
+- **Overview / reading level** (dashboard, list pages, entity overview tabs): Optimized for scanning. Shows status, summary stats, recent activity. Nothing here requires a full form to interact with — quick actions are inline.
+- **Detail / editing level** (entity detail tabs, settings, creation flows): Shows the full data model. Uses the two-column card layout. Editing is done inline within each card, not by navigating to a separate route.
+
+The only time a dedicated form page is appropriate is on creation flows (e.g., `/assets/new`, `/projects/new`) where the entity does not yet exist and inline editing is not possible.
 
 ### What this guide replaces
 
-This guide supersedes the previous `.asset-studio--{mode}` CSS class hierarchy and the flat `workbench-section` pattern. The workbench form internals (field grids, table patterns, input styling) are preserved — they now live inside card containers arranged in a two-column layout.
+This guide supersedes the previous `.asset-studio--{mode}` CSS class hierarchy and the flat `workbench-section` pattern. The workbench form internals (field grids, table patterns, input styling) are preserved — they now live inside card containers. The practice of building read-only panels that require navigating to a settings page to edit any value is deprecated.
+
+### Universal domain tool feature requirements
+
+Every primary domain workspace tool (Assets, Projects, Hobbies, Ideas) **must** provide the following tabs and interaction patterns. These are non-negotiable and must be preserved whenever a layout file or tab-nav component is modified.
+
+**Required tab surface matrix:**
+
+| Feature | Pattern | Component |
+|---------|---------|-----------|
+| Notes / Journal | `EntryTimeline` (`entityType=<domain>`) | Reading surface, single column |
+| Canvas | `EntityCanvasList` (`entityType=<domain>`) | Reading surface, single column |
+| Comments | `EntityComments` (domain-specific actions) | Reading surface, single column |
+| Activity / History | `getHouseholdActivity` filtered by entityId | Reading surface, single column |
+| **Inventory** (where applicable) | Linked inventory items panel with add/remove | Mixed surface — server data, client interaction |
+
+**Inventory tab rule:** Assets, Hobbies, and Projects each have an inventory linking feature. This tab **must** be present in their tab navigation. Ideas do not have inventory by default.
+
+### Inline editing on detail/reading panels
+
+**Rule:** Panels that display metadata (purchase details, warranty, location, insurance, etc.) on reading-surface tabs must support inline editing — they must **not** require the user to navigate to a separate settings/edit page to change that data.
+
+**Pattern:**
+- Panel renders as a `.panel` section with an "Edit" button (`button--ghost button--xs`) in `.panel__header`.
+- Clicking "Edit" replaces the `<dl className="data-list">` read view with a `.workbench-grid` form.
+- Form has "Save" and "Cancel" buttons.
+- "Save" calls a server action (e.g. `updateAssetFieldAction`) directly from the client component using `useTransition`.
+- On success, the panel returns to read mode showing updated values.
+- On error, an inline error message is shown below the form.
+
+**Implementation:** Client components that follow this pattern live in `components/asset-details-cards.tsx`. When adding a new inline-editable domain, create analogous card components following the same file/naming pattern.
+
+**Do not** build read-only panels for fields the user will frequently need to change. If it's metadata about the entity, it should be editable inline.
+
+### Interaction model
+
+LifeKeeper supports three inline interaction patterns. Use the right one for the data type:
+
+#### 1. Click-to-edit (field-level)
+
+For critical identity fields displayed prominently in page headers — asset name, manufacturer, model, description — use the `ClickToEdit` component (`apps/web/components/click-to-edit.tsx`). The value renders as styled display text. Clicking anywhere on the value (or tabbing to it) activates an input. Pressing Enter or blurring saves immediately (calls the server action). No separate Save button is shown.
+
+**Reference implementation:** `AssetHeroEditor` (`apps/web/components/asset-hero-editor.tsx`). The asset name, manufacturer, model, and description in the detail page header are all click-to-edit. There is no "Edit Asset" button needed for these core identity fields.
+
+Use click-to-edit when:
+- The field is a single value (text, number, date)
+- The field is prominent and frequently changed (name, title, status)
+- The user expects direct manipulation without a modal
+
+#### 2. Panel-level edit (grouped fields)
+
+For a group of related fields displayed together (purchase details, warranty info, location), use the panel edit button pattern. The panel header has a small "Edit" button (`button--ghost button--xs`). Clicking it switches the `<dl className="data-list">` to a `.workbench-grid` form in-place. Save and Cancel are shown below the form. Saving returns to read mode.
+
+**Reference implementation:** `apps/web/components/asset-details-cards.tsx`
+
+Use panel-level edit when:
+- Multiple related fields need to be edited together
+- Fields have explicit labels and types (select, date, textarea)
+- A grouped commit (Save/Cancel) is appropriate
+
+#### 3. Drag-and-drop reordering
+
+Any ordered list in the product — maintenance schedules, custom field definitions, project phases, tasks, metric templates — must support drag-to-reorder. The user grabs a drag handle (`⠿` icon, `cursor: grab`) on any row and drops it in the new position. Saving order happens immediately on drop via a server action.
+
+Rules:
+- Drag handles appear on hover (or are always visible on touch devices)
+- Use the `draggable` HTML attribute + `dragstart`/`dragover`/`drop` events, or a lightweight wrapper hook
+- The reordered array is sent as `{ orderedIds: string[] }` to the relevant server action
+- Animate the drop with a brief transition on the moved row
+- Never require a separate "Save Order" button — the drag-drop interaction is the save
+
+CSS: The drag handle cell in a `workbench-table` row uses class `.drag-handle`. The row being dragged gets class `.dragging` (reduced opacity). The drop target row gets class `.drag-over` (top border highlight).
+
+### Text economy
+
+**The UI should never explain itself.** LifeKeeper's users are not confused; they do not need walls of text to use the product. Every string rendered in the interface should be evaluated: is this word necessary? Can the user infer this from context?
+
+#### Labels and placeholders
+
+Prefer placeholder text over labels when the field's purpose is obvious from context. In a `.workbench-grid` inside a "Purchase Details" card, a "Price" label is redundant alongside a `$` input prefix — the placeholder `"0.00"` communicates enough. Reserve explicit labels for fields where the name is not obvious.
+
+Do not repeat the section name in field labels. Inside a "Warranty Info" card, the label is "Expires" not "Warranty Expiry Date." The card heading already provides context.
+
+#### Contextual language
+
+Language should tell the user what is *actionable* and *true right now*, not just what the state is called internally:
+
+| ❌ Avoid | ✅ Use instead | Why |
+|----------|----------------|-----|
+| Deleted | Recently Deleted | Implies the action is reversible |
+| No records found | No schedules yet | Specific to the context, implies they can add one |
+| Create new record | Add schedule | Use plain verbs specific to the domain |
+| Status: Active | An `active` pill | A pill communicates status without the word "Status:" |
+| Error occurred | Couldn't save. Try again. | Tells the user what to do next |
+| Loading... | *(skeleton or spinner only)* | Remove the word if a visual already communicates it |
+| Settings | Advanced | Better conveys that this tab is for low-frequency power settings |
+
+#### Button labels
+
+Use short, specific verbs. Never use "Submit," "OK," or "Confirm" as standalone labels — attach them to the action: "Save Changes," "Delete Asset," "Archive Project," "Mark Complete."
+
+Destructive confirm buttons must name what they destroy: "Delete Asset," not "Confirm." Ghost/cancel buttons use a single word: "Cancel," "Discard," "Undo."
+
+#### Empty states
+
+Empty state copy follows a strict formula: title (what's missing, 2–5 words) + body (what it does and how to add one, 1 sentence). No more than these two elements unless an action button is warranted. Do not use phrases like "It looks like," "There are currently no," or "You haven't added any yet."
 
 ---
 
@@ -413,11 +536,15 @@ Content:
 | Tab | Surface type | Layout |
 |-----|-------------|--------|
 | Overview | Reading | Single column. Hero card, Due Work panel, Recent Maintenance panel, Transfer History panel. No changes. |
-| Structured Details | Reading | Single column. KV grid of custom field values grouped by section. Preset browser. No changes. |
+| Details | Mixed (inline-editable) | Auto-fit grid. Each panel (Purchase Details, Warranty Details, Location Details, Insurance & Disposition) has an **Edit** button that switches the `<dl>` read view to an inline form. Save/Cancel returned to read view. Uses `AssetPurchaseDetailsCard`, `AssetWarrantyDetailsCard`, `AssetLocationDetailsCard`, `AssetInsuranceDetailsCard` client components in `components/asset-details-cards.tsx`. Condition History and Preset Browser remain as server-rendered panels. |
 | Usage Metrics | Reading | Single column. Metric cards with entry history and projections. No changes. |
 | Maintenance | Working | Two-column resource detail. Primary: Schedules list (expandable card), Maintenance Log panel, Log Maintenance form. Aside: Schedule stats, quick-complete actions. |
+| Inventory | Mixed | Single column. Linked inventory items table with add/remove controls. Server-fetched, client-interactive via `AssetInventoryLinks`. |
+| Notes | Reading | Single column. `EntryTimeline` with `entityType="asset"`. |
+| Canvas | Reading | Single column. `EntityCanvasList` with `entityType="asset"`. |
 | Comments | Reading | Single column. Comment thread with add/edit/delete. No changes. |
-| Settings | Working | Two-column resource detail. Primary: Asset Profile Workbench (the full edit form). Aside: Collapsible cards for Purchase, Warranty, Location, Insurance, Condition, Disposition. Danger zone (archive, delete, transfer). |
+| History | Reading | Single column. Activity feed. |
+| Settings | Working | Two-column resource detail. Primary: Asset Profile Workbench (the full edit form). Aside: Collapsible cards for Status, Template, Danger Zone. |
 
 **Settings tab — primary column cards:**
 
@@ -790,6 +917,334 @@ Tasks:
 - Test all density modes — relaxed, default, compact
 - Verify expandable cards work correctly when the parent form has unsaved changes (expanded content should not trigger a navigation warning)
 - Verify screen reader announcements for collapsible and expandable state changes
+
+---
+
+## 10. Navigation architecture
+
+### Two tab navigation systems
+
+The web app uses two distinct tab navigation systems. They must never be mixed — use the right one for the right domain.
+
+#### `WorkspaceLayout` (Projects, Hobbies, Ideas)
+
+**File:** `apps/web/components/workspace-layout.tsx`
+**Tab style:** `pill` variant (rounded pill tabs with accent background when active)
+**When to use:** Any workspace-style domain tool that has its own entity-detail route with multiple tabs.
+
+Props:
+- `entityType` — string identifier for the domain (e.g. `"project"`, `"hobby"`, `"idea"`)
+- `title` — entity name shown in the `<h1>`
+- `status` + `statusVariant` — pill badge shown next to the title (`"success"`, `"warning"`, `"info"`, `"muted"`, `"danger"`)
+- `breadcrumbs` — optional parent trail (e.g. sub-project parent path)
+- `headerActions` — React node rendered in the page header action area
+- `tabs: WorkspaceTab[]` — array of `{ id, label, href, show? }`
+- `backHref` + `backLabel` — the back link shown above the title
+
+Active tab detection:
+- Root/overview tab: exact pathname match
+- All other tabs: `pathname.startsWith(href)`
+
+Status variant mapping by domain:
+
+| Domain | Status → Variant |
+|--------|------------------|
+| Project | `planning`→`info`, `active`→`success`, `on_hold`→`warning`, `completed`→`muted`, `cancelled`→`danger` |
+| Hobby | `active`→`success`, `paused`→`warning`, `archived`→`muted` |
+| Idea | `spark`→`warning`, `developing`→`info`, `ready`→`success`; `archivedAt` present → `muted` override |
+
+#### `AssetTabNav` (Assets only)
+
+**File:** `apps/web/components/asset-tab-nav.tsx`
+**Tab style:** `underline` variant (tabs rendered inline with underline active indicator)
+**When to use:** Assets only. Assets have a unique page header (`detail-topbar` + `detail-hero`) that other domain tools do not use.
+
+The tab list is a `const` array — 12 tabs: Overview, Maintenance, Details, Relationships, Metrics, Costs, Inventory, Notes, Canvas, Comments, History, Advanced. Any new tab added to assets must be added to this array in the correct position.
+
+**Rule:** Never move Assets to `WorkspaceLayout`. Never use `AssetTabNav` for a non-asset domain.
+
+### Sidebar navigation groups
+
+The sidebar (rendered by `SidebarNav`) is structured into fixed groups. When adding a new top-level route, place it in the correct group:
+
+| Group | Routes |
+|-------|--------|
+| *(ungrouped)* | Dashboard (`/`) |
+| Capture | Ideas (`/ideas`), Notes (`/notes`) |
+| Manage | Assets (`/assets`), Inventory (`/inventory`), Projects (`/projects`), Hobbies (`/hobbies`), Maintenance (`/maintenance`) |
+| Insights | Analytics (`/analytics`), Service Providers (`/service-providers`), Activity (`/activity`) |
+| *(ungrouped)* | Trash (`/trash`) |
+
+New domain tools belong in **Manage**. New read-only analytics/reporting tools belong in **Insights**. Do not create a new sidebar group without explicit instruction.
+
+### Tab count and overflow
+
+No domain tool should have more than 15 tabs. If a tool would require more, consolidate related tabs into sub-sections within a single tab (e.g. a combined "Details" tab that partitions content into panels).
+
+Tab labels must be one or two words. Do not use full sentences or explanatory text as tab labels.
+
+---
+
+## 11. Universal page and overview templates
+
+### Domain tool overview page template
+
+Every domain tool overview page (the root tab for Assets, Projects, Hobbies, and Ideas) follows a mandatory top-of-page pattern before its domain-specific content:
+
+```
+1. IdeaProvenanceBar  — rendered only if the entity was promoted from an Idea
+2. PinnedNotesCard    — rendered only if pinned notes exist for this entity
+3. [Domain dashboard] — stats, recent activity, linked entities, etc.
+```
+
+**`IdeaProvenanceBar`** (`apps/web/components/idea-provenance-bar.tsx`): Shows the source Idea's name and a link back to it. Render only when `sourceIdeaId !== null` on the entity.
+
+**`PinnedNotesCard`** (`apps/web/components/pinned-notes-card.tsx`): Shows up to 10 pinned journal entries as preview cards. Render only when `pinnedEntries.length > 0`.
+
+Fetching pattern (in the page server component):
+
+```ts
+const [entity, sourceIdea, pinnedEntries] = await Promise.all([
+  getEntityDetail(entityId),
+  getSourceIdea(entityId).catch(() => null),
+  getEntries({ entityId, flags: "pinned", limit: 10 }).catch(() => ({ entries: [] }))
+]);
+```
+
+Never omit these two checks from an overview page. They take near-zero additional render cost when empty.
+
+### Page header anatomy
+
+All pages that use `WorkspaceLayout` share this header structure (rendered by the component):
+
+```
+← Back to [parent list]                [header meta: pill, etc.]
+[Status Badge]  Page Title
+                [headerActions: buttons]
+```
+
+Asset pages use `detail-topbar` + `detail-hero` which renders:
+
+```
+← Assets           [Log Maintenance] [Add Component] [Edit Asset] [⋮ menu]
+[eyebrow: category]
+[inline-editable name]  [meta: serial, visibility, dates, parent, children counts]
+[TabNav --underline]
+```
+
+The `AssetHeroEditor` allows inline title editing without navigating to settings.
+
+---
+
+## 12. Empty states
+
+### Rule
+
+Every list, table, grid, or collection that can be empty **must** have an explicit empty state. A blank container is never acceptable.
+
+### HTML and CSS pattern
+
+```html
+<div class="empty-state">
+  <p class="empty-state__icon">🗺️</p>
+  <p class="empty-state__title">No canvases yet</p>
+  <p class="empty-state__body">Create a canvas to sketch diagrams, floor plans, or visual notes.</p>
+  <!-- optional -->
+  <div class="empty-state__actions">
+    <button class="button button--primary button--sm">Create Canvas</button>
+  </div>
+</div>
+```
+
+### Writing good empty state copy
+
+| Element | Rule | Example |
+|---------|------|---------|
+| Icon | Single emoji relevant to the content type. No icon libraries. | 📋 for tasks, 🗺️ for canvases, 💬 for comments, 📦 for inventory |
+| Title | Short noun phrase describing what's missing. Two to five words. | "No inventory items linked" |
+| Body | One sentence: what the feature does and how to start. | "Link consumables and spare parts that belong to or are used with this asset." |
+| Action | Optional. Only include if there's a clear starting action. Use `button--primary button--sm`. | "Link Item", "Create Canvas" |
+
+### Empty state in tables
+
+When a `workbench-table` or `data-table` has no rows, render a `<tr>` with a single `<td colspan="N">` containing the empty state div inside it:
+
+```html
+<tr class="workbench-table__empty">
+  <td colspan="5">
+    <div class="empty-state"><p class="empty-state__title">No rows yet</p></div>
+  </td>
+</tr>
+```
+
+### Empty state in panels
+
+Do not use `.empty-state` inside `.panel__body`. Instead use `.panel__empty`:
+
+```html
+<div class="panel__empty">No condition assessments recorded yet.</div>
+```
+
+`.panel__empty` renders as muted italicized text with appropriate padding. Reserve `.empty-state` for full-section zero-state displays.
+
+---
+
+## 13. Destructive actions and confirmations
+
+### The principle
+
+Any action that destroys or permanently modifies data (hard delete, transfer, merge) requires explicit user confirmation before execution. Reversible disposals (archive, soft-delete to trash) do not require confirmation.
+
+### Hard delete confirmation pattern
+
+Hard deletes always require an explicit confirmation step. Pattern:
+
+1. A `button--danger` or `button--ghost` button triggers a confirmation expansion (not a modal).
+2. The confirmation renders inline below the button: a short warning sentence + a `button--danger` "Confirm Delete" + a `button--ghost` "Cancel" side by side.
+3. The warning must name what data will be permanently lost, e.g. "This will permanently delete the asset and all its maintenance logs, metrics, and history. This cannot be undone."
+4. After deletion, use `redirect()` to the parent list route — never render the deleted entity's page.
+
+### Soft delete / archiving
+
+Archive and trash operations do not need a confirmation dialog. The action button may be `button--ghost` or `button--subtle`. After execution, show a brief success indicator (change button label to "Archived" or similar) and offer an "Undo" action that is visible for 5 seconds.
+
+### Button choices for destructive actions
+
+| Action | Button style |
+|--------|--------------|
+| Confirm hard delete | `button--danger` |
+| Archive / soft delete | `button--ghost` |
+| Cancel confirmation | `button--ghost` |
+| Transfer (moves ownership) | `button--secondary` |
+
+Never use `button--primary` for destructive actions. The primary button is reserved for the main positive action on a page.
+
+### Danger zone section
+
+Group all destructive actions for an entity into a dedicated "Danger Zone" section at the bottom of the entity's Settings tab. This section should be visually separated (border-top, red-tinted background or red header text) and labeled clearly.
+
+---
+
+## 14. Error and loading feedback
+
+### Server action errors
+
+When a server action (form submit via `useTransition`) fails, render an inline error message **immediately below the form** that triggered it:
+
+```tsx
+{error && (
+  <p style={{ color: "var(--tone-danger, red)", marginTop: 8, fontSize: "0.85rem" }}>
+    {error}
+  </p>
+)}
+```
+
+Never display server action errors as global toasts, modals, or banners. Keep error feedback contextual — next to the form that caused it.
+
+### Form validation errors
+
+Field-level errors render below the individual field, not at the top of the form. Use the same red inline paragraph pattern.
+
+### Loading state during server actions
+
+All client components that call a server action via `useTransition` must:
+1. `disabled={isPending}` on every interactive element in the form while the action runs.
+2. Change the submit button label: `{isPending ? "Saving…" : "Save"}`, `{isPending ? "Deleting…" : "Delete"}`.
+3. Never show a spinner overlay — the button label change is sufficient feedback.
+
+### Page-level loading
+
+Every dynamic route under `(dashboard)/` must have a `loading.tsx` file. It renders while the server component data fetches. Use a simple `.panel` skeleton with a muted animated background or a spinner:
+
+```tsx
+export default function Loading() {
+  return <div className="panel" style={{ minHeight: 200 }} />;
+}
+```
+
+### API error fallback
+
+In page server components, wrap API calls in try/catch. On `ApiError`, render a fallback panel showing the error message. Do not let API errors propagate to the global Next.js error boundary unless absolutely necessary:
+
+```tsx
+catch (error) {
+  if (error instanceof ApiError) {
+    return (
+      <div className="panel">
+        <div className="panel__body--padded">
+          <p>Failed to load: {error.message}</p>
+        </div>
+      </div>
+    );
+  }
+  throw error; // re-throw unexpected errors
+}
+```
+
+---
+
+## 15. Component selection guide
+
+This quick-reference table answers the question "what should I reach for when building X?"
+
+### Layout
+
+| Scenario | What to use |
+|----------|-------------|
+| Domain tool entity detail (Projects, Hobbies, Ideas) | `WorkspaceLayout` from `components/workspace-layout.tsx` |
+| Asset detail page | `detail-topbar` + `detail-hero` + `AssetTabNav` (existing pattern — do not change) |
+| Working surface with metadata aside (creation, settings) | `.resource-layout` CSS grid with `.resource-layout__primary` + `.resource-layout__aside` |
+| Reading/browsing surface (list, queue, dashboard) | Single column with `.panel` containers |
+
+### Content containers
+
+| Scenario | What to use |
+|----------|-------------|
+| Always-visible section on a working surface | `Card` component (`.card`) |
+| Metadata that's rarely changed (warranty, location, etc.) in aside column | `CollapsibleCard` (`.card--collapsible`), defaults closed |
+| Dense editor with many rows (schedules, custom fields, tasks) | `ExpandableCard` (`.card--expandable`) with compact preview |
+| Content panel on a reading surface | `.panel` > `.panel__header` + `.panel__body--padded` |
+| Inline-editable metadata panel | `.panel` + Edit button → `.workbench-grid` form → `dl.data-list` (see `asset-details-cards.tsx`) |
+
+### Forms
+
+| Scenario | What to use |
+|----------|-------------|
+| Multi-field form inside a card body | `.workbench-grid` (3-col CSS grid auto-fit) |
+| Simpler form, fewer than 6 fields | `.form-grid` (2-col) |
+| Repeating rows of editable data | `.workbench-table` |
+| Radio button group in a form | `.workbench-radio-group` + `.workbench-radio` |
+| Sticky save bar at bottom of page | `.workbench-bar` |
+
+### Data display
+
+| Scenario | What to use |
+|----------|-------------|
+| Key-value metadata (read-only) | `dl.data-list` with `<dt>` label + `<dd>` value |
+| Tabular data in a reading surface | `.data-table` |
+| Key-value in an overview/summary area | `.kv-grid` |
+| Status badge inline in text or headers | `.pill` + variant class |
+| Count badge on a card header | `.card__header-badge` + `--danger` or `--warning` |
+
+### Navigation
+
+| Scenario | What to use |
+|----------|-------------|
+| Entity detail tab navigation (Projects, Hobbies, Ideas) | `WorkspaceLayout` (renders `TabNav --pill` internally) |
+| Entity detail tab navigation (Assets) | `AssetTabNav` (renders `TabNav --underline` internally) |
+| Custom tab-like navigation with data-analytics flavor | `TabNav` with `variant="analytics"` |
+
+### Generic shared components
+
+| Component | File | Use for |
+|-----------|------|---------|
+| `EntityCanvasList` | `components/entity-canvas-list.tsx` | Canvas tab on any domain tool |
+| `EntityComments` | `components/entity-comments.tsx` | Comments tab on any domain tool |
+| `EntryTimeline` | `components/entry-system/` | Notes/Journal tab on any domain tool |
+| `AssetInventoryLinks` | `components/asset-inventory-links.tsx` | Inventory tab on Assets |
+| `HobbyLinksManager` | `components/hobby-links-manager.tsx` | Inventory tab on Hobbies |
+| `IdeaProvenanceBar` | `components/idea-provenance-bar.tsx` | Overview page of any promoted entity |
+| `PinnedNotesCard` | `components/pinned-notes-card.tsx` | Overview page of any entity |
 
 ---
 

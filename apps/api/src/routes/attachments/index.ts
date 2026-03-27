@@ -108,6 +108,20 @@ const validateEntityOwnership = async (
       });
       return canvasObj !== null;
     }
+    case "hobby": {
+      const hobby = await prisma.hobby.findFirst({
+        where: { id: entityId, householdId, deletedAt: null },
+        select: { id: true },
+      });
+      return hobby !== null;
+    }
+    case "idea": {
+      const idea = await prisma.idea.findFirst({
+        where: { id: entityId, householdId, deletedAt: null },
+        select: { id: true },
+      });
+      return idea !== null;
+    }
     default:
       return false;
   }

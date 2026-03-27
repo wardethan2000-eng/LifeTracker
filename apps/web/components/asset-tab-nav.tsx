@@ -15,8 +15,12 @@ const tabs = [
   { id: "relationships", label: "Relationships" },
   { id: "metrics", label: "Metrics" },
   { id: "costs", label: "Costs" },
+  { id: "inventory", label: "Inventory" },
+  { id: "notes", label: "Notes" },
+  { id: "canvas", label: "Canvas" },
+  { id: "comments", label: "Comments" },
   { id: "history", label: "History" },
-  { id: "settings", label: "Settings" }
+  { id: "settings", label: "Advanced" },
 ] as const;
 
 export function AssetTabNav({ assetId }: AssetTabNavProps): JSX.Element {

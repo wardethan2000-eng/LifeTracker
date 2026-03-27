@@ -6,14 +6,15 @@ import {
 } from "../app/actions";
 import {
   formatCategoryLabel,
-  formatDate,
   formatDateTime
 } from "../lib/formatters";
 import { getDisplayPreferences } from "../lib/api";
 import {
-  renderMetaRow,
-  renderMoneyMetaRow
-} from "../app/(dashboard)/assets/[assetId]/shared";
+  AssetInsuranceDetailsCard,
+  AssetLocationDetailsCard,
+  AssetPurchaseDetailsCard,
+  AssetWarrantyDetailsCard,
+} from "./asset-details-cards";
 
 type AssetDetailsTabProps = {
   detail: AssetDetailResponse;
@@ -54,79 +55,35 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
 
   return (
     <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Purchase Details</h2>
-        </div>
-        <div className="panel__body--padded">
-          <dl className="data-list">
-            {renderMoneyMetaRow("Price", detail.asset.purchaseDetails?.price ?? null, prefs.currencyCode)}
-            {renderMetaRow("Vendor", detail.asset.purchaseDetails?.vendor)}
-            {renderMetaRow("Condition", detail.asset.purchaseDetails?.condition ?? null)}
-            {renderMetaRow("Financing", detail.asset.purchaseDetails?.financing)}
-            {renderMetaRow("Receipt Reference", detail.asset.purchaseDetails?.receiptRef)}
-          </dl>
-        </div>
-      </section>
+      <AssetPurchaseDetailsCard
+        assetId={assetId}
+        householdId={detail.asset.householdId}
+        purchaseDetails={detail.asset.purchaseDetails}
+        currencyCode={prefs.currencyCode}
+      />
 
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Warranty Details</h2>
-        </div>
-        <div className="panel__body--padded">
-          <dl className="data-list">
-            {renderMetaRow("Provider", detail.asset.warrantyDetails?.provider)}
-            {renderMetaRow("Policy Number", detail.asset.warrantyDetails?.policyNumber)}
-            {renderMetaRow("Coverage Type", detail.asset.warrantyDetails?.coverageType)}
-            {renderMetaRow("Start", formatDate(detail.asset.warrantyDetails?.startDate, "Not set", undefined, prefs.dateFormat))}
-            {renderMetaRow("End", formatDate(detail.asset.warrantyDetails?.endDate, "Not set", undefined, prefs.dateFormat))}
-            {renderMetaRow("Notes", detail.asset.warrantyDetails?.notes)}
-          </dl>
-        </div>
-      </section>
+      <AssetWarrantyDetailsCard
+        assetId={assetId}
+        householdId={detail.asset.householdId}
+        warrantyDetails={detail.asset.warrantyDetails}
+        dateFormat={prefs.dateFormat}
+      />
 
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Location Details</h2>
-        </div>
-        <div className="panel__body--padded">
-          <dl className="data-list">
-            {detail.asset.spaceLocation ? renderMetaRow(
-              "Assigned Space",
-              detail.asset.spaceLocation.breadcrumb.map((b) => b.name).join(" › ")
-            ) : null}
-            {renderMetaRow("Property", detail.asset.locationDetails?.propertyName)}
-            {renderMetaRow("Building", detail.asset.locationDetails?.building)}
-            {renderMetaRow("Room", detail.asset.locationDetails?.room)}
-            {renderMetaRow(
-              "Coordinates",
-              detail.asset.locationDetails?.latitude !== undefined && detail.asset.locationDetails?.longitude !== undefined
-                ? `${detail.asset.locationDetails.latitude}, ${detail.asset.locationDetails.longitude}`
-                : null
-            )}
-            {renderMetaRow("Notes", detail.asset.locationDetails?.notes)}
-          </dl>
-        </div>
-      </section>
+      <AssetLocationDetailsCard
+        assetId={assetId}
+        householdId={detail.asset.householdId}
+        locationDetails={detail.asset.locationDetails}
+        spaceLocation={detail.asset.spaceLocation}
+      />
 
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Insurance &amp; Disposition</h2>
-        </div>
-        <div className="panel__body--padded">
-          <dl className="data-list">
-            {renderMetaRow("Insurance Provider", detail.asset.insuranceDetails?.provider)}
-            {renderMetaRow("Policy Number", detail.asset.insuranceDetails?.policyNumber)}
-            {renderMoneyMetaRow("Coverage Amount", detail.asset.insuranceDetails?.coverageAmount ?? null, prefs.currencyCode)}
-            {renderMoneyMetaRow("Deductible", detail.asset.insuranceDetails?.deductible ?? null, prefs.currencyCode)}
-            {renderMetaRow("Renewal Date", formatDate(detail.asset.insuranceDetails?.renewalDate, "Not set", undefined, prefs.dateFormat))}
-            {renderMetaRow("Disposition Method", detail.asset.dispositionDetails?.method ?? null)}
-            {renderMetaRow("Disposition Date", formatDate(detail.asset.dispositionDetails?.date, "Not set", undefined, prefs.dateFormat))}
-            {renderMoneyMetaRow("Sale Price", detail.asset.dispositionDetails?.salePrice ?? null, prefs.currencyCode)}
-            {renderMetaRow("Buyer Info", detail.asset.dispositionDetails?.buyerInfo)}
-          </dl>
-        </div>
-      </section>
+      <AssetInsuranceDetailsCard
+        assetId={assetId}
+        householdId={detail.asset.householdId}
+        insuranceDetails={detail.asset.insuranceDetails}
+        dispositionDetails={detail.asset.dispositionDetails}
+        currencyCode={prefs.currencyCode}
+        dateFormat={prefs.dateFormat}
+      />
 
       <section className="panel">
         <div className="panel__header">

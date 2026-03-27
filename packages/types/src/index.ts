@@ -2620,6 +2620,7 @@ export const projectTaskSchema = z.object({
   assignedToId: z.string().cuid().nullable(),
   assignee: shallowUserSchema.nullable().default(null),
   dueDate: z.string().datetime().nullable(),
+  startedAt: z.string().datetime().nullable(),
   completedAt: z.string().datetime().nullable(),
   estimatedCost: z.number().nullable(),
   actualCost: z.number().nullable(),
@@ -2669,7 +2670,8 @@ export const updateProjectTaskSchema = createProjectTaskSchema.partial().extend(
   sortOrder: z.number().int().nullable().optional(),
   scheduleId: z.string().cuid().nullable().optional(),
   predecessorTaskIds: z.array(z.string().cuid()).max(50).optional(),
-  completedAt: z.string().datetime().nullable().optional()
+  completedAt: z.string().datetime().nullable().optional(),
+  startedAt: z.string().datetime().nullable().optional()
 });
 
 export const createQuickTodoSchema = z.object({
@@ -2927,6 +2929,8 @@ export const projectTimelineTaskSchema = z.object({
   title: z.string(),
   status: projectTaskStatusSchema,
   dueDate: z.string().datetime().nullable(),
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
   derivedStartDate: z.string().datetime().nullable(),
   estimatedHours: z.number().nullable(),
   assignedToId: z.string().cuid().nullable(),
@@ -2944,7 +2948,28 @@ export const projectTimelinePhaseSchema = z.object({
   startDate: z.string().datetime().nullable(),
   targetEndDate: z.string().datetime().nullable(),
   actualEndDate: z.string().datetime().nullable(),
+  completedTaskCount: z.number().int().default(0),
+  totalTaskCount: z.number().int().default(0),
   tasks: z.array(projectTimelineTaskSchema).default([])
+});
+
+// ── Project Timeline Event Schema ────────────────────────────────────
+
+export const timelineEventTypeValues = ["task_completed", "phase_status_changed", "entry"] as const;
+export const timelineEventTypeSchema = z.enum(timelineEventTypeValues);
+
+export const projectTimelineEventSchema = z.object({
+  id: z.string(),
+  type: timelineEventTypeSchema,
+  date: z.string().datetime(),
+  title: z.string(),
+  description: z.string().nullable(),
+  phaseId: z.string().nullable(),
+  taskId: z.string().nullable(),
+  entryType: entryTypeSchema.nullable(),
+  flags: z.array(entryFlagSchema).default([]),
+  thumbnailUrl: z.string().nullable(),
+  attachmentCount: z.number().int().default(0)
 });
 
 export const projectTimelineDependencySchema = z.object({
@@ -2962,6 +2987,7 @@ export const projectTimelineDataSchema = z.object({
   unscheduledPhases: z.array(projectTimelinePhaseSchema).default([]),
   dependencies: z.array(projectTimelineDependencySchema).default([]),
   criticalPathTaskIds: z.array(z.string().cuid()).default([]),
+  events: z.array(projectTimelineEventSchema).default([]),
   projectStartDate: z.string().datetime().nullable(),
   projectTargetEndDate: z.string().datetime().nullable()
 });
@@ -3842,6 +3868,7 @@ export type ProjectCriticalPath = z.infer<typeof projectCriticalPathSchema>;
 export type ProjectTimelineTask = z.infer<typeof projectTimelineTaskSchema>;
 export type ProjectTimelinePhase = z.infer<typeof projectTimelinePhaseSchema>;
 export type ProjectTimelineDependency = z.infer<typeof projectTimelineDependencySchema>;
+export type ProjectTimelineEvent = z.infer<typeof projectTimelineEventSchema>;
 export type ProjectTimelineData = z.infer<typeof projectTimelineDataSchema>;
 export type NoteCategory = z.infer<typeof noteCategorySchema>;
 export type ProjectNote = z.infer<typeof projectNoteSchema>;
@@ -4029,6 +4056,7 @@ export const attachmentEntityTypeValues = [
   "project_phase",
   "project_task",
   "inventory_item",
+  "hobby",
   "idea",
   "canvas",
   "canvas_object",

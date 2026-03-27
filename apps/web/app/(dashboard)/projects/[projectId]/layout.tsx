@@ -53,6 +53,7 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
     { id: "budget", label: "Budget", href: `${base}/budget${qs}` },
     { id: "supplies", label: "Materials", href: `${base}/supplies${qs}` },
     { id: "notes", label: "Log", href: `${base}/notes${qs}` },
+    { id: "comments", label: "Comments", href: `${base}/comments${qs}` },
     { id: "settings", label: "Settings", href: `${base}/settings${qs}` },
   ];
 

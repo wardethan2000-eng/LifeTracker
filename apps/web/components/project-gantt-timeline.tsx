@@ -1,8 +1,18 @@
 "use client";
 
 import type { JSX } from "react";
-import type { ProjectTimelineData, ProjectTimelinePhase, ProjectTimelineTask } from "@lifekeeper/types";
-import { useState, useMemo, useRef, useCallback } from "react";
+import type {
+  ProjectTimelineData,
+  ProjectTimelinePhase,
+  ProjectTimelineTask,
+  ProjectTimelineEvent,
+} from "@lifekeeper/types";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  updateProjectPhaseAction,
+  updateProjectTaskAction,
+} from "../app/actions";
 
 type ZoomLevel = "day" | "week" | "month";
 
@@ -10,10 +20,19 @@ type GanttRow =
   | { kind: "phase-header"; phase: ProjectTimelinePhase }
   | { kind: "task"; task: ProjectTimelineTask; phaseId: string };
 
-type TooltipState = {
-  x: number;
-  y: number;
-  task: ProjectTimelineTask;
+type TooltipState =
+  | { x: number; y: number; kind: "task"; task: ProjectTimelineTask }
+  | { x: number; y: number; kind: "event"; event: ProjectTimelineEvent }
+  | null;
+
+type EditingState = {
+  entityType: "phase" | "task";
+  entityId: string;
+  phaseId?: string;
+  startDate: string;
+  endDate: string;
+  anchorX: number;
+  anchorY: number;
 } | null;
 
 type Props = {
@@ -28,6 +47,19 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Completed",
   blocked: "Blocked",
   skipped: "Skipped",
+};
+
+const STATUS_DOTS: Record<string, string> = {
+  pending: "gantt-status-dot--pending",
+  in_progress: "gantt-status-dot--active",
+  completed: "gantt-status-dot--done",
+  skipped: "gantt-status-dot--skipped",
+};
+
+const EVENT_ICONS: Record<string, string> = {
+  task_completed: "✓",
+  phase_status_changed: "⚑",
+  entry: "◆",
 };
 
 function parseDate(str: string | null | undefined): Date | null {
@@ -48,6 +80,23 @@ function addDays(d: Date, n: number): Date {
 
 function diffDays(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+function toInputDate(isoStr: string | null | undefined): string {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function formatShortDate(isoStr: string): string {
+  const d = new Date(isoStr);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// Compute the effective bar start for a task
+function getTaskBarStart(task: ProjectTimelineTask, phase: ProjectTimelinePhase): string | null {
+  return task.startedAt ?? task.derivedStartDate ?? phase.startDate;
 }
 
 function formatHeaderLabel(d: Date, zoom: ZoomLevel): string {
@@ -98,73 +147,77 @@ function buildHeaderCells(
   return cells;
 }
 
-const COLUMN_WIDTH_PX: Record<ZoomLevel, number> = { day: 36, week: 100, month: 120 };
-const ROW_HEIGHT = 36;
-const HEADER_HEIGHT = 48;
-const SIDEBAR_WIDTH = 260;
+const COLUMN_WIDTH_PX: Record<ZoomLevel, number> = { day: 40, week: 110, month: 130 };
+const ROW_HEIGHT = 40;
+const HEADER_HEIGHT = 52;
+const SIDEBAR_WIDTH = 290;
+const EVENT_LANE_HEIGHT = 26;
 
 export function ProjectGanttTimeline({ data, householdId, projectId }: Props): JSX.Element {
   const [zoom, setZoom] = useState<ZoomLevel>("week");
   const [tooltip, setTooltip] = useState<TooltipState>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
+  const [editing, setEditing] = useState<EditingState>(null);
+  const [saving, setSaving] = useState(false);
+  const chartScrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
-  void householdId;
-  void projectId;
-
-  // Build flat row list for scheduled phases
-  const rows = useMemo<GanttRow[]>(() => {
+  // Build flat row list — include ALL phases (scheduled + unscheduled that have tasks)
+  const { rows, allPhases } = useMemo(() => {
     const result: GanttRow[] = [];
-    for (const phase of data.scheduledPhases) {
+    const all = [...data.scheduledPhases, ...data.unscheduledPhases];
+    for (const phase of all) {
       result.push({ kind: "phase-header", phase });
       for (const task of phase.tasks) {
         result.push({ kind: "task", task, phaseId: phase.id });
       }
     }
-    return result;
-  }, [data.scheduledPhases]);
+    return { rows: result, allPhases: all };
+  }, [data.scheduledPhases, data.unscheduledPhases]);
 
-  // Find chart date range
+  // Collect all dates for chart range (including events and startedAt)
   const { chartStart, chartEnd, totalDays } = useMemo(() => {
     const dates: Date[] = [];
 
-    for (const phase of data.scheduledPhases) {
+    for (const phase of allPhases) {
       const s = parseDate(phase.startDate);
       const e = parseDate(phase.targetEndDate);
+      const ae = parseDate(phase.actualEndDate);
       if (s) dates.push(s);
       if (e) dates.push(e);
+      if (ae) dates.push(ae);
       for (const task of phase.tasks) {
+        const ts = parseDate(task.startedAt);
         const ds = parseDate(task.derivedStartDate);
         const de = parseDate(task.dueDate);
+        const tc = parseDate(task.completedAt);
+        if (ts) dates.push(ts);
         if (ds) dates.push(ds);
         if (de) dates.push(de);
+        if (tc) dates.push(tc);
       }
+    }
+
+    for (const evt of data.events) {
+      const d = parseDate(evt.date);
+      if (d) dates.push(d);
     }
 
     const today = startOfDay(new Date());
 
     if (dates.length === 0) {
-      // No dates: show a 3-month window centered on today
-      return {
-        chartStart: addDays(today, -14),
-        chartEnd: addDays(today, 74),
-        totalDays: 88,
-      };
+      return { chartStart: addDays(today, -14), chartEnd: addDays(today, 74), totalDays: 88 };
     }
 
     const minDate = dates.reduce((a, b) => (a < b ? a : b));
     const maxDate = dates.reduce((a, b) => (a > b ? a : b));
-
     const cs = addDays(minDate, -7);
     const ce = addDays(maxDate, 14);
-    const total = diffDays(cs, ce);
+    return { chartStart: cs, chartEnd: ce, totalDays: diffDays(cs, ce) };
+  }, [allPhases, data.events]);
 
-    return { chartStart: cs, chartEnd: ce, totalDays: total };
-  }, [data.scheduledPhases]);
-
-  // Day-to-px helper
   const dayToPx = useCallback(
     (day: number) => day * COLUMN_WIDTH_PX[zoom],
-    [zoom]
+    [zoom],
   );
 
   const chartWidthPx = totalDays * COLUMN_WIDTH_PX[zoom];
@@ -173,10 +226,10 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
 
   const headerCells = useMemo(
     () => buildHeaderCells(chartStart, chartEnd, zoom),
-    [chartStart, chartEnd, zoom]
+    [chartStart, chartEnd, zoom],
   );
 
-  // Build a taskId → row index map for SVG arrows
+  // taskId → row index for SVG arrows
   const taskRowIndex = useMemo(() => {
     const map = new Map<string, number>();
     rows.forEach((row, idx) => {
@@ -185,27 +238,36 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
     return map;
   }, [rows]);
 
+  // Task ID → phase lookup
+  const taskPhaseMap = useMemo(() => {
+    const map = new Map<string, ProjectTimelinePhase>();
+    for (const phase of allPhases) {
+      for (const task of phase.tasks) {
+        map.set(task.id, phase);
+      }
+    }
+    return map;
+  }, [allPhases]);
+
   // Build dependency arrows
   const arrows = useMemo(() => {
+    const allTasks = allPhases.flatMap((p) => p.tasks);
     return data.dependencies
       .map((dep) => {
         const predRowIdx = taskRowIndex.get(dep.predecessorTaskId);
         const succRowIdx = taskRowIndex.get(dep.successorTaskId);
         if (predRowIdx == null || succRowIdx == null) return null;
 
-        // Find predecessor task end date and successor task start date
-        let predTask: ProjectTimelineTask | undefined;
-        let succTask: ProjectTimelineTask | undefined;
-        for (const phase of data.scheduledPhases) {
-          for (const t of phase.tasks) {
-            if (t.id === dep.predecessorTaskId) predTask = t;
-            if (t.id === dep.successorTaskId) succTask = t;
-          }
-        }
+        const predTask = allTasks.find((t) => t.id === dep.predecessorTaskId);
+        const succTask = allTasks.find((t) => t.id === dep.successorTaskId);
         if (!predTask || !succTask) return null;
 
-        const predEnd = parseDate(predTask.dueDate);
-        const succStart = parseDate(succTask.derivedStartDate) ?? parseDate(succTask.dueDate);
+        const predPhase = taskPhaseMap.get(predTask.id);
+        const succPhase = taskPhaseMap.get(succTask.id);
+        if (!predPhase || !succPhase) return null;
+
+        const predEnd = parseDate(predTask.dueDate) ?? parseDate(predTask.completedAt);
+        const succStart = parseDate(getTaskBarStart(succTask, succPhase)) ?? parseDate(succTask.dueDate);
         if (!predEnd || !succStart) return null;
 
         const x1 = dayToPx(diffDays(chartStart, predEnd));
@@ -216,14 +278,24 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
         return { id: dep.id, x1, y1, x2, y2, dependencyType: dep.dependencyType };
       })
       .filter(Boolean);
-  }, [data.dependencies, data.scheduledPhases, taskRowIndex, chartStart, dayToPx]);
+  }, [data.dependencies, allPhases, taskRowIndex, taskPhaseMap, chartStart, dayToPx]);
 
-  const totalChartHeight = HEADER_HEIGHT + rows.length * ROW_HEIGHT;
+  // Event markers positioned on the date axis
+  const eventMarkers = useMemo(() => {
+    return data.events.map((evt) => {
+      const d = parseDate(evt.date);
+      if (!d) return null;
+      const x = dayToPx(diffDays(chartStart, d));
+      return { ...evt, x };
+    }).filter(Boolean) as Array<ProjectTimelineEvent & { x: number }>;
+  }, [data.events, chartStart, dayToPx]);
+
+  const totalChartHeight = HEADER_HEIGHT + rows.length * ROW_HEIGHT + (eventMarkers.length > 0 ? EVENT_LANE_HEIGHT + 8 : 0);
 
   function getBarProps(startStr: string | null | undefined, endStr: string | null | undefined) {
     const s = parseDate(startStr);
     const e = parseDate(endStr);
-    if (!s || !e || e <= s) return null;
+    if (!s || !e || e < s) return null;
     const left = dayToPx(Math.max(0, diffDays(chartStart, s)));
     const right = dayToPx(Math.min(totalDays, diffDays(chartStart, e)));
     const width = right - left;
@@ -231,13 +303,84 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
     return { left, width };
   }
 
-  function handleTaskHover(e: React.MouseEvent, task: ProjectTimelineTask) {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setTooltip({ x: rect.right + 8, y: rect.top, task });
+  // Diamond position for tasks with only a due date (no start)
+  function getDiamondPos(dateStr: string | null | undefined) {
+    const d = parseDate(dateStr);
+    if (!d) return null;
+    return dayToPx(diffDays(chartStart, d));
   }
 
-  const hasScheduled = data.scheduledPhases.length > 0;
-  const hasUnscheduled = data.unscheduledPhases.length > 0;
+  function handleTaskHover(e: React.MouseEvent, task: ProjectTimelineTask) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setTooltip({ x: rect.right + 8, y: rect.top, kind: "task", task });
+  }
+
+  function handleEventHover(e: React.MouseEvent, evt: ProjectTimelineEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setTooltip({ x: rect.right + 8, y: rect.top - 40, kind: "event", event: evt });
+  }
+
+  function handleBarClick(e: React.MouseEvent, entityType: "phase" | "task", entityId: string, phaseId?: string) {
+    const phase = allPhases.find((p) => entityType === "phase" ? p.id === entityId : p.id === phaseId);
+    const task = entityType === "task" ? allPhases.flatMap((p) => p.tasks).find((t) => t.id === entityId) : null;
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setEditing({
+      entityType,
+      entityId,
+      phaseId,
+      startDate: entityType === "phase"
+        ? toInputDate(phase?.startDate)
+        : toInputDate(task?.dueDate),
+      endDate: entityType === "phase"
+        ? toInputDate(phase?.targetEndDate)
+        : "",
+      anchorX: rect.left,
+      anchorY: rect.bottom + 4,
+    });
+  }
+
+  async function handleDateSave() {
+    if (!editing) return;
+    setSaving(true);
+
+    const formData = new FormData();
+    formData.set("householdId", householdId);
+    formData.set("projectId", projectId);
+
+    if (editing.entityType === "phase") {
+      formData.set("phaseId", editing.entityId);
+      const phase = allPhases.find((p) => p.id === editing.entityId);
+      formData.set("name", phase?.name ?? "");
+      formData.set("status", phase?.status ?? "pending");
+      formData.set("startDate", editing.startDate ? new Date(editing.startDate + "T00:00:00Z").toISOString() : "");
+      formData.set("targetEndDate", editing.endDate ? new Date(editing.endDate + "T00:00:00Z").toISOString() : "");
+      await updateProjectPhaseAction(formData);
+    } else {
+      formData.set("taskId", editing.entityId);
+      const task = allPhases.flatMap((p) => p.tasks).find((t) => t.id === editing.entityId);
+      formData.set("title", task?.title ?? "");
+      formData.set("status", task?.status ?? "pending");
+      formData.set("dueDate", editing.startDate ? new Date(editing.startDate + "T00:00:00Z").toISOString() : "");
+      await updateProjectTaskAction(formData);
+    }
+
+    setSaving(false);
+    setEditing(null);
+    router.refresh();
+  }
+
+  // Scroll to today on mount
+  useEffect(() => {
+    if (chartScrollRef.current && todayOffset > 0) {
+      const scrollTarget = dayToPx(todayOffset) - chartScrollRef.current.clientWidth / 2;
+      chartScrollRef.current.scrollLeft = Math.max(0, scrollTarget);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hasAnyPhases = allPhases.length > 0;
+  const totalTasks = allPhases.reduce((sum, p) => sum + p.tasks.length, 0);
+  const totalScheduled = data.scheduledPhases.length;
 
   return (
     <div className="gantt-container">
@@ -258,41 +401,93 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
         </div>
       </div>
 
-      {!hasScheduled && !hasUnscheduled && (
+      {/* Legend */}
+      <div className="gantt-legend">
+        <span className="gantt-legend__item"><span className="gantt-legend__swatch gantt-legend__swatch--planned" />Planned</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__swatch gantt-legend__swatch--actual" />Actual</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__swatch gantt-legend__swatch--overdue" />Overdue</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__swatch gantt-legend__swatch--critical" />Critical Path</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__swatch gantt-legend__swatch--blocked" />Blocked</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__swatch gantt-legend__swatch--done" />Completed</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__diamond" />Due date only</span>
+        <span className="gantt-legend__item"><span className="gantt-legend__event-dot" />Event</span>
+      </div>
+
+      {/* Empty state */}
+      {!hasAnyPhases && (
         <div className="gantt-empty">
           <p>No phases or tasks have been planned yet.</p>
-          <p>Add phases and tasks with dates in the <a href={`/projects/${projectId}/phases`}>Plan tab</a> to see the timeline.</p>
+          <p>Add phases and tasks with dates in the <a href={`/projects/${projectId}/plan?householdId=${householdId}`}>Plan tab</a> to see the timeline.</p>
         </div>
       )}
 
-      {hasScheduled && (
+      {/* Main chart area */}
+      {hasAnyPhases && rows.length > 0 && (
         <div className="gantt-workspace">
+          {totalScheduled === 0 && (
+            <div className="gantt-hint-banner">
+              No dates set yet — click any phase name to add start and end dates
+            </div>
+          )}
+          <div className="gantt-workspace__body">
           {/* Sidebar */}
           <div className="gantt-sidebar" style={{ width: SIDEBAR_WIDTH }}>
-            {/* Header spacer */}
-            <div className="gantt-sidebar__header" style={{ height: HEADER_HEIGHT }} />
-            {/* Rows */}
+            <div className="gantt-sidebar__header" style={{ height: HEADER_HEIGHT }}>
+              <span>Phase / Task</span>
+            </div>
             {rows.map((row, idx) => {
               if (row.kind === "phase-header") {
+                const pct = row.phase.totalTaskCount > 0
+                  ? Math.round((row.phase.completedTaskCount / row.phase.totalTaskCount) * 100)
+                  : 0;
+                const isUnscheduled = !row.phase.startDate && !row.phase.targetEndDate;
                 return (
-                  <div key={`ph-${row.phase.id}`} className="gantt-sidebar__row gantt-sidebar__row--phase" style={{ height: ROW_HEIGHT }}>
+                  <div
+                    key={`ph-${row.phase.id}`}
+                    className={`gantt-sidebar__row gantt-sidebar__row--phase${isUnscheduled ? " gantt-sidebar__row--unscheduled" : ""}`}
+                    style={{ height: ROW_HEIGHT }}
+                    onClick={(e) => handleBarClick(e, "phase", row.phase.id)}
+                    role="button"
+                    tabIndex={0}
+                  >
                     <span className="gantt-sidebar__phase-name">{row.phase.name}</span>
+                    {isUnscheduled ? (
+                      <span className="gantt-sidebar__no-dates-tag">no dates</span>
+                    ) : (
+                      <span className="gantt-sidebar__phase-pct">{pct}%</span>
+                    )}
                   </div>
                 );
               }
+              const task = row.task;
+              const isOverdue = task.dueDate && task.status !== "completed" && task.status !== "skipped" && new Date(task.dueDate) < today;
               return (
-                <div key={`t-${row.task.id}-${idx}`} className={`gantt-sidebar__row gantt-sidebar__row--task${row.task.isCriticalPath ? " gantt-sidebar__row--critical" : ""}`} style={{ height: ROW_HEIGHT }}>
-                  <span className="gantt-sidebar__task-name">{row.task.title}</span>
-                  {row.task.assigneeName && (
-                    <span className="gantt-sidebar__assignee">{row.task.assigneeName}</span>
+                <div
+                  key={`t-${task.id}-${idx}`}
+                  className={`gantt-sidebar__row gantt-sidebar__row--task${task.isCriticalPath ? " gantt-sidebar__row--critical" : ""}${isOverdue ? " gantt-sidebar__row--overdue" : ""}`}
+                  style={{ height: ROW_HEIGHT }}
+                  onClick={(e) => handleBarClick(e, "task", task.id, row.phaseId)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <span className={`gantt-status-dot ${STATUS_DOTS[task.status] ?? ""}`} />
+                  <span className="gantt-sidebar__task-name">{task.title}</span>
+                  {task.assigneeName && (
+                    <span className="gantt-sidebar__assignee">{task.assigneeName}</span>
                   )}
                 </div>
               );
             })}
+            {/* Event lane label */}
+            {eventMarkers.length > 0 && (
+              <div className="gantt-sidebar__row gantt-sidebar__row--events" style={{ height: EVENT_LANE_HEIGHT }}>
+                <span className="gantt-sidebar__events-label">Events</span>
+              </div>
+            )}
           </div>
 
-          {/* Chart area */}
-          <div className="gantt-chart-scroll" ref={chartRef}>
+          {/* Chart scroll area */}
+          <div className="gantt-chart-scroll" ref={chartScrollRef}>
             <div className="gantt-chart" style={{ width: chartWidthPx, height: totalChartHeight, position: "relative" }}>
               {/* Header */}
               <div className="gantt-header" style={{ height: HEADER_HEIGHT, width: chartWidthPx }}>
@@ -307,7 +502,7 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
                 ))}
               </div>
 
-              {/* Background grid column stripes */}
+              {/* Background grid */}
               {headerCells.map((cell, i) => (
                 <div
                   key={`grid-${i}`}
@@ -323,10 +518,7 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
 
               {/* Today marker */}
               {todayOffset >= 0 && todayOffset <= totalDays && (
-                <div
-                  className="gantt-today-marker"
-                  style={{ left: dayToPx(todayOffset), top: 0, height: totalChartHeight }}
-                />
+                <div className="gantt-today-marker" style={{ left: dayToPx(todayOffset), top: 0, height: totalChartHeight }} />
               )}
 
               {/* Rows with bars */}
@@ -334,15 +526,35 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
                 const rowTop = HEADER_HEIGHT + idx * ROW_HEIGHT;
 
                 if (row.kind === "phase-header") {
-                  const bar = getBarProps(row.phase.startDate, row.phase.targetEndDate);
+                  const phase = row.phase;
+                  const bar = getBarProps(phase.startDate, phase.targetEndDate);
+                  const pct = phase.totalTaskCount > 0
+                    ? (phase.completedTaskCount / phase.totalTaskCount) * 100
+                    : 0;
+
                   return (
-                    <div key={`pr-${row.phase.id}`} className="gantt-row gantt-row--phase" style={{ top: rowTop, height: ROW_HEIGHT, width: chartWidthPx }}>
-                      {bar && (
+                    <div key={`pr-${phase.id}`} className="gantt-row gantt-row--phase" style={{ top: rowTop, height: ROW_HEIGHT, width: chartWidthPx }}>
+                      {bar ? (
                         <div
                           className="gantt-bar gantt-bar--phase"
                           style={{ left: bar.left, width: bar.width }}
-                          title={row.phase.name}
-                        />
+                          onClick={(e) => handleBarClick(e, "phase", phase.id)}
+                          role="button"
+                          tabIndex={0}
+                          title={`${phase.name} — ${Math.round(pct)}% complete`}
+                        >
+                          <div className="gantt-bar__phase-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                      ) : (
+                        <div
+                          className="gantt-row__no-dates"
+                          style={{ left: Math.max(16, dayToPx(Math.max(todayOffset, 2)) - 4) }}
+                          onClick={(e) => handleBarClick(e, "phase", phase.id)}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          + add dates
+                        </div>
                       )}
                     </div>
                   );
@@ -350,25 +562,99 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
 
                 // Task row
                 const task = row.task;
-                const bar = getBarProps(task.derivedStartDate ?? task.dueDate, task.dueDate);
+                const phase = taskPhaseMap.get(task.id);
+                const barStart = phase ? getTaskBarStart(task, phase) : task.derivedStartDate;
+                const barEnd = task.dueDate;
+                const bar = getBarProps(barStart, barEnd);
+
                 const isCritical = data.criticalPathTaskIds.includes(task.id);
-                const isCompleted = task.status === "completed";
+                const isCompleted = task.status === "completed" || task.status === "skipped";
+                const isOverdue = task.dueDate && !isCompleted && new Date(task.dueDate) < today;
+
+                // Actual progress overlay (startedAt → completedAt)
+                const actualBar = isCompleted && task.startedAt && task.completedAt
+                  ? getBarProps(task.startedAt, task.completedAt)
+                  : null;
+
+                // Overdue actual bar — completed after dueDate
+                const isLateCompletion = isCompleted && task.completedAt && task.dueDate && new Date(task.completedAt) > new Date(task.dueDate);
+                const overdueBar = isLateCompletion
+                  ? getBarProps(task.dueDate, task.completedAt)
+                  : null;
+
+                // Diamond for tasks with only a dueDate (no bar)
+                const diamondX = !bar ? getDiamondPos(task.dueDate) : null;
 
                 return (
                   <div key={`tr-${task.id}-${idx}`} className="gantt-row gantt-row--task" style={{ top: rowTop, height: ROW_HEIGHT, width: chartWidthPx }}>
+                    {/* Planned bar */}
                     {bar && (
                       <div
-                        className={`gantt-bar gantt-bar--task${isCritical ? " gantt-bar--critical" : ""}${isCompleted ? " gantt-bar--done" : ""}${task.isBlocked ? " gantt-bar--blocked" : ""}`}
+                        className={`gantt-bar gantt-bar--task${isCritical ? " gantt-bar--critical" : ""}${isCompleted ? " gantt-bar--done" : ""}${task.isBlocked ? " gantt-bar--blocked" : ""}${isOverdue ? " gantt-bar--overdue-outline" : ""}`}
                         style={{ left: bar.left, width: Math.max(bar.width, 8) }}
                         onMouseEnter={(e) => handleTaskHover(e, task)}
                         onMouseLeave={() => setTooltip(null)}
+                        onClick={(e) => handleBarClick(e, "task", task.id, row.phaseId)}
+                        role="button"
+                        tabIndex={0}
                       >
-                        {bar.width > 40 && <span className="gantt-bar__label">{task.title}</span>}
+                        {bar.width > 60 && <span className="gantt-bar__label">{task.title}</span>}
                       </div>
+                    )}
+
+                    {/* Actual completion overlay */}
+                    {actualBar && (
+                      <div
+                        className={`gantt-bar gantt-bar--actual${isLateCompletion ? "" : " gantt-bar--actual-ok"}`}
+                        style={{ left: actualBar.left, width: Math.max(actualBar.width, 4) }}
+                      />
+                    )}
+
+                    {/* Overdue extension */}
+                    {overdueBar && (
+                      <div
+                        className="gantt-bar gantt-bar--overdue"
+                        style={{ left: overdueBar.left, width: Math.max(overdueBar.width, 4) }}
+                      />
+                    )}
+
+                    {/* Diamond marker for date-only tasks */}
+                    {diamondX != null && (
+                      <div
+                        className={`gantt-diamond${isCritical ? " gantt-diamond--critical" : ""}${isCompleted ? " gantt-diamond--done" : ""}${isOverdue ? " gantt-diamond--overdue" : ""}`}
+                        style={{ left: diamondX - 6 }}
+                        onMouseEnter={(e) => handleTaskHover(e, task)}
+                        onMouseLeave={() => setTooltip(null)}
+                        onClick={(e) => handleBarClick(e, "task", task.id, row.phaseId)}
+                        role="button"
+                        tabIndex={0}
+                        title={task.title}
+                      />
                     )}
                   </div>
                 );
               })}
+
+              {/* Event markers lane */}
+              {eventMarkers.length > 0 && (
+                <div className="gantt-event-lane" style={{ top: HEADER_HEIGHT + rows.length * ROW_HEIGHT, height: EVENT_LANE_HEIGHT, width: chartWidthPx }}>
+                  {eventMarkers.map((evt) => (
+                    <div
+                      key={evt.id}
+                      className={`gantt-event-marker gantt-event-marker--${evt.type}${evt.thumbnailUrl ? " gantt-event-marker--photo" : ""}${evt.entryType === "milestone" ? " gantt-event-marker--milestone" : ""}`}
+                      style={{ left: evt.x - 8 }}
+                      onMouseEnter={(e) => handleEventHover(e, evt)}
+                      onMouseLeave={() => setTooltip(null)}
+                      title={evt.title}
+                    >
+                      {evt.thumbnailUrl
+                        ? <span className="gantt-event-marker__thumb" />
+                        : <span className="gantt-event-marker__icon">{EVENT_ICONS[evt.type] ?? "·"}</span>
+                      }
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Dependency arrows SVG */}
               <svg
@@ -398,22 +684,30 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
               </svg>
             </div>
           </div>
+          </div>
         </div>
       )}
 
-      {/* Tooltip */}
-      {tooltip && (
-        <div
-          className="gantt-tooltip"
-          style={{ position: "fixed", left: tooltip.x, top: tooltip.y }}
-        >
+      {/* Task tooltip */}
+      {tooltip && tooltip.kind === "task" && (
+        <div className="gantt-tooltip" style={{ position: "fixed", left: tooltip.x, top: tooltip.y }}>
           <div className="gantt-tooltip__title">{tooltip.task.title}</div>
           <div className="gantt-tooltip__row">
             <span>Status:</span> {STATUS_LABELS[tooltip.task.status] ?? tooltip.task.status}
           </div>
+          {tooltip.task.startedAt && (
+            <div className="gantt-tooltip__row">
+              <span>Started:</span> {formatShortDate(tooltip.task.startedAt)}
+            </div>
+          )}
           {tooltip.task.dueDate && (
             <div className="gantt-tooltip__row">
-              <span>Due:</span> {new Date(tooltip.task.dueDate).toLocaleDateString()}
+              <span>Due:</span> {formatShortDate(tooltip.task.dueDate)}
+            </div>
+          )}
+          {tooltip.task.completedAt && (
+            <div className="gantt-tooltip__row">
+              <span>Completed:</span> {formatShortDate(tooltip.task.completedAt)}
             </div>
           )}
           {tooltip.task.estimatedHours != null && (
@@ -432,30 +726,83 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
           {tooltip.task.isBlocked && (
             <div className="gantt-tooltip__badge gantt-tooltip__badge--blocked">Blocked</div>
           )}
+          <div className="gantt-tooltip__hint">Click to edit dates</div>
         </div>
       )}
 
-      {/* Unscheduled phases */}
-      {hasUnscheduled && (
-        <div className="gantt-unscheduled">
-          <h3 className="gantt-unscheduled__title">Unscheduled</h3>
-          <p className="gantt-unscheduled__hint">These phases have no start or end dates. Add dates in the Plan tab to place them on the timeline.</p>
-          {data.unscheduledPhases.map((phase) => (
-            <div key={phase.id} className="gantt-unscheduled__phase">
-              <div className="gantt-unscheduled__phase-name">{phase.name}</div>
-              {phase.tasks.length > 0 && (
-                <ul className="gantt-unscheduled__tasks">
-                  {phase.tasks.map((task) => (
-                    <li key={task.id} className={`gantt-unscheduled__task${task.status === "completed" ? " gantt-unscheduled__task--done" : ""}`}>
-                      <span className="gantt-unscheduled__task-status" />
-                      {task.title}
-                    </li>
-                  ))}
-                </ul>
-              )}
+      {/* Event tooltip */}
+      {tooltip && tooltip.kind === "event" && (
+        <div className="gantt-tooltip" style={{ position: "fixed", left: tooltip.x, top: tooltip.y }}>
+          <div className="gantt-tooltip__title">{tooltip.event.title}</div>
+          <div className="gantt-tooltip__row">
+            <span>Date:</span> {formatShortDate(tooltip.event.date)}
+          </div>
+          {tooltip.event.description && (
+            <div className="gantt-tooltip__row gantt-tooltip__desc">{tooltip.event.description}</div>
+          )}
+          {tooltip.event.entryType && (
+            <div className="gantt-tooltip__badge">{tooltip.event.entryType}</div>
+          )}
+          {tooltip.event.flags.length > 0 && (
+            <div className="gantt-tooltip__row">
+              {tooltip.event.flags.map((f) => (
+                <span key={f} className="gantt-tooltip__badge">{f}</span>
+              ))}
             </div>
-          ))}
+          )}
+          {tooltip.event.attachmentCount > 0 && (
+            <div className="gantt-tooltip__row"><span>📎</span> {tooltip.event.attachmentCount} attachment{tooltip.event.attachmentCount !== 1 ? "s" : ""}</div>
+          )}
         </div>
+      )}
+
+      {/* Inline date editor popover */}
+      {editing && (
+        <>
+          <div className="gantt-popover-backdrop" onClick={() => setEditing(null)} />
+          <div className="gantt-popover" style={{ left: editing.anchorX, top: editing.anchorY }}>
+            <div className="gantt-popover__title">
+              {editing.entityType === "phase" ? "Phase Dates" : "Task Due Date"}
+            </div>
+            {editing.entityType === "phase" ? (
+              <div className="gantt-popover__fields">
+                <label>
+                  Start
+                  <input
+                    type="date"
+                    value={editing.startDate}
+                    onChange={(e) => setEditing({ ...editing, startDate: e.target.value })}
+                  />
+                </label>
+                <label>
+                  End
+                  <input
+                    type="date"
+                    value={editing.endDate}
+                    onChange={(e) => setEditing({ ...editing, endDate: e.target.value })}
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="gantt-popover__fields">
+                <label>
+                  Due Date
+                  <input
+                    type="date"
+                    value={editing.startDate}
+                    onChange={(e) => setEditing({ ...editing, startDate: e.target.value })}
+                  />
+                </label>
+              </div>
+            )}
+            <div className="gantt-popover__actions">
+              <button className="gantt-popover__btn gantt-popover__btn--cancel" onClick={() => setEditing(null)}>Cancel</button>
+              <button className="gantt-popover__btn gantt-popover__btn--save" onClick={handleDateSave} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
