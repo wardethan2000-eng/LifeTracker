@@ -111,7 +111,7 @@ const entryTypeLabels = Object.fromEntries(entryTypeOptions.map((option) => [opt
 
 const flagOptions: Array<{ value: EntryFlag; label: string; tone: "accent" | "warning" | "info" | "muted" | "danger" | "success"; help: string }> = [
   { value: "important", label: "Important", tone: "accent", help: "Keeps high-value notes visually highlighted in the timeline." },
-  { value: "pinned", label: "Pinned", tone: "info", help: "Pinned entries stay at the top of the timeline." },
+  { value: "pinned", label: "Pinned", tone: "info", help: "Pin to overview — this note appears as a card on the entity's overview tab." },
   { value: "tip", label: "Tip", tone: "success", help: "Tips are surfaced when you start new sessions." },
   { value: "warning", label: "Warning", tone: "warning", help: "Warnings appear as alerts on related activities." },
   { value: "actionable", label: "Actionable", tone: "danger", help: "Marks an entry as something that still needs follow-up." },
@@ -1134,6 +1134,7 @@ export function EntryTimeline({
                 entry.flags.includes("tip") ? "entry-card--tip" : ""
               ].filter(Boolean).join(" ")}
             >
+              <div className="entry-card__row">
               <button
                 type="button"
                 className="entry-card__summary"
@@ -1163,6 +1164,15 @@ export function EntryTimeline({
                   </div>
                   <span className="entry-card__summary-toggle">{isExpanded ? "Hide" : "Show"}</span>
                 </button>
+                <button
+                  type="button"
+                  className={`entry-card__pin-btn${entry.flags.includes("pinned") ? " entry-card__pin-btn--active" : ""}`}
+                  title={entry.flags.includes("pinned") ? "Unpin from overview" : "Pin to overview"}
+                  onClick={() => { void handleToggleEntryFlag(entry, "pinned"); }}
+                >
+                  📌
+                </button>
+              </div>
 
                 {isExpanded ? (
                   <div className="entry-card__details">

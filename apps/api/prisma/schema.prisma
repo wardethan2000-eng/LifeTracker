@@ -376,6 +376,7 @@ model User {
   spaceScanLogs          SpaceScanLog[]
   layoutPreferences      UserLayoutPreference[]
   dashboardPins          DashboardPin[]
+  overviewPins           OverviewPin[]
 }
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.
@@ -2481,6 +2482,23 @@ model DashboardPin {
 
   @@unique([userId, entityType, entityId])
   @@index([userId])
+}
+
+// An item (canvas or attachment) pinned to a specific entity's overview tab.
+// Notes are pinned via Entry.flags["pinned"] instead.
+model OverviewPin {
+  id         String   @id @default(cuid())
+  userId     String
+  entityType String   @db.VarChar(50)
+  entityId   String   @db.VarChar(50)
+  itemType   String   @db.VarChar(20)  // "canvas" | "attachment"
+  itemId     String   @db.VarChar(50)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId, itemType, itemId])
+  @@index([userId, entityType, entityId])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗

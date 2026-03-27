@@ -482,7 +482,7 @@ These components and their CSS classes remain unchanged. They now live inside ca
 
 **Surface type:** Reading
 **Layout:** Single column with `dashboard-grid` (main + aside)
-**Card behavior:** All static. No changes to current implementation.
+**Card behavior:** Draggable, resizable cards powered by `DashboardGrid` (`components/dashboard-grid.tsx`). This component is now the required pattern for all entity overview tabs across the app.
 
 Content:
 - Stats row (assets needing attention, due this week, completed this month, unread notifications)
@@ -535,10 +535,10 @@ Content:
 
 | Tab | Surface type | Layout |
 |-----|-------------|--------|
-| Overview | Reading | Single column. Hero card, Due Work panel, Recent Maintenance panel, Transfer History panel. No changes. |
+| Overview | Reading | Uses `DashboardGrid` (`entityType="asset"`, `entityId`=assetId). Cards: `label`, `photos`, `due-work` (inline quick-log per due/overdue schedule — notes + cost + mark-complete in two taps), `recent-maintenance` (inline unscheduled quick-log with title + date + notes + cost), `relationships` (conditional), `transfer-history`, `notes-canvas`, `recent-timeline`. Stats row (`stats-row`) is static above the grid. Layout persisted per asset via `UserLayoutPreference`. Reference: `components/asset-overview-grid.tsx`. |
 | Details | Mixed (inline-editable) | Auto-fit grid. Each panel (Purchase Details, Warranty Details, Location Details, Insurance & Disposition) has an **Edit** button that switches the `<dl>` read view to an inline form. Save/Cancel returned to read view. Uses `AssetPurchaseDetailsCard`, `AssetWarrantyDetailsCard`, `AssetLocationDetailsCard`, `AssetInsuranceDetailsCard` client components in `components/asset-details-cards.tsx`. Condition History and Preset Browser remain as server-rendered panels. |
 | Usage Metrics | Reading | Single column. Metric cards with entry history and projections. No changes. |
-| Maintenance | Working | Two-column resource detail. Primary: Schedules list (expandable card), Maintenance Log panel, Log Maintenance form. Aside: Schedule stats, quick-complete actions. |
+| Maintenance | Working | Two-column resource detail. Primary: Schedules list (expandable card), Maintenance Log panel, Log Maintenance form. Aside: Schedule stats, quick-complete actions. **Note:** The Overview tab's Due Work and Recent Maintenance cards cover the common quick-log case (notes + cost only). Use this tab's full `LogMaintenanceForm` only when parts, usage metrics, or service provider assignment are needed. |
 | Inventory | Mixed | Single column. Linked inventory items table with add/remove controls. Server-fetched, client-interactive via `AssetInventoryLinks`. |
 | Notes | Reading | Single column. `EntryTimeline` with `entityType="asset"`. |
 | Canvas | Reading | Single column. `EntityCanvasList` with `entityType="asset"`. |
@@ -1012,6 +1012,24 @@ const [entity, sourceIdea, pinnedEntries] = await Promise.all([
 ```
 
 Never omit these two checks from an overview page. They take near-zero additional render cost when empty.
+
+### Entity overview tabs must use `DashboardGrid`
+
+The root overview tab for every primary domain workspace tool (Assets, Projects, Hobbies, Ideas, and any future domain) **must** render its content sections as `DashboardCardDef[]` passed to `<DashboardGrid>`. Do **not** render a static `<section className="panel">` grid on an overview tab.
+
+```tsx
+<DashboardGrid
+  entityType="<domain>"  // e.g. "asset", "project", "hobby", "idea"
+  entityId={entityId}
+  cards={cards}          // DashboardCardDef[]
+  defaultLayout={defaultLayout}  // LayoutItem[]
+/>
+```
+
+- The `stats-row` may remain as a static header rendered above the grid (it is not a draggable card).
+- Layout is persisted per entity via `UserLayoutPreference` automatically by `DashboardGrid`.
+- Optional cards (e.g. a "relationships" card that only appears when linked data exists) must be included conditionally in both `cards` and `defaultLayout`.
+- Reference implementations: `components/asset-overview-grid.tsx` (entity overview) and `components/home-dashboard.tsx` (home dashboard).
 
 ### Page header anatomy
 

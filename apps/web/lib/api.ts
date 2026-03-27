@@ -535,6 +535,10 @@ import {
   createDashboardPinSchema,
   type DashboardPin,
   type CreateDashboardPinInput,
+  overviewPinSchema,
+  createOverviewPinSchema,
+  type OverviewPin,
+  type CreateOverviewPinInput,
   bulkAssetOperationResultSchema,
   type BulkAssetOperationResult,
   type AssetCategory,
@@ -874,7 +878,9 @@ export const apiRequest = async <T>({
         : { next: cachePolicy.next };
     }
 
-    return { cache: "no-store" as const };
+    // Default: 30-second ISR window for all unconfigured GET requests.
+    // Functions that must always be fresh (entries, notifications, scans) opt out explicitly.
+    return { next: { revalidate: 30 } };
   })();
 
   try {
@@ -1089,13 +1095,13 @@ export const getHouseholdDueWork = async (
 export const getAssetDetail = async (assetId: string): Promise<AssetDetailResponse> => apiRequest({
   path: `/v1/assets/${assetId}/detail`,
   schema: assetDetailResponseSchema,
-  cacheOptions: "no-store"
+  revalidate: 15
 });
 
 export const getAssetInventoryLinks = async (assetId: string): Promise<AssetInventoryLinkSummary[]> => apiRequest({
   path: `/v1/assets/${assetId}/inventory`,
   schema: z.array(assetInventoryLinkSummarySchema),
-  cacheOptions: "no-store"
+  revalidate: 15
 });
 
 export const addAssetInventoryLink = async (
@@ -1988,7 +1994,8 @@ export const getNotifications = async (options?: {
 
   return apiRequest({
     path: `/v1/notifications${suffix}`,
-    schema: notificationListSchema
+    schema: notificationListSchema,
+    cacheOptions: "no-store"
   });
 };
 
@@ -2028,7 +2035,8 @@ export const getHouseholdNotifications = async (
 
   return apiRequest({
     path: `/v1/households/${householdId}/notifications${suffix}`,
-    schema: householdNotificationListSchema
+    schema: householdNotificationListSchema,
+    cacheOptions: "no-store"
   });
 };
 
@@ -6335,6 +6343,7 @@ export const getLayoutPreference = async (
     path: `/v1/layout-preferences?${params.toString()}`,
     method: "GET",
     schema: layoutPreferenceSchema.nullable(),
+    revalidate: 15,
   });
 };
 
@@ -6369,6 +6378,7 @@ export const getDashboardPins = async (): Promise<DashboardPin[]> =>
     path: "/v1/dashboard-pins",
     method: "GET",
     schema: dashboardPinSchema.array(),
+    revalidate: 15,
   });
 
 export const addDashboardPin = async (
@@ -6384,6 +6394,35 @@ export const addDashboardPin = async (
 export const removeDashboardPin = async (pinId: string): Promise<void> => {
   await apiRequest({
     path: `/v1/dashboard-pins/${encodeURIComponent(pinId)}`,
+    method: "DELETE",
+  });
+};
+
+// ── Overview Pins ────────────────────────────────────────────────────
+
+export const getOverviewPins = async (
+  entityType: string,
+  entityId: string
+): Promise<OverviewPin[]> =>
+  apiRequest({
+    path: `/v1/overview-pins?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}`,
+    method: "GET",
+    schema: overviewPinSchema.array(),
+  });
+
+export const addOverviewPin = async (
+  input: CreateOverviewPinInput
+): Promise<{ id: string }> =>
+  apiRequest({
+    path: "/v1/overview-pins",
+    method: "POST",
+    body: input,
+    schema: z.object({ id: z.string() }),
+  });
+
+export const removeOverviewPin = async (pinId: string): Promise<void> => {
+  await apiRequest({
+    path: `/v1/overview-pins/${encodeURIComponent(pinId)}`,
     method: "DELETE",
   });
 };

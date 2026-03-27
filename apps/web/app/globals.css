@@ -7567,6 +7567,34 @@ html[data-ui-density="compact"] .resource-layout__aside {
   opacity: 1;
 }
 
+.attachment-gallery__pin {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.attachment-gallery__item:hover .attachment-gallery__pin {
+  opacity: 1;
+}
+
+.attachment-gallery__pin--active {
+  opacity: 1 !important;
+  background: var(--accent, #2563eb);
+}
+
 /* Inline attachment list (for non-image files or list view) */
 .attachment-list {
   display: flex;
@@ -12705,6 +12733,43 @@ html[data-ui-density="compact"] .resource-layout__aside {
   gap: 16px;
 }
 
+.entry-card__row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.entry-card__row > .entry-card__summary {
+  flex: 1;
+}
+
+.entry-card__pin-btn {
+  flex-shrink: 0;
+  margin-top: 12px;
+  margin-right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  padding: 4px;
+  line-height: 1;
+  color: inherit;
+}
+
+.entry-card:hover .entry-card__pin-btn {
+  opacity: 0.7;
+}
+
+.entry-card__pin-btn--active {
+  opacity: 1 !important;
+  color: var(--accent, #2563eb);
+}
+
+.entry-card__pin-btn:hover {
+  opacity: 1 !important;
+}
+
 .entry-card__summary-main {
   display: grid;
   gap: 10px;
@@ -14485,6 +14550,31 @@ html[data-ui-density="compact"] .resource-layout__aside {
   border-color: var(--error, #d00);
 }
 
+.canvas-list__card-pin {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--ink-muted, #888);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.canvas-list__card:hover .canvas-list__card-pin {
+  opacity: 1;
+}
+
+.canvas-list__card-pin--active {
+  opacity: 1 !important;
+  color: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+}
+
 /* ── Idea Board ─────────────────────────────────────────────────── */
 
 .idea-board {
@@ -15691,6 +15781,146 @@ html[data-ui-density="compact"] .resource-layout__aside {
   opacity: 1;
 }
 
+/* ─── Pinned Overview Section (replaces PinnedNotesCard for projects/hobbies/ideas) ─── */
+.pinned-overview-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.pinned-overview-section__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.pinned-overview-section__icon {
+  font-size: 0.9rem;
+}
+.pinned-overview-section__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+.pinned-overview-section__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pinned-overview-section__card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised, #fafafa);
+  padding: 10px 36px 10px 12px;
+  min-width: 180px;
+  max-width: 260px;
+  flex: 1 1 180px;
+}
+.pinned-overview-section__card--attachment {
+  max-width: 200px;
+}
+.pinned-overview-section__card-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.pinned-overview-section__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.pinned-overview-section__card-body:hover .pinned-overview-section__card-title {
+  color: var(--accent);
+}
+.pinned-overview-section__card-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.pinned-overview-section__card-meta {
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+.pinned-overview-section__card-preview {
+  font-size: 0.76rem;
+  color: var(--ink-muted);
+  margin: 3px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pinned-overview-section__card-thumb {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+.pinned-overview-section__card-icon {
+  font-size: 1.6rem;
+  display: block;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.pinned-overview-section__unpin {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0.4;
+  padding: 2px 5px;
+}
+.pinned-overview-section__unpin:hover {
+  opacity: 1;
+}
+
+/* ─── Pinned Card Content (inside DashboardGrid for assets) ─── */
+.pinned-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.pinned-card-content__preview {
+  font-size: 0.82rem;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+.pinned-card-content__meta {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+.pinned-card-content__doc-icon {
+  font-size: 2.5rem;
+  display: block;
+  text-align: center;
+}
+.pinned-card-content__thumb {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.pinned-card-content__unpin {
+  align-self: flex-start;
+  font-size: 0.72rem;
+}
+
 /* Dashboard Reminders */
 .dashboard-reminders {
   background: var(--surface);
@@ -15992,6 +16222,73 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-size: 0.85rem;
   text-align: center;
   padding: 16px 0;
+}
+
+/* ─── Quick Log Form (asset overview inline maintenance logging) ─── */
+
+.quick-log-form {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.quick-log-form--unscheduled {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  border-top: none;
+  padding-top: 0;
+}
+
+.quick-log-form__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.quick-log-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.quick-log-form__field span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.quick-log-form__field input,
+.quick-log-form__field textarea {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.quick-log-form__field input:focus,
+.quick-log-form__field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.quick-log-form__field--full {
+  grid-column: 1 / -1;
+}
+
+.quick-log-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .dashboard-card__canvas-preview {

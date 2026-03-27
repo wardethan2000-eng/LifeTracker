@@ -181,7 +181,7 @@ export const buildHouseholdDashboard = async (
           select: { completedAt: true }
         }
       },
-      take: 100,
+      take: 20,
       orderBy: { createdAt: "desc" }
     }),
     prisma.notification.findMany({

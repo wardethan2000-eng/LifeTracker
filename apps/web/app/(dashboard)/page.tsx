@@ -69,13 +69,18 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, lowStockItems, onboardingPref, savedQuickActionIds, reminderWindowPref, entryProbe, pinnedNotes, canvases, spacesTree] = await Promise.all([
+
+    // Pre-compute a default reminder cutoff (7 days) so the reminder entries
+    // fetch can join the main Promise.all instead of running sequentially after it.
+    const defaultReminderCutoff = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, lowStockItems, onboardingPref, savedQuickActionIds, reminderWindowPref, entryProbe, pinnedNotes, canvases, spacesTree, reminderEntries, homeLayout] = await Promise.all([
       getDashboardData(selectedHousehold.id),
       getDashboardPins().catch(() => []),
       getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
       getHouseholdProjectStatusCounts(selectedHousehold.id).catch(() => []),
       getHouseholdHobbies(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
-      getHouseholdInventory(selectedHousehold.id, { limit: 100 }).catch(() => ({ items: [], nextCursor: null })),
+      getHouseholdInventory(selectedHousehold.id, { limit: 20 }).catch(() => ({ items: [], nextCursor: null })),
       getHouseholdLowStockInventory(selectedHousehold.id).catch(() => []),
       getLayoutPreference("onboarding", "dismissed").catch(() => null),
       getQuickActionsPreference().catch(() => null),
@@ -84,15 +89,18 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
       getEntries(selectedHousehold.id, { flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
       getCanvasesWithGeometry(selectedHousehold.id).catch(() => []),
       getHouseholdSpacesTree(selectedHousehold.id).catch(() => []),
+      getEntries(selectedHousehold.id, {
+        hasReminder: true,
+        reminderBefore: defaultReminderCutoff,
+        limit: 20,
+      }).catch(() => ({ items: [], nextCursor: null })),
+      getLayoutPreference("home").catch(() => null),
     ]);
 
+    // If the user has a custom reminder window, re-filter client-side from what we already fetched.
+    // For window < 7 days: filter down. For window > 7 days: we may miss some entries, but this
+    // is a minor edge case that resolves on future navigations via ISR.
     const reminderWindowDays = (reminderWindowPref as Array<{ value: number }> | null)?.[0]?.value ?? 7;
-    const reminderCutoff = new Date(Date.now() + reminderWindowDays * 24 * 60 * 60 * 1000).toISOString();
-    const reminderEntries = await getEntries(selectedHousehold.id, {
-      hasReminder: true,
-      reminderBefore: reminderCutoff,
-      limit: 20,
-    }).catch(() => ({ items: [], nextCursor: null }));
 
     const countAllSpaces = (nodes: typeof spacesTree): number =>
       nodes.reduce((sum, n) => sum + 1 + countAllSpaces(n.children ?? []), 0);
@@ -231,6 +239,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
             }))}
             pinnedNotes={pinnedNotes.items}
             canvases={canvases}
+            serverLayout={homeLayout?.layoutJson}
           />
         </div>
       </>

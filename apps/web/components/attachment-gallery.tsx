@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Attachment } from "@lifekeeper/types";
-import { getAttachmentDownloadUrl, deleteAttachment, updateAttachment } from "../lib/api";
+import { addOverviewPin, deleteAttachment, getAttachmentDownloadUrl, getOverviewPins, removeOverviewPin, updateAttachment } from "../lib/api";
 import { AttachmentLightbox } from "./attachment-lightbox";
 
 type AttachmentGalleryProps = {
@@ -13,6 +13,9 @@ type AttachmentGalleryProps = {
   onReorder?: (reorderedAttachments: Attachment[]) => void;
   compact?: boolean;
   readonly?: boolean;
+  // Optional: when provided, shows pin-to-overview buttons
+  entityType?: string;
+  entityId?: string;
 };
 
 type CachedUrl = { url: string; expiresAt: number };
@@ -31,6 +34,8 @@ export function AttachmentGallery({
   onReorder,
   compact = false,
   readonly = false,
+  entityType,
+  entityId,
 }: AttachmentGalleryProps) {
   const [urlCache, setUrlCache] = useState<Map<string, CachedUrl>>(new Map());
   const [items, setItems] = useState<Attachment[]>(() => sortByOrder(attachments));
@@ -38,6 +43,23 @@ export function AttachmentGallery({
   const [dragSrc, setDragSrc] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const pendingFetches = useRef<Set<string>>(new Set());
+  const [pinnedAttachmentIds, setPinnedAttachmentIds] = useState<Set<string>>(new Set());
+  const [pinIdMap, setPinIdMap] = useState<Map<string, string>>(new Map());
+
+  // Load pinned attachment IDs when entity context is provided
+  useEffect(() => {
+    if (!entityType || !entityId) return;
+    let cancelled = false;
+    getOverviewPins(entityType, entityId)
+      .then((pins) => {
+        if (cancelled) return;
+        const attachmentPins = pins.filter((p) => p.itemType === "attachment");
+        setPinnedAttachmentIds(new Set(attachmentPins.map((p) => p.itemId)));
+        setPinIdMap(new Map(attachmentPins.map((p) => [p.itemId, p.id])));
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [entityType, entityId]);
 
   // Sync items when parent adds/removes attachments
   useEffect(() => {
@@ -93,6 +115,23 @@ export function AttachmentGallery({
     await deleteAttachment(householdId, attachmentId);
     onDelete?.(attachmentId);
   }, [householdId, onDelete]);
+
+  const handlePinToggle = useCallback(async (attachmentId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!entityType || !entityId) return;
+    const isPinned = pinnedAttachmentIds.has(attachmentId);
+    if (isPinned) {
+      const pinId = pinIdMap.get(attachmentId);
+      if (!pinId) return;
+      setPinnedAttachmentIds((prev) => { const next = new Set(prev); next.delete(attachmentId); return next; });
+      setPinIdMap((prev) => { const next = new Map(prev); next.delete(attachmentId); return next; });
+      await removeOverviewPin(pinId);
+    } else {
+      setPinnedAttachmentIds((prev) => new Set([...prev, attachmentId]));
+      const { id } = await addOverviewPin({ entityType, entityId, itemType: "attachment", itemId: attachmentId });
+      setPinIdMap((prev) => new Map([...prev, [attachmentId, id]]));
+    }
+  }, [entityType, entityId, pinnedAttachmentIds, pinIdMap]);
 
   const handleCaptionUpdate = useCallback(async (id: string, caption: string) => {
     const updated = await updateAttachment(householdId, id, { caption });
@@ -172,6 +211,17 @@ export function AttachmentGallery({
                   <span className="attachment-gallery__icon">📄</span>
                   <span className="attachment-gallery__filename">{attachment.originalFilename}</span>
                 </>
+              )}
+
+              {entityType && entityId && (
+                <button
+                  type="button"
+                  className={`attachment-gallery__pin${pinnedAttachmentIds.has(attachment.id) ? " attachment-gallery__pin--active" : ""}`}
+                  onClick={(e) => { void handlePinToggle(attachment.id, e); }}
+                  title={pinnedAttachmentIds.has(attachment.id) ? "Unpin from overview" : "Pin to overview"}
+                >
+                  📌
+                </button>
               )}
 
               {!readonly && (

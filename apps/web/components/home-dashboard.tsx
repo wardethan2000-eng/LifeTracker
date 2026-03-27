@@ -78,6 +78,7 @@ type HomeDashboardProps = {
   rootSpaceCount?: number;
   pinnedNotes?: Entry[];
   canvases?: IdeaCanvasThumbnail[];
+  serverLayout?: Record<string, unknown>[];
 };
 
 const AVAILABLE_QUICK_ACTIONS: Array<{ id: string; label: string; href: string }> = [
@@ -120,6 +121,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
     rootSpaceCount = 0,
     pinnedNotes = [],
     canvases = [],
+    serverLayout,
   } = props;
 
   const [editingQuickActions, setEditingQuickActions] = useState(false);
@@ -504,6 +506,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
       entityType="home"
       cards={[...cards, ...pinCards]}
       defaultLayout={defaultLayout}
+      serverLayout={serverLayout}
     />
   );
 }

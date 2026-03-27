@@ -1,7 +1,28 @@
+/**
+ * Web page load benchmark.
+ *
+ * IMPORTANT: This script requires a PRODUCTION build of the web app.
+ * ISR caching (the `revalidate` optimizations) is disabled in `next dev`.
+ * To get real performance numbers, build and start the app first:
+ *
+ *   pnpm --filter @lifekeeper/web build && pnpm --filter @lifekeeper/web start
+ *
+ * Then run:  pnpm --filter @lifekeeper/web benchmark
+ *
+ * Pass --report-only to log violations without exiting 1 (useful for informational CI steps).
+ */
 import { devFixtureIds } from "@lifekeeper/types";
 
 const DEMO_USER_ID = devFixtureIds.ownerUserId;
 const DEMO_HOUSEHOLD_ID = devFixtureIds.householdId;
+
+// Warm-average thresholds (production build only — ISR is disabled in dev mode).
+// Pages exceeding WARM_CRITICAL_MS cause a non-zero exit unless --report-only is passed.
+const WARM_WARN_MS = 500;
+const WARM_CRITICAL_MS = 1000;
+
+// Pass --report-only to log violations without failing (useful for informational CI steps).
+const reportOnly = process.argv.includes("--report-only");
 
 const webBaseUrl = process.env.BENCHMARK_WEB_URL ?? "http://127.0.0.1:3000";
 const apiBaseUrl = process.env.LIFEKEEPER_API_BASE_URL ?? "http://127.0.0.1:4000";
@@ -81,6 +102,32 @@ const discoverProjectId = async (): Promise<string | null> => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`Warning: could not discover a project ID from ${url}: ${message}`);
+    return null;
+  }
+};
+
+const discoverHobbyId = async (): Promise<string | null> => {
+  const url = buildUrl(apiBaseUrl, `/v1/households/${DEMO_HOUSEHOLD_ID}/hobbies`);
+
+  try {
+    const payload = await fetchJson(url);
+    return extractFirstId(isRecord(payload) ? payload.items : payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: could not discover a hobby ID from ${url}: ${message}`);
+    return null;
+  }
+};
+
+const discoverIdeaId = async (): Promise<string | null> => {
+  const url = buildUrl(apiBaseUrl, `/v1/households/${DEMO_HOUSEHOLD_ID}/ideas`);
+
+  try {
+    const payload = await fetchJson(url);
+    return extractFirstId(isRecord(payload) ? payload.items : payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: could not discover an idea ID from ${url}: ${message}`);
     return null;
   }
 };
@@ -212,16 +259,17 @@ const printTable = (results: BenchmarkResult[]): void => {
   }
 };
 
-const printSummary = (results: BenchmarkResult[]): void => {
+const printSummary = (results: BenchmarkResult[]): boolean => {
   const numericResults = results.filter((result) => result.avgWarmMs !== null);
   const fastest = [...numericResults].sort((left, right) => (left.avgWarmMs ?? Infinity) - (right.avgWarmMs ?? Infinity))[0] ?? null;
   const slowest = [...numericResults].sort((left, right) => (right.avgWarmMs ?? -1) - (left.avgWarmMs ?? -1))[0] ?? null;
-  const warningPages = numericResults.filter((result) => (result.avgWarmMs ?? 0) > 1000);
-  const criticalPages = numericResults.filter((result) => (result.avgWarmMs ?? 0) > 2000);
+  const warningPages = numericResults.filter((result) => (result.avgWarmMs ?? 0) > WARM_WARN_MS);
+  const criticalPages = numericResults.filter((result) => (result.avgWarmMs ?? 0) > WARM_CRITICAL_MS);
 
   console.log("");
   console.log("Summary");
   console.log(`Total pages benchmarked: ${results.length}`);
+  console.log(`Thresholds: warn >${WARM_WARN_MS}ms  critical >${WARM_CRITICAL_MS}ms  (warm avg, production build)`);
   console.log(
     fastest
       ? `Fastest warm average: ${fastest.label} (${formatDuration(fastest.avgWarmMs ?? 0)} ms)`
@@ -234,30 +282,41 @@ const printSummary = (results: BenchmarkResult[]): void => {
   );
 
   if (warningPages.length > 0) {
-    console.log("Pages over 1000ms warm average:");
+    console.log(`Pages over ${WARM_WARN_MS}ms warm average:`);
     for (const result of warningPages) {
       console.log(`WARNING: ${result.label} (${formatDuration(result.avgWarmMs ?? 0)} ms)`);
     }
   } else {
-    console.log("Pages over 1000ms warm average: none");
+    console.log(`Pages over ${WARM_WARN_MS}ms warm average: none`);
   }
 
   if (criticalPages.length > 0) {
-    console.log("Pages over 2000ms warm average:");
+    console.log(`Pages over ${WARM_CRITICAL_MS}ms warm average:`);
     for (const result of criticalPages) {
       console.log(`CRITICAL: ${result.label} (${formatDuration(result.avgWarmMs ?? 0)} ms)`);
     }
   } else {
-    console.log("Pages over 2000ms warm average: none");
+    console.log(`Pages over ${WARM_CRITICAL_MS}ms warm average: none`);
   }
+
+  const passed = criticalPages.length === 0;
+  console.log("");
+  console.log(passed
+    ? "PASS"
+    : `FAIL — ${criticalPages.length} page(s) exceeded the ${WARM_CRITICAL_MS}ms critical threshold.`
+  );
+
+  return passed;
 };
 
 async function main(): Promise<void> {
   await ensureWebServerReachable();
 
-  const [assetId, projectId] = await Promise.all([
+  const [assetId, projectId, hobbyId, ideaId] = await Promise.all([
     discoverAssetId(),
-    discoverProjectId()
+    discoverProjectId(),
+    discoverHobbyId(),
+    discoverIdeaId()
   ]);
 
   const pages: PageDefinition[] = [
@@ -267,6 +326,8 @@ async function main(): Promise<void> {
     { label: "Maintenance queue", path: "/maintenance" },
     { label: "Notifications", path: "/notifications" },
     { label: "Projects list", path: "/projects" },
+    { label: "Hobbies list", path: "/hobbies" },
+    { label: "Ideas list", path: "/ideas" },
     { label: "Inventory", path: `/inventory?householdId=${DEMO_HOUSEHOLD_ID}` },
     { label: "Cost analytics", path: "/costs" },
     { label: "Activity log", path: "/activity" },
@@ -303,6 +364,37 @@ async function main(): Promise<void> {
     console.warn("Warning: no project found for the seeded household. Skipping project detail benchmark.");
   }
 
+  if (hobbyId) {
+    const hobbiesIndex = pages.findIndex((page) => page.label === "Hobbies list");
+    const hobbyDetailPages: PageDefinition[] = [
+      { label: "Hobby detail (overview)", path: `/hobbies/${hobbyId}` },
+      { label: "Hobby detail (entries)", path: `/hobbies/${hobbyId}/entries` }
+    ];
+
+    if (hobbiesIndex >= 0) {
+      pages.splice(hobbiesIndex + 1, 0, ...hobbyDetailPages);
+    } else {
+      pages.push(...hobbyDetailPages);
+    }
+  } else {
+    console.warn("Warning: no hobby found for the seeded household. Skipping hobby detail benchmarks.");
+  }
+
+  if (ideaId) {
+    const ideasIndex = pages.findIndex((page) => page.label === "Ideas list");
+    const ideaDetailPages: PageDefinition[] = [
+      { label: "Idea detail (overview)", path: `/ideas/${ideaId}` }
+    ];
+
+    if (ideasIndex >= 0) {
+      pages.splice(ideasIndex + 1, 0, ...ideaDetailPages);
+    } else {
+      pages.push(...ideaDetailPages);
+    }
+  } else {
+    console.warn("Warning: no idea found for the seeded household. Skipping idea detail benchmarks.");
+  }
+
   console.log(`Benchmarking ${pages.length} pages against ${webBaseUrl}`);
   console.log("");
 
@@ -321,7 +413,11 @@ async function main(): Promise<void> {
 
   console.log("");
   printTable(sortedResults);
-  printSummary(sortedResults);
+  const passed = printSummary(sortedResults);
+
+  if (!reportOnly && !passed) {
+    process.exit(1);
+  }
 }
 
 void main().catch((error) => {

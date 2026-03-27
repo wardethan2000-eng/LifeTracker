@@ -76,6 +76,8 @@ export function AttachmentSection({
         onReorder={handleReorder}
         compact={compact}
         readonly={readonly}
+        entityType={entityType}
+        entityId={entityId}
       />
 
       {!readonly && (

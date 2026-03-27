@@ -6205,6 +6205,41 @@ export const dashboardPinSchema = z.object({
 });
 export type DashboardPin = z.infer<typeof dashboardPinSchema>;
 
+// ── Overview Pins (item-level pins to entity overview tab) ─────────────────────
+
+export const createOverviewPinSchema = z.object({
+  entityType: z.string().min(1).max(50),
+  entityId: z.string().min(1).max(50),
+  itemType: z.enum(["canvas", "attachment"]),
+  itemId: z.string().min(1).max(50),
+});
+export type CreateOverviewPinInput = z.infer<typeof createOverviewPinSchema>;
+
+export const overviewPinSchema = z.object({
+  id: z.string(),
+  itemType: z.enum(["canvas", "attachment"]),
+  itemId: z.string(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  canvas: z.object({
+    id: z.string(),
+    name: z.string(),
+    canvasMode: z.string(),
+    nodeCount: z.number(),
+    edgeCount: z.number(),
+    updatedAt: z.string(),
+  }).nullable(),
+  attachment: z.object({
+    id: z.string(),
+    originalFilename: z.string(),
+    mimeType: z.string(),
+    thumbnailKey: z.string().nullable(),
+    caption: z.string().nullable(),
+    storageKey: z.string(),
+  }).nullable(),
+});
+export type OverviewPin = z.infer<typeof overviewPinSchema>;
+
 // ── Idea Domain ─────────────────────────────────────────────────────
 
 // Enum schemas

@@ -84,6 +84,7 @@ import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
 import { layoutPreferenceRoutes } from "./routes/layout-preferences.js";
 import { dashboardPinRoutes } from "./routes/dashboard-pins.js";
+import { overviewPinRoutes } from "./routes/overview-pins.js";
 import { ensureLegacyEntriesMigrated } from "./services/legacy-migration.js";
 import { enforceRateLimit } from "./lib/rate-limit.js";
 import { applyTier } from "./lib/rate-limit-tiers.js";
@@ -108,7 +109,8 @@ const accountRoutePlugins: FastifyPluginAsync[] = [
   barcodeRoutes,
   scanDetailRoutes,
   layoutPreferenceRoutes,
-  dashboardPinRoutes
+  dashboardPinRoutes,
+  overviewPinRoutes
 ];
 
 const householdRoutePlugins: FastifyPluginAsync[] = [

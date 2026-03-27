@@ -3,8 +3,8 @@
 import type { IdeaCanvasThumbnail } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
-import { useCallback, useState } from "react";
-import { createCanvas, deleteCanvas, getCanvasesByEntityWithGeometry } from "../lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { addOverviewPin, createCanvas, deleteCanvas, getCanvasesByEntityWithGeometry, getOverviewPins, removeOverviewPin } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
 import { CanvasThumbnail } from "./canvas-thumbnail";
 
@@ -39,6 +39,22 @@ export function EntityCanvasList({
   const [newName, setNewName] = useState("");
   const [newTemplate, setNewTemplate] = useState<CanvasTemplate>("blank");
   const [loading, setLoading] = useState(false);
+  const [pinnedCanvasIds, setPinnedCanvasIds] = useState<Set<string>>(new Set());
+  const [pinIdMap, setPinIdMap] = useState<Map<string, string>>(new Map());
+
+  // Load pinned canvas IDs on mount
+  useEffect(() => {
+    let cancelled = false;
+    getOverviewPins(entityType, entityId)
+      .then((pins) => {
+        if (cancelled) return;
+        const canvasPins = pins.filter((p) => p.itemType === "canvas");
+        setPinnedCanvasIds(new Set(canvasPins.map((p) => p.itemId)));
+        setPinIdMap(new Map(canvasPins.map((p) => [p.itemId, p.id])));
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [entityType, entityId]);
 
   const refreshCanvases = useCallback(async () => {
     setLoading(true);
@@ -73,6 +89,21 @@ export function EntityCanvasList({
     await deleteCanvas(householdId, canvasId);
     await refreshCanvases();
   }, [householdId, refreshCanvases]);
+
+  const handlePinToggle = useCallback(async (canvasId: string) => {
+    const isPinned = pinnedCanvasIds.has(canvasId);
+    if (isPinned) {
+      const pinId = pinIdMap.get(canvasId);
+      if (!pinId) return;
+      setPinnedCanvasIds((prev) => { const next = new Set(prev); next.delete(canvasId); return next; });
+      setPinIdMap((prev) => { const next = new Map(prev); next.delete(canvasId); return next; });
+      await removeOverviewPin(pinId);
+    } else {
+      setPinnedCanvasIds((prev) => new Set([...prev, canvasId]));
+      const { id } = await addOverviewPin({ entityType, entityId, itemType: "canvas", itemId: canvasId });
+      setPinIdMap((prev) => new Map([...prev, [canvasId, id]]));
+    }
+  }, [pinnedCanvasIds, pinIdMap, entityType, entityId]);
 
   return (
     <div className="canvas-list">
@@ -137,6 +168,14 @@ export function EntityCanvasList({
                 aria-label={`Delete canvas ${canvas.name}`}
               >
                 Delete
+              </button>
+              <button
+                type="button"
+                className={`button button--ghost button--sm canvas-list__card-pin${pinnedCanvasIds.has(canvas.id) ? " canvas-list__card-pin--active" : ""}`}
+                onClick={() => { void handlePinToggle(canvas.id); }}
+                title={pinnedCanvasIds.has(canvas.id) ? "Unpin from overview" : "Pin to overview"}
+              >
+                📌
               </button>
             </div>
           ))}

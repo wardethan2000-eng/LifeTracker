@@ -20,6 +20,9 @@ type DashboardGridProps = {
   entityId?: string;
   cards: DashboardCardDef[];
   defaultLayout: LayoutItem[];
+  /** Pre-fetched layout JSON from a server component. When provided the
+   * component renders immediately with the saved layout (no useEffect delay). */
+  serverLayout?: Record<string, unknown>[];
 };
 
 const COLS = { lg: 4, md: 4, sm: 2, xs: 2, xxs: 1 };
@@ -52,18 +55,32 @@ export function DashboardGrid({
   entityId,
   cards,
   defaultLayout,
+  serverLayout,
 }: DashboardGridProps) {
+  // If a serverLayout is provided, apply it immediately so there's no
+  // useEffect-induced layout shift after hydration.
+  const initialItems = (() => {
+    const saved = serverLayout as unknown as LayoutItem[] | undefined;
+    if (!saved?.length) return compactVertical(defaultLayout);
+    const fits = saved.every((item) => item.x + item.w <= COLS.lg);
+    if (!fits) return compactVertical(defaultLayout);
+    const savedMap = new Map(saved.map((item) => [item.i, item]));
+    const merged = defaultLayout.map((def) => savedMap.get(def.i) ?? def);
+    return compactVertical(merged);
+  })();
+
   const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => ({
-    lg: compactVertical(defaultLayout),
+    lg: initialItems,
   }));
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(!!serverLayout);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFP = useRef(layoutFingerprint(compactVertical(defaultLayout)));
+  const lastFP = useRef(layoutFingerprint(initialItems));
   const { width, containerRef: rawRef, mounted } = useContainerWidth({ initialWidth: 1280 });
   const containerRef = rawRef as React.RefObject<HTMLDivElement>;
 
-  // Load saved layout on mount
+  // Load saved layout on mount — skipped when serverLayout is already provided.
   useEffect(() => {
+    if (serverLayout !== undefined) return;
     let cancelled = false;
     getLayoutPreference(entityType, entityId)
       .then((pref) => {
