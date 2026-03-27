@@ -709,8 +709,13 @@ export function EntryTimeline({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(initialComposerOpen);
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const [quickBody, setQuickBody] = useState("");
+  const [quickType, setQuickType] = useState<EntryType>("note");
+  const [quickPending, setQuickPending] = useState(false);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<EntryType[]>([]);
   const [selectedFlags, setSelectedFlags] = useState<EntryFlag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -720,6 +725,7 @@ export function EntryTimeline({
   const [hasMeasurementsOnly, setHasMeasurementsOnly] = useState(false);
   const [includeArchived, setIncludeArchived] = useState(false);
   const deferredSearchText = useDeferredValue(searchText);
+  const hasActiveFilters = selectedTypes.length > 0 || selectedFlags.length > 0 || selectedTags.length > 0 || searchText.trim() !== "" || startDate !== "" || endDate !== "" || hasMeasurementsOnly || includeArchived;
 
   useEffect(() => {
     let cancelled = false;
@@ -852,8 +858,35 @@ export function EntryTimeline({
       ? [saved, ...current]
       : current.map((entry) => entry.id === saved.id ? saved : entry));
     setComposerOpen(false);
+    setComposerExpanded(false);
     setEditingEntryId(null);
     setExpandedEntryId(saved.id);
+  };
+
+  const handleQuickSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (quickPending || !quickBody.trim()) return;
+    setQuickPending(true);
+    try {
+      const saved = await createEntry(householdId, {
+        body: quickBody.trim(),
+        entryDate: new Date().toISOString(),
+        entryType: quickType,
+        entityType,
+        entityId,
+        flags: [],
+        tags: [],
+        measurements: [],
+      });
+      setEntries((current) => [saved, ...current]);
+      setQuickBody("");
+      setQuickType("note");
+      setExpandedEntryId(saved.id);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Failed to save entry.");
+    } finally {
+      setQuickPending(false);
+    }
   };
 
   const handleDelete = async (entryId: string): Promise<void> => {
@@ -883,30 +916,90 @@ export function EntryTimeline({
   const visibleEditingEntry = entries.find((entry) => entry.id === editingEntryId) ?? null;
 
   return (
-    <section className="panel entry-timeline-panel">
-      <div className="panel__header">
-        <div>
-          <h2>{title}</h2>
-          <div className="data-table__secondary">Structured notes, observations, decisions, measurements, and references.</div>
+    <section className="entry-timeline-panel">
+      {/* ── Inline Quick-Add Composer ── */}
+      <div className="entry-quick-add">
+        <form className="entry-quick-add__form" onSubmit={handleQuickSubmit}>
+          <div className="entry-quick-add__type-row">
+            {entryTypeOptions.slice(0, 6).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`entry-quick-add__type${quickType === option.value ? " entry-quick-add__type--active" : ""}`}
+                onClick={() => setQuickType(option.value)}
+                disabled={quickPending}
+              >
+                <EntryGlyph kind={option.value} />
+                <span>{option.shortLabel}</span>
+              </button>
+            ))}
+          </div>
+          <div className="entry-quick-add__input-row">
+            <textarea
+              className="entry-quick-add__body"
+              value={quickBody}
+              onChange={(event) => setQuickBody(event.target.value)}
+              placeholder={`Quick ${entryTypeLabels[quickType]?.toLowerCase() ?? "note"}…`}
+              rows={2}
+              disabled={quickPending}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && quickBody.trim()) {
+                  event.preventDefault();
+                  void handleQuickSubmit(event as unknown as FormEvent<HTMLFormElement>);
+                }
+              }}
+            />
+            <div className="entry-quick-add__actions">
+              <button type="submit" className="button button--primary button--sm" disabled={quickPending || !quickBody.trim()}>
+                {quickPending ? "Saving…" : "Log"}
+              </button>
+              <button
+                type="button"
+                className="button button--ghost button--sm"
+                onClick={() => { setComposerOpen(true); setComposerExpanded(true); }}
+              >
+                More options
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* ── Full Composer (expanded inline, not modal) ── */}
+      {composerOpen && composerExpanded ? (
+        <div className="entry-composer-inline">
+          <EntryEditor
+            householdId={householdId}
+            entityType={entityType}
+            entityId={entityId}
+            relatedEntries={entries}
+            onSaved={handleSaved}
+            onCancel={() => { setComposerOpen(false); setComposerExpanded(false); }}
+            submitLabel="Create Entry"
+            chrome="inline"
+          />
         </div>
-        <div className="panel__header-actions">
-          <button type="button" className="button button--primary button--sm" onClick={() => setComposerOpen(true)}>
-            + {quickAddLabel}
+      ) : null}
+
+      {/* ── Header bar with filter toggle ── */}
+      <div className="entry-timeline-bar">
+        <div className="entry-timeline-bar__info">
+          <h2>{title}</h2>
+          <span className="entry-timeline-bar__count">{filteredEntries.length} entr{filteredEntries.length === 1 ? "y" : "ies"}</span>
+        </div>
+        <div className="entry-timeline-bar__actions">
+          <button
+            type="button"
+            className={`button button--ghost button--sm${hasActiveFilters ? " entry-timeline-bar__filter-active" : ""}`}
+            onClick={() => setFiltersOpen((current) => !current)}
+          >
+            {filtersOpen ? "Hide filters" : "Filters"}{hasActiveFilters ? " •" : ""}
           </button>
         </div>
       </div>
 
-      <div className="panel__body--padded entry-timeline-panel__body">
-        {hasImportedLegacyEntries ? (
-          <p className="note">Older entries were imported from the previous system.</p>
-        ) : null}
-
-        {trendSeries.length > 0 ? (
-          <section className="entry-trends">
-            {trendSeries.map((series) => <EntryMeasurementSparkline key={series.key} series={series} />)}
-          </section>
-        ) : null}
-
+      {/* ── Collapsible Filters ── */}
+      {filtersOpen ? (
         <section className="entry-filters">
           <div className="entry-filters__row">
             <label className="field field--full">
@@ -1005,33 +1098,47 @@ export function EntryTimeline({
             </button>
           </div>
         </section>
+      ) : null}
 
-        {error ? <p className="workbench-error">{error}</p> : null}
-        {loading ? <p className="panel__empty">Loading entries…</p> : null}
-        {!loading && filteredEntries.length === 0 ? <p className="panel__empty">{emptyMessage}</p> : null}
+      {/* ── Trend sparklines ── */}
+      {trendSeries.length > 0 ? (
+        <section className="entry-trends">
+          {trendSeries.map((series) => <EntryMeasurementSparkline key={series.key} series={series} />)}
+        </section>
+      ) : null}
 
-        <div className="entry-timeline">
-          {filteredEntries.map((entry) => {
-            const isExpanded = expandedEntryId === entry.id;
-            const isEditing = editingEntryId === entry.id;
-            const entryHref = entryHrefBuilder?.(entry) ?? buildTemplateHref(entryHrefTemplate, entry.id);
+      {/* ── Legacy import notice ── */}
+      {hasImportedLegacyEntries ? (
+        <p className="note" style={{ margin: "0 0 4px" }}>Older entries were imported from the previous system.</p>
+      ) : null}
 
-            return (
-              <article
-                key={entry.id}
-                id={`entry-${entry.id}`}
-                className={[
-                  "entry-card",
-                  entry.flags.includes("important") ? "entry-card--important" : "",
-                  entry.flags.includes("warning") ? "entry-card--warning" : "",
-                  entry.flags.includes("tip") ? "entry-card--tip" : ""
-                ].filter(Boolean).join(" ")}
+      {/* ── Entry list ── */}
+      {error ? <p className="workbench-error">{error}</p> : null}
+      {loading ? <p className="panel__empty">Loading entries…</p> : null}
+      {!loading && filteredEntries.length === 0 ? <p className="panel__empty">{emptyMessage}</p> : null}
+
+      <div className="entry-timeline">
+        {filteredEntries.map((entry) => {
+          const isExpanded = expandedEntryId === entry.id;
+          const isEditing = editingEntryId === entry.id;
+          const entryHref = entryHrefBuilder?.(entry) ?? buildTemplateHref(entryHrefTemplate, entry.id);
+
+          return (
+            <article
+              key={entry.id}
+              id={`entry-${entry.id}`}
+              className={[
+                "entry-card",
+                entry.flags.includes("important") ? "entry-card--important" : "",
+                entry.flags.includes("warning") ? "entry-card--warning" : "",
+                entry.flags.includes("tip") ? "entry-card--tip" : ""
+              ].filter(Boolean).join(" ")}
+            >
+              <button
+                type="button"
+                className="entry-card__summary"
+                onClick={() => setExpandedEntryId((current) => current === entry.id ? null : entry.id)}
               >
-                <button
-                  type="button"
-                  className="entry-card__summary"
-                  onClick={() => setExpandedEntryId((current) => current === entry.id ? null : entry.id)}
-                >
                   <div className="entry-card__summary-main">
                     <div className="entry-card__summary-topline">
                       <EntryTypeBadge entryType={entry.entryType} />
@@ -1132,22 +1239,7 @@ export function EntryTimeline({
             );
           })}
         </div>
-      </div>
 
-      {composerOpen ? (
-        <ModalShell title="Create Entry" onClose={() => setComposerOpen(false)}>
-          <EntryEditor
-            householdId={householdId}
-            entityType={entityType}
-            entityId={entityId}
-            relatedEntries={entries}
-            onSaved={handleSaved}
-            onCancel={() => setComposerOpen(false)}
-            submitLabel="Create Entry"
-            chrome="modal"
-          />
-        </ModalShell>
-      ) : null}
     </section>
   );
 }

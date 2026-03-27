@@ -130,7 +130,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       relationship: assetRelationshipLabels[a.relationship ?? "target"] ?? a.relationship ?? "Linked",
     }));
 
-    // Recent journal entries
+    // Recent log entries
     const recentEntries = entriesResult.items
       .filter((e) => !(e.tags ?? []).includes("dashboard_notepad"))
       .slice(0, 5)

@@ -180,7 +180,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     },
     {
       key: "journal",
-      title: "Recent Journal",
+      title: "Recent Log",
       content: recentEntries.length > 0 ? (
         <div className="dashboard-card__list">
           {recentEntries.map((entry) => (
@@ -191,7 +191,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
           ))}
         </div>
       ) : (
-        <p className="dashboard-card__empty">No journal entries yet</p>
+        <p className="dashboard-card__empty">No log entries yet</p>
       ),
       footerLink: { label: "View log →", href: `${base}/notes${qs}` },
     },

@@ -32,17 +32,9 @@ export default async function ProjectNotesPage({ params, searchParams }: Project
       })),
     ];
 
-    const hasPhases = project.phases.length > 0;
-
     return (
       <section id="project-log">
         <EntryTipsSurface householdId={household.id} queries={queries} />
-        {hasPhases && (
-          <div className="callout callout--info" style={{ marginBottom: "var(--space-4)" }}>
-            <strong>Phase notes</strong> — notes written directly on a phase are scoped to that phase and editable in the{" "}
-            <a href={`/projects/${projectId}/phases`}>Plan tab</a>. They appear above in the recent activity feed.
-          </div>
-        )}
         <EntryTimeline
           householdId={household.id}
           entityType="project"
