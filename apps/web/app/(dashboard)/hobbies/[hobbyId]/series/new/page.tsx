@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { createHobbySeriesAction } from "../../../../../actions";
 import { HobbySeriesWorkbench } from "../../../../../../components/hobby-series-workbench";
@@ -10,21 +11,28 @@ type NewHobbySeriesPageProps = {
 
 export default async function NewHobbySeriesPage({ params }: NewHobbySeriesPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>New Series</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <NewSeriesContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function NewSeriesContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>New Series</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
-    const hobby = await getHobbyDetail(household.id, hobbyId);
+    const hobby = await getHobbyDetail(householdId, hobbyId);
 
     return (
       <>
@@ -38,7 +46,7 @@ export default async function NewHobbySeriesPage({ params }: NewHobbySeriesPageP
         </header>
 
         <div className="page-body">
-          <HobbySeriesWorkbench action={createHobbySeriesAction} householdId={household.id} hobbyId={hobbyId} />
+          <HobbySeriesWorkbench action={createHobbySeriesAction} householdId={householdId} hobbyId={hobbyId} />
         </div>
       </>
     );

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { DemoteToIdeaButton } from "../../../../../components/demote-to-idea-button";
 import { HobbyDangerActions } from "../../../../../components/hobby-danger-actions";
@@ -25,15 +26,23 @@ function statusBadgeClass(status: string): string {
 
 export default async function HobbySettingsPage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
-  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading settings…</div></div>}>
+      <SettingsContent householdId={household.id} hobbyId={hobbyId} timezone={household.timezone} />
+    </Suspense>
+  );
+}
 
+async function SettingsContent({ householdId, hobbyId, timezone }: { householdId: string; hobbyId: string; timezone: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
-    const hobby = await getHobbyDetail(household.id, hobbyId);
+    const [prefs, hobby] = await Promise.all([
+      getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" })),
+      getHobbyDetail(householdId, hobbyId),
+    ]);
     const isPipeline = hobby.lifecycleMode === "pipeline";
     const pipelineSteps = hobby.statusPipeline.sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -161,13 +170,13 @@ export default async function HobbySettingsPage({ params }: HobbySectionPageProp
               Archive hides the hobby from active work without removing its history. Delete removes the hobby and its related records.
             </p>
             <DemoteToIdeaButton
-              householdId={household.id}
+              householdId={householdId}
               sourceType="hobby"
               sourceId={hobbyId}
               sourceName={hobby.name}
             />
             <HobbyDangerActions
-              householdId={household.id}
+              householdId={householdId}
               hobbyId={hobbyId}
               isArchived={hobby.status === "archived"}
             />

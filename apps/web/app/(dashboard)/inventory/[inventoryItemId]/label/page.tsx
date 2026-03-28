@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssetLabelPrintToolbar } from "../../../../../components/asset-label-print-toolbar";
@@ -14,12 +15,20 @@ export default async function InventoryItemLabelPage({ params, searchParams }: I
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const householdIdParam = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
 
-  try {
-    const me = await getMe();
-    const household = me.households.find((h) => h.id === householdIdParam) ?? me.households[0];
-    if (!household) notFound();
+  const me = await getMe();
+  const household = me.households.find((h) => h.id === householdIdParam) ?? me.households[0];
+  if (!household) notFound();
 
-    const item = await getInventoryItemDetail(household.id, inventoryItemId);
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading label…</div></div>}>
+      <LabelContent householdId={household.id} inventoryItemId={inventoryItemId} />
+    </Suspense>
+  );
+}
+
+async function LabelContent({ householdId, inventoryItemId }: { householdId: string; inventoryItemId: string }): Promise<JSX.Element> {
+  try {
+    const item = await getInventoryItemDetail(householdId, inventoryItemId);
 
     const categoryDisplay = item.category
       ? item.category.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
@@ -40,7 +49,7 @@ export default async function InventoryItemLabelPage({ params, searchParams }: I
           </div>
           <div className="inline-actions inline-actions--end">
             <Link
-              href={`/inventory/${inventoryItemId}?householdId=${household.id}`}
+              href={`/inventory/${inventoryItemId}?householdId=${householdId}`}
               className="button button--ghost button--sm"
             >
               ← Item
@@ -53,7 +62,7 @@ export default async function InventoryItemLabelPage({ params, searchParams }: I
           <article className="print-label-card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`/api/households/${household.id}/inventory/${inventoryItemId}/qr?format=svg&size=240`}
+              src={`/api/households/${householdId}/inventory/${inventoryItemId}/qr?format=svg&size=240`}
               alt={`QR code for ${item.name}`}
               className="print-label-card__qr"
             />

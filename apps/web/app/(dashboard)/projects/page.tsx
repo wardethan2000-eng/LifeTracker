@@ -155,10 +155,14 @@ const ProjectAsideSkeleton = (): JSX.Element => (
 );
 
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps): Promise<JSX.Element> {
-  const t = await getTranslations("projects");
-  const tCommon = await getTranslations("common");
-  const params = searchParams ? await searchParams : {};
-  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
+  // Fire getMe() immediately so it runs in parallel with i18n/prefs setup.
+  const mePromise = getMe();
+  const [t, tCommon, params, prefs] = await Promise.all([
+    getTranslations("projects"),
+    getTranslations("common"),
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
+    getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" })),
+  ]);
   const householdId = getParam(params.householdId);
   const statusParam = getParam(params.status);
   const sortParam = getParam(params.sort);
@@ -174,7 +178,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
     : 0;
 
   try {
-    const me = await getMe();
+    const me = await mePromise;
     const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
 
     if (!household) {

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { HobbyCollectionItemDetailSurface } from "../../../../../../components/hobby-collection-item-detail";
 import { ApiError, getHobbyCollectionItem, getHobbyDetail, getHobbyMetrics, getMe } from "../../../../../../lib/api";
@@ -9,18 +10,25 @@ type HobbyCollectionDetailPageProps = {
 
 export default async function HobbyCollectionDetailPage({ params }: HobbyCollectionDetailPageProps): Promise<JSX.Element> {
   const { hobbyId, collectionItemId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) {
+    return <div className="page-body"><p>No household found.</p></div>;
+  }
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <CollectionItemContent householdId={household.id} hobbyId={hobbyId} collectionItemId={collectionItemId} />
+    </Suspense>
+  );
+}
+
+async function CollectionItemContent({ householdId, hobbyId, collectionItemId }: { householdId: string; hobbyId: string; collectionItemId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) {
-      return <div className="page-body"><p>No household found.</p></div>;
-    }
-
     const [hobby, item, metrics] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyCollectionItem(household.id, hobbyId, collectionItemId),
-      getHobbyMetrics(household.id, hobbyId),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyCollectionItem(householdId, hobbyId, collectionItemId),
+      getHobbyMetrics(householdId, hobbyId),
     ]);
 
     return (
@@ -35,7 +43,7 @@ export default async function HobbyCollectionDetailPage({ params }: HobbyCollect
           </div>
         </header>
         <div className="page-body">
-          <HobbyCollectionItemDetailSurface householdId={household.id} hobbyId={hobbyId} item={item} metrics={metrics} />
+          <HobbyCollectionItemDetailSurface householdId={householdId} hobbyId={hobbyId} item={item} metrics={metrics} />
         </div>
       </>
     );

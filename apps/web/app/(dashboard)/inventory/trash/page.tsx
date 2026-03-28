@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { ApiError, getHouseholdInventoryTrash, getMe } from "../../../../lib/api";
 import { formatDate } from "../../../../lib/formatters";
@@ -11,6 +12,14 @@ export default async function InventoryTrashPage(): Promise<JSX.Element> {
     return <p className="panel__empty">No household found.</p>;
   }
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading trash…</div></div>}>
+      <TrashContent householdId={householdId} />
+    </Suspense>
+  );
+}
+
+async function TrashContent({ householdId }: { householdId: string }): Promise<JSX.Element> {
   let trashedItems: Awaited<ReturnType<typeof getHouseholdInventoryTrash>> = [];
 
   try {

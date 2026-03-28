@@ -51,6 +51,7 @@ Run `pnpm db:generate` after every Prisma schema change before writing code that
 ## Web app conventions
 
 - App Router with server components by default. Client components use `"use client"` directive.
+- **Streaming Suspense for all pages:** Every `page.tsx` that fetches data beyond `getMe()` must use a deferred async server component wrapped in `<Suspense>`. The page function itself stays thin (only `getMe()` + household guard + searchParams parsing). See the dedicated "Streaming Suspense page pattern" section below for the full specification and code template.
 - API client lives in `apps/web/lib/api.ts` — a typed wrapper around fetch that handles auth headers and Zod parsing. Add new methods here for new endpoints.
 - API proxy: All browser-to-API requests that need to pass through the Next.js server (for cookie forwarding or to avoid CORS) use a catch-all proxy at `apps/web/app/api/[...path]/route.ts`. It forwards requests to `${LIFEKEEPER_API_BASE_URL}/v1/${path}` with auth header passthrough. The shared proxy utility lives in `apps/web/lib/api-proxy.ts`. Do not create individual proxy route files for new endpoints — the catch-all handles them automatically.
 - CSS is global in `apps/web/app/globals.css` — no CSS modules, no Tailwind. Use existing CSS custom properties (e.g. `var(--ink)`, `var(--surface)`, `var(--accent)`, `var(--border)`).
@@ -128,12 +129,62 @@ When passing `statusVariant` to `WorkspaceLayout`, use the string variants: `"su
 - Never use `button--primary` for destructive actions.
 - Group all destructive actions for an entity in a "Danger Zone" section at the bottom of the entity's Settings tab, visually separated from other content.
 
+## Streaming Suspense page pattern (REQUIRED)
+
+Every `page.tsx` under `(dashboard)/` that fetches data beyond `getMe()` **must** use the streaming Suspense pattern. This ensures the page shell renders instantly while heavy API calls stream in.
+
+### Structure
+
+```tsx
+import { Suspense, type JSX } from "react";
+
+// Deferred async server component — does the heavy fetching
+async function PageContent({ householdId, ...props }: { householdId: string }): Promise<JSX.Element> {
+  const [data1, data2] = await Promise.all([
+    getHeavyData(householdId),
+    getMoreData(householdId),
+  ]);
+  return <ClientOrServerUI data1={data1} data2={data2} />;
+}
+
+// Default export — thin shell, renders instantly
+export default async function Page({ params, searchParams }): Promise<JSX.Element> {
+  const me = await getMe(); // cached, essentially free
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__body--padded"><p className="note">Loading…</p></div></div>}>
+      <PageContent householdId={household.id} />
+    </Suspense>
+  );
+}
+```
+
+### Rules
+
+- **`getMe()` stays in the page function.** It is wrapped in `React.cache()` with 5-minute ISR and is essentially free. Layout files already call it, so subpage calls are cache hits.
+- **All other API calls go in the deferred component** (`PageContent`, `SettingsContent`, etc.). This includes `getHouseholdAssets`, `getHouseholdNotifications`, `getDisplayPreferences`, `getEntry`, `getCanvas`, etc.
+- **Pass primitives as props** to the deferred component — `householdId: string`, `entityId: string`, searchParam values. Never pass the full `household` object (it would serialize the entire object into the RSC payload).
+- **Error handling inside the deferred component:** Wrap API calls in try/catch. On `ApiError`, render a fallback `.panel` with the error message. Re-throw unexpected errors.
+- **Fallback content** should be a minimal skeleton matching the page header structure (e.g., `<header className="page-header"><h1>Title</h1></header>` + a loading panel). Keep fallbacks lightweight.
+- **Pages that only call `getMe()`** (e.g., pages that just render a client component with `householdId`) do not need Suspense — they are already fast enough.
+- **`getDisplayPreferences()`** is cached with 60s ISR. It can live in either the page function or the deferred component depending on whether its result is needed for the page shell.
+- **Module-level helpers** (formatters, constants, option arrays, helper functions) stay at module scope — they are not moved into the deferred component.
+- **When the page has searchParams** that control query filters (cursor, status, etc.), parse them in the page function and pass the parsed values as props to the deferred component.
+
+### When NOT to use Suspense
+
+- Redirect pages (e.g., `costs/page.tsx` → `/analytics`)
+- Pages that only call `getMe()` and render a client component
+- Creation pages (`/new`) that only need `getMe()` for the household ID
+
 ## Error and loading feedback
 
 - **Server action errors:** Render inline below the form that triggered the action using `<p style={{ color: "var(--tone-danger, red)" }}>`. Never use global toasts or banners for form submission errors.
 - **Loading state:** While a `useTransition` action is pending, `disabled={isPending}` all interactive elements and change the submit label to `"Saving…"` / `"Deleting…"`. No spinner overlays for button-level actions.
-- **Page-level loading:** Add a `loading.tsx` to every dynamic route under `(dashboard)/`. Render a minimal `.panel` skeleton.
-- **API error fallback:** In page server components, catch `ApiError` and render a fallback `.panel` with the error message. Re-throw unexpected (non-API) errors.
+- **Page-level loading:** Add a `loading.tsx` to every dynamic route under `(dashboard)/`. Render a minimal `.panel` skeleton. This is the route-segment-level fallback; the streaming Suspense pattern above provides finer-grained per-section loading.
+- **API error fallback:** In deferred Suspense content components, catch `ApiError` and render a fallback `.panel` with the error message. Re-throw unexpected (non-API) errors. Do not wrap the entire page function in try/catch — errors in the deferred component are caught by the Suspense boundary.
 
 ## Shared types contract
 
@@ -156,7 +207,8 @@ Presets live in `packages/presets/src/library.ts`. Each preset is built with hel
 3. Types: add Zod schemas and TS types in `packages/types/src/index.ts`.
 4. API routes: create or extend route files in `apps/api/src/routes/`. Wire activity log and search index.
 5. Web client: add API methods in `apps/web/lib/api.ts`, then build UI components.
-6. Seed data: update `apps/api/prisma/seed.ts` if the feature needs demo data.
+6. **Page components: follow the streaming Suspense pattern.** Every new `page.tsx` that fetches data beyond `getMe()` must use a deferred async server component wrapped in `<Suspense>`. See the "Streaming Suspense page pattern" section above.
+7. Seed data: update `apps/api/prisma/seed.ts` if the feature needs demo data.
 
 ## Onboarding walkthrough maintenance
 

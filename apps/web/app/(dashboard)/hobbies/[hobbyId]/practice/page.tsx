@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { HobbyPracticeTab } from "../../../../../components/hobby-practice-tab";
 import {
   ApiError,
@@ -15,22 +16,29 @@ type HobbySectionPageProps = {
 
 export default async function HobbyPracticePage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading practice…</div></div>}>
+      <PracticeContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function PracticeContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
     const [hobby, practiceGoals, practiceRoutines, metrics] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      listHobbyPracticeGoals(household.id, hobbyId, { limit: 100 }),
-      listHobbyPracticeRoutines(household.id, hobbyId, { limit: 100 }),
-      getHobbyMetrics(household.id, hobbyId),
+      getHobbyDetail(householdId, hobbyId),
+      listHobbyPracticeGoals(householdId, hobbyId, { limit: 100 }),
+      listHobbyPracticeRoutines(householdId, hobbyId, { limit: 100 }),
+      getHobbyMetrics(householdId, hobbyId),
     ]);
 
     return (
       <HobbyPracticeTab
-        householdId={household.id}
+        householdId={householdId}
         hobbyId={hobbyId}
         activityMode={hobby.activityMode}
         goals={practiceGoals.items}

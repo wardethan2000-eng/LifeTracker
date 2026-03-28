@@ -1172,7 +1172,7 @@ All client components that call a server action via `useTransition` must:
 
 ### Page-level loading
 
-Every dynamic route under `(dashboard)/` must have a `loading.tsx` file. It renders while the server component data fetches. Use a simple `.panel` skeleton with a muted animated background or a spinner:
+Every dynamic route under `(dashboard)/` must have a `loading.tsx` file. It renders while the full route segment loads. Use a simple `.panel` skeleton:
 
 ```tsx
 export default function Loading() {
@@ -1180,22 +1180,74 @@ export default function Loading() {
 }
 ```
 
-### API error fallback
+### Streaming Suspense page pattern
 
-In page server components, wrap API calls in try/catch. On `ApiError`, render a fallback panel showing the error message. Do not let API errors propagate to the global Next.js error boundary unless absolutely necessary:
+In addition to `loading.tsx`, every `page.tsx` that fetches data beyond `getMe()` **must** use the streaming Suspense pattern. This provides finer-grained loading — the page shell (header, tabs, nav) renders instantly while heavy API calls stream in asynchronously.
+
+**Structure:**
 
 ```tsx
-catch (error) {
-  if (error instanceof ApiError) {
-    return (
-      <div className="panel">
-        <div className="panel__body--padded">
-          <p>Failed to load: {error.message}</p>
+import { Suspense, type JSX } from "react";
+
+// Deferred component — contains all heavy API calls
+async function PageContent({ householdId }: { householdId: string }): Promise<JSX.Element> {
+  const data = await getHeavyData(householdId);
+  return <MyComponent data={data} />;
+}
+
+// Page function — thin shell, renders instantly
+export default async function MyPage(): Promise<JSX.Element> {
+  const me = await getMe(); // cached, fast
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
+
+  return (
+    <>
+      <header className="page-header"><h1>My Page</h1></header>
+      <Suspense fallback={
+        <div className="page-body">
+          <div className="panel"><div className="panel__body--padded">
+            <p className="note">Loading…</p>
+          </div></div>
         </div>
-      </div>
-    );
+      }>
+        <PageContent householdId={household.id} />
+      </Suspense>
+    </>
+  );
+}
+```
+
+**Key rules:**
+- `getMe()` is cached (5-min ISR) and stays in the page function. All other API calls go in the deferred component.
+- Pass only primitives (`householdId`, `entityId`, parsed searchParams) as props to the deferred component.
+- Fallback content should match the page's visual structure (show the same header, render a skeleton panel where content will appear).
+- Pages that only call `getMe()` do not need Suspense.
+- Module-level helpers (formatters, constants) stay at module scope, not inside the deferred component.
+
+See `AGENTS.md` → "Streaming Suspense page pattern" for the full specification and edge cases.
+
+### API error fallback
+
+Inside deferred Suspense content components, wrap API calls in try/catch. On `ApiError`, render a fallback panel showing the error message. Do not let API errors propagate to the global Next.js error boundary unless absolutely necessary:
+
+```tsx
+async function PageContent({ householdId }: { householdId: string }) {
+  try {
+    const data = await getHeavyData(householdId);
+    return <MyComponent data={data} />;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return (
+        <div className="panel">
+          <div className="panel__body--padded">
+            <p>Failed to load: {error.message}</p>
+          </div>
+        </div>
+      );
+    }
+    throw error; // re-throw unexpected errors
   }
-  throw error; // re-throw unexpected errors
 }
 ```
 

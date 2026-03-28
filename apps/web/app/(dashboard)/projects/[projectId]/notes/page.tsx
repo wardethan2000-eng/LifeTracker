@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { EntryTimeline, EntryTipsSurface } from "../../../../../components/entry-system";
 import { ApiError, getMe, getProjectDetail } from "../../../../../lib/api";
 
@@ -12,18 +13,24 @@ export default async function ProjectNotesPage({ params, searchParams }: Project
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+
+  if (!household) {
+    return <p>No household found.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading project log…</div></div>}>
+      <NotesContent householdId={household.id} projectId={projectId} />
+    </Suspense>
+  );
+}
+
+async function NotesContent({ householdId, projectId }: { householdId: string; projectId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+    const project = await getProjectDetail(householdId, projectId);
 
-    if (!household) {
-      return <p>No household found.</p>;
-    }
-
-    const project = await getProjectDetail(household.id, projectId);
-
-    // Build queries for the project itself and each of its phases so all
-    // project-scoped notes appear together in the unified log.
     const queries = [
       { entityType: "project" as const, entityId: projectId },
       ...project.phases.map((phase) => ({
@@ -34,9 +41,9 @@ export default async function ProjectNotesPage({ params, searchParams }: Project
 
     return (
       <section id="project-log">
-        <EntryTipsSurface householdId={household.id} queries={queries} />
+        <EntryTipsSurface householdId={householdId} queries={queries} />
         <EntryTimeline
-          householdId={household.id}
+          householdId={householdId}
           entityType="project"
           entityId={projectId}
           title="Project Log"

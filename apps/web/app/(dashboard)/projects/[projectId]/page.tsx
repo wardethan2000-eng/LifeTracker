@@ -3,6 +3,7 @@ import type {
   ProjectPhaseProgress,
 } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import {
   ApiError,
   getMe,
@@ -36,38 +37,24 @@ const assetRelationshipLabels: Record<string, string> = {
   supports: "Supports"
 };
 
-export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps): Promise<JSX.Element> {
-  const routeParams = await params;
-  const query = searchParams ? await searchParams : {};
-  const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
-
+// ── Deferred overview content ──────────────────────────────
+async function ProjectOverviewContent({ householdId, projectId, qs }: { householdId: string; projectId: string; qs: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return (
-        <p>No household found. <Link href="/projects" className="text-link">← Projects</Link>.</p>
-      );
-    }
-
     const [project, entriesResult, sourceIdea, canvases, pinnedResult, overviewPins] = await Promise.all([
-      getProjectDetail(household.id, routeParams.projectId),
-      getEntries(household.id, {
+      getProjectDetail(householdId, projectId),
+      getEntries(householdId, {
         entityType: "project",
-        entityId: routeParams.projectId,
+        entityId: projectId,
         limit: 5,
         sortBy: "entryDate",
         excludeFlags: ["archived"],
         tags: undefined,
       }).catch(() => ({ items: [], nextCursor: null })),
-      getSourceIdea(household.id, "project", routeParams.projectId).catch(() => null),
-      getCanvasesByEntityWithGeometry(household.id, "project", routeParams.projectId).catch(() => []),
-      getEntries(household.id, { entityType: "project", entityId: routeParams.projectId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
-      getOverviewPins("project", routeParams.projectId).catch(() => []),
+      getSourceIdea(householdId, "project", projectId).catch(() => null),
+      getCanvasesByEntityWithGeometry(householdId, "project", projectId).catch(() => []),
+      getEntries(householdId, { entityType: "project", entityId: projectId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
+      getOverviewPins("project", projectId).catch(() => []),
     ]);
-
-    const qs = `?householdId=${household.id}`;
 
     const quickTodos = project.tasks.filter((task) => task.taskType === "quick");
     const totalSpent = project.expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -152,14 +139,14 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
         )}
         <PinnedOverviewSection
-          householdId={household.id}
+          householdId={householdId}
           entityType="project"
-          entityId={routeParams.projectId}
+          entityId={projectId}
           entries={pinnedResult.items}
           overviewPins={overviewPins}
         />
         <ProjectDashboard
-        householdId={household.id}
+        householdId={householdId}
         projectId={project.id}
         qs={qs}
         status={project.status}
@@ -203,4 +190,27 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
     throw error;
   }
+}
+
+// ── Page ──────────────────────────────────────────────────
+export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps): Promise<JSX.Element> {
+  const [routeParams, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
+  const householdIdParam = typeof query.householdId === "string" ? query.householdId : undefined;
+
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdIdParam) ?? me.households[0];
+
+  if (!household) {
+    return (
+      <p>No household found. <Link href="/projects" className="text-link">← Projects</Link>.</p>
+    );
+  }
+
+  const qs = `?householdId=${household.id}`;
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <ProjectOverviewContent householdId={household.id} projectId={routeParams.projectId} qs={qs} />
+    </Suspense>
+  );
 }

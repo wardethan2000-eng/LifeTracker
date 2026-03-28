@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { JSX } from "react";
+import { Suspense, type JSX } from "react";
 import { CopyTextButton } from "../../../components/copy-text-button";
 import {
   acceptInvitationAction,
@@ -14,27 +14,23 @@ type InvitationsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function InvitationsPage({ searchParams }: InvitationsPageProps): Promise<JSX.Element> {
-  const params = searchParams ? await searchParams : {};
-  const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
-  const token = typeof params.token === "string" ? params.token : "";
-
+async function InvitationsContent({ householdId, token }: { householdId: string; token: string }): Promise<JSX.Element> {
+  let invitations;
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
+    invitations = await getHouseholdInvitations(householdId);
+  } catch (error) {
+    if (error instanceof ApiError) {
       return (
         <>
           <PageHeader title="Invitations" />
           <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+            <div className="panel"><div className="panel__body--padded"><p>Failed to load invitations: {error.message}</p></div></div>
           </div>
         </>
       );
     }
-
-    const invitations = await getHouseholdInvitations(household.id);
+    throw error;
+  }
 
     return (
       <>
@@ -65,7 +61,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
             </div>
             <div className="panel__body--padded">
               <form action={createInvitationAction} className="form-grid">
-                <input type="hidden" name="householdId" value={household.id} />
+                <input type="hidden" name="householdId" value={householdId} />
                 <label className="field">
                   <span>Email</span>
                   <input type="email" name="email" placeholder="member@example.com" required />
@@ -93,6 +89,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
                       <div className="schedule-card__summary">
                         <div>
                           <h3>{invitation.email}</h3>
+
                           <p style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
                             Created {formatDateTime(invitation.createdAt)} • Expires {formatDateTime(invitation.expiresAt)}
                           </p>
@@ -113,7 +110,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
                       </dl>
                       {invitation.status === "pending" ? (
                         <form action={revokeInvitationAction} className="inline-actions inline-actions--end" style={{ marginTop: "16px" }}>
-                          <input type="hidden" name="householdId" value={household.id} />
+                          <input type="hidden" name="householdId" value={householdId} />
                           <input type="hidden" name="invitationId" value={invitation.id} />
                           <button type="submit" className="button button--danger">Revoke Invitation</button>
                         </form>
@@ -127,22 +124,30 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
         </div>
       </>
     );
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return (
-        <>
-          <PageHeader title="Invitations" />
-          <div className="page-body">
-            <div className="panel">
-              <div className="panel__body--padded">
-                <p>Failed to load invitations: {error.message}</p>
-              </div>
-            </div>
-          </div>
-        </>
-      );
-    }
+}
 
-    throw error;
+export default async function InvitationsPage({ searchParams }: InvitationsPageProps): Promise<JSX.Element> {
+  const params = searchParams ? await searchParams : {};
+  const householdIdParam = typeof params.householdId === "string" ? params.householdId : undefined;
+  const token = typeof params.token === "string" ? params.token : "";
+
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdIdParam) ?? me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <PageHeader title="Invitations" />
+        <div className="page-body">
+          <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+        </div>
+      </>
+    );
   }
+
+  return (
+    <Suspense fallback={<><PageHeader title="Invitations" /><div className="page-body"><div className="panel"><div className="panel__body--padded"><p className="note">Loading…</p></div></div></div></>}>
+      <InvitationsContent householdId={household.id} token={token} />
+    </Suspense>
+  );
 }

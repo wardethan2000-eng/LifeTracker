@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { CopyTextButton } from "../../../../components/copy-text-button";
 import {
   updateServiceProviderAction
@@ -21,19 +22,27 @@ const formatContactValue = (value: string | null): string => value ?? "Not recor
 
 export default async function ServiceProviderOverviewPage({ params }: ServiceProviderDetailPageProps): Promise<JSX.Element> {
   const { providerId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+
+  if (!household) {
+    return <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link>.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading provider details…</div></div>}>
+      <ProviderDetailContent householdId={household.id} providerId={providerId} />
+    </Suspense>
+  );
+}
+
+async function ProviderDetailContent({ householdId, providerId }: { householdId: string; providerId: string }): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
 
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link>.</p>;
-    }
-
     const [provider, spend] = await Promise.all([
-      getServiceProvider(household.id, providerId),
-      getServiceProviderSpend(household.id)
+      getServiceProvider(householdId, providerId),
+      getServiceProviderSpend(householdId)
     ]);
 
     const spendSummary = spend.providers.find((entry) => entry.providerId === provider.id) ?? null;
@@ -71,7 +80,7 @@ export default async function ServiceProviderOverviewPage({ params }: ServicePro
             </div>
             <div className="panel__body--padded">
               <form action={updateServiceProviderAction} className="form-grid">
-                <input type="hidden" name="householdId" value={household.id} />
+                <input type="hidden" name="householdId" value={householdId} />
                 <input type="hidden" name="providerId" value={provider.id} />
                 <label className="field"><span>Name</span><input type="text" name="name" defaultValue={provider.name} required /></label>
                 <label className="field"><span>Specialty</span><input type="text" name="specialty" defaultValue={provider.specialty ?? ""} /></label>

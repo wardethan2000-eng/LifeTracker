@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssetLabelPrintToolbar } from "../../../../../../components/asset-label-print-toolbar";
@@ -15,15 +16,20 @@ export default async function SpaceLabelPage({ params, searchParams }: SpaceLabe
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const householdIdParam = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((h) => h.id === householdIdParam) ?? me.households[0];
+  if (!household) notFound();
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading label…</div></div>}>
+      <SpaceLabelContent householdId={household.id} spaceId={spaceId} />
+    </Suspense>
+  );
+}
+
+async function SpaceLabelContent({ householdId, spaceId }: { householdId: string; spaceId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((h) => h.id === householdIdParam) ?? me.households[0];
-
-    if (!household) {
-      notFound();
-    }
-
-    const space = await getSpace(household.id, spaceId);
+    const space = await getSpace(householdId, spaceId);
     const breadcrumbPath = space.breadcrumb.map((s) => s.name).join(" › ");
 
     return (
@@ -37,7 +43,7 @@ export default async function SpaceLabelPage({ params, searchParams }: SpaceLabe
           </div>
           <div className="inline-actions inline-actions--end">
             <Link
-              href={`/inventory/spaces/${spaceId}?householdId=${household.id}`}
+              href={`/inventory/spaces/${spaceId}?householdId=${householdId}`}
               className="button button--ghost button--sm"
             >
               ← Space
@@ -49,7 +55,7 @@ export default async function SpaceLabelPage({ params, searchParams }: SpaceLabe
         <section className="print-label-sheet">
           <article className="print-label-card">
             <img
-              src={`/api/households/${household.id}/spaces/${spaceId}/qr?format=svg&size=240`}
+              src={`/api/households/${householdId}/spaces/${spaceId}/qr?format=svg&size=240`}
               alt={`QR code for ${space.name}`}
               className="print-label-card__qr"
             />

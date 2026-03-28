@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import {
   createServiceProviderAction,
   deleteServiceProviderAction,
@@ -69,52 +70,9 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
             </div>
           </section>
 
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Household Providers ({providers.length})</h2>
-            </div>
-            <div className="panel__body">
-              {providers.length === 0 ? (
-                <EmptyState
-                  icon="wrench"
-                  title="No providers yet"
-                  message="Add a contractor, shop, or vendor to start tracking your service providers."
-                />
-              ) : (
-                <div className="schedule-stack">
-                  {providers.map((provider) => (
-                    <div key={provider.id} className={`schedule-card${provider.id === highlightId ? " schedule-card--highlight" : ""}`}>
-                      <form action={updateServiceProviderAction}>
-                        <input type="hidden" name="householdId" value={household.id} />
-                        <input type="hidden" name="providerId" value={provider.id} />
-                        <div className="inline-actions inline-actions--end" style={{ marginBottom: 16 }}>
-                          <Link href={buildProviderHref(household.id, provider.id)} className="button button--ghost button--sm">Open Details</Link>
-                        </div>
-                        <div className="form-grid">
-                          <label className="field"><span>Name</span><input type="text" name="name" defaultValue={provider.name} required /></label>
-                          <label className="field"><span>Specialty</span><input type="text" name="specialty" defaultValue={provider.specialty ?? ""} /></label>
-                          <label className="field"><span>Phone</span><input type="tel" name="phone" defaultValue={provider.phone ?? ""} /></label>
-                          <label className="field"><span>Email</span><input type="email" name="email" defaultValue={provider.email ?? ""} /></label>
-                          <label className="field"><span>Website</span><input type="url" name="website" defaultValue={provider.website ?? ""} /></label>
-                          <label className="field"><span>Rating</span><input type="number" name="rating" min="1" max="5" step="1" defaultValue={provider.rating ?? ""} /></label>
-                          <label className="field field--full"><span>Address</span><input type="text" name="address" defaultValue={provider.address ?? ""} /></label>
-                          <label className="field field--full"><span>Notes</span><textarea name="notes" rows={2} defaultValue={provider.notes ?? ""} /></label>
-                        </div>
-                        <div className="inline-actions" style={{ marginTop: 16 }}>
-                          <button type="submit" className="button button--ghost">Save Provider</button>
-                        </div>
-                      </form>
-                      <form action={deleteServiceProviderAction} className="inline-actions inline-actions--end">
-                        <input type="hidden" name="householdId" value={household.id} />
-                        <input type="hidden" name="providerId" value={provider.id} />
-                        <button type="submit" className="button button--danger">Delete Provider</button>
-                      </form>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
+          <Suspense fallback={<div className="panel"><div className="panel__empty">Loading providers…</div></div>}>
+            <ProvidersListContent householdId={household.id} highlightId={highlightId} />
+          </Suspense>
         </div>
       </>
     );
@@ -136,4 +94,57 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
 
     throw error;
   }
+}
+
+async function ProvidersListContent({ householdId, highlightId }: { householdId: string; highlightId: string | undefined }): Promise<JSX.Element> {
+  const providers = await getHouseholdServiceProviders(householdId);
+
+  return (
+    <section className="panel">
+      <div className="panel__header">
+        <h2>Household Providers ({providers.length})</h2>
+      </div>
+      <div className="panel__body">
+        {providers.length === 0 ? (
+          <EmptyState
+            icon="wrench"
+            title="No providers yet"
+            message="Add a contractor, shop, or vendor to start tracking your service providers."
+          />
+        ) : (
+          <div className="schedule-stack">
+            {providers.map((provider) => (
+              <div key={provider.id} className={`schedule-card${provider.id === highlightId ? " schedule-card--highlight" : ""}`}>
+                <form action={updateServiceProviderAction}>
+                  <input type="hidden" name="householdId" value={householdId} />
+                  <input type="hidden" name="providerId" value={provider.id} />
+                  <div className="inline-actions inline-actions--end" style={{ marginBottom: 16 }}>
+                    <Link href={`/service-providers/${provider.id}?householdId=${householdId}`} className="button button--ghost button--sm">Open Details</Link>
+                  </div>
+                  <div className="form-grid">
+                    <label className="field"><span>Name</span><input type="text" name="name" defaultValue={provider.name} required /></label>
+                    <label className="field"><span>Specialty</span><input type="text" name="specialty" defaultValue={provider.specialty ?? ""} /></label>
+                    <label className="field"><span>Phone</span><input type="tel" name="phone" defaultValue={provider.phone ?? ""} /></label>
+                    <label className="field"><span>Email</span><input type="email" name="email" defaultValue={provider.email ?? ""} /></label>
+                    <label className="field"><span>Website</span><input type="url" name="website" defaultValue={provider.website ?? ""} /></label>
+                    <label className="field"><span>Rating</span><input type="number" name="rating" min="1" max="5" step="1" defaultValue={provider.rating ?? ""} /></label>
+                    <label className="field field--full"><span>Address</span><input type="text" name="address" defaultValue={provider.address ?? ""} /></label>
+                    <label className="field field--full"><span>Notes</span><textarea name="notes" rows={2} defaultValue={provider.notes ?? ""} /></label>
+                  </div>
+                  <div className="inline-actions" style={{ marginTop: 16 }}>
+                    <button type="submit" className="button button--ghost">Save Provider</button>
+                  </div>
+                </form>
+                <form action={deleteServiceProviderAction} className="inline-actions inline-actions--end">
+                  <input type="hidden" name="householdId" value={householdId} />
+                  <input type="hidden" name="providerId" value={provider.id} />
+                  <button type="submit" className="button button--danger">Delete Provider</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }

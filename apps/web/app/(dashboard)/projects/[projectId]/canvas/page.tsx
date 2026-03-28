@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getCanvasesByEntityWithGeometry, getMe } from "../../../../../lib/api";
 import { ProjectCanvasList } from "../../../../../components/project-canvas-list";
 
@@ -15,20 +16,28 @@ export default async function ProjectCanvasPage({
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((h) => h.id === householdId) ?? me.households[0];
+
+  if (!household) {
+    return <p>No household found.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading canvases…</div></div>}>
+      <CanvasContent householdId={household.id} projectId={projectId} />
+    </Suspense>
+  );
+}
+
+async function CanvasContent({ householdId, projectId }: { householdId: string; projectId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((h) => h.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return <p>No household found.</p>;
-    }
-
-    const canvases = await getCanvasesByEntityWithGeometry(household.id, "project", projectId);
+    const canvases = await getCanvasesByEntityWithGeometry(householdId, "project", projectId);
 
     return (
       <section id="project-canvas" style={{ padding: "16px 0" }}>
         <ProjectCanvasList
-          householdId={household.id}
+          householdId={householdId}
           projectId={projectId}
           initialCanvases={canvases}
         />

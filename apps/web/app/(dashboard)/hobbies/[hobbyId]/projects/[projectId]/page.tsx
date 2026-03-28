@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { HobbyProjectDetailSurface } from "../../../../../../components/hobby-project-detail";
 import {
@@ -16,19 +17,26 @@ type HobbyProjectDetailPageProps = {
 
 export default async function HobbyProjectDetailPage({ params }: HobbyProjectDetailPageProps): Promise<JSX.Element> {
   const { hobbyId, projectId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) {
+    return <div className="page-body"><p>No household found.</p></div>;
+  }
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading project…</div></div>}>
+      <ProjectContent householdId={household.id} hobbyId={hobbyId} projectId={projectId} />
+    </Suspense>
+  );
+}
+
+async function ProjectContent({ householdId, hobbyId, projectId }: { householdId: string; hobbyId: string; projectId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) {
-      return <div className="page-body"><p>No household found.</p></div>;
-    }
-
     const [hobby, project, workLogs, inventory] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyProject(household.id, hobbyId, projectId),
-      listHobbyProjectWorkLogs(household.id, hobbyId, projectId, { limit: 100 }),
-      getHouseholdInventory(household.id, { limit: 200 }),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyProject(householdId, hobbyId, projectId),
+      listHobbyProjectWorkLogs(householdId, hobbyId, projectId, { limit: 100 }),
+      getHouseholdInventory(householdId, { limit: 200 }),
     ]);
 
     return (
@@ -45,7 +53,7 @@ export default async function HobbyProjectDetailPage({ params }: HobbyProjectDet
         </header>
         <div className="page-body">
           <HobbyProjectDetailSurface
-            householdId={household.id}
+            householdId={householdId}
             hobbyId={hobbyId}
             project={project}
             workLogs={workLogs.items}

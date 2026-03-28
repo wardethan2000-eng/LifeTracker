@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import {
   getAssetDetail,
   getHouseholdProjects,
@@ -12,6 +13,15 @@ type AssetRelationshipsPageProps = {
 
 export default async function AssetRelationshipsPage({ params }: AssetRelationshipsPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading relationships…</div></div>}>
+      <RelationshipsContent assetId={assetId} />
+    </Suspense>
+  );
+}
+
+async function RelationshipsContent({ assetId }: { assetId: string }): Promise<JSX.Element> {
   const detail = await getAssetDetail(assetId);
   const householdId = detail.asset.householdId;
 

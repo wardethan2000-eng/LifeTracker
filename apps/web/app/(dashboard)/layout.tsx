@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { getDisplayPreferences, getHouseholdDashboard, getMe } from "../../lib/api";
+import { getDisplayPreferences, getMe } from "../../lib/api";
 import { SearchCommandPaletteLazy } from "../../components/search-command-palette-lazy";
 import { RoutePrefetcher } from "../../components/route-prefetcher";
 import { RealtimeStatusIndicator } from "../../components/realtime-status-indicator";
@@ -76,34 +76,25 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   let userRole = "Member";
   let fallbackHouseholdId: string | null = null;
   let householdTimezone = "America/New_York";
-  let maintenanceBadge = 0;
+  // getDisplayPreferences and getMe have no dependency on each other — run together.
+  const [displayPrefsResult, meResult] = await Promise.allSettled([
+    getDisplayPreferences(),
+    getMe()
+  ]);
+  const resolvedDisplayPreferences = displayPrefsResult.status === "fulfilled"
+    ? displayPrefsResult.value
+    : { pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" };
 
-  const [displayPreferences] = await Promise.allSettled([getDisplayPreferences()]);
-  const resolvedDisplayPreferences = displayPreferences.status === "fulfilled" ? displayPreferences.value : { pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" };
-
-  try {
-    const me = await getMe();
+  if (meResult.status === "fulfilled") {
+    const me = meResult.value;
     userName = me.user.displayName ?? me.user.email ?? "User";
     userRole = me.households[0] ? "Owner" : "Member";
     fallbackHouseholdId = me.households[0]?.id ?? null;
     householdTimezone = me.households[0]?.timezone ?? "America/New_York";
-
-    if (fallbackHouseholdId) {
-      try {
-        const dashboard = await getHouseholdDashboard(fallbackHouseholdId);
-        maintenanceBadge = dashboard.stats.overdueScheduleCount + dashboard.stats.dueScheduleCount;
-      } catch {
-        // Badge counts are best-effort
-      }
-    }
-  } catch {
-    // Shell still renders even if user fetch fails.
   }
 
-  const navGroups = buildNavGroups(t, {
-    maintenance: maintenanceBadge,
-    notifications: 0,
-  });
+  // Maintenance badge is loaded asynchronously by SidebarNav on the client.
+  const navGroups = buildNavGroups(t, { maintenance: 0, notifications: 0 });
 
   const initials = userName
     .split(/\s+/)

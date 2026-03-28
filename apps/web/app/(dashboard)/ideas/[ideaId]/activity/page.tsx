@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import type { ActivityLog } from "@lifekeeper/types";
 import { getDisplayPreferences, getHouseholdActivity, getIdea, getMe } from "../../../../../lib/api";
 import { formatDateTime } from "../../../../../lib/formatters";
@@ -61,6 +62,14 @@ export default async function IdeaActivityPage({ params, searchParams }: IdeaAct
     return <p>No household found.</p>;
   }
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading activity…</div></div>}>
+      <ActivityContent householdId={household.id} ideaId={ideaId} cursor={cursor} history={history} />
+    </Suspense>
+  );
+}
+
+async function ActivityContent({ householdId, ideaId, cursor, history }: { householdId: string; ideaId: string; cursor: string | undefined; history: string[] }): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({
     pageSize: 25,
     dateFormat: "US" as const,
@@ -82,7 +91,7 @@ export default async function IdeaActivityPage({ params, searchParams }: IdeaAct
 
   const limit = 50;
 
-  const activity = await getHouseholdActivity(household.id, {
+  const activity = await getHouseholdActivity(householdId, {
     entityType: "idea",
     entityId: ideaId,
     ...(cursor ? { cursor } : {}),

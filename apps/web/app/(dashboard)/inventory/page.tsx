@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
 import { InventoryListWorkspace } from "../../../components/inventory-list-workspace";
@@ -85,9 +86,13 @@ const buildInventoryHref = (householdId: string, params?: Record<string, string 
 const buildInventoryItemHref = (householdId: string, inventoryItemId: string): string => `/inventory/${inventoryItemId}?householdId=${householdId}`;
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps): Promise<JSX.Element> {
-  const t = await getTranslations("inventory");
-  const tCommon = await getTranslations("common");
-  const params = searchParams ? await searchParams : {};
+  // Fire getMe() immediately so it runs in parallel with i18n/params setup.
+  const mePromise = getMe();
+  const [t, tCommon, params] = await Promise.all([
+    getTranslations("inventory"),
+    getTranslations("common"),
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
+  ]);
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
   const activeTab = typeof params.tab === "string" && params.tab === "spaces" ? "spaces" : "inventory";
@@ -95,37 +100,83 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const searchFilter = typeof params.search === "string" && params.search.length > 0 ? params.search : undefined;
   const categoryFilter = typeof params.category === "string" && params.category.length > 0 ? params.category : undefined;
   const sortParam = typeof params.sort === "string" ? params.sort : undefined;
+
+  const me = await mePromise;
+  const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>{t("pageTitle")}</h1></header>
+        <div className="page-body">
+          <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={
+      <>
+        <header className="page-header">
+          <div><h1>{t("pageTitle")}</h1><p style={{ marginTop: 6 }}>{t("pageSubtitle")}</p></div>
+        </header>
+        <div className="page-body"><div className="panel"><div className="panel__empty">Loading inventory…</div></div></div>
+      </>
+    }>
+      <InventoryContent
+        householdId={household.id}
+        highlightId={highlightId}
+        activeTab={activeTab}
+        itemTypeFilter={itemTypeFilter}
+        searchFilter={searchFilter}
+        categoryFilter={categoryFilter}
+        sortParam={sortParam}
+      />
+    </Suspense>
+  );
+}
+
+// ── Deferred inventory content ─────────────────────────────
+type InventoryContentProps = {
+  householdId: string;
+  highlightId: string | undefined;
+  activeTab: string;
+  itemTypeFilter: string | undefined;
+  searchFilter: string | undefined;
+  categoryFilter: string | undefined;
+  sortParam: string | undefined;
+};
+
+async function InventoryContent({
+  householdId,
+  highlightId,
+  activeTab,
+  itemTypeFilter,
+  searchFilter,
+  categoryFilter,
+  sortParam,
+}: InventoryContentProps): Promise<JSX.Element> {
+  const [t, tCommon] = await Promise.all([
+    getTranslations("inventory"),
+    getTranslations("common"),
+  ]);
   const isEquipmentView = itemTypeFilter === "equipment";
+  const inventoryViewHref = buildInventoryHref(householdId, itemTypeFilter ? { itemType: itemTypeFilter } : undefined);
+  const analyticsViewHref = `/analytics?tab=inventory&householdId=${householdId}`;
+  const inventoryRedirectHref = `/inventory?householdId=${householdId}`;
 
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
-          <div className="page-body">
-            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
-          </div>
-        </>
-      );
-    }
-
-    const inventoryViewHref = buildInventoryHref(household.id, itemTypeFilter ? { itemType: itemTypeFilter } : undefined);
-    const analyticsViewHref = `/analytics?tab=inventory&householdId=${household.id}`;
-    const inventoryRedirectHref = `/inventory?householdId=${household.id}`;
-
     const [{ items }, lowStockItems, shoppingList, spaces] = await Promise.all([
-      getHouseholdInventory(household.id, {
+      getHouseholdInventory(householdId, {
         limit: 100,
         ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
         ...(searchFilter ? { search: searchFilter } : {}),
         ...(categoryFilter ? { category: categoryFilter } : {}),
       }),
-      getHouseholdLowStockInventory(household.id),
-      getInventoryShoppingList(household.id),
-      getHouseholdSpacesTree(household.id)
+      getHouseholdLowStockInventory(householdId),
+      getInventoryShoppingList(householdId),
+      getHouseholdSpacesTree(householdId)
     ]);
 
     const highlightedItem = highlightId ? items.find((item) => item.id === highlightId) ?? null : null;
@@ -133,7 +184,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
     if (highlightedItem) {
       try {
-        highlightedAnalytics = await getInventoryItemConsumption(household.id, highlightedItem.id);
+        highlightedAnalytics = await getInventoryItemConsumption(householdId, highlightedItem.id);
       } catch (error) {
         if (!(error instanceof ApiError)) {
           throw error;
@@ -198,14 +249,14 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
     return (
       <>
-        <RealtimeRefreshBoundary householdId={household.id} eventTypes={["inventory.changed"]} />
+        <RealtimeRefreshBoundary householdId={householdId} eventTypes={["inventory.changed"]} />
         <header className="page-header">
           <div>
             <h1>{t("pageTitle")}</h1>
             <p style={{ marginTop: 6 }}>{t("pageSubtitle")}</p>
           </div>
           <div className="page-header__actions">
-            <InventoryValuationReportButton householdId={household.id} />
+            <InventoryValuationReportButton householdId={householdId} />
             <Link href="/inventory/trash" className="button button--ghost button--sm">Trash</Link>
             <Link href={inventoryViewHref} className="button button--primary button--sm">{t("inventoryButton")}</Link>
             <Link href={analyticsViewHref} className="button button--ghost button--sm">{t("analyticsHub")}</Link>
@@ -262,7 +313,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               {
                 id: "inventory",
                 label: "Inventory",
-                href: buildInventoryHref(household.id, {
+                href: buildInventoryHref(householdId, {
                   ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
                   tab: "inventory"
                 }),
@@ -271,7 +322,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               {
                 id: "spaces",
                 label: "Organization",
-                href: buildInventoryHref(household.id, { tab: "spaces" }),
+                href: buildInventoryHref(householdId, { tab: "spaces" }),
                 active: activeTab === "spaces"
               }
             ]}
@@ -285,9 +336,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
               {!isEquipmentView ? (
                 <>
-                  <InventoryShoppingListSection householdId={household.id} shoppingList={shoppingList} redirectTo={inventoryRedirectHref} />
+                  <InventoryShoppingListSection householdId={householdId} shoppingList={shoppingList} redirectTo={inventoryRedirectHref} />
                   <InventoryQuickRestock
-                    householdId={household.id}
+                    householdId={householdId}
                     items={items.filter((item) => item.itemType === "consumable")}
                     lowStockItemIds={lowStockItems.map((item) => item.id)}
                     redirectTo={inventoryRedirectHref}
@@ -320,7 +371,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                           <tr key={item.id} className={["row--due", item.id === highlightId ? "row--highlight" : null].filter(Boolean).join(" ")}>
                             <td>
                               <div className="data-table__primary">
-                                <Link href={buildInventoryItemHref(household.id, item.id)} className="data-table__link">{item.name}</Link>
+                                <Link href={buildInventoryItemHref(householdId, item.id)} className="data-table__link">{item.name}</Link>
                               </div>
                               <div className="data-table__secondary">
                                 {item.partNumber ?? "No part number"}
@@ -344,7 +395,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               )}
 
               <InventoryListWorkspace
-                householdId={household.id}
+                householdId={householdId}
                 totalCount={items.length}
                 categoryOptions={categoryOptions}
                 groupedItems={groupedItems.map(([label, groupedCategoryItems]) => ({
@@ -357,9 +408,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                 spaces={spaces}
               />
 
-              <InventoryTransactionHistory householdId={household.id} />
+              <InventoryTransactionHistory householdId={householdId} />
             </>
-          ) : <SpacesSection householdId={household.id} />}
+          ) : <SpacesSection householdId={householdId} />}
         </div>
       </>
     );

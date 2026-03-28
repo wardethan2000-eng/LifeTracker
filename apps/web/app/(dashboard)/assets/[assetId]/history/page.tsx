@@ -1,5 +1,6 @@
 import type { AssetTimelineQuery } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { AssetHistoryTab } from "../../../../../components/asset-history-tab";
 import {
   getAssetDetail,
@@ -18,6 +19,15 @@ type AssetHistoryPageProps = {
 
 export default async function AssetHistoryPage({ params, searchParams }: AssetHistoryPageProps): Promise<JSX.Element> {
   const [{ assetId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading history…</div></div>}>
+      <HistoryContent assetId={assetId} searchParams={resolvedSearchParams} />
+    </Suspense>
+  );
+}
+
+async function HistoryContent({ assetId, searchParams: resolvedSearchParams }: { assetId: string; searchParams: AssetHistoryPageSearchParams }): Promise<JSX.Element> {
   const sourceType = getSearchParamValue(resolvedSearchParams.sourceType);
   const category = getSearchParamValue(resolvedSearchParams.category);
   const search = getSearchParamValue(resolvedSearchParams.search);

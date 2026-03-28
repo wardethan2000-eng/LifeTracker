@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getMe, fetchProjectTimelineData } from "../../../../../lib/api";
 import { ProjectGanttTimeline } from "../../../../../components/project-gantt-timeline";
 
@@ -12,21 +13,29 @@ export default async function ProjectTimelinePage({ params, searchParams }: Proj
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+
+  if (!household) {
+    return <p>No household found.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading timeline…</div></div>}>
+      <TimelineContent householdId={household.id} projectId={projectId} />
+    </Suspense>
+  );
+}
+
+async function TimelineContent({ householdId, projectId }: { householdId: string; projectId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return <p>No household found.</p>;
-    }
-
-    const timelineData = await fetchProjectTimelineData(household.id, projectId);
+    const timelineData = await fetchProjectTimelineData(householdId, projectId);
 
     return (
       <section id="project-timeline">
         <ProjectGanttTimeline
           data={timelineData}
-          householdId={household.id}
+          householdId={householdId}
           projectId={projectId}
         />
       </section>

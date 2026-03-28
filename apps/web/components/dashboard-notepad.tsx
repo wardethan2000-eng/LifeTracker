@@ -1,8 +1,13 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createEntry, getEntries, updateEntry } from "../lib/api";
-import { RichEditor } from "./rich-editor";
+
+const RichEditor = dynamic(
+  () => import("./rich-editor").then((m) => ({ default: m.RichEditor })),
+  { ssr: false, loading: () => <div className="dashboard-notepad__loading" /> }
+);
 
 type DashboardNotepadProps = {
   householdId: string;

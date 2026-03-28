@@ -1,15 +1,14 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { JSX } from "react";
 import { createHouseholdAction } from "../actions";
-import { getDashboardData } from "../../components/dashboard-data";
-import { HomeDashboard } from "../../components/home-dashboard";
 import { LaunchPad } from "../../components/launch-pad";
 import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
-import { ApiError, getApiBaseUrl, getDevUserId, getDashboardPins, getEntries, getHouseholdHobbies, getHouseholdIdeas, getHouseholdInventory, getHouseholdLowStockInventory, getHouseholdProjectStatusCounts, getHouseholdSpacesTree, getLayoutPreference, getMe, getQuickActionsPreference, getCanvasesWithGeometry } from "../../lib/api";
-import { OnboardingChecklistClient } from "../../components/onboarding-checklist";
-import { DashboardReminders } from "../../components/dashboard-reminders";
-import { DashboardAttentionQueue } from "../../components/dashboard-attention-queue";
-import { formatCategoryLabel, formatDateTime, formatDueLabel } from "../../lib/formatters";
+import { ApiError, getApiBaseUrl, getDevUserId, getMe } from "../../lib/api";
+import { DashboardRemindersSection } from "../../components/dashboard-reminders-section";
+import { DashboardAttentionSection } from "../../components/dashboard-attention-section";
+import { DashboardOnboardingSection } from "../../components/dashboard-onboarding-section";
+import { HomeDashboardSection } from "../../components/home-dashboard-section";
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -62,6 +61,8 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
   const params = searchParams ? await searchParams : {};
 
   try {
+    // getMe() is React-cached (5 min). Resolves fast so the header and shell
+    // render immediately without waiting for any dashboard data.
     const me = await getMe();
     const fallbackHousehold = me.households[0];
 
@@ -69,100 +70,6 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     const requestedHouseholdId = getParam(params.householdId);
     const selectedHousehold = me.households.find((h) => h.id === requestedHouseholdId) ?? fallbackHousehold;
-
-    // Pre-compute a default reminder cutoff (7 days) so the reminder entries
-    // fetch can join the main Promise.all instead of running sequentially after it.
-    const defaultReminderCutoff = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const [dashboard, pins, recentIdeas, projectStatusCounts, hobbyData, inventoryData, lowStockItems, onboardingPref, savedQuickActionIds, reminderWindowPref, entryProbe, pinnedNotes, canvases, spacesTree, reminderEntries, homeLayout] = await Promise.all([
-      getDashboardData(selectedHousehold.id),
-      getDashboardPins().catch(() => []),
-      getHouseholdIdeas(selectedHousehold.id, { limit: 5 }).catch(() => []),
-      getHouseholdProjectStatusCounts(selectedHousehold.id).catch(() => []),
-      getHouseholdHobbies(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
-      getHouseholdInventory(selectedHousehold.id, { limit: 20 }).catch(() => ({ items: [], nextCursor: null })),
-      getHouseholdLowStockInventory(selectedHousehold.id).catch(() => []),
-      getLayoutPreference("onboarding", "dismissed").catch(() => null),
-      getQuickActionsPreference().catch(() => null),
-      getLayoutPreference("reminders_dashboard", "window_days").catch(() => null),
-      getEntries(selectedHousehold.id, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
-      getEntries(selectedHousehold.id, { flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
-      getCanvasesWithGeometry(selectedHousehold.id).catch(() => []),
-      getHouseholdSpacesTree(selectedHousehold.id).catch(() => []),
-      getEntries(selectedHousehold.id, {
-        hasReminder: true,
-        reminderBefore: defaultReminderCutoff,
-        limit: 20,
-      }).catch(() => ({ items: [], nextCursor: null })),
-      getLayoutPreference("home").catch(() => null),
-    ]);
-
-    // If the user has a custom reminder window, re-filter client-side from what we already fetched.
-    // For window < 7 days: filter down. For window > 7 days: we may miss some entries, but this
-    // is a minor edge case that resolves on future navigations via ISR.
-    const reminderWindowDays = (reminderWindowPref as Array<{ value: number }> | null)?.[0]?.value ?? 7;
-
-    const countAllSpaces = (nodes: typeof spacesTree): number =>
-      nodes.reduce((sum, n) => sum + 1 + countAllSpaces(n.children ?? []), 0);
-    const rootSpaceCount = spacesTree.length;
-    const totalSpaceCount = countAllSpaces(spacesTree);
-
-    const projectCount = projectStatusCounts.reduce((sum, s) => sum + s.count, 0);
-    const hobbyCount = hobbyData.items.length;
-    const inventoryCount = inventoryData.items.length;
-    const ideaCount = recentIdeas.length;
-    const entryCount = entryProbe.items.length;
-    const onboardingDismissed = onboardingPref !== null;
-    const lowStockCount = lowStockItems.length;
-    const outOfStockCount = inventoryData.items.filter((i) => i.quantityOnHand <= 0).length;
-
-    const sortedAssets = [...dashboard.assets].sort(
-      (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
-    );
-    const overdueAssetCount = sortedAssets.filter((a) => a.overdueScheduleCount > 0).length;
-    const dueAssetCount = sortedAssets.filter((a) => a.overdueScheduleCount === 0 && a.dueScheduleCount > 0).length;
-
-    const dueWork = dashboard.dueWork.slice(0, 8).map((item) => ({
-      scheduleId: item.scheduleId,
-      assetId: item.assetId,
-      assetName: item.assetName,
-      scheduleName: item.scheduleName,
-      status: item.status,
-      nextDueLabel: formatDueLabel(item.nextDueAt, item.nextDueMetricValue, item.metricUnit),
-    }));
-
-    const topAssets = sortedAssets.slice(0, 10).map((item) => ({
-      id: item.asset.id,
-      name: item.asset.name,
-      category: formatCategoryLabel(item.asset.category),
-      overdueCount: item.overdueScheduleCount,
-      dueCount: item.dueScheduleCount,
-      tone: item.overdueScheduleCount > 0
-        ? "overdue"
-        : item.dueScheduleCount > 0
-          ? "due"
-          : item.nextDueAt
-            ? "upcoming"
-            : "clear",
-    }));
-
-    const notifications = dashboard.notifications.slice(0, 5).map((n) => {
-      const payload = n.payload as Record<string, unknown> | null;
-      const href = n.assetId
-        ? `/assets/${n.assetId}`
-        : (payload && payload.entityType === "project" && typeof payload.entityId === "string")
-          ? `/projects/${payload.entityId}`
-          : null;
-      return {
-        id: n.id,
-        title: n.title,
-        body: n.body,
-        scheduledFor: formatDateTime(n.scheduledFor),
-        href,
-      };
-    });
-
-    const firstDueWork = dashboard.dueWork[0];
 
     return (
       <>
@@ -187,60 +94,29 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
         </header>
 
         <div className="page-body">
+          {/* LaunchPad renders instantly — no data dependency */}
           <LaunchPad />
-          <DashboardReminders
-            householdId={selectedHousehold.id}
-            entries={reminderEntries.items}
-            windowDays={reminderWindowDays}
-          />
-          <DashboardAttentionQueue
-            overdueItems={dueWork.filter((i) => i.status === "overdue")}
-            dueItems={dueWork.filter((i) => i.status === "due")}
-          />
-          {!onboardingDismissed && (
-            <OnboardingChecklistClient
-              assetCount={dashboard.stats.assetCount}
-              householdId={selectedHousehold.id}
-              projectCount={projectCount}
-              hobbyCount={hobbyCount}
-              inventoryItemCount={inventoryCount}
-              ideaCount={ideaCount}
-              entryCount={entryCount}
-              maintenanceScheduleCount={dashboard.stats.dueScheduleCount + dashboard.stats.overdueScheduleCount}
-            />
-          )}
-          <HomeDashboard
-            householdId={selectedHousehold.id}
-            assetCount={dashboard.stats.assetCount}
-            overdueScheduleCount={dashboard.stats.overdueScheduleCount}
-            dueScheduleCount={dashboard.stats.dueScheduleCount}
-            unreadNotificationCount={dashboard.stats.unreadNotificationCount}
-            overdueAssetCount={overdueAssetCount}
-            dueAssetCount={dueAssetCount}
-            latestAlertTime={dashboard.notifications.length > 0 ? formatDateTime(dashboard.notifications[0]?.scheduledFor) : null}
-            dueWork={dueWork}
-            topAssets={topAssets}
-            notifications={notifications}
-            nextDueAssetId={firstDueWork?.assetId ?? null}
-            nextDueAssetName={firstDueWork?.assetName ?? null}
-            pins={pins}
-            savedQuickActionIds={savedQuickActionIds}
-            inventoryTotalCount={inventoryCount}
-            lowStockCount={lowStockCount}
-            outOfStockCount={outOfStockCount}
-            spaceTotalCount={totalSpaceCount}
-            rootSpaceCount={rootSpaceCount}
-            ideas={recentIdeas.map((idea) => ({
-              id: idea.id,
-              title: idea.title,
-              stage: idea.stage,
-              priority: idea.priority,
-              promotionTarget: idea.promotionTarget,
-            }))}
-            pinnedNotes={pinnedNotes.items}
-            canvases={canvases}
-            serverLayout={homeLayout?.layoutJson}
-          />
+
+          {/* Reminders stream in independently (no-store entry fetch, runs concurrently) */}
+          <Suspense fallback={null}>
+            <DashboardRemindersSection householdId={selectedHousehold.id} />
+          </Suspense>
+
+          {/* Attention queue streams in as soon as getDashboardData resolves */}
+          <Suspense fallback={<div className="attention-queue attention-queue--loading" aria-busy="true" />}>
+            <DashboardAttentionSection householdId={selectedHousehold.id} />
+          </Suspense>
+
+          {/* Onboarding short-circuits on first await when already dismissed */}
+          <Suspense fallback={null}>
+            <DashboardOnboardingSection householdId={selectedHousehold.id} />
+          </Suspense>
+
+          {/* Main dashboard grid — streams in with all card data. getDashboardData
+              is React-cached so it deduplicates with the AttentionSection call. */}
+          <Suspense fallback={<div className="dashboard-grid-loading" aria-busy="true" />}>
+            <HomeDashboardSection householdId={selectedHousehold.id} />
+          </Suspense>
         </div>
       </>
     );

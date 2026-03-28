@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { HobbyMetricsManager } from "../../../../../components/hobby-metrics-manager";
 import {
   ApiError,
@@ -14,24 +15,31 @@ type HobbySectionPageProps = {
 
 export default async function HobbyMetricsPage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading metrics…</div></div>}>
+      <MetricsContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function MetricsContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
-    const metrics = await getHobbyMetrics(household.id, hobbyId);
+    const metrics = await getHobbyMetrics(householdId, hobbyId);
 
     const metricReadingsMap: Record<string, HobbyMetricReading[]> = {};
     await Promise.all(
       metrics.map(async (m) => {
-        metricReadingsMap[m.id] = await getHobbyMetricReadings(household.id, hobbyId, m.id);
+        metricReadingsMap[m.id] = await getHobbyMetricReadings(householdId, hobbyId, m.id);
       })
     );
 
     return (
       <HobbyMetricsManager
-        householdId={household.id}
+        householdId={householdId}
         hobbyId={hobbyId}
         initialMetrics={metrics}
         initialReadingsMap={metricReadingsMap}

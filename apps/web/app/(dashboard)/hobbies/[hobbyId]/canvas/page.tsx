@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getCanvasesByEntityWithGeometry, getMe } from "../../../../../lib/api";
 import { EntityCanvasList } from "../../../../../components/entity-canvas-list";
 
@@ -8,18 +9,25 @@ type HobbyCanvasPageProps = {
 
 export default async function HobbyCanvasPage({ params }: HobbyCanvasPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading canvases…</div></div>}>
+      <CanvasContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function CanvasContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
-    const canvases = await getCanvasesByEntityWithGeometry(household.id, "hobby", hobbyId);
+    const canvases = await getCanvasesByEntityWithGeometry(householdId, "hobby", hobbyId);
 
     return (
       <section id="hobby-canvas" style={{ padding: "16px 0" }}>
         <EntityCanvasList
-          householdId={household.id}
+          householdId={householdId}
           entityType="hobby"
           entityId={hobbyId}
           initialCanvases={canvases}

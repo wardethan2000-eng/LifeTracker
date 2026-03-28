@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { SpaceDetailActions } from "../../../../../components/space-detail-actions";
 import { SpaceQuickPlace } from "../../../../../components/space-quick-place";
 import { SpaceViewLogger } from "../../../../../components/space-view-logger";
@@ -48,7 +49,7 @@ type SpaceDetailPageProps = {
 export default async function SpaceDetailPage({ params, searchParams }: SpaceDetailPageProps): Promise<JSX.Element> {
   const { spaceId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const householdId = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
+  const householdIdParam = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
   const activeTab = typeof resolvedSearchParams.tab === "string"
     && ["contents", "subspaces", "history"].includes(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab as "contents" | "subspaces" | "history"
@@ -60,27 +61,51 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
   const historyUntil = typeof resolvedSearchParams.historyUntil === "string" ? resolvedSearchParams.historyUntil : "";
   const historyCursor = typeof resolvedSearchParams.historyCursor === "string" ? resolvedSearchParams.historyCursor : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdIdParam) ?? me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Space</h1></header>
+        <div className="page-body">
+          <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading space…</div></div>}>
+      <SpaceContent
+        householdId={household.id}
+        spaceId={spaceId}
+        activeTab={activeTab}
+        historyAction={historyAction}
+        historySince={historySince}
+        historyUntil={historyUntil}
+        historyCursor={historyCursor}
+      />
+    </Suspense>
+  );
+}
+
+async function SpaceContent({ householdId, spaceId, activeTab, historyAction, historySince, historyUntil, historyCursor }: {
+  householdId: string;
+  spaceId: string;
+  activeTab: "contents" | "subspaces" | "history";
+  historyAction: string;
+  historySince: string;
+  historyUntil: string;
+  historyCursor: string | undefined;
+}): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Space</h1></header>
-          <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
-          </div>
-        </>
-      );
-    }
-
     const [space, spaces, { items: inventoryItems }, history] = await Promise.all([
-      getSpace(household.id, spaceId),
-      getHouseholdSpacesTree(household.id),
-      getHouseholdInventory(household.id, { limit: 100 }),
+      getSpace(householdId, spaceId),
+      getHouseholdSpacesTree(householdId),
+      getHouseholdInventory(householdId, { limit: 100 }),
       activeTab === "history"
-        ? getSpaceHistory(household.id, spaceId, {
+        ? getSpaceHistory(householdId, spaceId, {
             ...(historyAction ? { actions: [historyAction as keyof typeof HISTORY_ACTION_LABELS] } : {}),
             ...(historySince ? { since: new Date(`${historySince}T00:00:00`).toISOString() } : {}),
             ...(historyUntil ? { until: new Date(`${historyUntil}T23:59:59`).toISOString() } : {}),
@@ -92,7 +117,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
 
     return (
       <>
-        <SpaceViewLogger householdId={household.id} spaceId={space.id} />
+        <SpaceViewLogger householdId={householdId} spaceId={space.id} />
         <header className="page-header">
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -109,7 +134,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
                     {isCurrent ? (
                       <strong>{segment.name}</strong>
                     ) : (
-                      <Link href={`/inventory/spaces/${segment.id}?householdId=${household.id}`} className="text-link">{segment.name}</Link>
+                      <Link href={`/inventory/spaces/${segment.id}?householdId=${householdId}`} className="text-link">{segment.name}</Link>
                     )}
                     {!isCurrent ? <span>/</span> : null}
                   </span>
@@ -122,9 +147,9 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
             </p>
           </div>
           <div className="page-header__actions">
-            <SpaceQuickPlace householdId={household.id} spaces={spaces} initialSpaceId={space.id} triggerLabel="Quick Place Items" triggerClassName="button button--primary button--sm" />
-            <Link href={`/inventory/spaces/${spaceId}/label?householdId=${household.id}`} className="button button--ghost button--sm">Print Label</Link>
-            <Link href={`/inventory?householdId=${household.id}&tab=spaces`} className="button button--ghost button--sm">← Spaces</Link>
+            <SpaceQuickPlace householdId={householdId} spaces={spaces} initialSpaceId={space.id} triggerLabel="Quick Place Items" triggerClassName="button button--primary button--sm" />
+            <Link href={`/inventory/spaces/${spaceId}/label?householdId=${householdId}`} className="button button--ghost button--sm">Print Label</Link>
+            <Link href={`/inventory?householdId=${householdId}&tab=spaces`} className="button button--ghost button--sm">← Spaces</Link>
           </div>
         </header>
 
@@ -145,7 +170,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
               </div>
             </section>
 
-            <SpaceDetailActions householdId={household.id} space={space} spaces={spaces} inventoryItems={inventoryItems} />
+            <SpaceDetailActions householdId={householdId} space={space} spaces={spaces} inventoryItems={inventoryItems} />
           </div>
 
           <TabNav
@@ -155,19 +180,19 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
               {
                 id: "contents",
                 label: "Contents",
-                href: `/inventory/spaces/${space.id}?householdId=${household.id}&tab=contents`,
+                href: `/inventory/spaces/${space.id}?householdId=${householdId}&tab=contents`,
                 active: activeTab === "contents"
               },
               {
                 id: "subspaces",
                 label: "Sub-Spaces",
-                href: `/inventory/spaces/${space.id}?householdId=${household.id}&tab=subspaces`,
+                href: `/inventory/spaces/${space.id}?householdId=${householdId}&tab=subspaces`,
                 active: activeTab === "subspaces"
               },
               {
                 id: "history",
                 label: "History",
-                href: `/inventory/spaces/${space.id}?householdId=${household.id}&tab=history`,
+                href: `/inventory/spaces/${space.id}?householdId=${householdId}&tab=history`,
                 active: activeTab === "history"
               }
             ]}
@@ -195,7 +220,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
                       <tbody>
                         {space.spaceItems?.map((link) => (
                           <tr key={link.id}>
-                            <td><Link href={`/inventory/${link.inventoryItem.id}?householdId=${household.id}`} className="data-table__link">{link.inventoryItem.name}</Link></td>
+                            <td><Link href={`/inventory/${link.inventoryItem.id}?householdId=${householdId}`} className="data-table__link">{link.inventoryItem.name}</Link></td>
                             <td>{link.inventoryItem.category ?? "—"}</td>
                             <td>{link.quantity ?? "—"}</td>
                             <td>{link.inventoryItem.quantityOnHand}</td>
@@ -247,7 +272,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
                           <div style={{ display: "grid", gap: 6 }}>
                             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               <span className="pill">{getSpaceTypeBadge(child.type)}</span>
-                              <Link href={`/inventory/spaces/${child.id}?householdId=${household.id}`} className="data-table__link">{child.name}</Link>
+                              <Link href={`/inventory/spaces/${child.id}?householdId=${householdId}`} className="data-table__link">{child.name}</Link>
                               <span className="pill">{child.shortCode}</span>
                             </div>
                             <div className="data-table__secondary">{child.totalItemCount ?? 0} items</div>
@@ -266,7 +291,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
               </div>
               <div className="panel__body--padded" style={{ display: "grid", gap: 18 }}>
                 <form method="get" style={{ display: "grid", gap: 14 }}>
-                  <input type="hidden" name="householdId" value={household.id} />
+                  <input type="hidden" name="householdId" value={householdId} />
                   <input type="hidden" name="tab" value="history" />
                   <div className="form-grid">
                     <label className="field">
@@ -289,7 +314,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
                   </div>
                   <div className="inline-actions">
                     <button type="submit" className="button button--primary button--sm">Apply Filters</button>
-                    <Link href={`/inventory/spaces/${space.id}?householdId=${household.id}&tab=history`} className="button button--ghost button--sm">Clear</Link>
+                    <Link href={`/inventory/spaces/${space.id}?householdId=${householdId}&tab=history`} className="button button--ghost button--sm">Clear</Link>
                   </div>
                 </form>
 
@@ -339,7 +364,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
                 {history?.nextCursor ? (
                   <div className="inline-actions">
                     <Link
-                      href={`/inventory/spaces/${space.id}?householdId=${household.id}&tab=history${historyAction ? `&historyAction=${encodeURIComponent(historyAction)}` : ""}${historySince ? `&historySince=${encodeURIComponent(historySince)}` : ""}${historyUntil ? `&historyUntil=${encodeURIComponent(historyUntil)}` : ""}&historyCursor=${history.nextCursor}`}
+                      href={`/inventory/spaces/${space.id}?householdId=${householdId}&tab=history${historyAction ? `&historyAction=${encodeURIComponent(historyAction)}` : ""}${historySince ? `&historySince=${encodeURIComponent(historySince)}` : ""}${historyUntil ? `&historyUntil=${encodeURIComponent(historyUntil)}` : ""}&historyCursor=${history.nextCursor}`}
                       className="button button--ghost button--sm"
                     >
                       Load More History

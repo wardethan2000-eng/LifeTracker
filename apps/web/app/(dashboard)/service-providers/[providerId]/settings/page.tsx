@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { deleteServiceProviderAction } from "../../../../actions";
 import { getMe, getServiceProvider } from "../../../../../lib/api";
 
@@ -15,7 +16,15 @@ export default async function ProviderSettingsPage({ params }: ProviderSettingsP
     return <p>No household found.</p>;
   }
 
-  const provider = await getServiceProvider(household.id, providerId);
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading settings…</div></div>}>
+      <ProviderSettingsContent householdId={household.id} providerId={providerId} />
+    </Suspense>
+  );
+}
+
+async function ProviderSettingsContent({ householdId, providerId }: { householdId: string; providerId: string }): Promise<JSX.Element> {
+  const provider = await getServiceProvider(householdId, providerId);
 
   return (
     <section className="panel panel--danger">
@@ -29,7 +38,7 @@ export default async function ProviderSettingsPage({ params }: ProviderSettingsP
             Permanently remove {provider.name} and all associated data. This cannot be undone.
           </p>
           <form action={deleteServiceProviderAction} className="inline-actions">
-            <input type="hidden" name="householdId" value={household.id} />
+            <input type="hidden" name="householdId" value={householdId} />
             <input type="hidden" name="providerId" value={provider.id} />
             <input type="hidden" name="redirectTo" value="/service-providers" />
             <button type="submit" className="button button--danger button--sm">Delete Provider</button>

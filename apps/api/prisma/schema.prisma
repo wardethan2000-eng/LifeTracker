@@ -139,6 +139,7 @@ enum EntryEntityType {
   inventory_item
   notebook
   idea
+  home
 }
 
 // High-level classification for a universal entry.
@@ -529,6 +530,7 @@ model Asset {
   hobbyLinks           HobbyAsset[]
 
   @@index([householdId, isArchived])
+  @@index([householdId, deletedAt])
   @@index([createdById])
   @@index([ownerId])
   @@index([category])
@@ -780,6 +782,7 @@ model Entry {
   @@index([householdId, entryType])
   @@index([householdId, entryDate])
   @@index([householdId, createdById])
+  @@index([householdId, reminderAt])
   @@index([folderId])
   @@index([reminderAt])
 }

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   createSessionFromRecipeAction,
@@ -46,23 +47,30 @@ const formatCustomFieldValue = (value: unknown): string => {
 
 export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetailPageProps): Promise<JSX.Element> {
   const { hobbyId, recipeId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Recipe</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading recipe…</div></div>}>
+      <RecipeContent householdId={household.id} hobbyId={hobbyId} recipeId={recipeId} timezone={household.timezone} />
+    </Suspense>
+  );
+}
+
+async function RecipeContent({ householdId, hobbyId, recipeId, timezone }: { householdId: string; hobbyId: string; recipeId: string; timezone: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Recipe</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
     const [hobby, recipe] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyRecipe(household.id, hobbyId, recipeId),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyRecipe(householdId, hobbyId, recipeId),
     ]);
     const customFieldEntries = Object.entries(recipe.customFields ?? {});
     const sortedIngredients = [...recipe.ingredients].sort((left, right) => left.sortOrder - right.sortOrder);
@@ -199,8 +207,8 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
                 <div className="panel__body--padded">
                   <dl className="data-list">
                     <div><dt>Source</dt><dd><span className="pill">{recipe.sourceType}</span></dd></div>
-                    <div><dt>Created</dt><dd>{formatDate(recipe.createdAt, "-", household.timezone)}</dd></div>
-                    <div><dt>Updated</dt><dd>{formatDate(recipe.updatedAt, "-", household.timezone)}</dd></div>
+                    <div><dt>Created</dt><dd>{formatDate(recipe.createdAt, "-", timezone)}</dd></div>
+                    <div><dt>Updated</dt><dd>{formatDate(recipe.updatedAt, "-", timezone)}</dd></div>
                     <div><dt>Sessions</dt><dd>Used in {recipe.sessionCount} sessions</dd></div>
                     <div><dt>Status</dt><dd>{recipe.isArchived ? "Archived" : "Active"}</dd></div>
                   </dl>
@@ -227,7 +235,7 @@ export default async function HobbyRecipeDetailPage({ params }: HobbyRecipeDetai
                 <div className="panel__header"><h2>Actions</h2></div>
                 <div className="panel__body--padded">
                   <form action={createSessionFromRecipeAction}>
-                    <input type="hidden" name="householdId" value={household.id} />
+                    <input type="hidden" name="householdId" value={householdId} />
                     <input type="hidden" name="hobbyId" value={hobbyId} />
                     <input type="hidden" name="recipeId" value={recipeId} />
                     <input type="hidden" name="recipeName" value={recipe.name} />

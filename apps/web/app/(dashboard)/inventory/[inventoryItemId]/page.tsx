@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { AttachmentSection } from "../../../../components/attachment-section";
 import { InventoryCommentsPanel } from "../../../../components/inventory-comments-panel";
 import { InventoryDangerActions } from "../../../../components/inventory-danger-actions";
@@ -65,30 +66,38 @@ const formatRevisionValue = (field: string, value: string | number | boolean | n
 export default async function InventoryItemDetailPage({ params, searchParams }: InventoryItemDetailPageProps): Promise<JSX.Element> {
   const { inventoryItemId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const householdId = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
+  const householdIdParam = typeof resolvedSearchParams.householdId === "string" ? resolvedSearchParams.householdId : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdIdParam) ?? me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Inventory Item</h1></header>
+        <div className="page-body">
+          <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading inventory item…</div></div>}>
+      <ItemDetailContent householdId={household.id} inventoryItemId={inventoryItemId} />
+    </Suspense>
+  );
+}
+
+async function ItemDetailContent({ householdId, inventoryItemId }: { householdId: string; inventoryItemId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Inventory Item</h1></header>
-          <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
-          </div>
-        </>
-      );
-    }
-
     const [item, analytics, comments, spaces] = await Promise.all([
-      getInventoryItemDetail(household.id, inventoryItemId, { transactionLimit: 20 }),
-      getInventoryItemConsumption(household.id, inventoryItemId),
-      getInventoryItemComments(household.id, inventoryItemId),
-      getHouseholdSpacesTree(household.id)
+      getInventoryItemDetail(householdId, inventoryItemId, { transactionLimit: 20 }),
+      getInventoryItemConsumption(householdId, inventoryItemId),
+      getInventoryItemComments(householdId, inventoryItemId),
+      getHouseholdSpacesTree(householdId)
     ]);
-    const backHref = `/inventory?householdId=${household.id}`;
+    const backHref = `/inventory?householdId=${householdId}`;
     const linkedEntityCount = item.assets.length + item.projects.length + item.hobbyLinks.length;
 
     return (
@@ -105,9 +114,9 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
               dialogTitle={`${item.name} QR Code`}
               dialogDescription="Open the printable label, download the QR image, or copy the scan identifier for this inventory item."
               imageAlt={`QR code for ${item.name}`}
-              svgPath={`/api/households/${household.id}/inventory/${item.id}/qr?format=svg&size=360`}
-              pngPath={`/api/households/${household.id}/inventory/${item.id}/qr?format=png&size=720`}
-              labelPath={`/api/households/${household.id}/inventory/${item.id}/label`}
+              svgPath={`/api/households/${householdId}/inventory/${item.id}/qr?format=svg&size=360`}
+              pngPath={`/api/households/${householdId}/inventory/${item.id}/qr?format=png&size=720`}
+              labelPath={`/api/households/${householdId}/inventory/${item.id}/label`}
               fileBaseName={`${item.name}-${item.partNumber ?? item.scanTag ?? item.id}`}
               codeLabel="Scan ID"
               codeValue={item.scanTag ?? item.partNumber ?? item.id}
@@ -115,7 +124,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
               copyValue={item.scanTag ?? item.id}
             />
             <Link
-              href={`/inventory/${item.id}/label?householdId=${household.id}`}
+              href={`/inventory/${item.id}/label?householdId=${householdId}`}
               className="button button--ghost button--sm"
             >
               Print Label
@@ -154,7 +163,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                 <h2>Edit Inventory Item</h2>
               </div>
               <div className="panel__body--padded">
-                <InventoryItemDetailEditor householdId={household.id} item={item} />
+                <InventoryItemDetailEditor householdId={householdId} item={item} />
               </div>
             </section>
 
@@ -195,7 +204,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                       <figcaption className="barcode-panel__caption">{item.partNumber}</figcaption>
                     </figure>
                     <a
-                      href={`/api/households/${household.id}/inventory/barcode-labels?itemIds=${item.id}`}
+                      href={`/api/households/${householdId}/inventory/barcode-labels?itemIds=${item.id}`}
                       target="_blank"
                       rel="noreferrer"
                       className="button button--secondary button--sm"
@@ -234,14 +243,14 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                 </div>
               </section>
 
-              <InventoryItemLocationsPanel householdId={household.id} item={item} spaces={spaces} />
+              <InventoryItemLocationsPanel householdId={householdId} item={item} spaces={spaces} />
 
               <section className="panel">
                 <div className="panel__header">
                   <h2>Danger Zone</h2>
                 </div>
                 <div className="panel__body--padded">
-                  <InventoryDangerActions householdId={household.id} inventoryItemId={item.id} redirectTo={backHref} />
+                  <InventoryDangerActions householdId={householdId} inventoryItemId={item.id} redirectTo={backHref} />
                 </div>
               </section>
             </aside>
@@ -267,7 +276,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
                   <tbody>
                     {item.projects.map((link) => (
                       <tr key={link.id}>
-                        <td><Link href={`/projects/${link.project.id}?householdId=${household.id}`} className="data-table__link">{link.project.name}</Link></td>
+                        <td><Link href={`/projects/${link.project.id}?householdId=${householdId}`} className="data-table__link">{link.project.name}</Link></td>
                         <td>{link.quantityNeeded}</td>
                         <td>{link.quantityAllocated}</td>
                         <td>{link.quantityRemaining}</td>
@@ -310,13 +319,13 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
           </section>
 
           <AttachmentSection
-            householdId={household.id}
+            householdId={householdId}
             entityType="inventory_item"
             entityId={item.id}
           />
 
           <InventoryCommentsPanel
-            householdId={household.id}
+            householdId={householdId}
             inventoryItemId={item.id}
             comments={comments}
           />
@@ -360,7 +369,7 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
             </div>
           </section>
 
-          <InventoryTransactionHistory householdId={household.id} inventoryItemId={item.id} title="Item Transaction History" />
+          <InventoryTransactionHistory householdId={householdId} inventoryItemId={item.id} title="Item Transaction History" />
         </div>
       </>
     );

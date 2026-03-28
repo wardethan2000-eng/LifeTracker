@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { deleteHobbySeriesAction } from "../../../../../actions";
 import { HobbySeriesDetail } from "../../../../../../components/hobby-series-detail";
@@ -10,24 +11,31 @@ type HobbySeriesDetailPageProps = {
 
 export default async function HobbySeriesDetailPage({ params }: HobbySeriesDetailPageProps): Promise<JSX.Element> {
   const { hobbyId, seriesId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Series</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading series…</div></div>}>
+      <SeriesDetailContent householdId={household.id} hobbyId={hobbyId} seriesId={seriesId} />
+    </Suspense>
+  );
+}
+
+async function SeriesDetailContent({ householdId, hobbyId, seriesId }: { householdId: string; hobbyId: string; seriesId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Series</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
     const [hobby, series, sessions] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbySeriesDetail(household.id, hobbyId, seriesId),
-      getHobbySessions(household.id, hobbyId),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbySeriesDetail(householdId, hobbyId, seriesId),
+      getHobbySessions(householdId, hobbyId),
     ]);
 
     return (
@@ -51,7 +59,7 @@ export default async function HobbySeriesDetailPage({ params }: HobbySeriesDetai
 
         <div className="page-body">
           <HobbySeriesDetail
-            householdId={household.id}
+            householdId={householdId}
             hobbyId={hobbyId}
             series={series}
             allSessions={sessions}

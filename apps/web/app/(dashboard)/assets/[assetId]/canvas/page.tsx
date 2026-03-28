@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getCanvasesByEntityWithGeometry, getMe } from "../../../../../lib/api";
 import { EntityCanvasList } from "../../../../../components/entity-canvas-list";
 
@@ -8,18 +9,25 @@ type AssetCanvasPageProps = {
 
 export default async function AssetCanvasPage({ params }: AssetCanvasPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading canvases…</div></div>}>
+      <CanvasContent householdId={household.id} assetId={assetId} />
+    </Suspense>
+  );
+}
+
+async function CanvasContent({ householdId, assetId }: { householdId: string; assetId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
-    const canvases = await getCanvasesByEntityWithGeometry(household.id, "asset", assetId);
+    const canvases = await getCanvasesByEntityWithGeometry(householdId, "asset", assetId);
 
     return (
       <section id="asset-canvas" style={{ padding: "16px 0" }}>
         <EntityCanvasList
-          householdId={household.id}
+          householdId={householdId}
           entityType="asset"
           entityId={assetId}
           initialCanvases={canvases}

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { updateHobbyRecipeAction } from "../../../../../../actions";
 import { HobbyRecipeWorkbench } from "../../../../../../../components/hobby-recipe-workbench";
@@ -10,23 +11,30 @@ type EditHobbyRecipePageProps = {
 
 export default async function EditHobbyRecipePage({ params }: EditHobbyRecipePageProps): Promise<JSX.Element> {
   const { hobbyId, recipeId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Edit Recipe</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <EditRecipeContent householdId={household.id} hobbyId={hobbyId} recipeId={recipeId} />
+    </Suspense>
+  );
+}
+
+async function EditRecipeContent({ householdId, hobbyId, recipeId }: { householdId: string; hobbyId: string; recipeId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Edit Recipe</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
     const [hobby, recipe] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyRecipe(household.id, hobbyId, recipeId),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyRecipe(householdId, hobbyId, recipeId),
     ]);
 
     return (
@@ -44,7 +52,7 @@ export default async function EditHobbyRecipePage({ params }: EditHobbyRecipePag
         <div className="page-body">
           <HobbyRecipeWorkbench
             mode="edit"
-            householdId={household.id}
+            householdId={householdId}
             hobbyId={hobbyId}
             updateAction={updateHobbyRecipeAction}
             initialRecipe={recipe}

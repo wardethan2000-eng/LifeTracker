@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { HobbyCollectionTab } from "../../../../../components/hobby-collection-tab";
 import {
   ApiError,
@@ -13,15 +14,22 @@ type HobbySectionPageProps = {
 
 export default async function HobbyCollectionPage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading collection…</div></div>}>
+      <CollectionContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function CollectionContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
     const [hobby, collectionItems] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      listHobbyCollectionItems(household.id, hobbyId, { limit: 100 }),
+      getHobbyDetail(householdId, hobbyId),
+      listHobbyCollectionItems(householdId, hobbyId, { limit: 100 }),
     ]);
 
     return <HobbyCollectionTab hobbyId={hobbyId} activityMode={hobby.activityMode} items={collectionItems.items} />;

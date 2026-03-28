@@ -65,6 +65,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const quickAddRef = useRef<HTMLButtonElement>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [liveBadges, setLiveBadges] = useState<Record<string, number>>({});
 
   // Restore collapse state from localStorage and sync to <html> data attribute
   useEffect(() => {
@@ -73,6 +74,21 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     setCollapsed(isCollapsed);
     document.documentElement.dataset.sidebarCollapsed = String(isCollapsed);
   }, []);
+
+  // Load the maintenance badge count asynchronously so it doesn't block server render.
+  useEffect(() => {
+    if (!householdId) return;
+    let cancelled = false;
+    fetch(`/api/households/${householdId}/dashboard`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data: { stats?: { overdueScheduleCount?: number; dueScheduleCount?: number } }) => {
+        if (cancelled) return;
+        const count = (data.stats?.overdueScheduleCount ?? 0) + (data.stats?.dueScheduleCount ?? 0);
+        if (count > 0) setLiveBadges((prev) => ({ ...prev, maintenance: count }));
+      })
+      .catch(() => { /* badge is best-effort */ });
+    return () => { cancelled = true; };
+  }, [householdId]);
 
   const toggleCollapse = useCallback(() => {
     setCollapsed((prev) => {
@@ -113,6 +129,9 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
         const isIdeas = item.href === "/ideas";
+        const effectiveBadge = item.href === "/maintenance"
+          ? (liveBadges.maintenance ?? item.badge ?? 0)
+          : (item.badge ?? 0);
 
         if (isIdeas && householdId) {
           return (
@@ -124,7 +143,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
               >
                 <NavIcon icon={item.icon} />
                 <span className="sidebar__link-label">{item.label}</span>
-                {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
+                {effectiveBadge > 0 ? <span className="sidebar__badge">{effectiveBadge}</span> : null}
               </Link>
               <button
                 ref={quickAddRef}
@@ -156,7 +175,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
           >
             <NavIcon icon={item.icon} />
             <span className="sidebar__link-label">{item.label}</span>
-            {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
+            {effectiveBadge > 0 ? <span className="sidebar__badge">{effectiveBadge}</span> : null}
           </Link>
         );
       })}

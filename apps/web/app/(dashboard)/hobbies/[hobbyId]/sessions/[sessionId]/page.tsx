@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { HobbySessionDetail } from "../../../../../../components/hobby-session-detail";
 import { deleteHobbySessionAction } from "../../../../../actions";
@@ -16,25 +17,32 @@ type SessionDetailPageProps = {
 
 export default async function SessionDetailPage({ params }: SessionDetailPageProps): Promise<JSX.Element> {
   const { hobbyId, sessionId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Session</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading session…</div></div>}>
+      <SessionContent householdId={household.id} hobbyId={hobbyId} sessionId={sessionId} />
+    </Suspense>
+  );
+}
+
+async function SessionContent({ householdId, hobbyId, sessionId }: { householdId: string; hobbyId: string; sessionId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Session</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
     const [hobby, session] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbySessionDetail(household.id, hobbyId, sessionId),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbySessionDetail(householdId, hobbyId, sessionId),
     ]);
 
-    const series = session.seriesId ? await getHobbySeriesDetail(household.id, hobbyId, session.seriesId) : null;
+    const series = session.seriesId ? await getHobbySeriesDetail(householdId, hobbyId, session.seriesId) : null;
 
     return (
       <>
@@ -65,7 +73,7 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
           </div>
         </header>
         <HobbySessionDetail
-          householdId={household.id}
+          householdId={householdId}
           hobbyId={hobbyId}
           hobby={hobby}
           session={session}

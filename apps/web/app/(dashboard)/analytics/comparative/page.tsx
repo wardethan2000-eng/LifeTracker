@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { JSX } from "react";
+import { Suspense, type JSX } from "react";
 import { ComparativeAnalyticsWorkspace } from "../../../../components/comparative-analytics-workspace";
 import { ApiError, getHouseholdAssets, getMe } from "../../../../lib/api";
 
@@ -15,69 +15,71 @@ const getParam = (value: string | string[] | undefined): string | undefined => {
   return Array.isArray(value) ? value[0] : undefined;
 };
 
-export default async function ComparativeAnalyticsPage({ searchParams }: ComparativeAnalyticsPageProps): Promise<JSX.Element> {
-  const params = searchParams ? await searchParams : {};
-
+async function ComparativeAnalyticsContent({ householdId, households, selectedHouseholdId }: { householdId: string; households: { id: string; name: string }[]; selectedHouseholdId: string }): Promise<JSX.Element> {
+  let assets;
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === getParam(params.householdId)) ?? me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Comparative Analytics</h1></header>
-          <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
-          </div>
-        </>
-      );
-    }
-
-    const assets = await getHouseholdAssets(household.id);
-
-    return (
-      <>
-        <header className="page-header">
-          <div>
-            <h1>Comparative Analytics</h1>
-            <p style={{ marginTop: 6 }}>Compare asset costs, seasonal maintenance patterns, and member contributions without changing operational data.</p>
-          </div>
-          {me.households.length > 1 ? (
-            <div className="household-switcher">
-              {me.households.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/analytics/comparative?householdId=${item.id}`}
-                  className={`household-chip${item.id === household.id ? " household-chip--active" : ""}`}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-        </header>
-
-        <div className="page-body">
-          <ComparativeAnalyticsWorkspace householdId={household.id} assets={assets} />
-        </div>
-      </>
-    );
+    assets = await getHouseholdAssets(householdId);
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <>
-          <header className="page-header"><h1>Comparative Analytics</h1></header>
-          <div className="page-body">
-            <div className="panel">
-              <div className="panel__body--padded">
-                <p>Failed to load: {error.message}</p>
-              </div>
-            </div>
+        <div className="panel">
+          <div className="panel__body--padded">
+            <p>Failed to load: {error.message}</p>
           </div>
-        </>
+        </div>
       );
     }
-
     throw error;
   }
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Comparative Analytics</h1>
+          <p style={{ marginTop: 6 }}>Compare asset costs, seasonal maintenance patterns, and member contributions without changing operational data.</p>
+        </div>
+        {households.length > 1 ? (
+          <div className="household-switcher">
+            {households.map((item) => (
+              <Link
+                key={item.id}
+                href={`/analytics/comparative?householdId=${item.id}`}
+                className={`household-chip${item.id === selectedHouseholdId ? " household-chip--active" : ""}`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        ) : null}
+      </header>
+
+      <div className="page-body">
+        <ComparativeAnalyticsWorkspace householdId={householdId} assets={assets} />
+      </div>
+    </>
+  );
+}
+
+export default async function ComparativeAnalyticsPage({ searchParams }: ComparativeAnalyticsPageProps): Promise<JSX.Element> {
+  const params = searchParams ? await searchParams : {};
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === getParam(params.householdId)) ?? me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Comparative Analytics</h1></header>
+        <div className="page-body">
+          <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<><header className="page-header"><h1>Comparative Analytics</h1></header><div className="page-body"><div className="panel"><div className="panel__body--padded"><p className="note">Loading analytics…</p></div></div></div></>}>
+      <ComparativeAnalyticsContent householdId={household.id} households={me.households} selectedHouseholdId={household.id} />
+    </Suspense>
+  );
 }

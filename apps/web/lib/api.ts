@@ -952,6 +952,9 @@ export const getEntries = async (
     entryType?: EntryType | EntryType[];
     flags?: EntryFlag[];
     excludeFlags?: EntryFlag[];
+    /** Override the default no-store cache policy. Useful for server-component
+     *  calls where stale-for-a-minute is acceptable (e.g. pinned notes, probes). */
+    cacheOptions?: RequestInit["cache"] | { revalidate: number };
   }
 ): Promise<{ items: Entry[]; nextCursor: string | null }> => {
   const params = new URLSearchParams();
@@ -1030,7 +1033,7 @@ export const getEntries = async (
   return apiRequest({
     path: `/v1/households/${householdId}/entries${suffix}`,
     schema: entryListSchema,
-    cacheOptions: "no-store"
+    cacheOptions: query?.cacheOptions ?? "no-store"
   });
 };
 
@@ -1088,7 +1091,7 @@ export const getHouseholdDueWork = async (
   return apiRequest({
     path: `/v1/households/${householdId}/due-work?${params.toString()}`,
     schema: dueWorkItemListSchema,
-    cachePolicy: { next: { revalidate: 15 } }
+    cachePolicy: { next: { revalidate: 60 } }
   });
 };
 
@@ -1278,13 +1281,13 @@ const getHouseholdAssetsPaginatedCached = cache(async (
 const getHouseholdMembersCached = cache(async (householdId: string): Promise<HouseholdMember[]> => apiRequest({
   path: `/v1/households/${householdId}/members`,
   schema: householdMemberListSchema,
-  revalidate: 15
+  revalidate: 60
 }));
 
 const getHouseholdServiceProvidersCached = cache(async (householdId: string): Promise<ServiceProvider[]> => apiRequest({
   path: `/v1/households/${householdId}/service-providers`,
   schema: serviceProviderListSchema,
-  revalidate: 15
+  revalidate: 60
 }));
 
 const getHouseholdInventoryCached = cache(async (
@@ -1360,7 +1363,7 @@ export const getHouseholdProjectPortfolio = async (
   return apiRequest({
     path: `/v1/households/${householdId}/projects/portfolio${suffix}`,
     schema: projectPortfolioListSchema,
-    revalidate: 15
+    revalidate: 30
   });
 };
 
@@ -1388,7 +1391,7 @@ export const getHouseholdProjectPortfolioPaginated = async (
   return apiRequest({
     path: `/v1/households/${householdId}/projects/portfolio?${params.toString()}`,
     schema: projectPortfolioPageSchema,
-    revalidate: 15
+    revalidate: 30
   });
 };
 

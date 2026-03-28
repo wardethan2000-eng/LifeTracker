@@ -1,6 +1,7 @@
 import type { HobbyActivityMode, HobbyStatus } from "@lifekeeper/types";
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { ApiError, getDisplayPreferences, getHouseholdHobbies, getMe } from "../../../lib/api";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
@@ -33,11 +34,161 @@ const getParam = (value: string | string[] | undefined): string | undefined => {
   return Array.isArray(value) ? value[0] : undefined;
 };
 
+// ── Deferred list content ──────────────────────────────────
+type HobbiesListContentProps = {
+  householdId: string;
+  selectedStatus: HobbyStatus | undefined;
+  selectedMode: HobbyActivityMode | undefined;
+  cursor: string | undefined;
+  history: string[];
+  limit: number;
+};
+
+async function HobbiesListContent({
+  householdId,
+  selectedStatus,
+  selectedMode,
+  cursor,
+  history,
+  limit,
+}: HobbiesListContentProps): Promise<JSX.Element> {
+  const [t, tCommon] = await Promise.all([
+    getTranslations("hobbies"),
+    getTranslations("common"),
+  ]);
+
+  const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
+    const q = new URLSearchParams();
+    if (selectedStatus) q.set("status", selectedStatus);
+    if (selectedMode) q.set("mode", selectedMode);
+    q.set("limit", String(p.limit));
+    if (p.cursor) q.set("cursor", p.cursor);
+    if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
+    return `/hobbies?${q.toString()}`;
+  };
+
+  try {
+    const hobbyPage = await getHouseholdHobbies(householdId, {
+      ...(selectedStatus ? { status: selectedStatus } : {}),
+      ...(selectedMode ? { activityMode: selectedMode } : {}),
+      limit,
+      ...(cursor ? { cursor } : {}),
+    });
+    const visibleHobbies = hobbyPage.items;
+
+    const totalActive = visibleHobbies.filter((h) => h.status === "active").length;
+    const totalSessions = visibleHobbies.reduce((sum, h) => sum + h.sessionCount, 0);
+    const activeSessions = visibleHobbies.reduce((sum, h) => sum + h.activeSessionCount, 0);
+    const totalRecipes = visibleHobbies.reduce((sum, h) => sum + h.recipeCount, 0);
+
+    return (
+      <>
+        <div className="stats-row">
+          <div className="stat-card">
+            <span className="stat-card__value">{totalActive}</span>
+            <span className="stat-card__label">Active Hobbies</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__value">{totalSessions}</span>
+            <span className="stat-card__label">Total Sessions</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__value">{activeSessions}</span>
+            <span className="stat-card__label">Active Sessions</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__value">{totalRecipes}</span>
+            <span className="stat-card__label">Recipes</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+          <span className="data-table__secondary">
+            {selectedStatus ? hobbyStatusLabels[selectedStatus] : "All hobbies"}
+          </span>
+          {visibleHobbies.length > 0 && (
+            <span className="pill">Showing {visibleHobbies.length}</span>
+          )}
+        </div>
+        {visibleHobbies.length === 0 ? (
+          <section className="panel">
+            <div className="panel__body--padded panel__empty">
+              <p>
+                {selectedStatus
+                  ? t("emptyFiltered", { status: hobbyStatusLabels[selectedStatus].toLowerCase() })
+                  : t("empty")}
+              </p>
+              <Link href="/hobbies/new" className="button button--primary">{t("createFirst")}</Link>
+            </div>
+          </section>
+        ) : (
+          <div className="hobby-card-grid">
+            {visibleHobbies.map((hobby) => (
+              <Link key={hobby.id} href={`/hobbies/${hobby.id}`} className="panel hobby-card">
+                <div className="panel__body--padded">
+                  <div className="hobby-card__header">
+                    <h3 className="hobby-card__name">{hobby.name}</h3>
+                    <span className={hobbyStatusPillClasses[hobby.status]}>
+                      {hobbyStatusLabels[hobby.status]}
+                    </span>
+                  </div>
+                  {hobby.description && (
+                    <p className="hobby-card__description">{hobby.description}</p>
+                  )}
+                  {hobby.hobbyType && (
+                    <span className="hobby-card__type-badge">{hobby.hobbyType}</span>
+                  )}
+                  <div className="hobby-card__stats">
+                    <span>{hobby.sessionCount} sessions</span>
+                    {hobby.activeSessionCount > 0 && (
+                      <span className="hobby-card__active-badge">{hobby.activeSessionCount} active</span>
+                    )}
+                    <span>{hobby.recipeCount} recipes</span>
+                    {hobby.linkedAssetCount > 0 && (
+                      <span>{hobby.linkedAssetCount} equipment</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        <CursorPaginationControls
+          nextCursor={hobbyPage.nextCursor}
+          currentCursor={cursor}
+          cursorHistory={history}
+          limit={limit}
+          resultCount={visibleHobbies.length}
+          entityLabel="hobbies"
+          buildHref={buildHref}
+        />
+      </>
+    );
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return (
+        <div className="panel">
+          <div className="panel__body--padded">
+            <p>Failed to load hobbies: {error.message}</p>
+          </div>
+        </div>
+      );
+    }
+    throw error;
+  }
+}
+
+// ── Page ──────────────────────────────────────────────────
 export default async function HobbiesPage({ searchParams }: HobbiesPageProps): Promise<JSX.Element> {
-  const t = await getTranslations("hobbies");
-  const tCommon = await getTranslations("common");
-  const params = searchParams ? await searchParams : {};
-  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
+  // Fire getMe() immediately so it runs in parallel with i18n/prefs setup.
+  const mePromise = getMe();
+  const [t, tCommon, params, prefs] = await Promise.all([
+    getTranslations("hobbies"),
+    getTranslations("common"),
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
+    getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" })),
+  ]);
   const statusParam = getParam(params.status);
   const selectedStatus = (statusParam === "active" || statusParam === "paused" || statusParam === "archived")
     ? statusParam as HobbyStatus
@@ -54,16 +205,6 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
     ? Number(params.limit)
     : prefs.pageSize;
 
-  const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
-    const q = new URLSearchParams();
-    if (selectedStatus) q.set("status", selectedStatus);
-    if (selectedMode) q.set("mode", selectedMode);
-    q.set("limit", String(p.limit));
-    if (p.cursor) q.set("cursor", p.cursor);
-    if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
-    return `/hobbies?${q.toString()}`;
-  };
-
   const buildFilterHref = (status: HobbyStatus | undefined, mode: HobbyActivityMode | undefined): string => {
     const q = new URLSearchParams();
     if (status) q.set("status", status);
@@ -72,187 +213,81 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
     return `/hobbies?${q.toString()}`;
   };
 
-  try {
-    const me = await getMe();
-    const household = me.households[0];
+  const me = await mePromise;
+  const household = me.households[0];
 
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
-          <div className="page-body">
-            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
-          </div>
-        </>
-      );
-    }
-
-    const hobbyPage = await getHouseholdHobbies(household.id, {
-      ...(selectedStatus ? { status: selectedStatus } : {}),
-      ...(selectedMode ? { activityMode: selectedMode } : {}),
-      limit,
-      ...(cursor ? { cursor } : {})
-    });
-    const visibleHobbies = hobbyPage.items;
-
-    const totalActive = visibleHobbies.filter((h) => h.status === "active").length;
-    const totalSessions = visibleHobbies.reduce((sum, h) => sum + h.sessionCount, 0);
-    const activeSessions = visibleHobbies.reduce((sum, h) => sum + h.activeSessionCount, 0);
-    const totalRecipes = visibleHobbies.reduce((sum, h) => sum + h.recipeCount, 0);
-
+  if (!household) {
     return (
       <>
-        <header className="page-header">
-          <div>
-            <h1>{t("pageTitle")}</h1>
-            <p>{t("pageSubtitle")}</p>
-          </div>
-          <div className="page-header__actions">
-            <Link href="/hobbies/new" className="button">{tCommon("actions.newHobby")}</Link>
-          </div>
-        </header>
-
+        <header className="page-header"><h1>{t("pageTitle")}</h1></header>
         <div className="page-body">
-          {/* Stats row */}
-          <div className="stats-row">
-            <div className="stat-card">
-              <span className="stat-card__value">{totalActive}</span>
-              <span className="stat-card__label">Active Hobbies</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__value">{totalSessions}</span>
-              <span className="stat-card__label">Total Sessions</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__value">{activeSessions}</span>
-              <span className="stat-card__label">Active Sessions</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card__value">{totalRecipes}</span>
-              <span className="stat-card__label">Recipes</span>
-            </div>
-          </div>
-
-          {/* Status filter */}
-          <div className="hobby-status-strip">
-            <Link
-              href={buildFilterHref(undefined, selectedMode)}
-              className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
-            >
-              <span>All</span>
-            </Link>
-            {(Object.keys(hobbyStatusLabels) as HobbyStatus[]).map((status) => {
-              return (
-                <Link
-                  key={status}
-                  href={buildFilterHref(status, selectedMode)}
-                  className={`project-status-chip${selectedStatus === status ? " project-status-chip--active" : ""}`}
-                >
-                  <span>{hobbyStatusLabels[status]}</span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Activity mode filter */}
-          <div className="hobby-status-strip">
-            <Link
-              href={buildFilterHref(selectedStatus, undefined)}
-              className={`project-status-chip${selectedMode === undefined ? " project-status-chip--active" : ""}`}
-            >
-              <span>All Modes</span>
-            </Link>
-            {(Object.keys(hobbyActivityModeLabels) as HobbyActivityMode[]).map((mode) => (
-              <Link
-                key={mode}
-                href={buildFilterHref(selectedStatus, mode)}
-                className={`project-status-chip${selectedMode === mode ? " project-status-chip--active" : ""}`}
-              >
-                <span>{hobbyActivityModeLabels[mode]}</span>
-              </Link>
-            ))}
-          </div>
-
-          {/* Hobby cards */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <span className="data-table__secondary">
-              {selectedStatus ? hobbyStatusLabels[selectedStatus] : "All hobbies"}
-            </span>
-            {visibleHobbies.length > 0 && (
-              <span className="pill">Showing {visibleHobbies.length}</span>
-            )}
-          </div>
-          {visibleHobbies.length === 0 ? (
-            <section className="panel">
-              <div className="panel__body--padded panel__empty">
-                <p>
-                  {selectedStatus
-                    ? t("emptyFiltered", { status: hobbyStatusLabels[selectedStatus].toLowerCase() })
-                    : t("empty")}
-                </p>
-                <Link href="/hobbies/new" className="button button--primary">{t("createFirst")}</Link>
-              </div>
-            </section>
-          ) : (
-            <div className="hobby-card-grid">
-              {visibleHobbies.map((hobby) => (
-                <Link key={hobby.id} href={`/hobbies/${hobby.id}`} className="panel hobby-card">
-                  <div className="panel__body--padded">
-                    <div className="hobby-card__header">
-                      <h3 className="hobby-card__name">{hobby.name}</h3>
-                      <span className={hobbyStatusPillClasses[hobby.status]}>
-                        {hobbyStatusLabels[hobby.status]}
-                      </span>
-                    </div>
-                    {hobby.description && (
-                      <p className="hobby-card__description">{hobby.description}</p>
-                    )}
-                    {hobby.hobbyType && (
-                      <span className="hobby-card__type-badge">{hobby.hobbyType}</span>
-                    )}
-                    <div className="hobby-card__stats">
-                      <span>{hobby.sessionCount} sessions</span>
-                      {hobby.activeSessionCount > 0 && (
-                        <span className="hobby-card__active-badge">{hobby.activeSessionCount} active</span>
-                      )}
-                      <span>{hobby.recipeCount} recipes</span>
-                      {hobby.linkedAssetCount > 0 && (
-                        <span>{hobby.linkedAssetCount} equipment</span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          <CursorPaginationControls
-            nextCursor={hobbyPage.nextCursor}
-            currentCursor={cursor}
-            cursorHistory={history}
-            limit={limit}
-            resultCount={visibleHobbies.length}
-            entityLabel="hobbies"
-            buildHref={buildHref}
-          />
+          <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
         </div>
       </>
     );
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return (
-        <>
-          <header className="page-header"><h1>Hobbies</h1></header>
-          <div className="page-body">
-            <div className="panel">
-              <div className="panel__body--padded">
-                <p>Failed to load: {error.message}</p>
-              </div>
-            </div>
-          </div>
-        </>
-      );
-    }
-    throw error;
   }
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <h1>{t("pageTitle")}</h1>
+          <p>{t("pageSubtitle")}</p>
+        </div>
+        <div className="page-header__actions">
+          <Link href="/hobbies/new" className="button">{tCommon("actions.newHobby")}</Link>
+        </div>
+      </header>
+
+      <div className="page-body">
+        {/* Filter chips — rendered immediately from URL params */}
+        <div className="hobby-status-strip">
+          <Link
+            href={buildFilterHref(undefined, selectedMode)}
+            className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
+          >
+            <span>All</span>
+          </Link>
+          {(Object.keys(hobbyStatusLabels) as HobbyStatus[]).map((status) => (
+            <Link
+              key={status}
+              href={buildFilterHref(status, selectedMode)}
+              className={`project-status-chip${selectedStatus === status ? " project-status-chip--active" : ""}`}
+            >
+              <span>{hobbyStatusLabels[status]}</span>
+            </Link>
+          ))}
+        </div>
+        <div className="hobby-status-strip">
+          <Link
+            href={buildFilterHref(selectedStatus, undefined)}
+            className={`project-status-chip${selectedMode === undefined ? " project-status-chip--active" : ""}`}
+          >
+            <span>All Modes</span>
+          </Link>
+          {(Object.keys(hobbyActivityModeLabels) as HobbyActivityMode[]).map((mode) => (
+            <Link
+              key={mode}
+              href={buildFilterHref(selectedStatus, mode)}
+              className={`project-status-chip${selectedMode === mode ? " project-status-chip--active" : ""}`}
+            >
+              <span>{hobbyActivityModeLabels[mode]}</span>
+            </Link>
+          ))}
+        </div>
+
+        {/* List deferred behind Suspense */}
+        <Suspense fallback={<div className="panel"><div className="panel__empty">Loading hobbies…</div></div>}>
+          <HobbiesListContent
+            householdId={household.id}
+            selectedStatus={selectedStatus}
+            selectedMode={selectedMode}
+            cursor={cursor}
+            history={history}
+            limit={limit}
+          />
+        </Suspense>
+      </div>
+    </>
+  );
 }

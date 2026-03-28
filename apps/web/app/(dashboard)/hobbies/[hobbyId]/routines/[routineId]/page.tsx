@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { HobbyPracticeRoutineDetail } from "../../../../../../components/hobby-practice-detail";
 import {
@@ -16,26 +17,33 @@ type HobbyRoutineDetailPageProps = {
 
 export default async function HobbyRoutineDetailPage({ params }: HobbyRoutineDetailPageProps): Promise<JSX.Element> {
   const { hobbyId, routineId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) {
+    return <div className="page-body"><p>No household found.</p></div>;
+  }
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading routine…</div></div>}>
+      <RoutineContent householdId={household.id} hobbyId={hobbyId} routineId={routineId} />
+    </Suspense>
+  );
+}
+
+async function RoutineContent({ householdId, hobbyId, routineId }: { householdId: string; hobbyId: string; routineId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) {
-      return <div className="page-body"><p>No household found.</p></div>;
-    }
-
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - 83);
 
     const [hobby, routine, compliance, sessions] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyPracticeRoutine(household.id, hobbyId, routineId),
-      getHobbyPracticeRoutineCompliance(household.id, hobbyId, routineId, {
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyPracticeRoutine(householdId, hobbyId, routineId),
+      getHobbyPracticeRoutineCompliance(householdId, hobbyId, routineId, {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
       }),
-      getHobbySessions(household.id, hobbyId),
+      getHobbySessions(householdId, hobbyId),
     ]);
 
     return (

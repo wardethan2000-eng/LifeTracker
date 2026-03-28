@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { HobbySeriesCompare } from "../../../../../../../components/hobby-series-compare";
 import { ApiError, compareHobbySeries, getEntries, getHobbyDetail, getHobbySessions, getMe } from "../../../../../../../lib/api";
@@ -18,46 +19,52 @@ function parseSelectedSessions(value: string | string[] | undefined): string[] {
 }
 
 export default async function HobbySeriesComparePage({ params, searchParams }: HobbySeriesComparePageProps): Promise<JSX.Element> {
-  const { hobbyId, seriesId } = await params;
-  const { sessions } = await searchParams;
+  const [{ hobbyId, seriesId }, { sessions }] = await Promise.all([params, searchParams]);
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Batch Comparison</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  const selectedSessionIds = parseSelectedSessions(sessions);
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading comparison…</div></div>}>
+      <CompareContent householdId={household.id} hobbyId={hobbyId} seriesId={seriesId} selectedSessionIds={selectedSessionIds} />
+    </Suspense>
+  );
+}
+
+async function CompareContent({ householdId, hobbyId, seriesId, selectedSessionIds }: { householdId: string; hobbyId: string; seriesId: string; selectedSessionIds: string[] }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Batch Comparison</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
-    const selectedSessionIds = parseSelectedSessions(sessions);
-
     const [hobby, comparison, sessionSummaries] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      compareHobbySeries(household.id, hobbyId, seriesId, selectedSessionIds.length > 0 ? { sessionIds: selectedSessionIds } : undefined),
-      getHobbySessions(household.id, hobbyId),
+      getHobbyDetail(householdId, hobbyId),
+      compareHobbySeries(householdId, hobbyId, seriesId, selectedSessionIds.length > 0 ? { sessionIds: selectedSessionIds } : undefined),
+      getHobbySessions(householdId, hobbyId),
     ]);
 
     const detailEntries = await Promise.all(
       comparison.sessions.map(async (sessionItem) => {
         const [lessons, issues, observations] = await Promise.all([
-          getEntries(household.id, {
+          getEntries(householdId, {
             entityType: "hobby_session",
             entityId: sessionItem.sessionId,
             entryType: "lesson",
             limit: 50,
           }),
-          getEntries(household.id, {
+          getEntries(householdId, {
             entityType: "hobby_session",
             entityId: sessionItem.sessionId,
             entryType: "issue",
             limit: 50,
           }),
-          getEntries(household.id, {
+          getEntries(householdId, {
             entityType: "hobby_session",
             entityId: sessionItem.sessionId,
             entryType: "observation",

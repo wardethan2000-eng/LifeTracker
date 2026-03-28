@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { createHobbyRecipeAction } from "../../../../../actions";
 import { HobbyRecipeWorkbench } from "../../../../../../components/hobby-recipe-workbench";
@@ -10,21 +11,28 @@ type NewHobbyRecipePageProps = {
 
 export default async function NewHobbyRecipePage({ params }: NewHobbyRecipePageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>New Recipe</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <NewRecipeContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function NewRecipeContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>New Recipe</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
-    const hobby = await getHobbyDetail(household.id, hobbyId);
+    const hobby = await getHobbyDetail(householdId, hobbyId);
 
     return (
       <>
@@ -40,7 +48,7 @@ export default async function NewHobbyRecipePage({ params }: NewHobbyRecipePageP
         <div className="page-body">
           <HobbyRecipeWorkbench
             mode="create"
-            householdId={household.id}
+            householdId={householdId}
             hobbyId={hobbyId}
             createAction={createHobbyRecipeAction}
             initialRecipe={null}

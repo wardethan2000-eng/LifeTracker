@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getAssetComments, getAssetDetail, getMe } from "../../../../../lib/api";
 import {
   createCommentAction,
@@ -13,12 +14,19 @@ type AssetCommentsPageProps = {
 
 export default async function AssetCommentsPage({ params }: AssetCommentsPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading comments…</div></div>}>
+      <CommentsContent assetId={assetId} />
+    </Suspense>
+  );
+}
+
+async function CommentsContent({ assetId }: { assetId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
     const [detail, comments] = await Promise.all([
       getAssetDetail(assetId),
       getAssetComments(assetId),

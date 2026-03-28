@@ -1,5 +1,6 @@
 import type { AssetLabelData } from "@lifekeeper/types";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssetLabelPrintToolbar } from "../../../../../components/asset-label-print-toolbar";
@@ -38,9 +39,16 @@ const renderLabelCard = (label: AssetLabelData, index: number, assetId: string):
 );
 
 export default async function AssetLabelPage({ params, searchParams }: AssetLabelPageProps): Promise<JSX.Element> {
-  const { assetId } = await params;
-  const { layout = "single", copies } = await searchParams;
+  const [{ assetId }, { layout = "single", copies }] = await Promise.all([params, searchParams]);
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading label…</div></div>}>
+      <LabelContent assetId={assetId} layout={layout} copies={copies} />
+    </Suspense>
+  );
+}
+
+async function LabelContent({ assetId, layout, copies }: { assetId: string; layout: string; copies?: string }): Promise<JSX.Element> {
   try {
     const label = await getAssetLabelData(assetId);
     const labelCount = layout === "sheet" ? Math.max(6, clampCopies(copies)) : 1;

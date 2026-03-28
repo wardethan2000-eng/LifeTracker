@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Notification } from "@lifekeeper/types";
-import type { JSX } from "react";
+import { Suspense, type JSX } from "react";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
 import { getTranslations } from "next-intl/server";
 import {
@@ -165,22 +165,48 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     ? params.history.split(",").map((value) => value.trim()).filter(Boolean)
     : [];
 
+  const me = await getMe();
+  const household = me.households[0];
+
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>{t("pageTitle")}</h1></header>
+        <div className="page-body">
+          <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<><header className="page-header"><h1>{t("pageTitle")}</h1></header><div className="page-body"><div className="panel"><div className="panel__body--padded"><p className="note">Loading notifications…</p></div></div></div></>}>
+      <NotificationsContent
+        householdId={household.id}
+        status={status}
+        channel={channel}
+        type={type}
+        limit={limit}
+        cursor={cursor}
+        history={history}
+      />
+    </Suspense>
+  );
+}
+
+async function NotificationsContent({ householdId, status, channel, type, limit, cursor, history }: {
+  householdId: string;
+  status: (typeof statusOptions)[number];
+  channel: (typeof channelOptions)[number];
+  type: (typeof typeOptions)[number];
+  limit: number;
+  cursor: string | undefined;
+  history: string[];
+}): Promise<JSX.Element> {
+  const t = await getTranslations("notifications");
+
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>{t("pageTitle")}</h1></header>
-          <div className="page-body">
-            <p>{tCommon("empty.noHousehold")} <Link href="/" className="text-link">{tCommon("actions.goToDashboard")}</Link> to create one.</p>
-          </div>
-        </>
-      );
-    }
-
-    const notificationList = await getHouseholdNotifications(household.id, {
+    const notificationList = await getHouseholdNotifications(householdId, {
       limit,
       status,
       ...(cursor ? { cursor } : {}),

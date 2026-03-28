@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import type { ActivityLog } from "@lifekeeper/types";
 import { HouseholdCsvExportButton } from "../../../components/asset-export-actions";
 import { ApiError, getDisplayPreferences, getHouseholdActivity, getMe } from "../../../lib/api";
@@ -89,8 +90,12 @@ const formatMetadataValue = (value: unknown): string => {
 };
 
 export default async function ActivityPage({ searchParams }: ActivityPageProps): Promise<JSX.Element> {
-  const params = searchParams ? await searchParams : {};
-  const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
+  // Fire getMe() immediately so it runs in parallel with params/prefs setup.
+  const mePromise = getMe();
+  const [params, prefs] = await Promise.all([
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
+    getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" })),
+  ]);
   const formatMetadataValueWithPrefs = (value: unknown): string => {
     if (value === null || value === undefined) return "—";
     if (typeof value === "string") return isIsoDateTime(value) ? formatDateTime(value, "Not set", undefined, prefs.dateFormat) : value;
@@ -118,166 +123,202 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
     ? params.history.split(",").map((v) => v.trim()).filter(Boolean)
     : [];
 
-  try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+  const me = await mePromise;
+  const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
 
-    if (!household) {
-      return (
-        <>
-          <PageHeader title="Activity" />
-          <div className="page-body">
-            <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+  if (!household) {
+    return (
+      <>
+        <PageHeader title="Activity" />
+        <div className="page-body">
+          <p>No household found. <Link href="/" className="text-link">Go to dashboard</Link> to create one.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Activity Log"
+        subtitle="Household audit trail for assets, schedules, projects, invitations, and collaboration events."
+        actions={<HouseholdCsvExportButton householdId={household.id} dataset="activity-log" />}
+      />
+
+      <div className="page-body">
+        {/* Filters form — rendered immediately */}
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Filters</h2>
           </div>
-        </>
-      );
-    }
+          <div className="panel__body--padded">
+            <form method="GET" className="form-grid">
+              <input type="hidden" name="householdId" value={household.id} />
+              <label className="field">
+                <span>Entity Type</span>
+                <select name="entityType" defaultValue={entityType}>
+                  <option value="all">All entities</option>
+                  <option value="asset">Assets</option>
+                  <option value="schedule">Schedules</option>
+                  <option value="log">Maintenance Logs</option>
+                  <option value="timeline_entry">Timeline Entries</option>
+                  <option value="project">Projects</option>
+                  <option value="comment">Comments</option>
+                  <option value="inventory_item">Inventory</option>
+                  <option value="service_provider">Service Providers</option>
+                  <option value="invitation">Invitations</option>
+                  <option value="hobby">Hobbies</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Time Window</span>
+                <select name="windowDays" defaultValue={windowDays}>
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="all">All time</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Result Count</span>
+                <select name="limit" defaultValue={String(limit)}>
+                  <option value="25">25 entries</option>
+                  <option value="50">50 entries</option>
+                  <option value="100">100 entries</option>
+                </select>
+              </label>
+              <div className="inline-actions field field--full">
+                <button type="submit" className="button button--ghost">Apply Filters</button>
+                <Link href={`/activity?householdId=${household.id}`} className="button button--ghost">Reset</Link>
+              </div>
+            </form>
+          </div>
+        </section>
 
-    const since = windowDays === "all"
-      ? undefined
-      : new Date(Date.now() - Number(windowDays) * 24 * 60 * 60 * 1000).toISOString();
+        {/* Activity list — deferred */}
+        <Suspense fallback={<div className="panel"><div className="panel__empty">Loading activity…</div></div>}>
+          <ActivityListContent
+            householdId={household.id}
+            entityType={entityType}
+            windowDays={windowDays}
+            cursor={cursor}
+            history={history}
+            limit={limit}
+            dateFormat={prefs.dateFormat}
+            formatMetadataValueWithPrefs={formatMetadataValueWithPrefs}
+          />
+        </Suspense>
+      </div>
+    </>
+  );
+}
 
-    const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
-      const q = new URLSearchParams();
-      q.set("householdId", household.id);
-      q.set("entityType", entityType);
-      q.set("windowDays", windowDays);
-      q.set("limit", String(p.limit));
-      if (p.cursor) q.set("cursor", p.cursor);
-      if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
-      return `/activity?${q.toString()}`;
-    };
+// ── Deferred activity list ─────────────────────────────────
+type ActivityListContentProps = {
+  householdId: string;
+  entityType: string;
+  windowDays: string;
+  cursor: string | undefined;
+  history: string[];
+  limit: number;
+  dateFormat: string;
+  formatMetadataValueWithPrefs: (value: unknown) => string;
+};
 
-    const activity = await getHouseholdActivity(household.id, {
+async function ActivityListContent({
+  householdId,
+  entityType,
+  windowDays,
+  cursor,
+  history,
+  limit,
+  dateFormat,
+  formatMetadataValueWithPrefs,
+}: ActivityListContentProps): Promise<JSX.Element> {
+  const since = windowDays === "all"
+    ? undefined
+    : new Date(Date.now() - Number(windowDays) * 24 * 60 * 60 * 1000).toISOString();
+
+  const buildHref = (p: { cursor?: string; history?: string[]; limit: number }): string => {
+    const q = new URLSearchParams();
+    q.set("householdId", householdId);
+    q.set("entityType", entityType);
+    q.set("windowDays", windowDays);
+    q.set("limit", String(p.limit));
+    if (p.cursor) q.set("cursor", p.cursor);
+    if (p.history && p.history.length > 0) q.set("history", p.history.join(","));
+    return `/activity?${q.toString()}`;
+  };
+
+  try {
+    const activity = await getHouseholdActivity(householdId, {
       ...(entityType !== "all" ? { entityType } : {}),
       ...(since ? { since } : {}),
       ...(cursor ? { cursor } : {}),
-      limit
+      limit,
     });
 
     return (
       <>
-        <PageHeader
-          title="Activity Log"
-          subtitle="Household audit trail for assets, schedules, projects, invitations, and collaboration events."
-          actions={<HouseholdCsvExportButton householdId={household.id} dataset="activity-log" />}
-        />
-
-        <div className="page-body">
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Filters</h2>
-            </div>
-            <div className="panel__body--padded">
-              <form method="GET" className="form-grid">
-                <input type="hidden" name="householdId" value={household.id} />
-                <label className="field">
-                  <span>Entity Type</span>
-                  <select name="entityType" defaultValue={entityType}>
-                    <option value="all">All entities</option>
-                    <option value="asset">Assets</option>
-                    <option value="schedule">Schedules</option>
-                    <option value="log">Maintenance Logs</option>
-                    <option value="timeline_entry">Timeline Entries</option>
-                    <option value="project">Projects</option>
-                    <option value="comment">Comments</option>
-                    <option value="inventory_item">Inventory</option>
-                    <option value="service_provider">Service Providers</option>
-                    <option value="invitation">Invitations</option>
-                    <option value="hobby">Hobbies</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Time Window</span>
-                  <select name="windowDays" defaultValue={windowDays}>
-                    <option value="7">Last 7 days</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                    <option value="all">All time</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Result Count</span>
-                  <select name="limit" defaultValue={String(limit)}>
-                    <option value="25">25 entries</option>
-                    <option value="50">50 entries</option>
-                    <option value="100">100 entries</option>
-                  </select>
-                </label>
-                <div className="inline-actions field field--full">
-                  <button type="submit" className="button button--ghost">Apply Filters</button>
-                  <Link href={`/activity?householdId=${household.id}`} className="button button--ghost">Reset</Link>
-                </div>
-              </form>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Recent Activity ({activity.entries.length})</h2>
-              <span className="pill">Newest first</span>
-            </div>
-            <div className="panel__body">
-              {activity.entries.length === 0 ? (
-                <p className="panel__empty">No activity recorded yet.</p>
-              ) : (
-                <div className="schedule-stack">
-                  {activity.entries.map((entry) => (
-                    <article key={entry.id} className="schedule-card">
-                      <div className="schedule-card__summary">
-                        <div>
-                          <h3>{formatActionLabel(entry.action)}</h3>
-                          {renderEntityRef(entry)}
-                        </div>
-                        <span className="pill">{formatDateTime(entry.createdAt, undefined, undefined, prefs.dateFormat)}</span>
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Recent Activity ({activity.entries.length})</h2>
+            <span className="pill">Newest first</span>
+          </div>
+          <div className="panel__body">
+            {activity.entries.length === 0 ? (
+              <p className="panel__empty">No activity recorded yet.</p>
+            ) : (
+              <div className="schedule-stack">
+                {activity.entries.map((entry) => (
+                  <article key={entry.id} className="schedule-card">
+                    <div className="schedule-card__summary">
+                      <div>
+                        <h3>{formatActionLabel(entry.action)}</h3>
+                        {renderEntityRef(entry)}
                       </div>
-                      {entry.metadata ? (
-                        <div style={{ display: "grid", gap: "8px" }}>
-                          {Object.entries(entry.metadata).map(([key, value]) => (
-                            <div key={key}>
-                              <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                {formatMetadataLabel(key)}
-                              </div>
-                              <div style={{ fontSize: "0.88rem" }}>{formatMetadataValueWithPrefs(value)}</div>
+                      <span className="pill">{formatDateTime(entry.createdAt, undefined, undefined, dateFormat)}</span>
+                    </div>
+                    {entry.metadata ? (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        {Object.entries(entry.metadata).map(([key, value]) => (
+                          <div key={key}>
+                            <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                              {formatMetadataLabel(key)}
                             </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
+                            <div style={{ fontSize: "0.88rem" }}>{formatMetadataValueWithPrefs(value)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
-          <CursorPaginationControls
-            nextCursor={activity.nextCursor ?? null}
-            currentCursor={cursor}
-            cursorHistory={history}
-            limit={limit}
-            resultCount={activity.entries.length}
-            entityLabel="entries"
-            buildHref={buildHref}
-          />
-        </div>
+        <CursorPaginationControls
+          nextCursor={activity.nextCursor ?? null}
+          currentCursor={cursor}
+          cursorHistory={history}
+          limit={limit}
+          resultCount={activity.entries.length}
+          entityLabel="entries"
+          buildHref={buildHref}
+        />
       </>
     );
   } catch (error) {
     if (error instanceof ApiError) {
       return (
-        <>
-          <PageHeader title="Activity" />
-          <div className="page-body">
-            <div className="panel">
-              <div className="panel__body--padded">
-                <p>Failed to load activity: {error.message}</p>
-              </div>
-            </div>
+        <div className="panel">
+          <div className="panel__body--padded">
+            <p>Failed to load activity: {error.message}</p>
           </div>
-        </>
+        </div>
       );
     }
-
     throw error;
   }
 }

@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   ApiError,
   getHobbyDetail,
@@ -22,32 +23,25 @@ type HobbyDetailPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function HobbyDetailPage({ params }: HobbyDetailPageProps): Promise<JSX.Element> {
-  const { hobbyId } = await params;
-
+// ── Deferred overview content ──────────────────────────────
+async function HobbyOverviewContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) {
-      return <p>No household found.</p>;
-    }
-
     const [hobby, sessions, series, entriesResult, sourceIdea, goalsResult, routinesResult, canvases, pinnedResult, overviewPins] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbySessions(household.id, hobbyId),
-      getHobbySeries(household.id, hobbyId),
-      getEntries(household.id, {
+      getHobbyDetail(householdId, hobbyId),
+      getHobbySessions(householdId, hobbyId),
+      getHobbySeries(householdId, hobbyId),
+      getEntries(householdId, {
         entityType: "hobby",
         entityId: hobbyId,
         limit: 5,
         sortBy: "entryDate",
         excludeFlags: ["archived"],
       }).catch(() => ({ items: [], nextCursor: null })),
-      getSourceIdea(household.id, "hobby", hobbyId).catch(() => null),
-      listHobbyPracticeGoals(household.id, hobbyId, { limit: 10, status: "active" }).catch(() => ({ items: [], nextCursor: null })),
-      listHobbyPracticeRoutines(household.id, hobbyId, { limit: 10, isActive: true }).catch(() => ({ items: [], nextCursor: null })),
-      getCanvasesByEntity(household.id, "hobby", hobbyId).catch(() => []),
-      getEntries(household.id, { entityType: "hobby", entityId: hobbyId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
+      getSourceIdea(householdId, "hobby", hobbyId).catch(() => null),
+      listHobbyPracticeGoals(householdId, hobbyId, { limit: 10, status: "active" }).catch(() => ({ items: [], nextCursor: null })),
+      listHobbyPracticeRoutines(householdId, hobbyId, { limit: 10, isActive: true }).catch(() => ({ items: [], nextCursor: null })),
+      getCanvasesByEntity(householdId, "hobby", hobbyId).catch(() => []),
+      getEntries(householdId, { entityType: "hobby", entityId: hobbyId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
       getOverviewPins("hobby", hobbyId).catch(() => []),
     ]);
 
@@ -73,14 +67,14 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
           <IdeaProvenanceBar ideaId={sourceIdea.id} ideaTitle={sourceIdea.title} />
         )}
         <PinnedOverviewSection
-          householdId={household.id}
+          householdId={householdId}
           entityType="hobby"
           entityId={hobbyId}
           entries={pinnedResult.items}
           overviewPins={overviewPins}
         />
         <HobbyDashboard
-        householdId={household.id}
+        householdId={householdId}
         hobbyId={hobbyId}
         hobbyName={hobby.name}
         status={hobby.status}
@@ -138,4 +132,21 @@ export default async function HobbyDetailPage({ params }: HobbyDetailPageProps):
     }
     throw error;
   }
+}
+
+// ── Page ──────────────────────────────────────────────────
+export default async function HobbyDetailPage({ params }: HobbyDetailPageProps): Promise<JSX.Element> {
+  const { hobbyId } = await params;
+
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) {
+    return <p>No household found. <Link href="/hobbies" className="text-link">← Hobbies</Link>.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <HobbyOverviewContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
 }

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { hobbyPresetLibrary } from "@lifekeeper/presets";
 import { updateHobbyAction } from "../../../../actions";
@@ -11,21 +12,28 @@ type EditHobbyPageProps = {
 
 export default async function EditHobbyPage({ params }: EditHobbyPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>Edit Hobby</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <EditContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function EditContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>Edit Hobby</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
-    const hobby = await getHobbyDetail(household.id, hobbyId);
+    const hobby = await getHobbyDetail(householdId, hobbyId);
     const initialHobby = {
       id: hobby.id,
       name: hobby.name,
@@ -54,7 +62,7 @@ export default async function EditHobbyPage({ params }: EditHobbyPageProps): Pro
           <HobbyWorkbench
             mode="edit"
             action={updateHobbyAction}
-            householdId={household.id}
+            householdId={householdId}
             presets={hobbyPresetLibrary}
             initialHobby={initialHobby}
           />

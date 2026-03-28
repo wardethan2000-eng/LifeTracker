@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import {
   cloneProjectAction,
   saveProjectAsTemplateAction,
@@ -33,15 +34,23 @@ export default async function ProjectSettingsPage({ params, searchParams }: Proj
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
 
+  const me = await getMe();
+  const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
+
+  if (!household) {
+    return <p>No household found.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading settings…</div></div>}>
+      <SettingsContent householdId={household.id} projectId={projectId} />
+    </Suspense>
+  );
+}
+
+async function SettingsContent({ householdId, projectId }: { householdId: string; projectId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
-
-    if (!household) {
-      return <p>No household found.</p>;
-    }
-
-    const project = await getProjectDetail(household.id, projectId);
+    const project = await getProjectDetail(householdId, projectId);
 
     return (
       <div id="project-settings">
@@ -62,13 +71,13 @@ export default async function ProjectSettingsPage({ params, searchParams }: Proj
           <div>
             <ProjectCoreFormFields
               action={updateProjectAction}
-              householdId={household.id}
+              householdId={householdId}
               project={project}
               submitLabel="Save Project"
             />
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)", display: "grid", gap: 16 }}>
               <form action={saveProjectAsTemplateAction} className="workbench-grid">
-                <input type="hidden" name="householdId" value={household.id} />
+                <input type="hidden" name="householdId" value={householdId} />
                 <input type="hidden" name="projectId" value={project.id} />
                 <label className="field">
                   <span>Save as Template</span>
@@ -88,7 +97,7 @@ export default async function ProjectSettingsPage({ params, searchParams }: Proj
               </form>
 
               <form action={cloneProjectAction} className="workbench-grid">
-                <input type="hidden" name="householdId" value={household.id} />
+                <input type="hidden" name="householdId" value={householdId} />
                 <input type="hidden" name="projectId" value={project.id} />
                 <label className="field">
                   <span>Clone Project</span>
@@ -109,12 +118,12 @@ export default async function ProjectSettingsPage({ params, searchParams }: Proj
             </div>
             <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
               <DemoteToIdeaButton
-                householdId={household.id}
+                householdId={householdId}
                 sourceType="project"
                 sourceId={project.id}
                 sourceName={project.name}
               />
-              <ProjectDangerActions householdId={household.id} projectId={project.id} />
+              <ProjectDangerActions householdId={householdId} projectId={project.id} />
             </div>
           </div>
         </ExpandableCard>

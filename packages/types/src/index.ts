@@ -106,7 +106,8 @@ export const entryEntityTypeValues = [
   "maintenance_log",
   "inventory_item",
   "notebook",
-  "idea"
+  "idea",
+  "home"
 ] as const;
 export const entryTypeValues = [
   "note",

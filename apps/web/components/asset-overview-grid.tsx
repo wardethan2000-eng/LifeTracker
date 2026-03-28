@@ -8,7 +8,9 @@ import type { AssetDetailResponse, AssetTransferList, Entry, OverviewPin } from 
 import { updateEntry, removeOverviewPin } from "../lib/api";
 import { useCallback } from "react";
 import type { LayoutItem } from "react-grid-layout";
-import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
+import dynamic from "next/dynamic";
+import type { DashboardCardDef } from "./dashboard-grid";
+const DashboardGrid = dynamic(() => import("./dashboard-grid").then((m) => ({ default: m.DashboardGrid })), { ssr: false });
 import { AssetLabelActions } from "./asset-label-actions";
 import { AttachmentSection } from "./attachment-section";
 import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
@@ -92,17 +94,6 @@ export function AssetOverviewGrid({
     setLocalPins((prev) => prev.filter((p) => p.id !== pinId));
     await removeOverviewPin(pinId);
   }, []);
-
-  // --- Unscheduled quick-log state ---
-  const [showUnscheduledForm, setShowUnscheduledForm] = useState(false);
-  const [unscheduledTitle, setUnscheduledTitle] = useState("");
-  const [unscheduledDate, setUnscheduledDate] = useState(
-    () => new Date().toISOString().slice(0, 16)
-  );
-  const [unscheduledNotes, setUnscheduledNotes] = useState("");
-  const [unscheduledCost, setUnscheduledCost] = useState("");
-  const [unscheduledError, setUnscheduledError] = useState<string | null>(null);
-  const [isLogPending, startLogTransition] = useTransition();
 
   const handleExpandSchedule = (scheduleId: string) => {
     if (expandedScheduleId === scheduleId) {

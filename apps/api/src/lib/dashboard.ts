@@ -334,6 +334,7 @@ export const buildAssetDetail = async (
         orderBy: { createdAt: "asc" }
       },
       logs: {
+        where: { deletedAt: null },
         include: { parts: true },
         orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
         take: logLimit

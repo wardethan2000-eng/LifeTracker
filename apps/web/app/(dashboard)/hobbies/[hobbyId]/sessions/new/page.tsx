@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { createHobbySessionAction } from "../../../../../actions";
 import { HobbySessionWorkbench } from "../../../../../../components/hobby-session-workbench";
@@ -20,33 +21,39 @@ type NewHobbySessionPageProps = {
 };
 
 export default async function NewHobbySessionPage({ params, searchParams }: NewHobbySessionPageProps): Promise<JSX.Element> {
-  const { hobbyId } = await params;
-  const { seriesId } = await searchParams;
+  const [{ hobbyId }, { seriesId }] = await Promise.all([params, searchParams]);
+  const me = await getMe();
+  const household = me.households[0];
 
+  if (!household) {
+    return (
+      <>
+        <header className="page-header"><h1>New Session</h1></header>
+        <div className="page-body"><p>No household found.</p></div>
+      </>
+    );
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <NewSessionContent householdId={household.id} hobbyId={hobbyId} seriesId={seriesId} />
+    </Suspense>
+  );
+}
+
+async function NewSessionContent({ householdId, hobbyId, seriesId }: { householdId: string; hobbyId: string; seriesId?: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return (
-        <>
-          <header className="page-header"><h1>New Session</h1></header>
-          <div className="page-body"><p>No household found.</p></div>
-        </>
-      );
-    }
-
     const [hobby, recipes, activeSeries, goals, routines, collectionItems] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyRecipes(household.id, hobbyId),
-      getHobbySeries(household.id, hobbyId, { status: "active" }),
-      listHobbyPracticeGoals(household.id, hobbyId, { status: "active", limit: 12 }),
-      listHobbyPracticeRoutines(household.id, hobbyId, { isActive: true, limit: 12 }),
-      listHobbyCollectionItems(household.id, hobbyId, { limit: 50 }),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyRecipes(householdId, hobbyId),
+      getHobbySeries(householdId, hobbyId, { status: "active" }),
+      listHobbyPracticeGoals(householdId, hobbyId, { status: "active", limit: 12 }),
+      listHobbyPracticeRoutines(householdId, hobbyId, { isActive: true, limit: 12 }),
+      listHobbyCollectionItems(householdId, hobbyId, { limit: 50 }),
     ]);
 
     const activeSeriesDetails = await Promise.all(
-      activeSeries.map((series) => getHobbySeriesDetail(household.id, hobbyId, series.id)),
+      activeSeries.map((series) => getHobbySeriesDetail(householdId, hobbyId, series.id)),
     );
 
     return (
@@ -63,7 +70,7 @@ export default async function NewHobbySessionPage({ params, searchParams }: NewH
         <div className="page-body">
           <HobbySessionWorkbench
             action={createHobbySessionAction}
-            householdId={household.id}
+            householdId={householdId}
             hobbyId={hobbyId}
             activityMode={hobby.activityMode}
             recipes={recipes}

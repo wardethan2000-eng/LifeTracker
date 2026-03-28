@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { HobbyLinksManager } from "../../../../../components/hobby-links-manager";
 import {
   ApiError,
@@ -15,22 +16,29 @@ type HobbySectionPageProps = {
 
 export default async function HobbyInventoryPage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading inventory…</div></div>}>
+      <InventoryContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function InventoryContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
     const [hobby, assets, inventoryCatalog, projects] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHouseholdAssets(household.id),
-      getHouseholdInventory(household.id, { limit: 100 }),
-      getHouseholdProjects(household.id),
+      getHobbyDetail(householdId, hobbyId),
+      getHouseholdAssets(householdId),
+      getHouseholdInventory(householdId, { limit: 100 }),
+      getHouseholdProjects(householdId),
     ]);
 
     return (
       <HobbyLinksManager
-        householdId={household.id}
+        householdId={householdId}
         hobbyId={hobbyId}
         initialAssetLinks={hobby.assetLinks}
         initialInventoryLinks={hobby.inventoryLinks}

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getHobbyComments, getHobbyDetail, getMe } from "../../../../../lib/api";
 import {
   createHobbyCommentAction,
@@ -13,15 +14,22 @@ type HobbyCommentsPageProps = {
 
 export default async function HobbyCommentsPage({ params }: HobbyCommentsPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  const me = await getMe();
+  const household = me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading comments…</div></div>}>
+      <CommentsContent householdId={household.id} hobbyId={hobbyId} />
+    </Suspense>
+  );
+}
+
+async function CommentsContent({ householdId, hobbyId }: { householdId: string; hobbyId: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-    if (!household) return <p>No household found.</p>;
-
     const [, comments] = await Promise.all([
-      getHobbyDetail(household.id, hobbyId),
-      getHobbyComments(household.id, hobbyId),
+      getHobbyDetail(householdId, hobbyId),
+      getHobbyComments(householdId, hobbyId),
     ]);
 
     return (
@@ -29,7 +37,7 @@ export default async function HobbyCommentsPage({ params }: HobbyCommentsPagePro
         <EntityComments
           comments={comments}
           config={{
-            hiddenFields: { householdId: household.id, hobbyId },
+            hiddenFields: { householdId, hobbyId },
             createAction: createHobbyCommentAction,
             updateAction: updateHobbyCommentAction,
             deleteAction: deleteHobbyCommentAction,

@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getMe, getProjectComments, getProjectDetail } from "../../../../../lib/api";
 import {
   createProjectCommentAction,
@@ -17,14 +18,22 @@ export default async function ProjectCommentsPage({ params, searchParams }: Proj
   const query = searchParams ? await searchParams : {};
   const householdIdParam = typeof query.householdId === "string" ? query.householdId : undefined;
 
-  try {
-    const me = await getMe();
-    const household = me.households.find((h) => h.id === householdIdParam) ?? me.households[0];
-    if (!household) return <p>No household found.</p>;
+  const me = await getMe();
+  const household = me.households.find((h) => h.id === householdIdParam) ?? me.households[0];
+  if (!household) return <p>No household found.</p>;
 
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading comments…</div></div>}>
+      <CommentsContent householdId={household.id} projectId={projectId} />
+    </Suspense>
+  );
+}
+
+async function CommentsContent({ householdId, projectId }: { householdId: string; projectId: string }): Promise<JSX.Element> {
+  try {
     const [, comments] = await Promise.all([
-      getProjectDetail(household.id, projectId),
-      getProjectComments(household.id, projectId),
+      getProjectDetail(householdId, projectId),
+      getProjectComments(householdId, projectId),
     ]);
 
     return (
@@ -32,7 +41,7 @@ export default async function ProjectCommentsPage({ params, searchParams }: Proj
         <EntityComments
           comments={comments}
           config={{
-            hiddenFields: { householdId: household.id, projectId },
+            hiddenFields: { householdId, projectId },
             createAction: createProjectCommentAction,
             updateAction: updateProjectCommentAction,
             deleteAction: deleteProjectCommentAction,

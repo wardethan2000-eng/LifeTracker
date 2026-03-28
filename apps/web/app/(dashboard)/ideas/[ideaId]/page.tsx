@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { JSX } from "react";
+import { Suspense } from "react";
 import { ApiError, getCanvasesByEntity, getEntries, getIdea, getMe, getOverviewPins } from "../../../../lib/api";
 import { formatDate } from "../../../../lib/formatters";
 import { IdeaDescriptionCard } from "../../../../components/idea-description-card";
@@ -22,28 +23,20 @@ type IdeaDetailPageProps = {
   params: Promise<{ ideaId: string }>;
 };
 
-export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps): Promise<JSX.Element> {
-  const { ideaId } = await params;
-
+// ── Deferred overview content ──────────────────────────────
+async function IdeaOverviewContent({ householdId, ideaId, timezone }: { householdId: string; ideaId: string; timezone: string }): Promise<JSX.Element> {
   try {
-    const me = await getMe();
-    const household = me.households[0];
-
-    if (!household) {
-      return <p>No household found. <Link href="/ideas" className="text-link">← Ideas</Link>.</p>;
-    }
-
     const [idea, entriesResult, canvases, pinnedResult, overviewPins] = await Promise.all([
-      getIdea(household.id, ideaId),
-      getEntries(household.id, {
+      getIdea(householdId, ideaId),
+      getEntries(householdId, {
         entityType: "idea",
         entityId: ideaId,
         limit: 1,
         sortBy: "entryDate",
         excludeFlags: ["archived"],
       }).catch(() => ({ items: [], nextCursor: null })),
-      getCanvasesByEntity(household.id, "idea", ideaId).catch(() => []),
-      getEntries(household.id, { entityType: "idea", entityId: ideaId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
+      getCanvasesByEntity(householdId, "idea", ideaId).catch(() => []),
+      getEntries(householdId, { entityType: "idea", entityId: ideaId, flags: ["pinned"], limit: 10 }).catch(() => ({ items: [], nextCursor: null })),
       getOverviewPins("idea", ideaId).catch(() => []),
     ]);
 
@@ -60,11 +53,10 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
       updatedAt: c.updatedAt,
     }));
 
-    const createdDate = formatDate(idea.createdAt, "-", household.timezone);
+    const createdDate = formatDate(idea.createdAt, "-", timezone);
 
     return (
       <>
-        {/* Summary meta line */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
           <span className={`priority-dot priority-dot--${idea.priority}`} />
           <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
@@ -75,9 +67,8 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
           </span>
         </div>
 
-        {/* Two-column layout */}
         <PinnedOverviewSection
-          householdId={household.id}
+          householdId={householdId}
           entityType="idea"
           entityId={ideaId}
           entries={pinnedResult.items}
@@ -86,12 +77,12 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
         <div className="resource-layout">
           <div className="resource-layout__primary">
             <IdeaDescriptionCard
-              householdId={household.id}
+              householdId={householdId}
               ideaId={idea.id}
               description={idea.description}
             />
             <NotesAndCanvasCard
-              householdId={household.id}
+              householdId={householdId}
               entityType="idea"
               entityId={idea.id}
               recentNote={recentNote}
@@ -104,14 +95,14 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
               }))}
             />
             <IdeaLinksCard
-              householdId={household.id}
+              householdId={householdId}
               ideaId={idea.id}
               links={idea.links}
             />
           </div>
           <div className="resource-layout__aside">
             <IdeaStatusCard
-              householdId={household.id}
+              householdId={householdId}
               ideaId={idea.id}
               stage={idea.stage}
               priority={idea.priority}
@@ -120,7 +111,7 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
               updatedAt={idea.updatedAt}
             />
             <IdeaPromotionCard
-              householdId={household.id}
+              householdId={householdId}
               ideaId={idea.id}
               title={idea.title}
               description={idea.description}
@@ -143,14 +134,13 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
           </div>
         </div>
 
-        {/* Full-width cards below grid */}
         <IdeaMaterialsCard
-          householdId={household.id}
+          householdId={householdId}
           ideaId={idea.id}
           materials={idea.materials}
         />
         <IdeaStepsCard
-          householdId={household.id}
+          householdId={householdId}
           ideaId={idea.id}
           steps={idea.steps}
         />
@@ -169,4 +159,22 @@ export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps):
     }
     throw error;
   }
+}
+
+// ── Page ──────────────────────────────────────────────────
+export default async function IdeaOverviewPage({ params }: IdeaDetailPageProps): Promise<JSX.Element> {
+  const { ideaId } = await params;
+
+  const me = await getMe();
+  const household = me.households[0];
+
+  if (!household) {
+    return <p>No household found. <Link href="/ideas" className="text-link">← Ideas</Link>.</p>;
+  }
+
+  return (
+    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+      <IdeaOverviewContent householdId={household.id} ideaId={ideaId} timezone={household.timezone} />
+    </Suspense>
+  );
 }

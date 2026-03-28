@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import type { LayoutItem } from "react-grid-layout";
-import { DashboardGrid, type DashboardCardDef } from "./dashboard-grid";
+import dynamic from "next/dynamic";
+import type { DashboardCardDef } from "./dashboard-grid";
+const DashboardGrid = dynamic(() => import("./dashboard-grid").then((m) => ({ default: m.DashboardGrid })), { ssr: false });
 import { PinButton } from "./pin-button";
 import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
