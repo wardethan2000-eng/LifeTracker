@@ -1,0 +1,116 @@
+import {
+  MD3LightTheme,
+  MD3DarkTheme,
+  type MD3Theme,
+} from "react-native-paper";
+
+// LifeKeeper brand palette — mirrors CSS custom properties in globals.css
+const brand = {
+  teal: "#0d9488",
+  tealDark: "#14342b",
+  tealMid: "#1a3d35",
+  cream: "#f3efe5",
+  warmWhite: "#fffaf2",
+  textLight: "#f7f3ea",
+  textMuted: "#35554a",
+  danger: "#dc2626",
+  warning: "#f59e0b",
+  success: "#16a34a",
+  info: "#2563eb",
+  border: "#d4cfc4",
+  borderDark: "#2d5a4a",
+  surface: "#fffaf2",
+  surfaceDark: "#14342b",
+  backgroundDark: "#0a1f1a",
+} as const;
+
+export const lightTheme: MD3Theme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: brand.teal,
+    primaryContainer: brand.cream,
+    secondary: brand.tealDark,
+    secondaryContainer: "#e0f2f0",
+    tertiary: brand.tealMid,
+    background: brand.warmWhite,
+    surface: brand.cream,
+    surfaceVariant: "#ebe7dd",
+    error: brand.danger,
+    outline: brand.border,
+    outlineVariant: "#e9e5db",
+    onPrimary: brand.textLight,
+    onPrimaryContainer: brand.tealDark,
+    onSecondary: brand.textLight,
+    onBackground: brand.tealDark,
+    onSurface: brand.tealDark,
+    onSurfaceVariant: brand.textMuted,
+    onError: "#ffffff",
+    inversePrimary: brand.teal,
+    inverseSurface: brand.tealDark,
+    inverseOnSurface: brand.textLight,
+    shadow: "#000000",
+    scrim: "#000000",
+    backdrop: "rgba(0, 0, 0, 0.4)",
+    elevation: {
+      ...MD3LightTheme.colors.elevation,
+      level0: "transparent",
+      level1: "#f8f4ea",
+      level2: "#f3efe5",
+      level3: "#edeae0",
+      level4: "#ebe7dd",
+      level5: "#e8e4d9",
+    },
+  },
+};
+
+export const darkTheme: MD3Theme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: brand.teal,
+    primaryContainer: "#1a3d35",
+    secondary: "#4db6ac",
+    secondaryContainer: "#1a3d35",
+    tertiary: "#80cbc4",
+    background: brand.backgroundDark,
+    surface: brand.surfaceDark,
+    surfaceVariant: "#1e3d32",
+    error: "#ef9a9a",
+    outline: brand.borderDark,
+    outlineVariant: "#2a4a3e",
+    onPrimary: brand.tealDark,
+    onPrimaryContainer: brand.textLight,
+    onSecondary: brand.tealDark,
+    onBackground: brand.textLight,
+    onSurface: brand.textLight,
+    onSurfaceVariant: "#a0c4bc",
+    onError: "#401313",
+    inversePrimary: brand.tealDark,
+    inverseSurface: brand.cream,
+    inverseOnSurface: brand.tealDark,
+    shadow: "#000000",
+    scrim: "#000000",
+    backdrop: "rgba(0, 0, 0, 0.6)",
+    elevation: {
+      ...MD3DarkTheme.colors.elevation,
+      level0: "transparent",
+      level1: "#162e27",
+      level2: "#14342b",
+      level3: "#183a30",
+      level4: "#1a3d33",
+      level5: "#1c4036",
+    },
+  },
+};
+
+// Status color tokens — used by StatusPill component
+export const statusColors = {
+  success: brand.success,
+  warning: brand.warning,
+  danger: brand.danger,
+  info: brand.info,
+  muted: "#6b7280",
+} as const;
+
+export type StatusVariant = keyof typeof statusColors;

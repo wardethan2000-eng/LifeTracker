@@ -6,14 +6,14 @@ import type { JSX } from "react";
 import { useMemo } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
+import { BulkActionBar } from "./bulk-action-bar";
+import { MaintenanceBulkActions } from "./maintenance-bulk-actions";
 
 const SCHEDULE_STATUS_PILL: Record<string, string> = {
   overdue: "pill--danger",
   due: "pill--warning",
   upcoming: "pill--info",
 };
-import { BulkActionBar } from "./bulk-action-bar";
-import { MaintenanceBulkActions } from "./maintenance-bulk-actions";
 
 type MaintenanceListWorkspaceProps = {
   householdId: string;

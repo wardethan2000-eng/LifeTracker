@@ -3,17 +3,21 @@ import { useCallback, useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type BarcodeScannerProps = {
-  onScan: (data: { barcode: string; format: string }) => void;
+  /** Called with the raw scanned value and format string */
+  onScanValue: (value: string, format: string) => void;
+  /** When true, ignore incoming scan events (e.g. while resolving) */
+  paused?: boolean;
 };
 
 const SCAN_DEBOUNCE_MS = 2000;
 
-export function BarcodeScanner({ onScan }: BarcodeScannerProps) {
+export function BarcodeScanner({ onScanValue, paused = false }: BarcodeScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const lastScanRef = useRef<number>(0);
 
   const handleBarcodeScanned = useCallback(
     (result: { data: string; type: string }) => {
+      if (paused) return;
       const now = Date.now();
 
       if (now - lastScanRef.current < SCAN_DEBOUNCE_MS) {
@@ -21,9 +25,9 @@ export function BarcodeScanner({ onScan }: BarcodeScannerProps) {
       }
 
       lastScanRef.current = now;
-      onScan({ barcode: result.data, format: result.type });
+      onScanValue(result.data, result.type);
     },
-    [onScan]
+    [onScanValue, paused]
   );
 
   if (!permission) {

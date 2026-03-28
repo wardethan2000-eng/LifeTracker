@@ -2,7 +2,26 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["ES2022"]
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "@lifekeeper/types": ["../../packages/types/src/index.ts"],
+      "@lifekeeper/utils": ["../../packages/utils/src/index.ts"],
+      "@lifekeeper/presets": ["../../packages/presets/src/index.ts"]
+    }
   },
-  "include": ["App.tsx", "components/**/*.tsx", "screens/**/*.tsx"]
+  "include": [
+    "app/**/*.tsx",
+    "app/**/*.ts",
+    "components/**/*.tsx",
+    "components/**/*.ts",
+    "hooks/**/*.ts",
+    "lib/**/*.ts",
+    "screens/**/*.tsx",
+    "App.tsx",
+    "app.config.ts"
+  ]
 }

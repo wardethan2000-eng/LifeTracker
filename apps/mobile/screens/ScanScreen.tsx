@@ -14,18 +14,18 @@ export function ScanScreen({ onBack, onAssetScan, onProductScan }: ScanScreenPro
   const [isHandlingScan, setIsHandlingScan] = useState(false);
 
   const handleScan = useCallback(
-    async (data: { barcode: string; format: string }) => {
+    async (barcode: string, format: string) => {
       if (isHandlingScan) {
         return;
       }
 
-      console.log("Scanned barcode:", data);
+      console.log("Scanned barcode:", { barcode, format });
 
-      const assetTarget = resolveAssetScanTarget(data.barcode);
+      const assetTarget = resolveAssetScanTarget(barcode);
       setIsHandlingScan(true);
 
       if (assetTarget) {
-        setStatus(`Opening asset flow for ${data.barcode.trim()}...`);
+        setStatus(`Opening asset flow for ${barcode.trim()}...`);
 
         try {
           await onAssetScan(assetTarget);
@@ -48,7 +48,7 @@ export function ScanScreen({ onBack, onAssetScan, onProductScan }: ScanScreenPro
       setStatus("Looking up product barcode...");
 
       try {
-        await onProductScan(data);
+        await onProductScan({ barcode, format });
       } catch (error) {
         Alert.alert(
           "Barcode Lookup Failed",
@@ -67,7 +67,7 @@ export function ScanScreen({ onBack, onAssetScan, onProductScan }: ScanScreenPro
 
   return (
     <View style={styles.container}>
-      <BarcodeScanner onScan={handleScan} />
+      <BarcodeScanner onScanValue={handleScan} />
       <View style={styles.footer}>
         <Text style={styles.status}>{status}</Text>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
