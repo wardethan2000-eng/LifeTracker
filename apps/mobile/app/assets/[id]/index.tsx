@@ -231,8 +231,10 @@ export default function AssetDetailScreen() {
             { label: "Maintenance Schedules", icon: "calendar-check-outline", route: "schedules" },
             { label: "History", icon: "history", route: "history" },
             { label: "Notes", icon: "notebook-outline", route: "notes" },
+            { label: "Comments", icon: "comment-multiple-outline", route: "comments" },
             { label: "Inventory", icon: "package-variant-closed", route: "inventory" },
             { label: "Photos", icon: "image-multiple-outline", route: "photos" },
+            { label: "Share Links", icon: "share-variant-outline", route: "share" },
           ].map(({ label, icon, route }) => (
             <List.Item
               key={route}

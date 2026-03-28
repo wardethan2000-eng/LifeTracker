@@ -15,6 +15,13 @@ const DOMAIN_SECTIONS = [
     ],
   },
   {
+    title: "Insights",
+    items: [
+      { label: "Analytics", icon: "chart-bar", route: "/analytics" as const },
+      { label: "Canvases", icon: "map-outline", route: "/canvas" as const },
+    ],
+  },
+  {
     title: "Activity",
     items: [
       { label: "Notes & Entries", icon: "notebook-outline", route: "/entries" as const },
@@ -24,6 +31,7 @@ const DOMAIN_SECTIONS = [
   {
     title: "Account",
     items: [
+      { label: "Household", icon: "home-account", route: "/household" as const },
       { label: "Settings", icon: "cog-outline", route: "/settings" as const },
     ],
   },
@@ -47,12 +55,10 @@ export default function MoreScreen() {
 
         {DOMAIN_SECTIONS.map((section) => (
           <List.Section key={section.title}>
-            <List.Subheader
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
+            <List.Subheader style={{ color: theme.colors.onSurfaceVariant }}>
               {section.title}
             </List.Subheader>
-            {section.items.map((item, idx) => (
+            {section.items.map((item) => (
               <List.Item
                 key={item.route}
                 title={item.label}

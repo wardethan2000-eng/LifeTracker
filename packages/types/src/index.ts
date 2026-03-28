@@ -6495,3 +6495,25 @@ export const trashListResponseSchema = z.object({
 });
 export type TrashListResponse = z.infer<typeof trashListResponseSchema>;
 
+// ─── Device Tokens (Mobile Push Notifications) ───────────────────────────────
+
+export const platformValues = ["ios", "android"] as const;
+export const platformSchema = z.enum(platformValues);
+
+export const registerDeviceBodySchema = z.object({
+  token: z.string().min(1).max(500),
+  platform: platformSchema,
+  label: z.string().max(100).optional(),
+});
+
+export const deviceTokenSchema = z.object({
+  id: z.string().cuid(),
+  token: z.string(),
+  platform: platformSchema,
+  label: z.string().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export type RegisterDeviceBody = z.infer<typeof registerDeviceBodySchema>;
+export type DeviceToken = z.infer<typeof deviceTokenSchema>;
+

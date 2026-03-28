@@ -25,6 +25,7 @@ import { maintenanceLogRoutes } from "./routes/logs/index.js";
 import { maintenanceLogPartRoutes } from "./routes/logs/parts.js";
 import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications/index.js";
+import { deviceRoutes } from "./routes/devices/index.js";
 import { presetRoutes } from "./routes/presets/index.js";
 import { scheduleRoutes } from "./routes/schedules/index.js";
 import { scheduleBulkRoutes } from "./routes/schedules/bulk.js";
@@ -104,6 +105,7 @@ const publicRoutePlugins: FastifyPluginAsync[] = [
 const accountRoutePlugins: FastifyPluginAsync[] = [
   meRoutes,
   notificationRoutes,
+  deviceRoutes,
   dashboardRoutes,
   searchRoutes,
   barcodeRoutes,

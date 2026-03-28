@@ -826,7 +826,7 @@ export const scanAndCreateNotifications = async (
     }
   }
 
-  const noteReminderIds = await scanNoteReminders(prisma, { householdId: options.householdId, now });
+  const noteReminderIds = await scanNoteReminders(prisma, { ...(options.householdId !== undefined ? { householdId: options.householdId } : {}), now });
   createdNotificationIds.push(...noteReminderIds);
 
   return {
@@ -1003,7 +1003,8 @@ const getDeliveryMode = (): DeliveryMode => (process.env.NOTIFICATION_DELIVERY_M
 const deliverToAdapter = async (
   notification: ReturnType<typeof toNotificationResponse>,
   mode: DeliveryMode,
-  recipientEmail?: string
+  recipientEmail?: string,
+  expoPushTokens?: string[]
 ): Promise<void> => {
   if (mode === "noop") {
     return;
@@ -1040,7 +1041,8 @@ const deliverToAdapter = async (
         title: notification.title,
         body: notification.body,
         type: notification.type,
-        payload: notification.payload
+        payload: notification.payload,
+        ...(expoPushTokens !== undefined ? { expoPushTokens } : {}),
       });
       break;
     }
@@ -1070,11 +1072,22 @@ export const deliverPendingNotification = async (
 
   const mode = getDeliveryMode();
 
+  // For push channel, resolve device tokens so the adapter has them
+  let expoPushTokens: string[] | undefined;
+  if (notification.channel === "push" && mode === "live") {
+    const devices = await prisma.deviceToken.findMany({
+      where: { userId: notification.userId },
+      select: { token: true },
+    });
+    expoPushTokens = devices.map((d: { token: string }) => d.token);
+  }
+
   try {
     await deliverToAdapter(
       toNotificationResponse(notification),
       mode,
-      notification.user?.email ?? undefined
+      notification.user?.email ?? undefined,
+      expoPushTokens
     );
     await prisma.notification.update({
       where: { id: notification.id },

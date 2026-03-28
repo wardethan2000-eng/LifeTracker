@@ -10,6 +10,7 @@ import { SkeletonCard } from "../../../components/SkeletonCard";
 const SUB_SCREENS = [
   { route: "sessions", label: "Sessions", icon: "▶" },
   { route: "notes", label: "Notes", icon: "📝" },
+  { route: "comments", label: "Comments", icon: "💬" },
 ] as const;
 
 export default function HobbyDetailScreen() {

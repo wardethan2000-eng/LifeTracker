@@ -43,6 +43,7 @@ export const STORAGE_KEYS = {
   RECENT_SEARCHES: "recent_searches",
   USER_PREFERENCES: "user_preferences",
   COLOR_SCHEME: "color_scheme",
+  DEVICE_TOKEN_ID: "push_device_token_id",
 } as const;
 
 /**

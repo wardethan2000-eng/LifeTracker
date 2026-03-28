@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { Card, Chip, Text, useTheme } from "react-native-paper";
+import { Card, Chip, FAB, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -26,7 +26,8 @@ export default function InventoryScreen() {
   const items = data?.items ?? [];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>
           Inventory
@@ -116,11 +117,20 @@ export default function InventoryScreen() {
         />
       )}
     </SafeAreaView>
+      <FAB
+        icon="plus"
+        label="New item"
+        style={styles.fab}
+        onPress={() => router.push("/inventory/new")}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  safeArea: { flex: 1 },
+  fab: { position: "absolute", right: 16, bottom: 24 },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   filters: {
     flexDirection: "row",

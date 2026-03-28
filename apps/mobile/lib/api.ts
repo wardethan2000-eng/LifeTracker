@@ -29,10 +29,20 @@ import {
   spaceResponseSchema,
   spaceListResponseSchema,
   spaceContentsResponseSchema,
+  notificationSchema,
+  householdNotificationListSchema,
+  createAssetSchema,
+  createProjectSchema,
+  createHobbyInputSchema,
+  createInventoryItemSchema,
+  libraryPresetSchema,
+  applyPresetSchema,
+  deviceTokenSchema,
   type Asset,
   type AssetPage,
   type AssetDetailResponse,
   type UpdateAssetInput,
+  type CreateAssetInput,
   type BarcodeLookupResult,
   type Entry,
   type EntryListResponse,
@@ -53,6 +63,7 @@ import {
   type ProjectTask,
   type UpdateProjectInput,
   type UpdateProjectTaskInput,
+  type CreateProjectInput,
   type Hobby,
   type HobbySummary,
   type HobbyDetail,
@@ -61,6 +72,7 @@ import {
   type UpdateHobbyInput,
   type CreateHobbySessionInput,
   type UpdateHobbySessionInput,
+  type CreateHobbyInput,
   type Idea,
   type IdeaSummary,
   type CreateIdeaInput,
@@ -70,9 +82,42 @@ import {
   type InventoryItemListResponse,
   type InventoryTransaction,
   type CreateInventoryTransactionInput,
+  type CreateInventoryItemInput,
   type SpaceResponse,
   type SpaceListResponse,
   type SpaceContentsResponse,
+  type Notification,
+  type HouseholdNotificationList,
+  type LibraryPreset,
+  type ApplyPresetInput,
+  type DeviceToken,
+  type RegisterDeviceBody,
+  threadedCommentSchema,
+  createCommentSchema,
+  updateCommentSchema,
+  ideaCanvasSummarySchema,
+  ideaCanvasSchema,
+  householdSummarySchema,
+  householdMemberSchema,
+  householdInvitationSchema,
+  householdDashboardSchema,
+  scheduleComplianceDashboardSchema,
+  householdCostOverviewSchema,
+  shareLinkSchema,
+  shareLinkListSchema,
+  type Comment,
+  type ThreadedComment,
+  type CreateCommentInput,
+  type UpdateCommentInput,
+  type IdeaCanvas,
+  type IdeaCanvasSummary,
+  type HouseholdSummary,
+  type HouseholdMember,
+  type HouseholdInvitation,
+  type HouseholdDashboard,
+  type ScheduleComplianceDashboard,
+  type HouseholdCostOverview,
+  type ShareLink,
 } from "@lifekeeper/types";
 import { z } from "zod";
 import { API_BASE_URL, DEV_USER_ID } from "./constants";
@@ -754,4 +799,417 @@ export const getSpaceContents = (
   apiRequest(
     `/v1/households/${householdId}/spaces/${spaceId}/contents`,
     spaceContentsResponseSchema
+  );
+
+// ---------------------------------------------------------------------------
+// Notifications — Phase 3
+// ---------------------------------------------------------------------------
+
+export type {
+  Notification,
+  HouseholdNotificationList,
+};
+
+export interface NotificationListOptions {
+  status?: "all" | "unread" | "read";
+  limit?: number;
+  cursor?: string;
+}
+
+export const getHouseholdNotifications = (
+  householdId: string,
+  options: NotificationListOptions = {}
+): Promise<HouseholdNotificationList> =>
+  apiRequest(
+    `/v1/households/${householdId}/notifications`,
+    householdNotificationListSchema,
+    {
+      params: {
+        status: options.status ?? "all",
+        ...(options.limit ? { limit: options.limit } : {}),
+        ...(options.cursor ? { cursor: options.cursor } : {}),
+      },
+    }
+  );
+
+export const markNotificationRead = (
+  notificationId: string
+): Promise<Notification> =>
+  apiRequest(
+    `/v1/notifications/${notificationId}/read`,
+    notificationSchema,
+    { method: "PATCH" }
+  );
+
+export const markNotificationUnread = (
+  notificationId: string
+): Promise<Notification> =>
+  apiRequest(
+    `/v1/notifications/${notificationId}/unread`,
+    notificationSchema,
+    { method: "PATCH" }
+  );
+
+// ---------------------------------------------------------------------------
+// Device Tokens (Push Notifications) — Phase 3
+// ---------------------------------------------------------------------------
+
+export type { DeviceToken, RegisterDeviceBody };
+
+export const registerDevice = (
+  input: RegisterDeviceBody
+): Promise<DeviceToken> =>
+  apiRequest(`/v1/devices/register`, deviceTokenSchema, {
+    method: "POST",
+    body: input,
+  });
+
+export const unregisterDevice = (
+  deviceId: string
+): Promise<void> =>
+  apiRequest(`/v1/devices/${deviceId}`, z.unknown(), {
+    method: "DELETE",
+  }).then(() => undefined);
+
+// ---------------------------------------------------------------------------
+// Asset Creation — Phase 3
+// ---------------------------------------------------------------------------
+
+export type { CreateAssetInput };
+
+export const createAsset = (
+  input: CreateAssetInput
+): Promise<Asset> =>
+  apiRequest(
+    `/v1/households/${input.householdId}/assets`,
+    assetSchema,
+    { method: "POST", body: createAssetSchema.parse(input) }
+  );
+
+// ---------------------------------------------------------------------------
+// Project Creation — Phase 3
+// ---------------------------------------------------------------------------
+
+export type { CreateProjectInput };
+
+export const createProject = (
+  householdId: string,
+  input: CreateProjectInput
+): Promise<ProjectDetail> =>
+  apiRequest(
+    `/v1/households/${householdId}/projects`,
+    projectDetailSchema,
+    { method: "POST", body: createProjectSchema.parse(input) }
+  );
+
+// ---------------------------------------------------------------------------
+// Hobby Creation — Phase 3
+// ---------------------------------------------------------------------------
+
+export type { CreateHobbyInput };
+
+export const createHobby = (
+  householdId: string,
+  input: CreateHobbyInput
+): Promise<Hobby> =>
+  apiRequest(
+    `/v1/households/${householdId}/hobbies`,
+    hobbySchema,
+    { method: "POST", body: createHobbyInputSchema.parse(input) }
+  );
+
+// ---------------------------------------------------------------------------
+// Inventory Item Creation — Phase 3
+// ---------------------------------------------------------------------------
+
+export type { CreateInventoryItemInput };
+
+export const createInventoryItem = (
+  householdId: string,
+  input: CreateInventoryItemInput
+): Promise<InventoryItemDetail> =>
+  apiRequest(
+    `/v1/households/${householdId}/inventory`,
+    inventoryItemDetailSchema,
+    { method: "POST", body: createInventoryItemSchema.parse(input) }
+  );
+
+// ---------------------------------------------------------------------------
+// Library Presets — Phase 3
+// ---------------------------------------------------------------------------
+
+export type { LibraryPreset, ApplyPresetInput };
+
+const libraryPresetListSchema = z.array(libraryPresetSchema);
+
+export const getLibraryPresets = (): Promise<LibraryPreset[]> =>
+  apiRequest("/v1/presets/library", libraryPresetListSchema);
+
+export const applyLibraryPreset = (
+  assetId: string,
+  input: ApplyPresetInput
+) =>
+  apiRequest(
+    `/v1/assets/${assetId}/apply-preset`,
+    z.object({ preset: libraryPresetSchema, result: z.unknown() }),
+    { method: "POST", body: applyPresetSchema.parse(input) }
+  );
+
+// ---------------------------------------------------------------------------
+// Comments — Phase 4A
+// ---------------------------------------------------------------------------
+
+export type { Comment, ThreadedComment, CreateCommentInput, UpdateCommentInput };
+
+const threadedCommentListSchema = z.array(threadedCommentSchema);
+
+// Assets
+export const getAssetComments = (assetId: string): Promise<ThreadedComment[]> =>
+  apiRequest(`/v1/assets/${assetId}/comments`, threadedCommentListSchema);
+
+export const createAssetComment = (assetId: string, input: CreateCommentInput): Promise<Comment> =>
+  apiRequest(
+    `/v1/assets/${assetId}/comments`,
+    threadedCommentSchema,
+    { method: "POST", body: createCommentSchema.parse(input) }
+  );
+
+export const updateAssetComment = (
+  assetId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/assets/${assetId}/comments/${commentId}`,
+    threadedCommentSchema,
+    { method: "PATCH", body: updateCommentSchema.parse(input) }
+  );
+
+export const deleteAssetComment = (assetId: string, commentId: string): Promise<void> =>
+  apiRequest(`/v1/assets/${assetId}/comments/${commentId}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+
+// Projects
+export const getProjectComments = (
+  householdId: string,
+  projectId: string
+): Promise<ThreadedComment[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/projects/${projectId}/comments`,
+    threadedCommentListSchema
+  );
+
+export const createProjectComment = (
+  householdId: string,
+  projectId: string,
+  input: CreateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/households/${householdId}/projects/${projectId}/comments`,
+    threadedCommentSchema,
+    { method: "POST", body: createCommentSchema.parse(input) }
+  );
+
+export const updateProjectComment = (
+  householdId: string,
+  projectId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/households/${householdId}/projects/${projectId}/comments/${commentId}`,
+    threadedCommentSchema,
+    { method: "PATCH", body: updateCommentSchema.parse(input) }
+  );
+
+export const deleteProjectComment = (
+  householdId: string,
+  projectId: string,
+  commentId: string
+): Promise<void> =>
+  apiRequest(
+    `/v1/households/${householdId}/projects/${projectId}/comments/${commentId}`,
+    z.unknown(),
+    { method: "DELETE" }
+  ).then(() => undefined);
+
+// Hobbies
+export const getHobbyComments = (
+  householdId: string,
+  hobbyId: string
+): Promise<ThreadedComment[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/hobbies/${hobbyId}/comments`,
+    threadedCommentListSchema
+  );
+
+export const createHobbyComment = (
+  householdId: string,
+  hobbyId: string,
+  input: CreateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/households/${householdId}/hobbies/${hobbyId}/comments`,
+    threadedCommentSchema,
+    { method: "POST", body: createCommentSchema.parse(input) }
+  );
+
+export const updateHobbyComment = (
+  householdId: string,
+  hobbyId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/households/${householdId}/hobbies/${hobbyId}/comments/${commentId}`,
+    threadedCommentSchema,
+    { method: "PATCH", body: updateCommentSchema.parse(input) }
+  );
+
+export const deleteHobbyComment = (
+  householdId: string,
+  hobbyId: string,
+  commentId: string
+): Promise<void> =>
+  apiRequest(
+    `/v1/households/${householdId}/hobbies/${hobbyId}/comments/${commentId}`,
+    z.unknown(),
+    { method: "DELETE" }
+  ).then(() => undefined);
+
+// ---------------------------------------------------------------------------
+// Analytics — Phase 4B
+// ---------------------------------------------------------------------------
+
+export type { HouseholdDashboard, ScheduleComplianceDashboard, HouseholdCostOverview };
+
+export const getHouseholdDashboard = (householdId: string): Promise<HouseholdDashboard> =>
+  apiRequest(
+    `/v1/households/${householdId}/dashboard`,
+    householdDashboardSchema
+  );
+
+export const getScheduleComplianceDashboard = (
+  householdId: string,
+  periodMonths = 12
+): Promise<ScheduleComplianceDashboard> =>
+  apiRequest(
+    `/v1/households/${householdId}/schedule-compliance?periodMonths=${periodMonths}`,
+    scheduleComplianceDashboardSchema
+  );
+
+export const getHouseholdCostOverview = (
+  householdId: string,
+  periodMonths = 12
+): Promise<HouseholdCostOverview> =>
+  apiRequest(
+    `/v1/households/${householdId}/cost-analytics/overview?periodMonths=${periodMonths}`,
+    householdCostOverviewSchema
+  );
+
+// ---------------------------------------------------------------------------
+// Canvas — Phase 4C
+// ---------------------------------------------------------------------------
+
+export type { IdeaCanvas, IdeaCanvasSummary };
+
+const ideaCanvasSummaryListSchema = z.array(ideaCanvasSummarySchema);
+
+export const getCanvases = (
+  householdId: string,
+  options?: { entityType?: string; entityId?: string }
+): Promise<IdeaCanvasSummary[]> => {
+  const params = new URLSearchParams();
+  if (options?.entityType) params.set("entityType", options.entityType);
+  if (options?.entityId) params.set("entityId", options.entityId);
+  const qs = params.toString();
+  return apiRequest(
+    `/v1/households/${householdId}/canvases${qs ? `?${qs}` : ""}`,
+    ideaCanvasSummaryListSchema
+  );
+};
+
+export const getCanvas = (householdId: string, canvasId: string): Promise<IdeaCanvas> =>
+  apiRequest(
+    `/v1/households/${householdId}/canvases/${canvasId}`,
+    ideaCanvasSchema
+  );
+
+// ---------------------------------------------------------------------------
+// Share Links — Phase 4D
+// ---------------------------------------------------------------------------
+
+export type { ShareLink };
+
+export const getShareLinks = (
+  householdId: string,
+  assetId: string
+): Promise<ShareLink[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/share-links?assetId=${assetId}`,
+    shareLinkListSchema
+  );
+
+export const createShareLink = (
+  householdId: string,
+  assetId: string,
+  options?: { label?: string; expiresAt?: string }
+): Promise<ShareLink> =>
+  apiRequest(
+    `/v1/households/${householdId}/share-links`,
+    shareLinkSchema,
+    { method: "POST", body: { assetId, ...options } }
+  );
+
+export const revokeShareLink = (
+  householdId: string,
+  shareLinkId: string
+): Promise<ShareLink> =>
+  apiRequest(
+    `/v1/households/${householdId}/share-links/${shareLinkId}`,
+    shareLinkSchema,
+    { method: "DELETE" }
+  );
+
+// ---------------------------------------------------------------------------
+// Household Management — Phase 4E
+// ---------------------------------------------------------------------------
+
+export type { HouseholdSummary, HouseholdMember, HouseholdInvitation };
+
+const householdMemberListSchema = z.array(householdMemberSchema);
+const householdInvitationListSchema = z.array(householdInvitationSchema);
+const householdSummaryListSchema = z.array(householdSummarySchema);
+
+export const getHouseholds = (): Promise<HouseholdSummary[]> =>
+  apiRequest("/v1/households", householdSummaryListSchema);
+
+export const getHouseholdMembers = (householdId: string): Promise<HouseholdMember[]> =>
+  apiRequest(`/v1/households/${householdId}/members`, householdMemberListSchema);
+
+export const getHouseholdInvitations = (
+  householdId: string
+): Promise<HouseholdInvitation[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/invitations?status=pending`,
+    householdInvitationListSchema
+  );
+
+export const inviteMember = (
+  householdId: string,
+  email: string
+): Promise<HouseholdInvitation> =>
+  apiRequest(
+    `/v1/households/${householdId}/invitations`,
+    householdInvitationSchema,
+    { method: "POST", body: { email } }
+  );
+
+export const revokeInvitation = (
+  householdId: string,
+  invitationId: string
+): Promise<HouseholdInvitation> =>
+  apiRequest(
+    `/v1/households/${householdId}/invitations/${invitationId}/revoke`,
+    householdInvitationSchema,
+    { method: "POST" }
   );

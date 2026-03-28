@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { Card, Chip, Text, useTheme } from "react-native-paper";
+import { Card, Chip, FAB, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -30,7 +30,8 @@ export default function ProjectsScreen() {
   });
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>
           Projects
@@ -119,11 +120,20 @@ export default function ProjectsScreen() {
         />
       )}
     </SafeAreaView>
+      <FAB
+        icon="plus"
+        label="New project"
+        style={styles.fab}
+        onPress={() => router.push("/projects/new")}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  safeArea: { flex: 1 },
+  fab: { position: "absolute", right: 16, bottom: 24 },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   chips: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
   chip: { marginRight: 4 },
