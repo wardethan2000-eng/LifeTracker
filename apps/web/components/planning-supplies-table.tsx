@@ -110,8 +110,8 @@ function SupplyRow({
           disabled={isPending}
         >
           {supply.isProcured
-            ? <span className="status-chip status-chip--upcoming">Yes</span>
-            : <span className="status-chip status-chip--overdue">No</span>}
+            ? <span className="pill pill--success">Yes</span>
+            : <span className="pill pill--danger">No</span>}
         </button>
       </td>
       <td>

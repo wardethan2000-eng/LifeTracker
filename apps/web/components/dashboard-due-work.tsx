@@ -4,6 +4,12 @@ import type { JSX } from "react";
 import { getHouseholdPartsReadiness } from "../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
 
+const DUE_WORK_STATUS_PILL: Record<string, string> = {
+  overdue: "pill--danger",
+  due: "pill--warning",
+  upcoming: "pill--info",
+};
+
 type DashboardDueWorkProps = {
   dashboardPromise: Promise<HouseholdDashboard>;
   householdId: string;
@@ -44,7 +50,7 @@ export async function DashboardDueWork({ dashboardPromise, householdId }: Dashbo
                 return (
                   <tr key={item.scheduleId} className={`row--${item.status}`}>
                     <td>
-                      <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
+                      <span className={`pill ${DUE_WORK_STATUS_PILL[item.status] ?? ""}`}>{item.status}</span>
                     </td>
                     <td>
                       <div className="data-table__primary">{item.assetName}</div>
@@ -73,7 +79,7 @@ export async function DashboardDueWork({ dashboardPromise, householdId }: Dashbo
                       <strong>{formatDueLabel(item.nextDueAt, item.nextDueMetricValue, item.metricUnit)}</strong>
                     </td>
                     <td>
-                      <span className={`status-chip status-chip--${item.status}`}>
+                      <span className={`pill ${DUE_WORK_STATUS_PILL[item.status] ?? ""}`}>
                         {item.status === "overdue" ? "High" : item.status === "due" ? "Medium" : "Low"}
                       </span>
                     </td>

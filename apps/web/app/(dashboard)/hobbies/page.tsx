@@ -111,16 +111,18 @@ async function HobbiesListContent({
           )}
         </div>
         {visibleHobbies.length === 0 ? (
-          <section className="panel">
-            <div className="panel__body--padded panel__empty">
-              <p>
-                {selectedStatus
-                  ? t("emptyFiltered", { status: hobbyStatusLabels[selectedStatus].toLowerCase() })
-                  : t("empty")}
-              </p>
-              <Link href="/hobbies/new" className="button button--primary">{t("createFirst")}</Link>
-            </div>
-          </section>
+          <div className="empty-state">
+            <p className="empty-state__icon">🎯</p>
+            <p className="empty-state__title">
+              {selectedStatus ? `No ${hobbyStatusLabels[selectedStatus].toLowerCase()} hobbies` : t("empty")}
+            </p>
+            <p className="empty-state__body">
+              {selectedStatus
+                ? t("emptyFiltered", { status: hobbyStatusLabels[selectedStatus].toLowerCase() })
+                : "Track the things you love doing — sports, crafts, music, and more."}
+            </p>
+            <Link href="/hobbies/new" className="button button--primary">{t("createFirst")}</Link>
+          </div>
         ) : (
           <div className="hobby-card-grid">
             {visibleHobbies.map((hobby) => (
@@ -235,16 +237,16 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
           <p>{t("pageSubtitle")}</p>
         </div>
         <div className="page-header__actions">
-          <Link href="/hobbies/new" className="button">{tCommon("actions.newHobby")}</Link>
+          <Link href="/hobbies/new" className="button button--primary">{tCommon("actions.newHobby")}</Link>
         </div>
       </header>
 
       <div className="page-body">
         {/* Filter chips — rendered immediately from URL params */}
-        <div className="hobby-status-strip">
+        <div className="filter-strip">
           <Link
             href={buildFilterHref(undefined, selectedMode)}
-            className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
+            className={`filter-chip${selectedStatus === undefined ? " filter-chip--active" : ""}`}
           >
             <span>All</span>
           </Link>
@@ -252,16 +254,16 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
             <Link
               key={status}
               href={buildFilterHref(status, selectedMode)}
-              className={`project-status-chip${selectedStatus === status ? " project-status-chip--active" : ""}`}
+              className={`filter-chip${selectedStatus === status ? " filter-chip--active" : ""}`}
             >
               <span>{hobbyStatusLabels[status]}</span>
             </Link>
           ))}
         </div>
-        <div className="hobby-status-strip">
+        <div className="filter-strip">
           <Link
             href={buildFilterHref(selectedStatus, undefined)}
-            className={`project-status-chip${selectedMode === undefined ? " project-status-chip--active" : ""}`}
+            className={`filter-chip${selectedMode === undefined ? " filter-chip--active" : ""}`}
           >
             <span>All Modes</span>
           </Link>
@@ -269,7 +271,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
             <Link
               key={mode}
               href={buildFilterHref(selectedStatus, mode)}
-              className={`project-status-chip${selectedMode === mode ? " project-status-chip--active" : ""}`}
+              className={`filter-chip${selectedMode === mode ? " filter-chip--active" : ""}`}
             >
               <span>{hobbyActivityModeLabels[mode]}</span>
             </Link>

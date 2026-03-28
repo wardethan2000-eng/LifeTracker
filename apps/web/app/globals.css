@@ -6116,6 +6116,7 @@ textarea { resize: vertical; }
   gap: 10px;
 }
 
+.filter-chip,
 .project-status-chip {
   display: inline-flex;
   align-items: center;
@@ -6128,19 +6129,28 @@ textarea { resize: vertical; }
   transition: border-color 150ms, background 150ms, transform 150ms;
 }
 
+.filter-chip strong,
 .project-status-chip strong {
   font-size: 0.82rem;
 }
 
+.filter-chip:hover,
 .project-status-chip:hover {
   transform: translateY(-1px);
   border-color: var(--accent-border);
 }
 
+.filter-chip--active,
 .project-status-chip--active {
   background: var(--accent-bg);
   border-color: var(--accent-border);
   color: var(--accent-ink, var(--ink));
+}
+
+.filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .project-portfolio-grid {

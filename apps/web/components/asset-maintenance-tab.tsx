@@ -48,7 +48,7 @@ export async function AssetMaintenanceTab({ detail, householdMembers }: AssetMai
               <dt>Overdue</dt>
               <dd>
                 {overdueCount > 0 ? (
-                  <span className="status-chip status-chip--overdue">{overdueCount}</span>
+                  <span className="pill pill--danger">{overdueCount}</span>
                 ) : (
                   <span style={{ color: "var(--ink-muted)" }}>None</span>
                 )}
@@ -58,7 +58,7 @@ export async function AssetMaintenanceTab({ detail, householdMembers }: AssetMai
               <dt>Due now</dt>
               <dd>
                 {dueCount > 0 ? (
-                  <span className="status-chip status-chip--due">{dueCount}</span>
+                  <span className="pill pill--warning">{dueCount}</span>
                 ) : (
                   <span style={{ color: "var(--ink-muted)" }}>None</span>
                 )}

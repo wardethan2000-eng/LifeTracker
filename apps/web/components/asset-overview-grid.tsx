@@ -21,6 +21,12 @@ import {
   formatScheduleStatus,
   formatTriggerSummary,
 } from "../lib/formatters";
+
+const SCHEDULE_STATUS_PILL: Record<string, string> = {
+  overdue: "pill--danger",
+  due: "pill--warning",
+  upcoming: "pill--info",
+};
 import {
   renderLogSummary,
   formatTimelineSourceLabel,
@@ -232,7 +238,7 @@ export function AssetOverviewGrid({
                       gap: "6px",
                     }}
                   >
-                    <span className={`status-chip status-chip--${schedule.status}`}>
+                    <span className={`pill ${SCHEDULE_STATUS_PILL[schedule.status] ?? ""}`}>
                       {formatScheduleStatus(schedule.status)}
                     </span>
                     <button

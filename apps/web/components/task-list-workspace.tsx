@@ -16,10 +16,10 @@ const TASK_STATUS_LABELS: Record<string, string> = {
 };
 
 const TASK_STATUS_TONES: Record<string, string> = {
-  pending: "default",
-  in_progress: "accent",
-  completed: "success",
-  skipped: "neutral"
+  pending: "",
+  in_progress: "pill--info",
+  completed: "pill--success",
+  skipped: "pill--muted"
 };
 
 type TaskListWorkspaceProps = {
@@ -132,7 +132,7 @@ export function TaskListWorkspace({
                   )}
                 </td>
                 <td>
-                  <span className={`status-chip status-chip--${tone}`}>
+                  <span className={`pill ${tone}`}>
                     {TASK_STATUS_LABELS[task.status] ?? task.status}
                   </span>
                 </td>

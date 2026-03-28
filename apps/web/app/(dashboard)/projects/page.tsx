@@ -245,7 +245,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                 ))}
               </div>
             )}
-            <Link href={`/projects/new?householdId=${household.id}`} className="button">{tCommon("actions.newProject")}</Link>
+            <Link href={`/projects/new?householdId=${household.id}`} className="button button--primary">{tCommon("actions.newProject")}</Link>
           </div>
         </header>
 
@@ -288,10 +288,10 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                 </div>
               </form>
 
-              <div className="project-status-strip" aria-label="Project status filters">
+              <div className="filter-strip" aria-label="Project status filters">
                 <Link
                   href={buildProjectsHref({ householdId: household.id, query: rawSearchQuery, sort: selectedSort })}
-                  className={`project-status-chip${selectedStatus === undefined ? " project-status-chip--active" : ""}`}
+                  className={`filter-chip${selectedStatus === undefined ? " filter-chip--active" : ""}`}
                 >
                   <span>All</span>
                   <strong>{allProjectsCount}</strong>
@@ -305,7 +305,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                       query: rawSearchQuery,
                       sort: selectedSort
                     })}
-                    className={`project-status-chip${selectedStatus === item.status ? " project-status-chip--active" : ""}`}
+                    className={`filter-chip${selectedStatus === item.status ? " filter-chip--active" : ""}`}
                   >
                     <span>{projectStatusLabels[item.status]}</span>
                     <strong>{item.count}</strong>

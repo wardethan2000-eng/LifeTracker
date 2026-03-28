@@ -13,6 +13,20 @@ type Props = {
   tasks: TaskEntry[];
 };
 
+const TASK_STATUS_PILL: Record<TaskEntry["status"], string> = {
+  pending: "pill--muted",
+  in_progress: "pill--info",
+  completed: "pill--success",
+  skipped: "pill--muted",
+};
+
+const TASK_STATUS_LABEL: Record<TaskEntry["status"], string> = {
+  pending: "Pending",
+  in_progress: "In Progress",
+  completed: "Completed",
+  skipped: "Skipped",
+};
+
 export function CompactTaskPreview({ tasks }: Props) {
   if (tasks.length === 0) {
     return (
@@ -36,13 +50,13 @@ export function CompactTaskPreview({ tasks }: Props) {
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
         <span className="compact-preview__pill">{completedCount} / {tasks.length} done</span>
         {inProgressCount > 0 ? (
-          <span className="status-chip status-chip--due">{inProgressCount} in progress</span>
+          <span className="pill pill--info">{inProgressCount} in progress</span>
         ) : null}
         {unphasedCount > 0 ? (
           <span className="compact-preview__pill compact-preview__pill--muted">{unphasedCount} unphased</span>
         ) : null}
         {blockedCount > 0 ? (
-          <span className="status-chip status-chip--overdue">{blockedCount} blocked</span>
+          <span className="pill pill--danger">{blockedCount} blocked</span>
         ) : null}
         {criticalCount > 0 ? (
           <span className="compact-preview__pill">{criticalCount} critical</span>
@@ -55,7 +69,7 @@ export function CompactTaskPreview({ tasks }: Props) {
           items={pending.map((task) => ({
             id: task.id,
             label: task.title,
-            value: <span className={`status-chip status-chip--${task.status}`}>{task.status.replace("_", " ")}</span>,
+            value: <span className={`pill ${TASK_STATUS_PILL[task.status]}`}>{TASK_STATUS_LABEL[task.status]}</span>,
           }))}
           emptyMessage="No tasks added yet"
         />

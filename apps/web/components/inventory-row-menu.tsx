@@ -2,9 +2,9 @@
 
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { duplicateInventoryItem, deleteInventoryItem } from "../lib/api";
 import { useToast } from "./toast-provider";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 
 type InventoryRowMenuProps = {
   householdId: string;
@@ -16,7 +16,7 @@ export function InventoryRowMenu({ householdId, itemId, itemName }: InventoryRow
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const { pushToast } = useToast();
 
   // Close on outside click
@@ -50,28 +50,28 @@ export function InventoryRowMenu({ householdId, itemId, itemName }: InventoryRow
     try {
       const copy = await duplicateInventoryItem(householdId, itemId);
       pushToast({ message: `Duplicated "${itemName}" → "${copy.name}"` });
-      router.refresh();
+      requestRefresh();
     } catch {
       pushToast({ message: "Failed to duplicate item", tone: "danger" });
     } finally {
       setBusy(false);
       setOpen(false);
     }
-  }, [householdId, itemId, itemName, pushToast, router]);
+  }, [householdId, itemId, itemName, pushToast, requestRefresh]);
 
   const handleDelete = useCallback(async () => {
     setBusy(true);
     try {
       await deleteInventoryItem(householdId, itemId);
       pushToast({ message: `Moved "${itemName}" to trash` });
-      router.refresh();
+      requestRefresh();
     } catch {
       pushToast({ message: "Failed to delete item", tone: "danger" });
     } finally {
       setBusy(false);
       setOpen(false);
     }
-  }, [householdId, itemId, itemName, pushToast, router]);
+  }, [householdId, itemId, itemName, pushToast, requestRefresh]);
 
   return (
     <div className="row-menu" ref={menuRef}>

@@ -25,7 +25,7 @@ export function InventoryPurchaseLineActions({ householdId, purchaseId, line, re
   if (line.status === "received") {
     return (
       <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
-        <span className="status-chip status-chip--upcoming">Received</span>
+        <span className="pill pill--success">Received</span>
         <span className="data-table__secondary">
           {line.receivedQuantity ?? line.orderedQuantity ?? line.plannedQuantity} @ {formatCurrency(line.unitCost, "—")}
         </span>

@@ -3,7 +3,6 @@ import { Suspense } from "react";
 import type { JSX } from "react";
 import { createHouseholdAction } from "../actions";
 import { LaunchPad } from "../../components/launch-pad";
-import { RealtimeRefreshBoundary } from "../../components/realtime-refresh-boundary";
 import { ApiError, getApiBaseUrl, getDevUserId, getMe } from "../../lib/api";
 import { DashboardRemindersSection } from "../../components/dashboard-reminders-section";
 import { DashboardAttentionSection } from "../../components/dashboard-attention-section";
@@ -73,7 +72,6 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
 
     return (
       <>
-        <RealtimeRefreshBoundary householdId={selectedHousehold.id} eventTypes={["asset.updated", "inventory.changed", "maintenance.completed", "hobby.session-progress"]} />
         <header className="page-header">
           <h1>Dashboard</h1>
           <div className="page-header__actions">

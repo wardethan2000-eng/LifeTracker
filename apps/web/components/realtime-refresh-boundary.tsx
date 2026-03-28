@@ -11,6 +11,8 @@ type RealtimeRefreshBoundaryProps = {
   eventTypes: RealtimeEventType[];
 };
 
+const REFRESH_THROTTLE_MS = 15000;
+
 export function RealtimeRefreshBoundary({ householdId, eventTypes }: RealtimeRefreshBoundaryProps): JSX.Element | null {
   const router = useRouter();
   const lastRefreshAtRef = useRef(0);
@@ -20,9 +22,13 @@ export function RealtimeRefreshBoundary({ householdId, eventTypes }: RealtimeRef
     eventTypes,
     enabled: Boolean(householdId),
     onEvent: () => {
+      if (process.env.NODE_ENV === "development") {
+        return;
+      }
+
       const now = Date.now();
 
-      if (now - lastRefreshAtRef.current < 1000) {
+      if (now - lastRefreshAtRef.current < REFRESH_THROTTLE_MS) {
         return;
       }
 

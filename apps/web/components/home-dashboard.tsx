@@ -226,7 +226,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
                 <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>{asset.category}</div>
               </div>
               <span
-                className={`status-chip status-chip--${asset.tone}`}
+                className={`pill pill--${asset.tone === "overdue" ? "danger" : asset.tone === "due" ? "warning" : "info"}`}
                 style={{ fontSize: "0.72rem" }}
               >
                 {asset.tone}

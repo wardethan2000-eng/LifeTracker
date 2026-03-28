@@ -12,6 +12,12 @@ type Props = {
   schedules: ScheduleEntry[];
 };
 
+const SCHEDULE_STATUS_PILL: Record<ScheduleEntry["status"], string> = {
+  overdue: "pill--danger",
+  due: "pill--warning",
+  upcoming: "pill--info",
+};
+
 export function CompactMaintenanceSchedulePreview({ schedules }: Props) {
   if (schedules.length === 0) {
     return (
@@ -33,10 +39,10 @@ export function CompactMaintenanceSchedulePreview({ schedules }: Props) {
     <div className="compact-preview">
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
         {overdueCount > 0 ? (
-          <span className="status-chip status-chip--overdue">{overdueCount} overdue</span>
+          <span className="pill pill--danger">{overdueCount} overdue</span>
         ) : null}
         {dueCount > 0 ? (
-          <span className="status-chip status-chip--due">{dueCount} due</span>
+          <span className="pill pill--warning">{dueCount} due</span>
         ) : null}
         {upcomingCount > 0 ? (
           <span className="compact-preview__pill">{upcomingCount} upcoming</span>
@@ -51,7 +57,7 @@ export function CompactMaintenanceSchedulePreview({ schedules }: Props) {
         items={preview.map((schedule) => ({
           id: schedule.id,
           label: schedule.name,
-          value: <span className={`status-chip status-chip--${schedule.status}`}>{schedule.status}</span>,
+          value: <span className={`pill ${SCHEDULE_STATUS_PILL[schedule.status]}`}>{schedule.status}</span>,
         }))}
         emptyMessage="No active schedules"
       />

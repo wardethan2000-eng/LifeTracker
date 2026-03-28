@@ -3,11 +3,11 @@
 import type { InventoryPurchaseLine, InventoryShoppingListSummary } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 import { generateInventoryShoppingListAction, updateInventoryPurchaseLineAction } from "../app/actions";
 import { deleteInventoryPurchase, updateInventoryPurchase } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 import { useToast } from "./toast-provider";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 
 type InventoryShoppingListSectionProps = {
   householdId: string;
@@ -57,7 +57,7 @@ function PurchaseLineRow({ householdId, purchaseId, line, redirectTo }: {
         <td>{formatQuantity(line.plannedQuantity, line.inventoryItem.unit)}</td>
         <td>{formatCurrency(line.unitCost, "—")}</td>
         <td>
-          <span className={`status-chip status-chip--${isReceived ? "upcoming" : line.status === "ordered" ? "due" : "warning"}`}>
+          <span className={`pill ${isReceived ? "pill--success" : line.status === "ordered" ? "pill--warning" : "pill--muted"}`}>
             {line.status}
           </span>
         </td>
@@ -185,29 +185,29 @@ function PurchaseEditForm({ purchase, onSave, onCancel }: PurchaseEditFormProps)
 export function InventoryShoppingListSection({ householdId, shoppingList, redirectTo }: InventoryShoppingListSectionProps): JSX.Element {
   const [collapsed, setCollapsed] = useState(true);
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null);
-  const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const { pushToast } = useToast();
 
   const handleDeletePurchase = useCallback(async (purchaseId: string) => {
     try {
       await deleteInventoryPurchase(householdId, purchaseId);
       pushToast({ message: "Purchase deleted." });
-      router.refresh();
+      requestRefresh();
     } catch {
       pushToast({ message: "Failed to delete purchase.", tone: "danger" });
     }
-  }, [householdId, pushToast, router]);
+  }, [householdId, pushToast, requestRefresh]);
 
   const handleUpdatePurchase = useCallback(async (purchaseId: string, data: { supplierName?: string; notes?: string }) => {
     try {
       await updateInventoryPurchase(householdId, purchaseId, data);
       pushToast({ message: "Purchase updated." });
       setEditingPurchaseId(null);
-      router.refresh();
+      requestRefresh();
     } catch {
       pushToast({ message: "Failed to update purchase.", tone: "danger" });
     }
-  }, [householdId, pushToast, router]);
+  }, [householdId, pushToast, requestRefresh]);
 
   return (
     <section className="panel">
@@ -237,7 +237,7 @@ export function InventoryShoppingListSection({ householdId, shoppingList, redire
                 <div className="purchase-group__header">
                   <div className="purchase-group__identity">
                     <strong className="purchase-group__name">{purchase.supplierName ?? "No supplier specified"}</strong>
-                    <span className={`status-chip status-chip--${purchase.status === "ordered" ? "due" : "upcoming"}`}>
+                    <span className={`pill ${purchase.status === "ordered" ? "pill--warning" : "pill--success"}`}>
                       {purchase.status}
                     </span>
                   </div>

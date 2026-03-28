@@ -29,6 +29,7 @@ import { SpaceForm } from "./space-form";
 import { SpacePickerField } from "./space-picker-field";
 import { SpaceQuickPlace } from "./space-quick-place";
 import { SpaceTreeMap } from "./space-tree-map";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 import {
   Dialog,
@@ -297,6 +298,7 @@ export function SpacesSectionClient({
   recentScans
 }: SpacesSectionClientProps): JSX.Element {
   const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [activeView, setActiveView] = useState<SpaceViewMode>("tree");
@@ -488,7 +490,7 @@ export function SpacesSectionClient({
       setImportResult(result);
 
       if (result.created > 0 || result.updated > 0) {
-        router.refresh();
+        requestRefresh();
       }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Unable to import spaces CSV.");
@@ -513,7 +515,7 @@ export function SpacesSectionClient({
       setOrphanItems((current) => current.filter((item) => item.id !== assignTarget.item.id));
       setOrphanCountValue((current) => Math.max(0, current - 1));
       setAssignTarget(null);
-      router.refresh();
+      requestRefresh();
     } catch (error) {
       setAssignError(error instanceof Error ? error.message : "Unable to assign that item.");
     } finally {
@@ -718,7 +720,7 @@ export function SpacesSectionClient({
             spaces={spaces}
             onSaved={() => {
               setShowCreate(false);
-              router.refresh();
+              requestRefresh();
             }}
             onCancel={() => setShowCreate(false)}
           />

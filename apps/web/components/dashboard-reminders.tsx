@@ -6,7 +6,7 @@ import type { JSX } from "react";
 import { useCallback, useTransition } from "react";
 import { saveLayoutPreference } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
-import { useRouter } from "next/navigation";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 
 type DashboardRemindersProps = {
   householdId: string;
@@ -34,7 +34,7 @@ function getRelativeLabel(dateStr: string): string {
 
 export function DashboardReminders({ householdId, entries, windowDays }: DashboardRemindersProps): JSX.Element | null {
   const { formatDate } = useFormattedDate();
-  const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const [isPending, startTransition] = useTransition();
 
   const handleWindowChange = useCallback(
@@ -45,10 +45,10 @@ export function DashboardReminders({ householdId, entries, windowDays }: Dashboa
           entityId: "window_days",
           layoutJson: [{ value }],
         });
-        router.refresh();
+        requestRefresh();
       });
     },
-    [router]
+    [requestRefresh]
   );
 
   if (entries.length === 0) return null;

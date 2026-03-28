@@ -2,7 +2,6 @@ import type { JSX, ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssetDangerActions } from "../../../../components/asset-danger-actions";
-import { RealtimeRefreshBoundary } from "../../../../components/realtime-refresh-boundary";
 import { AssetTabNav } from "../../../../components/asset-tab-nav";
 import { AssetHeroEditor } from "../../../../components/asset-hero-editor";
 import {
@@ -28,7 +27,6 @@ export default async function AssetDetailLayout({ params, children }: AssetDetai
 
     return (
       <>
-        <RealtimeRefreshBoundary householdId={detail.asset.householdId} eventTypes={["asset.updated", "maintenance.completed"]} />
         <div className="detail-topbar">
           <Link href="/assets" className="text-link">&larr; Assets</Link>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>

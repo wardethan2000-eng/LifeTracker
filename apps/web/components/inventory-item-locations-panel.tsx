@@ -2,13 +2,13 @@
 
 import type { InventoryItemDetail, SpaceResponse } from "@lifekeeper/types";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { addItemToSpace, removeItemFromSpace } from "../app/actions";
 import { formatSpaceBreadcrumb, getSpaceTypeBadge, getSpaceTypeLabel } from "../lib/spaces";
 import { SpacePickerField } from "./space-picker-field";
 import { useToast } from "./toast-provider";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,7 @@ const flattenSpaceChoices = (nodes: SpaceResponse[], depth = 0): Array<{ id: str
 ]);
 
 export function InventoryItemLocationsPanel({ householdId, item, spaces }: InventoryItemLocationsPanelProps): JSX.Element {
-  const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const { pushToast } = useToast();
   const [showAssign, setShowAssign] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -132,7 +132,7 @@ export function InventoryItemLocationsPanel({ householdId, item, spaces }: Inven
       }
 
       closeOperation();
-      router.refresh();
+      requestRefresh();
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "Unable to update item locations.");
     } finally {
@@ -174,7 +174,7 @@ export function InventoryItemLocationsPanel({ householdId, item, spaces }: Inven
                   });
                   setShowAssign(false);
                   pushToast({ message: `${item.name} assigned to the selected space.` });
-                  router.refresh();
+                  requestRefresh();
                 } catch (submissionError) {
                   setError(submissionError instanceof Error ? submissionError.message : "Failed to assign item to space.");
                 } finally {
@@ -259,7 +259,7 @@ export function InventoryItemLocationsPanel({ householdId, item, spaces }: Inven
                           try {
                             await removeItemFromSpace(householdId, link.spaceId, item.id);
                             pushToast({ message: `${item.name} removed from ${link.space.name}.` });
-                            router.refresh();
+                            requestRefresh();
                           } catch (submissionError) {
                             setError(submissionError instanceof Error ? submissionError.message : "Failed to remove location.");
                           } finally {

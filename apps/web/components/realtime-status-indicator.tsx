@@ -1,19 +1,16 @@
 "use client";
 
 import type { JSX } from "react";
-import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useRealtimeUpdates } from "./use-realtime-updates";
+import { useRealtimeConnectionState } from "./realtime-sync-provider";
 
 type RealtimeStatusIndicatorProps = {
-  householdId: string | null;
+  householdId?: string | null;
 };
 
-export function RealtimeStatusIndicator({ householdId }: RealtimeStatusIndicatorProps): JSX.Element {
-  const searchParams = useSearchParams();
+export function RealtimeStatusIndicator({ householdId: _householdId = null }: RealtimeStatusIndicatorProps): JSX.Element {
   const t = useTranslations("common.toolbar.realtime");
-  const activeHouseholdId = searchParams.get("householdId") ?? householdId;
-  const { connectionState } = useRealtimeUpdates({ householdId: activeHouseholdId, enabled: Boolean(activeHouseholdId) });
+  const connectionState = useRealtimeConnectionState();
   const isConnected = connectionState === "connected";
   const label = isConnected ? t("connected") : connectionState === "paused" ? t("paused") : t("disconnected");
 

@@ -225,7 +225,7 @@ export function InventoryListWorkspace({
                           />
                         </td>
                         <td>
-                          <span className={`status-chip status-chip--${quantityOnHand <= 0 ? "overdue" : item.lowStock ? "due" : "upcoming"}`}>
+                          <span className={`pill ${quantityOnHand <= 0 ? "pill--danger" : item.lowStock ? "pill--warning" : "pill--success"}`}>
                             {quantityOnHand <= 0 ? "Out" : item.lowStock ? "Low" : "OK"}
                           </span>
                         </td>

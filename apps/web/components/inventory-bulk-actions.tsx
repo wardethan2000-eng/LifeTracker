@@ -3,7 +3,6 @@
 import type { InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { addItemToSpace } from "../app/actions";
 import {
   ApiError,
@@ -24,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 
 type InventoryBulkActionsProps = {
   householdId: string;
@@ -130,7 +130,7 @@ const normalizeImportItems = (rows: Array<Record<string, string>>): Array<Record
 });
 
 export function InventoryBulkActions({ householdId, selectedItems, spaces, onBulkAssigned }: InventoryBulkActionsProps): JSX.Element {
-  const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const { pushToast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -195,7 +195,7 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
       setImportResult(result);
 
       if (result.created > 0) {
-        router.refresh();
+        requestRefresh();
       }
     } catch (error) {
       const message = error instanceof ApiError || error instanceof Error
@@ -246,7 +246,7 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
         failed,
         spaceName: destinationSpace?.name ?? "the selected space",
       });
-      router.refresh();
+      requestRefresh();
 
       if (failed.length === 0) {
         pushToast({ message: `Assigned ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} to ${destinationSpace?.name ?? "the selected space"}.` });
@@ -268,7 +268,7 @@ export function InventoryBulkActions({ householdId, selectedItems, spaces, onBul
       await bulkDeleteInventoryItems(householdId, { itemIds: selectedItems.map((item) => item.id) });
       pushToast({ message: `Moved ${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} to trash.` });
       onBulkAssigned?.();
-      router.refresh();
+      requestRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete items.";
       setErrorMessage(message);

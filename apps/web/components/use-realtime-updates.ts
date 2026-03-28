@@ -24,6 +24,7 @@ export function useRealtimeUpdates({ householdId, eventTypes, enabled = true, on
   const reconnectAttemptsRef = useRef(0);
   const onEventRef = useRef(onEvent);
   const isVisibleRef = useRef(true);
+  const eventTypesKey = eventTypes?.join(",") ?? "";
 
   onEventRef.current = onEvent;
 
@@ -125,7 +126,7 @@ export function useRealtimeUpdates({ householdId, eventTypes, enabled = true, on
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       disconnect("disconnected");
     };
-  }, [enabled, eventTypes, householdId]);
+  }, [enabled, eventTypesKey, householdId]);
 
   return { connectionState, lastEvent };
 }

@@ -328,7 +328,7 @@ async function SpaceContent({ householdId, spaceId, activeTab, historyAction, hi
                           <div style={{ display: "grid", gap: 8, width: "100%" }}>
                             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               <span className="pill">{HISTORY_ACTION_MARKERS[entry.action]}</span>
-                              <span className="status-chip status-chip--clear">{HISTORY_ACTION_LABELS[entry.action]}</span>
+                              <span className="pill pill--success">{HISTORY_ACTION_LABELS[entry.action]}</span>
                               <span className="data-table__secondary">{formatHistoryDateTime(entry.createdAt)}</span>
                             </div>
                             <div style={{ display: "grid", gap: 6 }}>

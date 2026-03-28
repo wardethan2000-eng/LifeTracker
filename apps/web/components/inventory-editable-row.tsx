@@ -19,9 +19,9 @@ const formatExpirationLabel = (expiresAt: string | null): string | null => {
 const expirationTone = (expiresAt: string | null): string => {
   if (!expiresAt) return "";
   const daysUntil = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  if (daysUntil < 0) return "status-chip--overdue";
-  if (daysUntil <= 30) return "status-chip--due";
-  return "status-chip--upcoming";
+  if (daysUntil < 0) return "pill--danger";
+  if (daysUntil <= 30) return "pill--warning";
+  return "pill--info";
 };
 
 type InventoryEditableRowProps = {
@@ -114,7 +114,7 @@ export function InventoryEditableRow({ householdId, item, className, defaultOpen
                   {item.expiresAt && (
                     <div>
                       <span className="inventory-row-expand__label">Expires</span>
-                      <span className={`status-chip ${expirationTone(item.expiresAt)}`} style={{ fontSize: "0.75rem" }}>
+                      <span className={`pill ${expirationTone(item.expiresAt)}`} style={{ fontSize: "0.75rem" }}>
                         {formatExpirationLabel(item.expiresAt)}
                       </span>
                     </div>

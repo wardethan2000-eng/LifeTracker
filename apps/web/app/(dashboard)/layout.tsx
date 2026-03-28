@@ -10,6 +10,7 @@ import { TimezoneProvider } from "../../lib/timezone-context";
 import { DisplayPreferencesProvider } from "../../components/display-preferences-context";
 import { CompletionSlideOverProvider } from "../../components/completion-slide-over-context";
 import { CompletionSlideOver } from "../../components/completion-slide-over";
+import { RealtimeSyncProvider } from "../../components/realtime-sync-provider";
 
 type NavItemDef = {
   href: string;
@@ -128,15 +129,16 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         </div>
       </nav>
 
-      <div className="main-content">
-        <RoutePrefetcher routes={prefetchedRoutes} />
-        <div className="shell-toolbar">
-          <SearchCommandPaletteLazy fallbackHouseholdId={fallbackHouseholdId} />
-          <div className="shell-toolbar__controls">
-            <RealtimeStatusIndicator householdId={fallbackHouseholdId} />
+      <RealtimeSyncProvider householdId={fallbackHouseholdId}>
+        <div className="main-content">
+          <RoutePrefetcher routes={prefetchedRoutes} />
+          <div className="shell-toolbar">
+            <SearchCommandPaletteLazy fallbackHouseholdId={fallbackHouseholdId} />
+            <div className="shell-toolbar__controls">
+              <RealtimeStatusIndicator householdId={fallbackHouseholdId} />
+            </div>
           </div>
-        </div>
-        <TimezoneProvider timezone={householdTimezone}>
+          <TimezoneProvider timezone={householdTimezone}>
             <DisplayPreferencesProvider initialPreferences={resolvedDisplayPreferences}>
               <CompletionSlideOverProvider>
                 {children}
@@ -144,7 +146,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
               </CompletionSlideOverProvider>
             </DisplayPreferencesProvider>
           </TimezoneProvider>
-      </div>
+        </div>
+      </RealtimeSyncProvider>
     </div>
   );
 }

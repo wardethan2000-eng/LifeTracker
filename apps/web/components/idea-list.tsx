@@ -149,16 +149,12 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
 
   if (ideas.length === 0) {
     return (
-      <section className="panel">
-        <div className="panel__body--padded panel__empty">
-          <p>
-            No ideas yet. Capture your first spark to get started.{" "}
-            <Link href="/ideas/new" className="text-link">
-              New Idea
-            </Link>
-          </p>
-        </div>
-      </section>
+      <div className="empty-state">
+        <p className="empty-state__icon">💡</p>
+        <p className="empty-state__title">No ideas yet</p>
+        <p className="empty-state__body">Capture your first spark to get started.</p>
+        <Link href="/ideas/new" className="button button--primary">New Idea</Link>
+      </div>
     );
   }
 
@@ -166,7 +162,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
     <>
       {/* Filter bar */}
       <div className="inline-filter-form" style={{ marginBottom: 16 }}>
-        <div className="hobby-status-strip">
+        <div className="filter-strip">
           {(["all", ...stageOrder] as const).map((s) => {
             const count =
               s === "all"
@@ -176,7 +172,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
               <button
                 key={s}
                 type="button"
-                className={`project-status-chip${stageFilter === s ? " project-status-chip--active" : ""}`}
+                className={`filter-chip${stageFilter === s ? " filter-chip--active" : ""}`}
                 onClick={() => setStageFilter(s)}
               >
                 <span>{s === "all" ? "All" : stageLabels[s]}</span>
@@ -261,7 +257,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                   <span className="count">{columnIdeas.length}</span>
                 </h3>
                 {columnIdeas.length === 0 && (
-                  <p style={{ color: "var(--ink-muted)", fontSize: "0.8rem", padding: "8px 0" }}>No ideas at this stage yet.</p>
+                  <p className="panel__empty">No ideas at this stage yet.</p>
                 )}
                 {columnIdeas.map((idea) => (
                   <div
@@ -414,7 +410,7 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
                       )}
                     </td>
                     <td>
-                      <span className={`status-chip status-chip--${idea.stage === "ready" ? "success" : idea.stage === "developing" ? "upcoming" : "clear"}`}>
+                      <span className={`pill pill--${idea.stage === "ready" ? "success" : idea.stage === "developing" ? "info" : "warning"}`}>
                         {stageLabels[idea.stage]}
                       </span>
                     </td>

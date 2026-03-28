@@ -20,6 +20,12 @@ import {
 } from "../lib/formatters";
 import { useDisplayPreferences } from "./display-preferences-context";
 
+const SCHEDULE_STATUS_PILL: Record<string, string> = {
+  overdue: "pill--danger",
+  due: "pill--warning",
+  upcoming: "pill--info",
+};
+
 type AssetMaintenanceSectionsProps = {
   detail: AssetDetailResponse;
   createScheduleAction: (formData: FormData) => void | Promise<void>;
@@ -108,10 +114,10 @@ export function AssetMaintenanceSections({
                             </p>
                           </div>
                           <div className="schedule-card__badges">
-                            <span className={`status-chip status-chip--${schedule.status}`}>
+                            <span className={`pill ${SCHEDULE_STATUS_PILL[schedule.status] ?? ""}`}>
                               {formatScheduleStatus(schedule.status)}
                             </span>
-                            {!schedule.isActive ? <span className="status-chip status-chip--paused">Paused</span> : null}
+                            {!schedule.isActive ? <span className="pill pill--muted">Paused</span> : null}
                           </div>
                         </div>
                         <dl className="schedule-meta">

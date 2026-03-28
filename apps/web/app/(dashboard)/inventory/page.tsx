@@ -5,7 +5,6 @@ import { getTranslations } from "next-intl/server";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
 import { InventoryListWorkspace } from "../../../components/inventory-list-workspace";
 import { InventoryQuickRestock } from "../../../components/inventory-quick-restock";
-import { RealtimeRefreshBoundary } from "../../../components/realtime-refresh-boundary";
 import { InventoryValuationReportButton } from "../../../components/report-download-actions";
 import { InventoryShoppingListSection } from "../../../components/inventory-shopping-list-section";
 import { InventoryTransactionHistory } from "../../../components/inventory-transaction-history";
@@ -249,7 +248,6 @@ async function InventoryContent({
 
     return (
       <>
-        <RealtimeRefreshBoundary householdId={householdId} eventTypes={["inventory.changed"]} />
         <header className="page-header">
           <div>
             <h1>{t("pageTitle")}</h1>

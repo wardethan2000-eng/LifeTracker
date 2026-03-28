@@ -40,11 +40,11 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
 };
 
 const STATUS_CHIP_CLASS: Record<ProjectStatus, string> = {
-  planning: "status-chip--pending",
-  active: "status-chip--upcoming",
-  on_hold: "status-chip--due",
-  completed: "status-chip--clear",
-  cancelled: "status-chip--overdue",
+  planning: "pill--info",
+  active: "pill--success",
+  on_hold: "pill--warning",
+  completed: "pill--muted",
+  cancelled: "pill--danger",
 };
 
 const STATUS_OPTIONS = projectStatusValues.map((v) => ({
@@ -219,7 +219,7 @@ export function ProjectPortfolioWorkspace({
                           disabled={saving.has(`${project.id}:status`)}
                           aria-label={`Edit status of ${project.name}`}
                           renderValue={(v) => (
-                            <span className={`status-chip ${STATUS_CHIP_CLASS[v as ProjectStatus] ?? ""}`}>
+                            <span className={`pill ${STATUS_CHIP_CLASS[v as ProjectStatus] ?? ""}`}>
                               {STATUS_LABELS[v as ProjectStatus] ?? v}
                             </span>
                           )}

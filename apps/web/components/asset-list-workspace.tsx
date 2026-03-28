@@ -230,7 +230,11 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
                     onSave={(v) => { void handleSave(asset.id, "visibility", v); }}
                   />
                 </td>
-                <td>{asset.isArchived ? "Archived" : "Active"}</td>
+                <td>
+                  {asset.isArchived
+                    ? <span className="pill pill--muted">Archived</span>
+                    : <span className="pill pill--success">Active</span>}
+                </td>
                 <td>
                   {(() => {
                     const counts = scheduleCountsByAssetId?.get(asset.id);

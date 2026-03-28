@@ -32,7 +32,7 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
   useEffect(() => {
     let cancelled = false;
     getEntries(householdId, {
-      entityType: entityType as "project",
+      entityType,
       entityId,
       tags: [NOTEPAD_TAG],
       limit: 1,
@@ -60,7 +60,7 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
           await updateEntry(householdId, entryId, { body: text });
         } else {
           const entry = await createEntry(householdId, {
-            entityType: entityType as "project",
+            entityType,
             entityId,
             title: "Dashboard Notepad",
             body: text,

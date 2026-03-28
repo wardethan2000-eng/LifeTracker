@@ -6,6 +6,12 @@ import type { JSX } from "react";
 import { useMemo } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
+
+const SCHEDULE_STATUS_PILL: Record<string, string> = {
+  overdue: "pill--danger",
+  due: "pill--warning",
+  upcoming: "pill--info",
+};
 import { BulkActionBar } from "./bulk-action-bar";
 import { MaintenanceBulkActions } from "./maintenance-bulk-actions";
 
@@ -79,7 +85,7 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
                 />
               </td>
               <td>
-                <span className={`status-chip status-chip--${item.status}`}>{item.status}</span>
+                <span className={`pill ${SCHEDULE_STATUS_PILL[item.status] ?? ""}`}>{item.status}</span>
               </td>
               <td>
                 <div className="data-table__primary">

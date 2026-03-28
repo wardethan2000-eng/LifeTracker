@@ -104,7 +104,7 @@ function NotificationTable({ notifications }: { notifications: Notification[] })
           return (
             <tr key={notification.id}>
               <td>
-                <span className={`status-chip status-chip--${tone === "pending" ? "pending" : "read"}`}>
+                <span className={`pill ${tone === "pending" ? "pill--info" : "pill--muted"}`}>
                   {tone === "pending" ? "Unread" : "Read"}
                 </span>
               </td>

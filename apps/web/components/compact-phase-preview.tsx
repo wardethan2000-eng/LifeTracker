@@ -17,6 +17,13 @@ const statusLabels: Record<PhaseEntry["status"], string> = {
   skipped: "Skipped",
 };
 
+const PHASE_STATUS_PILL: Record<PhaseEntry["status"], string> = {
+  pending: "pill--muted",
+  in_progress: "pill--info",
+  completed: "pill--success",
+  skipped: "pill--muted",
+};
+
 export function CompactPhasePreview({ phases }: Props) {
   if (phases.length === 0) {
     return (
@@ -38,7 +45,7 @@ export function CompactPhasePreview({ phases }: Props) {
       <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px", flexWrap: "wrap" }}>
         <span className="compact-preview__pill">{completedCount} / {phases.length} complete</span>
         {activePhase ? (
-          <span className="status-chip status-chip--due">Active: {activePhase.name}</span>
+          <span className="pill pill--warning">Active: {activePhase.name}</span>
         ) : null}
         <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>{progressPct}%</span>
       </div>
@@ -48,7 +55,7 @@ export function CompactPhasePreview({ phases }: Props) {
         items={preview.map((phase) => ({
           id: phase.id,
           label: phase.name,
-          value: <span className={`status-chip status-chip--${phase.status}`}>{statusLabels[phase.status]}</span>,
+          value: <span className={`pill ${PHASE_STATUS_PILL[phase.status]}`}>{statusLabels[phase.status]}</span>,
         }))}
         emptyMessage="No phases defined yet"
       />

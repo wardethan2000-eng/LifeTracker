@@ -688,7 +688,7 @@ export function SearchCommandPalette({ fallbackHouseholdId }: SearchCommandPalet
                                 <span className="search-palette__result-chip">{spaceShortCode}</span>
                               ) : null}
                               {isHistorical ? (
-                                <span className="status-chip status-chip--clear">Historical</span>
+                                <span className="pill pill--success">Historical</span>
                               ) : null}
                             </span>
                             {secondaryLine ? (

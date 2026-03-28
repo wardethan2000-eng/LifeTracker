@@ -8,9 +8,9 @@ import type {
 import { Fragment, type JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createInventoryTransactionCorrection, getHouseholdInventoryTransactions } from "../lib/api";
 import { formatCurrency, formatDateTime } from "../lib/formatters";
+import { useCoalescedRefresh } from "./use-coalesced-refresh";
 
 type InventoryTransactionHistoryProps = {
   householdId: string;
@@ -119,7 +119,7 @@ const truncateText = (value: string | null, length = 72): string => {
 };
 
 export function InventoryTransactionHistory({ householdId, inventoryItemId, title = "Transaction History" }: InventoryTransactionHistoryProps): JSX.Element {
-  const router = useRouter();
+  const requestRefresh = useCoalescedRefresh();
   const [transactions, setTransactions] = useState<InventoryTransactionWithItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
@@ -247,7 +247,7 @@ export function InventoryTransactionHistory({ householdId, inventoryItemId, titl
       setEditingTransactionId(null);
       setReplacementQuantity("");
       setCorrectionNotes("");
-      router.refresh();
+      requestRefresh();
     } catch (error) {
       setCorrectionErrorMessage(error instanceof Error ? error.message : "Failed to create correction.");
     } finally {
