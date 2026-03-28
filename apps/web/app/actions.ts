@@ -113,6 +113,9 @@ import {
   createInventoryComment,
   createHobbyComment,
   createProjectComment,
+  createIdeaComment,
+  updateIdeaComment,
+  deleteIdeaComment,
   createEntry,
   createAssetTimelineEntry,
   createInvitation,
@@ -3715,6 +3718,7 @@ const revalidateIdeaPaths = (ideaId?: string): void => {
   if (ideaId) {
     revalidatePath(`/ideas/${ideaId}`);
     revalidatePath(`/ideas/${ideaId}/edit`);
+    revalidatePath(`/ideas/${ideaId}/comments`);
   }
 };
 
@@ -3846,6 +3850,39 @@ export async function demoteToIdeaAction(
   const idea = await demoteToIdea(householdId, data);
   revalidateIdeaPaths();
   return { id: idea.id, title: idea.title };
+}
+
+export async function createIdeaCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const ideaId = getRequiredString(formData, "ideaId");
+  const input: CreateCommentInput = { body: getRequiredString(formData, "body") };
+  const parentCommentId = getOptionalString(formData, "parentCommentId");
+  if (parentCommentId) input.parentCommentId = parentCommentId;
+
+  await createIdeaComment(householdId, ideaId, input);
+  revalidateIdeaPaths(ideaId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function updateIdeaCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const ideaId = getRequiredString(formData, "ideaId");
+  const commentId = getRequiredString(formData, "commentId");
+  const input: UpdateCommentInput = { body: getRequiredString(formData, "body") };
+
+  await updateIdeaComment(householdId, ideaId, commentId, input);
+  revalidateIdeaPaths(ideaId);
+  revalidateActivityPaths(householdId);
+}
+
+export async function deleteIdeaCommentAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const ideaId = getRequiredString(formData, "ideaId");
+  const commentId = getRequiredString(formData, "commentId");
+
+  await deleteIdeaComment(householdId, ideaId, commentId);
+  revalidateIdeaPaths(ideaId);
+  revalidateActivityPaths(householdId);
 }
 
 // ── Restore Actions ──────────────────────────────────────────────────

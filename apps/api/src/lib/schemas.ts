@@ -27,6 +27,11 @@ export const hobbyParamsSchema = householdParamsSchema.extend({
   hobbyId: z.string().cuid()
 });
 
+/** Idea param — includes householdId. */
+export const ideaParamsSchema = householdParamsSchema.extend({
+  ideaId: z.string().cuid()
+});
+
 // ---------------------------------------------------------------------------
 // Shared query schemas
 // ---------------------------------------------------------------------------

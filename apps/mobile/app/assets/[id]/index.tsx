@@ -232,6 +232,7 @@ export default function AssetDetailScreen() {
             { label: "History", icon: "history", route: "history" },
             { label: "Notes", icon: "notebook-outline", route: "notes" },
             { label: "Comments", icon: "comment-multiple-outline", route: "comments" },
+            { label: "Canvas", icon: "vector-square", route: "canvas" },
             { label: "Inventory", icon: "package-variant-closed", route: "inventory" },
             { label: "Photos", icon: "image-multiple-outline", route: "photos" },
             { label: "Share Links", icon: "share-variant-outline", route: "share" },

@@ -1579,6 +1579,7 @@ model Comment {
   projectId       String?
   hobbyId         String?
   inventoryItemId String?
+  ideaId          String?
   authorId        String
   body            String
   parentCommentId String?
@@ -1591,6 +1592,7 @@ model Comment {
   project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   hobby           Hobby?    @relation(fields: [hobbyId], references: [id], onDelete: Cascade)
   inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  idea            Idea?     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
   author          User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   parentComment   Comment?  @relation("CommentThread", fields: [parentCommentId], references: [id], onDelete: SetNull)
   replies         Comment[] @relation("CommentThread")
@@ -1600,6 +1602,7 @@ model Comment {
   @@index([projectId, createdAt])
   @@index([hobbyId, createdAt])
   @@index([inventoryItemId, createdAt])
+  @@index([ideaId, createdAt])
   @@index([authorId])
   @@index([parentCommentId])
 }
@@ -1766,6 +1769,7 @@ model Idea {
 
   household       Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
   createdBy       User                 @relation("IdeaCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  comments        Comment[]
 
   @@index([householdId, stage])
   @@index([householdId, category])

@@ -118,6 +118,9 @@ export default function ProjectDetailScreen() {
             { label: "Tasks", icon: "checkbox-marked-outline", route: "tasks" },
             { label: "Notes", icon: "notebook-outline", route: "notes" },
             { label: "Comments", icon: "comment-multiple-outline", route: "comments" },
+            { label: "Canvas", icon: "vector-square", route: "canvas" },
+            { label: "Activity", icon: "timeline-outline", route: "activity" },
+            { label: "Supplies", icon: "toolbox-outline", route: "supplies" },
           ].map(({ label, icon, route }) => (
             <List.Item
               key={route}

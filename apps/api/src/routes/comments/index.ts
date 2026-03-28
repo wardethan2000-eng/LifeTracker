@@ -14,7 +14,7 @@ import { commentResponseInclude, toCommentResponse, type CommentResponseRecord }
 import { removeSearchIndexEntry, syncCommentToSearchIndex } from "../../lib/search-index.js";
 import { notFound } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
-import { assetParamsSchema, hobbyParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
+import { assetParamsSchema, hobbyParamsSchema, ideaParamsSchema, projectParamsSchema } from "../../lib/schemas.js";
 
 const inventoryParamsSchema = z.object({
   householdId: z.string().cuid(),
@@ -34,6 +34,10 @@ const hobbyCommentParamsSchema = hobbyParamsSchema.extend({
 });
 
 const inventoryCommentParamsSchema = inventoryParamsSchema.extend({
+  commentId: z.string().cuid()
+});
+
+const ideaCommentParamsSchema = ideaParamsSchema.extend({
   commentId: z.string().cuid()
 });
 
@@ -60,6 +64,7 @@ type CommentTarget = {
     projectId?: string;
     hobbyId?: string;
     inventoryItemId?: string;
+    ideaId?: string;
   };
 };
 
@@ -759,6 +764,131 @@ export const commentRoutes: FastifyPluginAsync = async (app) => {
       entityId: inventoryItem.id,
       targetName: inventoryItem.name,
       relationData: { inventoryItemId: inventoryItem.id }
+    }, params.commentId, request.auth.userId);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(204).send();
+  });
+
+  // -------------------------------------------------------------------------
+  // Ideas
+  // -------------------------------------------------------------------------
+
+  app.get("/v1/households/:householdId/ideas/:ideaId/comments", async (request, reply) => {
+    const params = ideaParamsSchema.parse(request.params);
+    const query = listCommentsQuerySchema.parse(request.query);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const idea = await app.prisma.idea.findFirst({
+      where: { id: params.ideaId, householdId: params.householdId },
+      select: { id: true, householdId: true, title: true }
+    });
+
+    if (!idea) {
+      return notFound(reply, "Idea");
+    }
+
+    return listTargetComments(app.prisma, {
+      householdId: idea.householdId,
+      entityType: "idea",
+      entityId: idea.id,
+      targetName: idea.title,
+      relationData: { ideaId: idea.id }
+    }, query);
+  });
+
+  app.post("/v1/households/:householdId/ideas/:ideaId/comments", async (request, reply) => {
+    const params = ideaParamsSchema.parse(request.params);
+    const input = createCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const idea = await app.prisma.idea.findFirst({
+      where: { id: params.ideaId, householdId: params.householdId },
+      select: { id: true, householdId: true, title: true }
+    });
+
+    if (!idea) {
+      return notFound(reply, "Idea");
+    }
+
+    const result = await createComment(app, {
+      householdId: idea.householdId,
+      entityType: "idea",
+      entityId: idea.id,
+      targetName: idea.title,
+      relationData: { ideaId: idea.id }
+    }, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return reply.code(201).send(toCommentResponse(result.comment));
+  });
+
+  app.patch("/v1/households/:householdId/ideas/:ideaId/comments/:commentId", async (request, reply) => {
+    const params = ideaCommentParamsSchema.parse(request.params);
+    const input = updateCommentSchema.parse(request.body);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const idea = await app.prisma.idea.findFirst({
+      where: { id: params.ideaId, householdId: params.householdId },
+      select: { id: true, householdId: true, title: true }
+    });
+
+    if (!idea) {
+      return notFound(reply, "Idea");
+    }
+
+    const result = await updateComment(app, {
+      householdId: idea.householdId,
+      entityType: "idea",
+      entityId: idea.id,
+      targetName: idea.title,
+      relationData: { ideaId: idea.id }
+    }, params.commentId, request.auth.userId, input);
+
+    if ("error" in result) {
+      return reply.code(result.error.code).send({ message: result.error.message });
+    }
+
+    return toCommentResponse(result.comment);
+  });
+
+  app.delete("/v1/households/:householdId/ideas/:ideaId/comments/:commentId", async (request, reply) => {
+    const params = ideaCommentParamsSchema.parse(request.params);
+
+    if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
+      return;
+    }
+
+    const idea = await app.prisma.idea.findFirst({
+      where: { id: params.ideaId, householdId: params.householdId },
+      select: { id: true, householdId: true, title: true }
+    });
+
+    if (!idea) {
+      return notFound(reply, "Idea");
+    }
+
+    const result = await deleteComment(app, {
+      householdId: idea.householdId,
+      entityType: "idea",
+      entityId: idea.id,
+      targetName: idea.title,
+      relationData: { ideaId: idea.id }
     }, params.commentId, request.auth.userId);
 
     if ("error" in result) {

@@ -249,7 +249,7 @@ Every primary domain workspace tool (Assets, Projects, Hobbies, Ideas) **must** 
 |---------|--------|----------|---------|-------|
 | Notes | ✅ `/notes` | ✅ `/notepad` | ✅ `/entries` | ✅ `/notes` |
 | Canvas | ✅ `/canvas` | ✅ `/canvas` | ✅ `/canvas` | ✅ `/canvas` |
-| Comments | ✅ `/comments` | ✅ `/comments` | ✅ `/comments` | ❌ no API yet |
+| Comments | ✅ `/comments` | ✅ `/comments` | ✅ `/comments` | ✅ `/comments` |
 | Activity | ✅ `/history` | ✅ `/timeline` | ✅ `/activity` | ✅ `/activity` |
 | Inventory | ✅ `/inventory` | ✅ `/supplies` | ✅ `/inventory` | N/A |
 

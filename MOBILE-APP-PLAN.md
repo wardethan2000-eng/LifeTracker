@@ -1080,6 +1080,79 @@ Refactor the existing BarcodeScanner component into the Expo Router structure wi
 
 ---
 
+## Phase 5 — Entity Sub-Screen Parity
+
+**Goal:** Close the gap between web and mobile on entity detail navigation. Every domain tool (Assets, Projects, Hobbies, Ideas) must expose the same set of sub-screens that exist on the web, completing the mobile feature parity matrix.
+
+**Status:** ✅ Completed 2026-03-28
+
+### Parity gaps addressed
+
+| Sub-screen | Assets | Projects | Hobbies | Ideas |
+|---|---|---|---|---|
+| Canvas | ✅ (added) | ✅ (added) | ✅ (added) | ✅ (added) |
+| Activity/History | ✅ (existing) | ✅ (added) | ✅ (added) | ✅ (added) |
+| Notes | ✅ (existing) | ✅ (existing) | ✅ (existing) | ✅ (added) |
+| Inventory/Supplies | ✅ (existing) | ✅ (added) | ✅ (added) | N/A |
+
+### 5A: Canvas sub-screens for all domains
+
+Each entity detail screen now navigates to an entity-scoped canvas list that calls `getCanvases(householdId, { entityType, entityId })`. Tapping a canvas opens the read-only viewer at `/canvas/[canvasId]`.
+
+**New files:**
+- `apps/mobile/app/assets/[id]/canvas.tsx`
+- `apps/mobile/app/projects/[id]/canvas.tsx`
+- `apps/mobile/app/hobbies/[id]/canvas.tsx`
+- `apps/mobile/app/ideas/[id]/canvas.tsx`
+
+### 5B: Activity sub-screens for Projects, Hobbies, Ideas
+
+Uses `getHouseholdActivity` with client-side filtering by `entityId`, same pattern as `assets/[id]/history.tsx`.
+
+**New files:**
+- `apps/mobile/app/projects/[id]/activity.tsx`
+- `apps/mobile/app/hobbies/[id]/activity.tsx`
+- `apps/mobile/app/ideas/[id]/activity.tsx`
+
+### 5C: Ideas Notes sub-screen
+
+Ideas previously rendered notes inline on the detail screen. Now navigates to a dedicated notes sub-screen matching Hobbies/Projects/Assets pattern.
+
+**New file:** `apps/mobile/app/ideas/[id]/notes.tsx`
+
+### 5D: Project Supplies sub-screen
+
+Read-only view of supply counts per phase from `getProjectDetail().phases`. Shows procurement progress (procured/total) per phase. Full supply item details available on web.
+
+**New file:** `apps/mobile/app/projects/[id]/supplies.tsx`
+
+### 5E: Hobby Inventory sub-screen
+
+Shows `inventoryLinks` from `getHobbyDetail()`. Each link includes item name, quantity on hand, and unit. Tapping an item navigates to `/inventory/[id]`.
+
+**New file:** `apps/mobile/app/hobbies/[id]/inventory.tsx`
+
+### 5F: Nav entries wired in all detail screens
+
+- `assets/[id]/index.tsx` — added Canvas between Comments and Inventory
+- `projects/[id]/index.tsx` — added Canvas, Activity, Supplies
+- `hobbies/[id]/index.tsx` — added Canvas, Activity, Inventory to `SUB_SCREENS`
+- `ideas/[id]/index.tsx` — added Notes, Canvas, Activity (in addition to existing Comments)
+
+### Phase 5 Verification
+
+- [ ] Asset detail Sections card shows Canvas entry; tapping opens canvas list for that asset
+- [ ] Project detail shows Canvas, Activity, Supplies entries
+- [ ] Hobby detail shows Canvas, Activity, Inventory entries
+- [ ] Idea detail shows Notes, Comments, Canvas, Activity entries
+- [ ] Canvas list screen lists canvases filtered to the entity; tapping opens read-only viewer
+- [ ] Activity screen shows activity log filtered to entity
+- [ ] Ideas Notes screen allows creating and listing notes
+- [ ] Project Supplies screen shows per-phase supply counts
+- [ ] Hobby Inventory screen shows linked inventory items with quantities
+
+---
+
 ## Key Files Reference
 
 ### Existing Files (modify or reference)

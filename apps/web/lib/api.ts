@@ -1805,6 +1805,46 @@ export const deleteProjectComment = async (
   });
 };
 
+export const getIdeaComments = async (householdId: string, ideaId: string): Promise<ThreadedComment[]> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/comments`,
+  schema: threadedCommentListSchema,
+  revalidate: 15,
+});
+
+export const createIdeaComment = async (
+  householdId: string,
+  ideaId: string,
+  input: CreateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/comments`,
+  method: "POST",
+  body: input,
+  schema: commentWithRepliesSchema,
+});
+
+export const updateIdeaComment = async (
+  householdId: string,
+  ideaId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<ThreadedComment> => apiRequest({
+  path: `/v1/households/${householdId}/ideas/${ideaId}/comments/${commentId}`,
+  method: "PATCH",
+  body: input,
+  schema: commentWithRepliesSchema,
+});
+
+export const deleteIdeaComment = async (
+  householdId: string,
+  ideaId: string,
+  commentId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/ideas/${ideaId}/comments/${commentId}`,
+    method: "DELETE",
+  });
+};
+
 export const getAssetTimeline = async (
   assetId: string,
   query?: Partial<AssetTimelineQuery>

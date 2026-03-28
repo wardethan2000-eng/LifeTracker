@@ -1076,6 +1076,50 @@ export const deleteHobbyComment = (
     { method: "DELETE" }
   ).then(() => undefined);
 
+// Ideas comments
+export const getIdeaComments = (
+  householdId: string,
+  ideaId: string
+): Promise<ThreadedComment[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/ideas/${ideaId}/comments`,
+    threadedCommentListSchema
+  );
+
+export const createIdeaComment = (
+  householdId: string,
+  ideaId: string,
+  input: CreateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/households/${householdId}/ideas/${ideaId}/comments`,
+    threadedCommentSchema,
+    { method: "POST", body: createCommentSchema.parse(input) }
+  );
+
+export const updateIdeaComment = (
+  householdId: string,
+  ideaId: string,
+  commentId: string,
+  input: UpdateCommentInput
+): Promise<Comment> =>
+  apiRequest(
+    `/v1/households/${householdId}/ideas/${ideaId}/comments/${commentId}`,
+    threadedCommentSchema,
+    { method: "PATCH", body: updateCommentSchema.parse(input) }
+  );
+
+export const deleteIdeaComment = (
+  householdId: string,
+  ideaId: string,
+  commentId: string
+): Promise<void> =>
+  apiRequest(
+    `/v1/households/${householdId}/ideas/${ideaId}/comments/${commentId}`,
+    z.unknown(),
+    { method: "DELETE" }
+  ).then(() => undefined);
+
 // ---------------------------------------------------------------------------
 // Analytics — Phase 4B
 // ---------------------------------------------------------------------------

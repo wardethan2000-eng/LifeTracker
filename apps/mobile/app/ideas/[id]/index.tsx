@@ -5,6 +5,7 @@ import {
   Card,
   Chip,
   Divider,
+  List,
   Text,
   TextInput,
   useTheme,
@@ -288,6 +289,26 @@ export default function IdeaDetailScreen() {
               </Card.Content>
             </Card>
           )}
+
+          {/* Sections navigation */}
+          <Card mode="outlined" style={styles.card}>
+            <Card.Title title="Sections" titleVariant="titleSmall" />
+            <Divider />
+            {[
+              { label: "Notes", icon: "notebook-outline", route: "notes" },
+              { label: "Comments", icon: "comment-multiple-outline", route: "comments" },
+              { label: "Canvas", icon: "vector-square", route: "canvas" },
+              { label: "Activity", icon: "timeline-outline", route: "activity" },
+            ].map(({ label, icon, route }) => (
+              <List.Item
+                key={route}
+                title={label}
+                left={(props) => <List.Icon {...props} icon={icon} />}
+                right={(props) => <List.Icon {...props} icon="chevron-right" />}
+                onPress={() => router.push(`/ideas/${id}/${route}` as never)}
+              />
+            ))}
+          </Card>
         </ScrollView>
       )}
     </SafeAreaView>

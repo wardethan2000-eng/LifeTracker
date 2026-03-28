@@ -11,6 +11,9 @@ const SUB_SCREENS = [
   { route: "sessions", label: "Sessions", icon: "▶" },
   { route: "notes", label: "Notes", icon: "📝" },
   { route: "comments", label: "Comments", icon: "💬" },
+  { route: "canvas", label: "Canvas", icon: "🗺" },
+  { route: "activity", label: "Activity", icon: "📋" },
+  { route: "inventory", label: "Inventory", icon: "📦" },
 ] as const;
 
 export default function HobbyDetailScreen() {
