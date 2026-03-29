@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   Button,
   Card,
@@ -12,8 +12,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, getInventoryItemDetail, createInventoryTransaction } from "../../lib/api";
+import type { InventoryTransaction } from "../../lib/api";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { EmptyState } from "../../components/EmptyState";
+import { useOfflineSync } from "../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../lib/offline-queue";
 
 type TransactionType = "consume" | "purchase" | "adjust";
 
@@ -35,6 +38,7 @@ export default function InventoryItemDetailScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { data: item, isLoading } = useQuery({
     queryKey: ["inventory-item", householdId, id],
@@ -55,6 +59,26 @@ export default function InventoryItemDetailScreen() {
       setActiveAction(null);
       setQty("1");
       setTxNotes("");
+    },
+    onError: (err: Error) => {
+      if (!isOnline) {
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/households/${householdId}/inventory/${id}/transactions`,
+          body: {
+            type: activeAction!,
+            quantity: Number(qty),
+            notes: txNotes.trim() || undefined,
+          },
+          entityType: "inventory-transactions",
+          description: `${activeAction}: ${qty} ${item?.unit ?? "units"} of ${item?.name ?? "item"}`,
+        });
+        setActiveAction(null);
+        setQty("1");
+        setTxNotes("");
+      } else {
+        Alert.alert("Error", err.message ?? "Could not record transaction.");
+      }
     },
   });
 
@@ -218,7 +242,7 @@ export default function InventoryItemDetailScreen() {
               {!item.transactions || item.transactions.length === 0 ? (
                 <EmptyState icon="📋" title="No transactions" body="Record a transaction above." />
               ) : (
-                item.transactions.slice(0, 20).map((tx: any, idx: number) => (
+                item.transactions.slice(0, 20).map((tx: InventoryTransaction, idx: number) => (
                   <View key={tx.id}>
                     {idx > 0 && <Divider style={{ marginVertical: 8 }} />}
                     <View style={styles.txRow}>
@@ -235,10 +259,10 @@ export default function InventoryItemDetailScreen() {
                         variant="titleSmall"
                         style={{
                           color:
-                            tx.type === "consumption" ? theme.colors.error : theme.colors.primary,
+                            tx.type === "consume" ? theme.colors.error : theme.colors.primary,
                         }}
                       >
-                        {tx.type === "consumption" ? "−" : "+"}{tx.quantity}
+                        {tx.type === "consume" ? "−" : "+"}{tx.quantity}
                       </Text>
                     </View>
                   </View>

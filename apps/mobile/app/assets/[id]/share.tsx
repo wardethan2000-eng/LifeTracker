@@ -54,6 +54,7 @@ export default function AssetShareScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       copyToClipboard(link.token);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not create share link."),
   });
 
   const { mutate: revoke } = useMutation({
@@ -62,6 +63,7 @@ export default function AssetShareScreen() {
       queryClient.invalidateQueries({ queryKey: ["share-links", householdId, id] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not revoke link."),
   });
 
   const copyToClipboard = async (token: string) => {

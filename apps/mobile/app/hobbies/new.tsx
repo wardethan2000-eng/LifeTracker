@@ -6,6 +6,8 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { getMe, createHobby } from "../../lib/api";
+import { useOfflineSync } from "../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../lib/offline-queue";
 
 type HobbyStatus = "active" | "paused";
 type ActivityMode = "session" | "project" | "practice" | "collection";
@@ -37,6 +39,7 @@ export default function CreateHobbyScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { mutate: create, isPending: creating } = useMutation({
     mutationFn: async () => {
@@ -55,7 +58,27 @@ export default function CreateHobbyScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace(`/hobbies/${hobby.id}`);
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      if (!isOnline) {
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/households/${householdId}/hobbies`,
+          body: {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            status,
+            activityMode,
+            hobbyType: hobbyType.trim() || undefined,
+            notes: notes.trim() || undefined,
+          },
+          entityType: "hobbies",
+          description: `Create hobby: ${name.trim()}`,
+        });
+        router.replace("/hobbies");
+      } else {
+        setError(err.message);
+      }
+    },
   });
 
   return (

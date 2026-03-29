@@ -19,6 +19,7 @@ const DOMAIN_SECTIONS = [
     items: [
       { label: "Analytics", icon: "chart-bar", route: "/analytics" as const },
       { label: "Canvases", icon: "map-outline", route: "/canvas" as const },
+      { label: "Export", icon: "export-variant", route: "/export" as const },
     ],
   },
   {

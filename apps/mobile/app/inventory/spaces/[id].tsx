@@ -1,9 +1,10 @@
-import { StyleSheet, View, ScrollView } from "react-native";
+import { RefreshControl, StyleSheet, View, ScrollView } from "react-native";
 import { Button, Card, Divider, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, getSpaceContents } from "../../../lib/api";
+import type { SpaceContentsResponse } from "../../../lib/api";
 import { SkeletonCard } from "../../../components/SkeletonCard";
 import { EmptyState } from "../../../components/EmptyState";
 
@@ -15,7 +16,7 @@ export default function SpaceDetailScreen() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: contents, isLoading } = useQuery({
+  const { data: contents, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["space-contents", householdId, id],
     queryFn: () => getSpaceContents(householdId, id),
     enabled: !!householdId && !!id,
@@ -35,12 +36,22 @@ export default function SpaceDetailScreen() {
         </Button>
       </View>
 
-      {isLoading || !contents ? (
+      {isLoading ? (
         <View style={{ padding: 16 }}>
           <SkeletonCard lines={4} />
         </View>
+      ) : error || !contents ? (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+        >
+          <EmptyState icon="⚠️" title="Could not load space" body="Pull down to try again." />
+        </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+        >
           {/* Child spaces */}
           {contents.childSpaces && contents.childSpaces.count > 0 && (
             <Card mode="outlined" style={styles.card}>
@@ -71,13 +82,13 @@ export default function SpaceDetailScreen() {
               {!contents.inventoryItems || contents.inventoryItems.length === 0 ? (
                 <EmptyState icon="📦" title="No inventory items" body="No items stored here." />
               ) : (
-                contents.inventoryItems.map((item: any, idx: number) => (
+                contents.inventoryItems.map((item: SpaceContentsResponse["inventoryItems"][number], idx: number) => (
                   <View key={item.id}>
                     {idx > 0 && <Divider style={{ marginVertical: 8 }} />}
                     <View style={styles.itemRow}>
                       <View style={{ flex: 1 }}>
                         <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                          {item.itemName ?? item.name}
+                          {item.inventoryItem.name}
                         </Text>
                         {item.notes && (
                           <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -89,7 +100,7 @@ export default function SpaceDetailScreen() {
                         variant="titleSmall"
                         style={{ color: theme.colors.primary }}
                       >
-                        {item.quantity ?? ""} {item.unit ?? ""}
+                        {item.quantity ?? ""} {item.inventoryItem.unit ?? ""}
                       </Text>
                     </View>
                   </View>
@@ -106,7 +117,7 @@ export default function SpaceDetailScreen() {
                 titleVariant="titleSmall"
               />
               <Card.Content>
-                {contents.generalItems.map((item: any, idx: number) => (
+                {contents.generalItems.map((item: SpaceContentsResponse["generalItems"][number], idx: number) => (
                   <View key={item.id ?? idx}>
                     {idx > 0 && <Divider style={{ marginVertical: 8 }} />}
                     <View style={styles.itemRow}>

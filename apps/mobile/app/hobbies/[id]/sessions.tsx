@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, Card, Divider, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -7,6 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, getHobbySessions, createHobbySession } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
 import { SkeletonCard } from "../../../components/SkeletonCard";
+import { useOfflineSync } from "../../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../../lib/offline-queue";
 import { StatusPill } from "../../../components/StatusPill";
 import type { HobbySessionSummary } from "../../../lib/api";
 
@@ -27,6 +29,7 @@ export default function HobbySessionsScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { data: sessions = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["hobby-sessions", householdId, id],
@@ -47,6 +50,26 @@ export default function HobbySessionsScreen() {
       queryClient.invalidateQueries({ queryKey: ["hobby", householdId, id] });
       setShowCreate(false);
       setForm({ name: "", notes: "" });
+    },
+    onError: (err: Error) => {
+      if (!isOnline) {
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/households/${householdId}/hobbies/${id}/sessions`,
+          body: {
+            name: form.name.trim(),
+            startDate: new Date().toISOString(),
+            completedDate: new Date().toISOString(),
+            notes: form.notes.trim() || undefined,
+          },
+          entityType: "hobby-sessions",
+          description: `Log session: ${form.name.trim()}`,
+        });
+        setShowCreate(false);
+        setForm({ name: "", notes: "" });
+      } else {
+        Alert.alert("Error", err.message ?? "Could not log session.");
+      }
     },
   });
 

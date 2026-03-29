@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Card, FAB, IconButton, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -41,6 +41,7 @@ export default function AssetNotesScreen() {
       setNoteText("");
       setShowForm(false);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not save note."),
   });
 
   const { mutate: saveEdit, isPending: editSaving } = useMutation({
@@ -49,6 +50,7 @@ export default function AssetNotesScreen() {
       queryClient.invalidateQueries({ queryKey: ["entries", "asset", id] });
       setEditingEntry(null);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not update note."),
   });
 
   const { mutate: remove, isPending: removing } = useMutation({
@@ -57,6 +59,7 @@ export default function AssetNotesScreen() {
       queryClient.invalidateQueries({ queryKey: ["entries", "asset", id] });
       setDeletingId(null);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not delete note."),
   });
 
   const entries = data?.items ?? [];

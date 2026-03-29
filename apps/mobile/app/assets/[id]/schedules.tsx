@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, getAssetDetail, completeSchedule } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
 import { StatusPill } from "../../../components/StatusPill";
+import { useOfflineSync } from "../../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../../lib/offline-queue";
 
 export default function AssetSchedulesScreen() {
   const theme = useTheme();
@@ -15,6 +17,7 @@ export default function AssetSchedulesScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["asset-detail", id],
@@ -34,8 +37,23 @@ export default function AssetSchedulesScreen() {
       queryClient.invalidateQueries({ queryKey: ["dueWork"] });
       if (householdId) queryClient.invalidateQueries({ queryKey: ["activity", householdId] });
     },
-    onError: () => {
-      Alert.alert("Error", "Could not mark schedule as done. Please try again.");
+    onError: (_err: Error, scheduleId: string) => {
+      if (!isOnline) {
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/assets/${id}/schedules/${scheduleId}/complete`,
+          body: {
+            completedAt: new Date().toISOString(),
+            applyLinkedParts: true,
+            metadata: {},
+          },
+          entityType: "maintenance-schedules",
+          entityId: scheduleId,
+          description: `Complete schedule`,
+        });
+      } else {
+        Alert.alert("Error", "Could not mark schedule as done. Please try again.");
+      }
     },
   });
 

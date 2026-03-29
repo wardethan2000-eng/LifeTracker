@@ -1591,6 +1591,266 @@ Phase 11 left several silent failure modes, false affordances, and loose TypeScr
 
 ---
 
+## Phase 13 — Entry Detail Editing, Feed Refresh, Mutation Error Handling ✅ Completed
+
+**Goal:** Close the last set of correctness gaps identified by auditing the state after Phase 12: the global entry detail screen had no edit capability, several list screens were missing pull-to-refresh and error states, and three mutation calls silently swallowed errors.
+
+### 13A — `entries/[id].tsx`: Inline edit + error state + entity navigation
+
+**Bugs:**
+- No edit capability — the detail screen was permanently read-only despite `updateEntry` existing in `lib/api.ts`.
+- `isLoading || !entry` check causes infinite spinner when the query errors (same class of bug fixed in Phase 11 for hobby and idea detail).
+- No pull-to-refresh (no `RefreshControl`) — stale data is not recoverable without leaving the screen.
+- The `entry.resolvedEntity.label` was display-only with no way to navigate to the linked entity.
+
+**Fix:**
+- Added `editing: boolean`, `draftBody: string`, `draftTitle: string` state.
+- Added `save` mutation calling `updateEntry(householdId, id, { body: draftBody.trim(), title: draftTitle.trim() || undefined })`.
+- Pencil `IconButton` in the header row toggles `editing`. When editing: body becomes a `TextInput`, title becomes a `TextInput`, and Save + Cancel buttons replace the type/date label row.
+- Added `error` to the `useQuery` destructure; changed loading guard to `isLoading ? <Skeleton/> : error || !entry ? <EmptyState + Retry/> : <Content/>`.
+- Added `refetch`, `isRefetching` from `useQuery`; added `<RefreshControl>` to the `ScrollView`.
+- Wrapped `entry.resolvedEntity.label` in a `<Pressable>` that navigates to the entity's root route when `resolvedEntity.entityType` is a supported type (`asset`, `project`, `hobby`, `idea`).
+
+### 13B — `entries/index.tsx`: Pull-to-refresh + error state
+
+**Bugs:**
+- `FlatList` had no `RefreshControl` — stale data could not be refreshed without leaving the screen.
+- Query failure left the spinner up indefinitely.
+
+**Fix:**
+- Added `refetch`, `isRefetching`, `error` to `useQuery` destructure.
+- Added `<RefreshControl refreshing={isRefetching} onRefresh={refetch} />` to the `FlatList`.
+- Changed loading branch to: `isLoading ? <Spinner/> : error ? <EmptyState title="Could not load entries" body="Pull down to retry." /> : <FlatList .../>`.
+
+### 13C — `inventory/[id].tsx`: `onError` + remove `any` cast
+
+**Bugs:**
+- `mutation.mutate()` (record transaction) had no `onError` — silent failure on network error or 4xx.
+- Transaction history used `(tx: any, idx: number)` cast — masked TypeScript type errors.
+
+**Fix:**
+- Added `import type { InventoryTransaction }` to the import from `../../lib/api`.
+- Added `onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not record transaction.")` to the mutation.
+- Changed `item.transactions.slice(0, 20).map((tx: any, ...)` to `item.transactions.slice(0, 20).map((tx: InventoryTransaction, ...)`.
+
+### 13D — `hobbies/[id]/sessions.tsx` + `projects/[id]/tasks.tsx`: `onError` handlers + error state
+
+**Bugs:**
+- `mutation.mutate()` in sessions screen (log session) had no `onError` — silent failure.
+- `toggleTask` mutation in tasks screen had no `onError` — silent failure.
+- Tasks screen `isLoading` guard spun forever on query error (same class as Phase 11 bugs).
+
+**Fix (`sessions.tsx`):**
+- Added `Alert` to react-native imports.
+- Added `onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not log session.")` to the create session mutation.
+
+**Fix (`tasks.tsx`):**
+- Added `Alert` to react-native imports.
+- Added `error` to `useQuery` destructure; changed the loading guard from `if (isLoading) return <Spinner/>` to a ternary with an `error` branch showing `<EmptyState title="Could not load tasks" body="Go back and try again." />`.
+- Added `onError: (err: Error) => Alert.alert("Could not update task", err.message ?? "Please try again.")` to the `toggleTask` mutation.
+
+### Phase 13 Verification
+
+- [ ] Open global entry detail → pencil button appears in header; tapping it switches body + title to editable `TextInput`s
+- [ ] Edit body + title → tap Save → entry updates in place; Save/Cancel buttons disappear
+- [ ] Tap Cancel during edit → original content restored, no API call made
+- [ ] `entry.resolvedEntity.label` is tappable for supported entity types → navigates to that entity
+- [ ] Open entry detail with API error → EmptyState shown with Retry button (not infinite spinner)
+- [ ] Pull down on entry detail → refreshes entry data
+- [ ] On Notes & Entries list, pull down → list refreshes
+- [ ] Open Notes & Entries list with API error → EmptyState shown (not infinite spinner)
+- [ ] Record a transaction (Consume/Restock/Adjust) with no network → Alert shown
+- [ ] Log a hobby session with no network → Alert shown
+- [ ] Toggle a task with no network → Alert shown
+- [ ] Open project tasks with API error → EmptyState shown (not infinite spinner)
+- [ ] No new TypeScript errors introduced
+
+---
+
+## Phase 14 — Space Detail Fixes, Share Link Errors, Comment Pull-to-Refresh ✅ Completed
+
+**Goal:** Close the remaining quality gaps found in the Phase 13 audit — silent mutation failures on share and household screens, infinite-skeleton bugs on the space detail screen, `any` casts in space items, and comment screens that showed empty threads (instead of an error state) on query failure with no refresh path.
+
+### 14A — `inventory/spaces/[id].tsx`: Error state + `RefreshControl` + remove `any` casts
+
+**Bugs:**
+- `isLoading || !contents` check causes infinite skeleton when the query errors (same class as Phase 11/12 bugs).
+- No `RefreshControl` — stale space contents can't be refreshed without navigating away.
+- Inventory items rendered as `(item: any)` and general items rendered as `(item: any)` — TypeScript types lost, masking potential errors.
+
+**Fix:**
+- Added `error`, `refetch`, `isRefetching` to `useQuery` destructure.
+- Changed loading/error guard to three branches: loading → `<SkeletonCard/>`, error → `<EmptyState icon="⚠️" title="Could not load space" body="Pull down to try again."/>` + `<RefreshControl>`, success → content.
+- Added `<RefreshControl refreshing={isRefetching} onRefresh={refetch} />` to the `ScrollView`.
+- Changed `(item: any)` inventory map to `(item: SpaceContentsResponse["inventoryItems"][number])` and general items map to `(item: SpaceContentsResponse["generalItems"][number])`, importing `SpaceContentsResponse` from `../../../lib/api`.
+- Removed orphaned `(name: string, idx: number)` cast in child spaces names map.
+
+### 14B — `assets/[id]/share.tsx`: `onError` for `create` and `revoke`
+
+**Bugs:**
+- `create` mutation (create new share link) had no `onError` — failed API call was completely silent.
+- `revoke` mutation (revoke share link) had no `onError` — failed API call was completely silent.
+
+**Fix:**
+- Added `onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not create share link.")` to the `create` mutation.
+- Added `onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not revoke link.")` to the `revoke` mutation.
+
+### 14C — `household/index.tsx`: `onError` for `revoke`
+
+**Bug:** The `revoke` mutation (revoke household invitation) had no `onError`. The invitation list would appear unchanged after a silent network failure.
+
+**Fix:** Added `onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not revoke invitation.")` to the `revoke` mutation.
+
+### 14D — Comments screens (`projects/[id]/comments.tsx`, `hobbies/[id]/comments.tsx`, `ideas/[id]/comments.tsx`): Error state + pull-to-refresh
+
+**Bugs (identical in all three files):**
+- `isLoading ? <ActivityIndicator/> : <CommentThread comments={comments ?? []}/>` — when the query errors, `isLoading = false` and `comments = undefined`, so `comments ?? []` renders an empty thread with no indication that data failed to load.
+- No `RefreshControl` — the `ScrollView` wrapping `CommentThread` has no way to refresh stale or failed data.
+
+**Fix (applied to all three files):**
+- Added `error`, `refetch`, `isRefetching` to each `useQuery` destructure.
+- Added `EmptyState` import.
+- Added `RefreshControl` to react-native imports.
+- Changed the render branch: `isLoading ? <ActivityIndicator/> : error ? <EmptyState icon="💬" title="Could not load comments" body="Pull down to try again." /> : <CommentThread .../>`.
+- Wrapped the `ScrollView` `refreshControl` prop: `<ScrollView refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}>`.
+
+### 14E — `settings/index.tsx`: Push toggle error feedback
+
+**Bug:** The `handlePushToggle` function wrapped everything in a `try/catch` with an empty catch block — any failure during push registration or deregistration was completely silent. The toggle could appear to succeed (or flicker) without the user knowing anything went wrong.
+
+**Fix:** Changed the empty `catch` block to `catch (err) { Alert.alert("Error", err instanceof Error ? err.message : "Could not update notification settings."); }`. Added `Alert` to react-native imports.
+
+### Phase 14 Verification
+
+- [x] Open a space detail screen with API error → EmptyState shown (not infinite skeleton); pull down → retries
+- [x] Space detail shows typed inventory item names/quantities without TypeScript errors
+- [x] Create share link with no network → Alert shown
+- [x] Revoke share link with no network → Alert shown
+- [x] Revoke household invitation with no network → Alert shown
+- [x] Open project/hobby/idea comments with API error → EmptyState shown (not empty thread)
+- [x] Pull down on any comments screen → refreshes the comment list
+- [x] Toggle push notifications OFF when API fails → Alert shown, switch state reverts
+- [x] `npx tsc --noEmit` passes with no new errors
+
+---
+
+---
+
+## Phase 15 — Offline Queue Propagation ✅ Completed
+
+**Goal:** Route all significant write operations through the offline mutation queue so they work when the device has no connectivity, matching the behaviour already implemented for entry capture.
+
+**Pattern (same as `capture.tsx`):** In each mutation's `onError` handler, check `!isOnline`. If offline, call `enqueueMutation()` with a serialised representation of the request and reset/navigate the UI as if the operation succeeded locally. If online but the server returned an error, show an `Alert` as before.
+
+### 15A: Hobby Session Logging (`hobbies/[id]/sessions.tsx`)
+
+**Bug:** `createHobbySession` has no offline path — logging a session while away from Wi-Fi silently fails with an Alert.
+
+**Fix:** Import `useOfflineSync` and `enqueueMutation`. Add `onError` offline branch: enqueue `POST /v1/households/{householdId}/hobbies/{hobbyId}/sessions` and dismiss the form as if saved. Show an Alert when online but the request fails.
+
+### 15B: Project Task Toggling (`projects/[id]/tasks.tsx`)
+
+**Bug:** `updateProjectTask` has no offline path — toggling a task checkbox while offline shows an error Alert and reverts.
+
+**Fix:** Import `useOfflineSync` and `enqueueMutation`. Add offline branch in `onError`: enqueue `PATCH /v1/households/{householdId}/projects/{projectId}/tasks/{taskId}` with the toggled payload.
+
+### 15C: Maintenance Schedule Completion (`assets/[id]/schedules.tsx`)
+
+**Bug:** `completeSchedule` has no offline path — marking a schedule done offline shows an error.
+
+**Fix:** Import `useOfflineSync` and `enqueueMutation`. Add offline branch in `onError`: enqueue `POST /v1/assets/{assetId}/schedules/{scheduleId}/complete`.
+
+### 15D: Inventory Transactions (`inventory/[id].tsx`)
+
+**Bug:** `createInventoryTransaction` has no offline path — consuming or adjusting stock while offline shows an error.
+
+**Fix:** Import `useOfflineSync` and `enqueueMutation`. Add offline branch in `onError`: enqueue `POST /v1/households/{householdId}/inventory/{itemId}/transactions`.
+
+### 15E: Entity Creation Forms (`hobbies/new.tsx`, `projects/new.tsx`, `ideas/new.tsx`, `inventory/new.tsx`)
+
+**Bug:** All four creation forms navigate to the new entity detail screen on success. When offline, this navigation is impossible (no entity ID). The `onError` handler just sets an inline error string, which is confusing.
+
+**Fix (same pattern for all four):** Add `useOfflineSync` import. In `onError`, check `!isOnline`:
+- Enqueue the creation mutation
+- Reset the form
+- Navigate to the list (`/hobbies`, `/projects`, `/ideas`, `/inventory`) instead of the detail
+- The OfflineBanner will surface the pending operation to the user
+
+`assets/new.tsx` is excluded — the multi-step preset flow makes offline creation complex and higher-risk; it is deferred.
+
+### Phase 15 Verification
+
+- [x] Log hobby session with airplane mode → banner shows 1 pending → reconnect → session appears in list
+- [x] Toggle task checkbox offline → banner increments → reconnect → task state matches
+- [x] Mark schedule done offline → banner increments → reconnect → schedule status updates
+- [x] Consume inventory item offline → banner increments → reconnect → quantity decrements
+- [x] Create hobby offline → navigate to hobbies list → banner shows pending → reconnect → hobby appears
+- [x] Create project offline → navigate to projects list → syncs on reconnect
+- [x] Create idea offline → navigate to ideas list → syncs on reconnect
+- [x] Create inventory item offline → navigate to list → syncs on reconnect
+- [x] `npx tsc --noEmit` passes with no new errors
+
+---
+
+## Phase 16 — Notes Screen Mutation Error Handling ✅ Completed
+
+**Goal:** Close the last class of silent mutations — all four entity notes screens (`assets`, `projects`, `hobbies`, `ideas`) had three `useMutation` calls each (create, update, delete) with no `onError` handler. A failed save, edit, or delete left the user with no feedback.
+
+**Fix (identical for all 4 screens):**
+- Added `Alert` to the `react-native` import
+- Added `onError: (err: Error) => Alert.alert("Error", err.message ?? "fallback")` to each of the three mutations (`addNote`/create, `saveEdit`, `remove`)
+
+**Files changed:**
+- `apps/mobile/app/assets/[id]/notes.tsx`
+- `apps/mobile/app/projects/[id]/notes.tsx`
+- `apps/mobile/app/hobbies/[id]/notes.tsx`
+- `apps/mobile/app/ideas/[id]/notes.tsx`
+
+### Phase 16 Verification
+
+- [x] All 33 mobile screen files audited — zero infinite-skeleton bugs remaining
+- [x] All mutations across all screens have `onError` handlers
+- [x] `npx tsc --noEmit` passes with zero errors
+
+---
+
+## Phase 17 — Analytics Charts & PDF Export ✅ Completed
+
+### 17A: Analytics Charts
+Added visual charts to `apps/mobile/app/analytics/index.tsx` using `react-native-gifted-charts` + `react-native-svg`:
+
+- **Schedule Compliance card**: donut gauge showing on-time rate % (PieChart), plus area line chart of monthly on-time rate trend over 12 months (LineChart)
+- **Cost Overview card**: bar chart of top-5 spend categories (BarChart), plus bar chart of monthly spend over 12 months (BarChart)
+- **Spend Forecast card**: bar chart comparing 3-month, 6-month, and 12-month forecast values (BarChart)
+- All charts use `theme.colors.primary` / `theme.colors.secondary` so they respect dark/light mode
+
+### 17B: PDF Export
+New screen `apps/mobile/app/export/index.tsx` using `expo-print` + `expo-sharing`:
+
+- Fetches up to 200 household assets via existing `getHouseholdAssets()` API
+- Builds a clean HTML table report (name, type, manufacturer, model, condition score, location)
+- Calls `Print.printToFileAsync({ html })` to generate PDF on-device
+- Calls `Sharing.shareAsync(uri)` to push PDF to the OS share sheet
+- Handles: no assets, sharing unavailable, generation errors
+
+### 17C: Navigation wiring
+Added "Export" entry to the **Insights** section of `apps/mobile/app/(tabs)/more.tsx` (`icon: "export-variant"`, `route: "/export"`).
+
+### Dependencies added
+- `react-native-svg@15.8.0` (Expo SDK 52 managed)
+- `expo-print@~14.0.3` (Expo SDK 52 managed)
+- `expo-sharing@~13.0.1` (Expo SDK 52 managed)
+- `react-native-gifted-charts@^1.4.76`
+
+### Phase 17 Verification
+
+- [x] Analytics screen shows donut gauge, compliance trend line, category bars, monthly spend bars, forecast bars
+- [x] Export screen fetches assets and generates/shares a PDF via OS share sheet
+- [x] Export entry visible under More → Insights
+- [x] `npx tsc --noEmit` passes with zero errors
+
+---
+
 ### Existing Files (modify or reference)
 
 | File | Purpose |

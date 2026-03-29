@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import {
   Card,
   Divider,
@@ -71,8 +71,8 @@ export default function SettingsScreen() {
         }
         setPushEnabled(false);
       }
-    } catch {
-      // Silently fail — user can retry
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Could not update notification settings.");
     } finally {
       setPushPending(false);
     }

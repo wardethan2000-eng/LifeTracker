@@ -13,6 +13,8 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { getMe, createIdea } from "../../lib/api";
+import { useOfflineSync } from "../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../lib/offline-queue";
 
 type Stage = "spark" | "developing" | "ready";
 type Priority = "low" | "medium" | "high";
@@ -30,6 +32,7 @@ export default function NewIdeaScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { mutate: create, isPending } = useMutation({
     mutationFn: () => {
@@ -47,7 +50,23 @@ export default function NewIdeaScreen() {
       router.replace(`/ideas/${idea.id}`);
     },
     onError: (err: Error) => {
-      setError(err.message);
+      if (!isOnline) {
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/households/${householdId}/ideas`,
+          body: {
+            title: title.trim(),
+            description: description.trim() || undefined,
+            stage,
+            priority,
+          },
+          entityType: "ideas",
+          description: `Create idea: ${title.trim()}`,
+        });
+        router.replace("/ideas");
+      } else {
+        setError(err.message);
+      }
     },
   });
 

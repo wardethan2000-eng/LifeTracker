@@ -1,9 +1,11 @@
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
-import { ActivityIndicator, Button, Chip, Text, useTheme } from "react-native-paper";
+import { useState } from "react";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Button, Chip, IconButton, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { getMe, getEntry, deleteEntry } from "../../lib/api";
+import { getMe, getEntry, updateEntry, deleteEntry } from "../../lib/api";
+import { EmptyState } from "../../components/EmptyState";
 
 const FLAG_ICONS: Record<string, string> = {
   important: "⭐",
@@ -27,18 +29,45 @@ const ENTRY_TYPE_ICONS: Record<string, string> = {
   comparison: "↔️",
 };
 
+const ENTITY_ROUTES: Partial<Record<string, string>> = {
+  asset: "/assets",
+  project: "/projects",
+  hobby: "/hobbies",
+  idea: "/ideas",
+};
+
 export default function EntryDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
 
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: entry, isLoading } = useQuery({
+  const { data: entry, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["entry", id],
     queryFn: () => getEntry(householdId, id),
     enabled: !!householdId && !!id,
+  });
+
+  const { mutate: save, isPending: saving } = useMutation({
+    mutationFn: () =>
+      updateEntry(householdId, id, {
+        body: draftBody.trim(),
+        title: draftTitle.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entry", id] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      setEditing(false);
+    },
+    onError: (err) => {
+      Alert.alert("Error", err instanceof Error ? err.message : "Could not save entry.");
+    },
   });
 
   const { mutate: remove, isPending: deleting } = useMutation({
@@ -52,6 +81,16 @@ export default function EntryDetailScreen() {
     },
   });
 
+  function startEdit() {
+    setDraftTitle(entry?.title ?? "");
+    setDraftBody(entry?.body ?? "");
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+  }
+
   function confirmDelete() {
     Alert.alert(
       "Delete Entry",
@@ -63,10 +102,25 @@ export default function EntryDetailScreen() {
     );
   }
 
-  if (isLoading || !entry) {
+  if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !entry) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <EmptyState
+          icon="⚠️"
+          title="Could not load entry"
+          body="Something went wrong."
+        />
+        <Button mode="text" onPress={() => void refetch()} style={{ alignSelf: "center" }}>
+          Retry
+        </Button>
       </SafeAreaView>
     );
   }
@@ -80,29 +134,101 @@ export default function EntryDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.typeIcon}>{ENTRY_TYPE_ICONS[entry.entryType] ?? "📝"}</Text>
           <View style={styles.headerText}>
-            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, textTransform: "capitalize" }}>
-              {entry.entryType} · {formattedDate}
-            </Text>
-            {entry.title ? (
-              <Text variant="titleMedium" style={{ color: theme.colors.onSurface, marginTop: 2 }}>
-                {entry.title}
-              </Text>
-            ) : null}
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {entry.resolvedEntity.label}
-            </Text>
+            {editing ? (
+              <TextInput
+                value={draftTitle}
+                onChangeText={setDraftTitle}
+                mode="outlined"
+                dense
+                placeholder="Title (optional)"
+                style={{ marginBottom: 4 }}
+              />
+            ) : (
+              <>
+                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, textTransform: "capitalize" }}>
+                  {entry.entryType} · {formattedDate}
+                </Text>
+                {entry.title ? (
+                  <Text variant="titleMedium" style={{ color: theme.colors.onSurface, marginTop: 2 }}>
+                    {entry.title}
+                  </Text>
+                ) : null}
+                <Pressable
+                  onPress={() => {
+                    const base = ENTITY_ROUTES[entry.resolvedEntity.entityType];
+                    if (base && entry.resolvedEntity.entityId) {
+                      router.push(`${base}/${entry.resolvedEntity.entityId}` as Parameters<typeof router.push>[0]);
+                    }
+                  }}
+                >
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: ENTITY_ROUTES[entry.resolvedEntity.entityType]
+                        ? theme.colors.primary
+                        : theme.colors.onSurfaceVariant,
+                    }}
+                  >
+                    {entry.resolvedEntity.label}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
+          {!editing ? (
+            <IconButton
+              icon="pencil-outline"
+              size={18}
+              onPress={startEdit}
+              iconColor={theme.colors.onSurfaceVariant}
+            />
+          ) : (
+            <View style={styles.editActions}>
+              <Button
+                mode="text"
+                compact
+                onPress={cancelEdit}
+                textColor={theme.colors.onSurfaceVariant}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                mode="contained"
+                compact
+                onPress={() => save()}
+                loading={saving}
+                disabled={saving || !draftBody.trim()}
+              >
+                Save
+              </Button>
+            </View>
+          )}
         </View>
 
         {/* Body */}
-        <Text variant="bodyMedium" style={[styles.body, { color: theme.colors.onSurface }]}>
-          {entry.body}
-        </Text>
+        {editing ? (
+          <TextInput
+            value={draftBody}
+            onChangeText={setDraftBody}
+            mode="outlined"
+            multiline
+            numberOfLines={6}
+            style={styles.bodyInput}
+          />
+        ) : (
+          <Text variant="bodyMedium" style={[styles.body, { color: theme.colors.onSurface }]}>
+            {entry.body}
+          </Text>
+        )}
 
         {/* Flags */}
         {entry.flags.length > 0 && (
@@ -158,6 +284,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
   typeIcon: { fontSize: 28, marginTop: 2 },
   headerText: { flex: 1, gap: 2 },
+  editActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  bodyInput: { minHeight: 120 },
   body: { lineHeight: 22 },
   flagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   flag: {},

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ActivityIndicator, Chip, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +25,7 @@ export default function EntriesScreen() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["entries", householdId, filter],
     queryFn: () =>
       filter === "all"
@@ -67,11 +67,20 @@ export default function EntriesScreen() {
           color={theme.colors.primary}
           style={styles.loader}
         />
+      ) : error ? (
+        <EmptyState
+          icon="⚠️"
+          title="Could not load entries"
+          body="Pull down to retry."
+        />
       ) : (
         <FlatList
           data={data?.items ?? []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => router.push(`/entries/${item.id}`)}

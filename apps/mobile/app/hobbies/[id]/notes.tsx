@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, Card, IconButton, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -37,6 +37,7 @@ export default function HobbyNotesScreen() {
       setShowCreate(false);
       setBody("");
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not save note."),
   });
 
   const { mutate: saveEdit, isPending: editSaving } = useMutation({
@@ -45,6 +46,7 @@ export default function HobbyNotesScreen() {
       queryClient.invalidateQueries({ queryKey: ["hobby-notes", householdId, id] });
       setEditingEntry(null);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not update note."),
   });
 
   const { mutate: remove, isPending: removing } = useMutation({
@@ -53,6 +55,7 @@ export default function HobbyNotesScreen() {
       queryClient.invalidateQueries({ queryKey: ["hobby-notes", householdId, id] });
       setDeletingId(null);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not delete note."),
   });
 
   return (

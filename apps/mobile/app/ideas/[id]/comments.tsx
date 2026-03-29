@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet } from "react-native";
 import { ActivityIndicator, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
@@ -11,6 +11,7 @@ import {
   deleteIdeaComment,
 } from "../../../lib/api";
 import { CommentThread } from "../../../components/CommentThread";
+import { EmptyState } from "../../../components/EmptyState";
 
 export default function IdeaCommentsScreen() {
   const theme = useTheme();
@@ -20,7 +21,7 @@ export default function IdeaCommentsScreen() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: comments, isLoading } = useQuery({
+  const { data: comments, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["idea-comments", ideaId],
     queryFn: () => getIdeaComments(householdId, ideaId),
     enabled: !!householdId && !!ideaId,
@@ -28,7 +29,11 @@ export default function IdeaCommentsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+      >
         <Text
           variant="titleMedium"
           style={{ color: theme.colors.onBackground, marginBottom: 12 }}
@@ -37,6 +42,8 @@ export default function IdeaCommentsScreen() {
         </Text>
         {isLoading ? (
           <ActivityIndicator />
+        ) : error ? (
+          <EmptyState icon="💬" title="Could not load comments" body="Pull down to try again." />
         ) : (
           <CommentThread
             comments={comments ?? []}

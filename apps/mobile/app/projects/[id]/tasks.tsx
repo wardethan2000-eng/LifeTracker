@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -13,6 +13,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, getProjectDetail, updateProjectTask } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
 import type { ProjectTask } from "../../../lib/api";
+import { useOfflineSync } from "../../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../../lib/offline-queue";
 
 export default function ProjectTasksScreen() {
   const theme = useTheme();
@@ -22,8 +24,9 @@ export default function ProjectTasksScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
-  const { data: project, isLoading } = useQuery({
+  const { data: project, isLoading, error } = useQuery({
     queryKey: ["project", householdId, id],
     queryFn: () => getProjectDetail(householdId, id!),
     enabled: !!householdId && !!id,
@@ -37,6 +40,23 @@ export default function ProjectTasksScreen() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", householdId, id] });
+    },
+    onError: (err: Error, task: ProjectTask) => {
+      if (!isOnline) {
+        enqueueMutation({
+          method: "PATCH",
+          path: `/v1/households/${householdId}/projects/${id}/tasks/${task.id}`,
+          body: {
+            isCompleted: !task.isCompleted,
+            completedAt: !task.isCompleted ? new Date().toISOString() : null,
+          },
+          entityType: "project-tasks",
+          entityId: task.id,
+          description: `${!task.isCompleted ? "Complete" : "Reopen"} task: ${task.title}`,
+        });
+      } else {
+        Alert.alert("Could not update task", err.message ?? "Please try again.");
+      }
     },
   });
 
@@ -59,6 +79,18 @@ export default function ProjectTasksScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator style={styles.loader} size="large" color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <EmptyState
+          icon="⚠️"
+          title="Could not load tasks"
+          body="Go back and try again."
+        />
       </SafeAreaView>
     );
   }

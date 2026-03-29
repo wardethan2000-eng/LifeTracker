@@ -13,6 +13,8 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { getMe, createProject } from "../../lib/api";
+import { useOfflineSync } from "../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../lib/offline-queue";
 
 type ProjectStatus = "planning" | "active" | "on_hold";
 
@@ -36,6 +38,7 @@ export default function CreateProjectScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { mutate: create, isPending: creating } = useMutation({
     mutationFn: async () => {
@@ -53,7 +56,26 @@ export default function CreateProjectScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace(`/projects/${project.id}`);
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      if (!isOnline) {
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/households/${householdId}/projects`,
+          body: {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            status,
+            targetEndDate: targetEndDate.trim() ? new Date(targetEndDate.trim()).toISOString() : undefined,
+            notes: notes.trim() || undefined,
+          },
+          entityType: "projects",
+          description: `Create project: ${name.trim()}`,
+        });
+        router.replace("/projects");
+      } else {
+        setError(err.message);
+      }
+    },
   });
 
   return (

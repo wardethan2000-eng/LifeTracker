@@ -12,6 +12,8 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { getMe, createInventoryItem } from "../../lib/api";
+import { useOfflineSync } from "../../hooks/useOfflineSync";
+import { enqueueMutation } from "../../lib/offline-queue";
 
 export default function CreateInventoryItemScreen() {
   const theme = useTheme();
@@ -29,6 +31,7 @@ export default function CreateInventoryItemScreen() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
+  const { isOnline } = useOfflineSync();
 
   const { mutate: create, isPending: creating } = useMutation({
     mutationFn: async () => {
@@ -50,7 +53,30 @@ export default function CreateInventoryItemScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace(`/inventory/${item.id}`);
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      if (!isOnline) {
+        const qty = parseFloat(quantity);
+        const threshold = reorderThreshold.trim() ? parseFloat(reorderThreshold) : undefined;
+        enqueueMutation({
+          method: "POST",
+          path: `/v1/households/${householdId}/inventory`,
+          body: {
+            name: name.trim(),
+            quantityOnHand: isNaN(qty) ? 1 : qty,
+            unit: unit.trim() || "each",
+            category: category.trim() || undefined,
+            storageLocation: storageLocation.trim() || undefined,
+            reorderThreshold: threshold !== undefined && !isNaN(threshold) ? threshold : undefined,
+            notes: notes.trim() || undefined,
+          },
+          entityType: "inventory",
+          description: `Create inventory item: ${name.trim()}`,
+        });
+        router.replace("/inventory");
+      } else {
+        setError(err.message);
+      }
+    },
   });
 
   return (

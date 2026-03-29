@@ -98,6 +98,7 @@ export default function HouseholdScreen() {
       queryClient.invalidateQueries({ queryKey: ["household-invitations", householdId] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     },
+    onError: (err: Error) => Alert.alert("Error", err.message ?? "Could not revoke invitation."),
   });
 
   const handleSendInvite = () => {
