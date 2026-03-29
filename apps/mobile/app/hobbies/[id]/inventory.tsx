@@ -53,7 +53,7 @@ export default function HobbyInventoryScreen() {
             <Card
               mode="outlined"
               style={styles.card}
-              onPress={() => router.push(`/inventory/${item.inventoryItemId}` as never)}
+              onPress={() => router.push(`/inventory/${item.inventoryItemId}` as Parameters<typeof router.push>[0])}
             >
               <Card.Content style={styles.cardContent}>
                 <View style={{ flex: 1 }}>

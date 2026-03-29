@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Badge,
@@ -134,14 +134,13 @@ export default function NotificationsScreen() {
   });
 
   const { mutate: markRead } = useMutation({
-    mutationFn: async (notificationId: string) => {
-      setMarkingId(notificationId);
-      return markNotificationRead(notificationId);
-    },
+    mutationFn: (notificationId: string) => markNotificationRead(notificationId),
+    onMutate: (notificationId) => setMarkingId(notificationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", householdId] });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
+    onError: () => Alert.alert("Error", "Could not mark as read. Please try again."),
     onSettled: () => setMarkingId(null),
   });
 

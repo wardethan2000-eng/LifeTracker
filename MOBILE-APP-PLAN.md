@@ -1153,7 +1153,443 @@ Shows `inventoryLinks` from `getHobbyDetail()`. Each link includes item name, qu
 
 ---
 
-## Key Files Reference
+## Phase 6 — Polish & Completeness
+
+**Goal:** Close the remaining feature gaps and UX rough edges that exist after Phase 5. All primary domain tools have full sub-screen parity; Phase 6 makes the app feel production-ready for daily use.
+
+**Status:** ✅ Completed 2026-03-28
+
+### Gaps addressed
+
+#### 6A: Idea Creation Form
+
+Ideas was the only primary domain with no creation path on mobile — the list had no FAB and no `new.tsx` screen.
+
+**Changes:**
+- `apps/mobile/app/ideas/new.tsx` — multi-field creation form: title (required), description (optional), stage (spark/developing/ready), priority (low/medium/high). On success navigates to the new idea detail screen.
+- `apps/mobile/app/ideas/index.tsx` — added `<FAB icon="plus" label="New idea" />` using the container/SafeAreaView/FAB pattern from the Projects screen.
+
+#### 6B: Color Scheme Preference Wiring
+
+The Settings screen stored a user theme preference (system/light/dark) to MMKV but the root layout ignored it and always followed the device setting.
+
+**Changes:**
+- `apps/mobile/app/_layout.tsx` — `RootLayout` now reads the initial preference from MMKV via `mmkvGet(STORAGE_KEYS.COLOR_SCHEME)`, holds it in `useState`, and subscribes to MMKV changes via `storage.addOnValueChangedListener`. The effective color scheme overrides the system setting when the user has explicitly selected light or dark. `StatusBar` style and `PaperProvider` theme both reflect the preference immediately when Settings is changed.
+
+#### 6C: Unread Notification Badge in Tab Bar
+
+The More tab had no indicator when unread notifications were waiting.
+
+**Changes:**
+- `apps/mobile/app/(tabs)/_layout.tsx` — Added `useQuery` calls for `getMe` and `getHouseholdNotifications({ status: "unread", limit: 1 })` (stale time 1 min). The `unreadCount` from `HouseholdNotificationList` drives `tabBarBadge` on the More tab.
+
+#### 6D: Failed Mutation Retry / Discard UI
+
+The `OfflineBanner` showed failure count but provided no way for the user to act on failures.
+
+**Changes:**
+- `apps/mobile/hooks/useOfflineSync.ts` — Extended return type with `failedMutations: QueuedMutation[]`, `retry(id)`, and `discard(id)` helpers. `refreshCounts()` now also refreshes the `failedMutations` list after each flush or user action.
+- `apps/mobile/components/OfflineBanner.tsx` — Banner is now a `<Pressable>` when failures exist. Tapping it opens a Paper `<Dialog>` (via `<Portal>`) listing each failed mutation with its description, path, retry count, and timestamp. Each row has **Retry** (re-enqueues as pending) and **Discard** (removes permanently) buttons. The Dialog auto-closes when the last failure is resolved.
+
+### Phase 6 Verification
+
+- [ ] Ideas list shows "New idea" FAB → tapping opens creation form → saving navigates to idea detail
+- [ ] Creating an idea with title only succeeds; description is optional
+- [ ] Settings → Theme → Light forces light mode immediately without restart
+- [ ] Settings → Theme → Dark forces dark mode immediately without restart
+- [ ] Settings → Theme → System follows device setting
+- [ ] More tab shows badge number matching unread notification count
+- [ ] Badge clears after all notifications are marked read
+- [ ] Trigger an offline failure → OfflineBanner shows red "X failed — tap to review"
+- [ ] Tapping the banner opens dialog listing the failed mutation
+- [ ] Retry re-queues the mutation; banner updates count
+- [ ] Discard removes the mutation; banner hides once queue is empty
+
+---
+
+## Phase 7 — Photo Gallery & Entity-Linked Capture ✅ Completed
+
+**Goal:** Replace the `photos.tsx` placeholder stub with a real upload + gallery flow, and give the Capture tab entity-linking so notes can be attached to a specific asset, project, hobby, or idea.
+
+### 7A — Attachment API methods (`apps/mobile/lib/api.ts`)
+
+Three methods appended after `confirmAttachmentUpload`:
+
+- `getEntityAttachments(householdId, entityType, entityId)` — `GET /v1/households/:id/attachments?entityType=X&entityId=Y` → `Attachment[]`
+- `getAttachmentDownloadUrl(householdId, attachmentId)` — `GET /v1/households/:id/attachments/:attachmentId/download` → `{ url: string }`
+- `deleteAttachment(householdId, attachmentId)` — `DELETE /v1/households/:id/attachments/:attachmentId` → `void`
+
+### 7B — EntitySelector component (`apps/mobile/components/EntitySelector.tsx`)
+
+New component. Props: `householdId`, `value: EntitySelection | null`, `onChange`.
+
+Shows a trigger `<Button>` with the currently linked entity name (or "None (standalone)"). Tapping opens a Paper `<Dialog>` with:
+- Searchbar to filter across all domains
+- "None (standalone)" list item (links to household home entry)
+- Four sections: Assets, Projects, Hobbies, Ideas — each fetched lazily (enabled only when dialog is open)
+- Selected item highlighted in primary color
+
+The dialog only fires queries when open (`enabled: open && !!householdId`), so it doesn't add background traffic.
+
+**Bug fixes bundled with this work:**
+- `app/ideas/[id]/index.tsx` — import paths corrected from `../../` to `../../../`
+- `app/ideas/[id]/notes.tsx` — `getEntries` returns `EntryListResponse` (paginated object), not an array; fixed to extract `.items`
+
+### 7C — Entity-linked Capture tab (`apps/mobile/app/(tabs)/capture.tsx`)
+
+- Added `entity: EntitySelection | null` state
+- `EntitySelector` component rendered below the type chips with "Linked to" label
+- `resolvedEntityType` / `resolvedEntityId` derive the final values — fall back to `"home"` / `householdId` when no entity is selected
+- Both the online mutation and offline queue body now use resolved entity fields
+- `TouchableOpacity` import removed (was unused)
+
+### 7D — Asset Photos & Files screen (`apps/mobile/app/assets/[id]/photos.tsx`)
+
+Full replacement of the Phase 1 placeholder stub:
+
+**Gallery:**
+- Loads `getEntityAttachments(householdId, "asset", id)` via React Query
+- 2-column `FlatList` grid; tile size adapts to screen width
+- Each tile is a `PhotoTile` sub-component that lazily fetches its download URL via `getAttachmentDownloadUrl` (staleTime 5 min, React Query deduplication prevents duplicate calls)
+- Image tiles render the URL in `<Image>`; non-image files show a file/PDF emoji icon
+- Filename overlay at tile bottom
+- Tap → `Linking.openURL(downloadUrl)` to open in browser/viewer
+- Long-press → triggers delete confirmation dialog
+
+**Upload:**
+- FAB "Add photo" → `Alert.alert` with Camera / Photo library options
+- Supports multi-select from library (`allowsMultipleSelection: true`)
+- Each selected image: compress via `ImageManipulator` (max 1200px, 85% quality) → get file size with `expo-file-system` → `requestAttachmentUpload` → `FileSystem.uploadAsync` (binary PUT to presigned S3 URL) → `confirmAttachmentUpload`
+- Invalidates `["asset-attachments", id]` on success; haptic success feedback
+- FAB shows "Uploading…" with disabled state during in-progress upload
+
+**Delete:**
+- Long-press sets `deleteTargetId`; Paper `<Dialog>` appears with explicit "Delete photo" / Cancel
+- On confirm: calls `deleteAttachment`; haptic success; invalidates attachment list
+
+### Phase 7 Verification
+
+- [ ] Capture tab shows "Linked to" picker — default is "None (standalone)"
+- [ ] Tapping "Linked to" opens entity dialog; search filters across all domains
+- [ ] Selecting an asset name updates the button label
+- [ ] Saving a note with an entity linked creates the entry with the correct `entityType`/`entityId`
+- [ ] Asset detail → Photos tab shows "No photos yet" with correct empty state (no "Phase 3" copy)
+- [ ] FAB → Camera captures and uploads; photo appears in grid
+- [ ] FAB → Photo library allows multi-select; all selected photos upload
+- [ ] Tap a grid tile opens the file in browser/viewer
+- [ ] Long-press a tile shows delete dialog naming the action "Delete photo"
+- [ ] Confirming delete removes the tile from the grid
+
+---
+
+## Phase 8 — Bug Fixes & Quality Improvements ✅ Completed
+
+**Goal:** Systematically resolve all identified runtime bugs, dead-end stubs, and data-integrity issues found in the Phase 7 audit.
+
+### 8A — Server-side activity filtering (`lib/api.ts`, 4 activity screens)
+
+**Bug:** All four entity activity screens (`assets/[id]/history.tsx`, `projects/[id]/activity.tsx`, `hobbies/[id]/activity.tsx`, `ideas/[id]/activity.tsx`) were fetching up to 50 **household-wide** activity events and discarding all entries not matching the entity ID client-side. In an active household, entity-specific history older than the 50th most recent event never appeared.
+
+**Fix:** Extended `getHouseholdActivity()` in `lib/api.ts` to accept optional `entityType` and `entityId` params (the API route at `GET /v1/households/:id/activity` already supported them). All four screens now pass the correct values and drop the client-side `.filter()`.
+
+### 8B — Hobbies notes crash bug (`app/hobbies/[id]/notes.tsx`)
+
+**Bug:** `getEntries()` returns `EntryListResponse` — a paginated object `{ items: Entry[], nextCursor }` — not a plain array. The component was passing this object directly to `FlatList data=`, producing a runtime crash (or silent empty list) when the query resolved.
+
+**Fix:** Changed `data: entries = []` to `data: entriesData` and derived `entries = entriesData?.items ?? []`. Also removed the `as any[]` cast from `FlatList data=`. The same pattern was already used in asset notes, project notes, and idea notes — this was a copy-paste omission.
+
+### 8C — Product barcode dead-end (`app/(tabs)/scan.tsx`)
+
+**Bug:** When a product barcode (UPC, EAN, Code-128, Code-39) was scanned, `lookupBarcodeMobile()` succeeded and returned product data but the result was thrown away and an `Alert.alert` showed "Full product detail screen coming in Phase 1."
+
+**Fix:** The scan screen now stores the `BarcodeLookupResult` in `productResult` state and shows a Paper `<Dialog>` (via `<Portal>`) with the product name, brand, category, description, and a "View image" link button when an image URL is available. Dismissing the dialog resets state and resumes scanning. `BarcodeLookupResult` is now also re-exported from `lib/api.ts`.
+
+### 8D — Push notification toggle (`app/settings/index.tsx`)
+
+**Bug:** The push notification `<Switch>` was `disabled` and permanently stuck at `value=true` — non-interactive UI showing a false "enabled" state.
+
+**Fix:**
+- On mount: checks actual OS permission status via `Notifications.getPermissionsAsync()` to reflect real state
+- Toggle ON: calls `Notifications.requestPermissionsAsync()` → on grant, calls `Notifications.getExpoPushTokenAsync()` → registers token via `registerDevice()` → stores the returned `DeviceToken.id` in MMKV under `STORAGE_KEYS.DEVICE_TOKEN_ID`
+- Toggle OFF: retrieves stored token ID from MMKV → calls `unregisterDevice(id)` → clears MMKV entry
+- `pushPending` state disables the switch during async operations
+
+### 8E — Version string (`app/settings/index.tsx`)
+
+**Fix:** About section description replaced `"Phase 3 · Expo SDK 52"` with `\`Version ${appVersion} · Expo SDK 52\`` where `appVersion` is read from `Constants.expoConfig?.version`.
+
+### Phase 8 Verification
+
+- [ ] Asset history shows only that asset's activity (not other entities' events)
+- [ ] Project/Hobby/Idea activity screens do the same
+- [ ] Hobby notes screen loads and displays entries correctly (no crash)
+- [ ] Scan a product barcode → dialog appears with product name/brand/category
+- [ ] Dismiss dialog → camera resumes scanning
+- [ ] Settings → Notifications toggle is OFF if permissions not granted
+- [ ] Toggling ON requests OS permission → if granted, switch stays ON
+- [ ] About section shows real app version (e.g. "Version 1.0.0 · Expo SDK 52")
+
+---
+
+## Phase 9 — Supplies Drill-Through, Search Fix, Comment Fix, Data Integrity ✅ Completed
+
+**Goal:** Address remaining bugs and UX gaps identified in the Phase 8 audit focused on data integrity, navigation correctness, and interaction safety.
+
+### 9A — Project supplies drill-through (`app/projects/[id]/supplies.tsx`, new `phases/[phaseId]/supplies.tsx`)
+
+**Problem:** The project supplies screen showed only phase-level aggregate counts (total / procured). Individual supply item names, SKUs, quantities, suppliers, and per-item procurement status were invisible — the API level was completely missing.
+
+**Fix:**
+- Added `getProjectPhaseSupplies(householdId, projectId, phaseId)` to `lib/api.ts`, calling `GET /v1/households/:id/projects/:id/phases/:id/supplies` and validating against `projectPhaseSupplyListSchema`.
+- Rewrote `supplies.tsx` phase cards to be tappable, navigating to `/projects/[id]/phases/[phaseId]/supplies`. Cards now show a compact `procured/total ›` summary.
+- Created `app/projects/[id]/phases/[phaseId]/supplies.tsx` — a new drill-through screen that shows each `ProjectPhaseSupply` item with name, category, quantity needed/on hand, unit, estimated cost, supplier name, supplier link button, procurement status chip, and notes.
+
+### 9B — `getHouseholdIdeas` pagination cursor discarded (`lib/api.ts`, `app/ideas/index.tsx`, `components/EntitySelector.tsx`)
+
+**Bug:** `getHouseholdIdeas()` returned `Promise<IdeaSummary[]>` by stripping `nextCursor` with `.then((r) => r.items)` — making cursor-based load-more impossible and hiding the full paginated API response. The same function is used by both the ideas list screen and `EntitySelector`.
+
+**Fix:**
+- Changed return type to `Promise<{ items: IdeaSummary[]; nextCursor?: string | null | undefined }>` — full paginated result now preserved.
+- Updated `app/ideas/index.tsx`: `const ideas = data?.items ?? []` (same pattern as all other paginated list screens).
+- Updated `components/EntitySelector.tsx`: `(ideas?.items ?? []).filter(...)` to unwrap from the paginated result.
+
+### 9C — Silent navigation failure in search (`app/(tabs)/search.tsx`)
+
+**Bug:** Tapping on search results for entity types with no mobile screen (`inventory_item`, `schedule`, `log`, `comment`) silently swallowed the navigation failure inside a `try/catch` block — the user got no feedback and nothing happened.
+
+**Fix:**
+- Added a `MOBILE_ENTITY_TYPES` set covering supported entity types.
+- For unsupported entity types, shows a `<Snackbar>` "Not available in the mobile app yet" instead of attempting navigation.
+- Removed the `try/catch` wrapper entirely; navigation to supported types is now direct.
+
+### 9D — CommentThread double-delete race condition (`components/CommentThread.tsx`)
+
+**Bug:** The `destroy` `useMutation` did not destructure `isPending`, so the Delete button had no disabled or loading state. A user could tap Delete multiple times, firing parallel delete requests against the same comment ID.
+
+**Fix:**
+- Destructured `isPending: destroying` from the `destroy` mutation.
+- Added `loading={destroying}` and `disabled={destroying}` to the Delete button.
+- Added `onError` handlers to all three mutations (`save`, `destroy`, `reply`) — failures are now logged instead of silently discarded.
+
+### 9E — Dead code removal
+
+- Deleted `components/ComingSoon.tsx` — a Phase 0 placeholder component with zero imports anywhere in the codebase.
+
+### Phase 9 Verification
+
+- [ ] Tapping a phase card in Project Supplies navigates to the item-level drill-through
+- [ ] Drill-through shows individual supply names, quantities, supplier info, and procurement status chips
+- [ ] Ideas list screen loads correctly (no regression from paginated unwrap change)
+- [ ] EntitySelector still shows Ideas group when ideas exist
+- [ ] Searching for an inventory item or schedule and tapping it shows "Not available in mobile app yet" snackbar
+- [ ] Searching for an asset/project/hobby/idea and tapping navigates correctly
+- [ ] Rapid-tapping Delete on a comment is prevented (button goes loading/disabled after first tap)
+- [ ] `ComingSoon.tsx` is gone — zero TypeScript errors
+
+---
+
+## Phase 10 — Entry Edit/Delete, Photo Upload, Home Tab Feedback ✅ Completed
+
+**Goal:** Wire up missing CRUD on notes screens, make captured photos actually upload to the selected entity, and surface error/success feedback on the home tab task-completion button.
+
+### 10A — `updateEntry` API method missing (`lib/api.ts`)
+
+**Bug:** `updateEntry` was never added to the mobile API client, so editing an existing journal entry / note was impossible regardless of what the UI did.
+
+**Fix:**
+- Imported `type UpdateEntryInput` from `@lifekeeper/types`.
+- Added `updateEntry(householdId, entryId, input: UpdateEntryInput): Promise<Entry>` — calls `PATCH /v1/households/:id/entries/:id` and validates with `entrySchema`.
+
+### 10B — Inline edit/delete on all 4 notes screens
+
+**Bug:** All four notes screens (`assets/[id]/notes.tsx`, `projects/[id]/notes.tsx`, `hobbies/[id]/notes.tsx`, `ideas/[id]/notes.tsx`) were read-only — no edit, no delete.
+
+**Fix (consistent pattern across all 4 screens):**
+- Added `editingEntry: { id: string; body: string } | null` and `deletingId: string | null` state.
+- Added `saveEdit` mutation (calls `updateEntry`) and `remove` mutation (calls `deleteEntry`).
+- Each note card's body is now wrapped in a `noteRow` flex row with pencil + trash `IconButton`s on the right.
+- Tapping pencil replaces the card body with an inline `TextInput` + Save/Cancel buttons.
+- Tapping trash shows an inline "Delete this note?" confirmation row below the card with Keep / Delete buttons.
+- New styles: `noteRow`, `noteActions`, `deleteConfirm`, `deleteActions`.
+
+### 10C — Home tab silent failure and missing haptic feedback (`app/(tabs)/index.tsx`)
+
+**Bug:** The "Mark as done" button on the home tab's overdue tasks list had no error handling (`onError` was absent) and no success feedback beyond re-rendering the list.
+
+**Fix:**
+- Added `import * as Haptics from "expo-haptics"`.
+- Added `Alert` to the react-native import.
+- `complete` mutation `onSuccess`: `Haptics.notificationAsync(NotificationFeedbackType.Success)`.
+- `complete` mutation `onError`: `Alert.alert("Error", "Could not mark as done. Please try again.")`.
+
+### 10D — Capture tab `canSave` missing `householdId` guard (`app/(tabs)/capture.tsx`)
+
+**Bug:** `canSave` was computed as `!!body.trim() && !saving` — the Save button could become enabled even when `householdId` was not yet loaded, causing a thrown error inside `mutationFn`.
+
+**Fix:** `const canSave = !!body.trim() && !!householdId && !saving;`
+
+### 10E — Photo upload dead code in capture tab (`app/(tabs)/capture.tsx`)
+
+**Bug:** The capture tab let users pick/take a photo (stored in `photoUri` state) and selected an entity, but never uploaded the photo — it was silently discarded after `createEntry` succeeded.
+
+**Fix:**
+- Added `import * as FileSystem from "expo-file-system"`.
+- Added `requestAttachmentUpload` and `confirmAttachmentUpload` to the `lib/api` import.
+- After `createEntry` succeeds, if `photoUri` is set and `entity` is a real entity (not the home fallback),  the photo is uploaded: `FileSystem.getInfoAsync` → `requestAttachmentUpload` → `FileSystem.uploadAsync` (PUT, BINARY_CONTENT) → `confirmAttachmentUpload`. The upload is wrapped in `try/catch` so a failed photo upload never discards the already-saved entry.
+
+### Phase 10 Verification
+
+- [ ] Tapping the pencil icon on any note (assets, projects, hobbies, ideas) opens inline edit form
+- [ ] Saving an edit updates the note in place without navigating away
+- [ ] Tapping the trash icon shows inline delete confirmation; confirming removes the note
+- [ ] "Keep" on delete confirmation dismisses without deleting
+- [ ] Home tab "Mark as done" shows success haptic on completion
+- [ ] Home tab "Mark as done" shows Alert on network failure
+- [ ] Capture tab Save button stays disabled until both body is non-empty AND householdId is loaded
+- [ ] Capturing a photo and saving to a specific asset/project/hobby/idea attaches the photo to that entity
+- [ ] Capturing a note without a photo (or without a specific entity selected) saves cleanly without errors
+
+---
+
+## Phase 11 — Bug Fixes: Scanner, Mutations, Query Errors, Data Gaps ✅ Completed
+
+**Goal:** Fix a set of correctness bugs found by auditing the completed screens — broken scanner state, silent mutation failures, infinite loading states on API errors, stale cache invalidation, and missing data in detail views.
+
+### 11A — QR scanner locked after successful navigation (`app/(tabs)/scan.tsx`)
+
+**Bug:** After a successful asset tag scan, `setState("resolving")` was never reset before `router.push()`. When the user navigated back, the scanner was permanently stuck in the `"resolving"` guard and refused every new scan.
+
+**Fix:** Call `setState("scanning")` immediately before `router.push(...)` so the scanner is ready on return.
+
+### 11B — Capture tab inherits previous entity after save (`app/(tabs)/capture.tsx`)
+
+**Bug:** `onSuccess` reset body, title, entryType, flags, and photoUri — but not `entity`. The next capture silently attached to the previously selected entity. The same gap existed in the offline `onError` branch.
+
+**Fix:** Added `setEntity(null)` in both `onSuccess` and the offline-enqueue `onError` branch.
+
+### 11C — Asset/Idea mutations had no `onError` (`app/assets/[id]/index.tsx`, `app/ideas/[id]/index.tsx`)
+
+**Bug:** The `save` mutation in asset detail and both `updateMutation`/`stageMutation` in idea detail had no `onError`. Any API failure silently closed the loading spinner with zero user feedback.
+
+**Fix:** Added `onError: (err) => Alert.alert(...)` to all three mutations. Added `Alert` to the react-native import in both files.
+
+### 11D — Infinite skeleton when query fails (`app/hobbies/[id]/index.tsx`, `app/ideas/[id]/index.tsx`)
+
+**Bug:** Both screens rendered the skeleton when `isLoading || !data`. When the query errored, `isLoading` became `false` but `data` stayed `undefined`, so the skeleton rendered forever.
+
+**Fix:** Destructured `error` from `useQuery`, added `EmptyState` import, and changed the condition to: `isLoading ? <Skeleton/> : error || !hobby ? <EmptyState .../> : <Content/>`.
+
+### 11E — Home tab schedule completion missed asset-detail cache (`app/(tabs)/index.tsx`)
+
+**Bug:** The `complete` mutation invalidated `dueWork` and `activity` but not `["asset-detail", item.assetId]`. Opening the asset after completing a schedule showed stale overdue/due counts until a manual refresh.
+
+**Fix:** Added `queryClient.invalidateQueries({ queryKey: ["asset-detail", item.assetId] })` in `onSuccess`, using `item` from the mutation variables argument: `onSuccess: (_, item) => { ... }`.
+
+### 11F — Notifications `markRead` side-effect in wrong lifecycle (`app/notifications/index.tsx`)
+
+**Bug:** `setMarkingId(notificationId)` was called inside `mutationFn`. With retries, this could mismatch the loading indicator and fire multiple times. `onError` was absent, so mark-read failures were fully silent.
+
+**Fix:** Moved `setMarkingId` to `onMutate`, added `onError: () => Alert.alert(...)`, and simplified `mutationFn` to a single `return markNotificationRead(notificationId)`.
+
+### 11G — Idea detail notes card read from Zod-stripped field (`app/ideas/[id]/index.tsx`)
+
+**Bug:** The Notes card rendered `idea.notes.map((note: any) => note.content ?? note.body)`. `ideaSchema` has no `notes` array — Zod strips it — so the card was always invisible. The `any` cast masked the type error.
+
+**Fix:** Removed the `idea.notes` block entirely. Added a `useQuery` for `getEntries(householdId, { entityType: "idea", entityId: id, limit: 5 })` stored in `recentNotes`. The card now renders from that typed result, matching the pattern used by all other notes screens.
+
+### 11H — CommentThread hard-delete had no confirmation (`components/CommentThread.tsx`)
+
+**Bug:** Tapping Delete immediately called `destroy()` with no confirmation. Comments are permanently deleted.
+
+**Fix:** Replaced the direct `onPress={() => destroy()}` with `Alert.alert("Delete comment?", ..., [{ text: "Delete", style: "destructive", onPress: () => destroy() }, { text: "Cancel" }])`.
+
+### 11I — Asset detail hid purchaseDate when price absent; location never shown (`app/assets/[id]/index.tsx`)
+
+**Bug:** The purchase row rendered only inside `asset.purchaseDetails?.price` — if an asset had a date but no price, the date was invisible. `locationDetails` (room, building, property) was never rendered.
+
+**Fix:** Split into two independent rows: one for price guarded by `purchaseDetails?.price`, one for date guarded by `purchaseDate`. Added a Location row that renders `room / building / propertyName` from `asset.locationDetails` when any are present.
+
+### Phase 11 Verification
+
+- [ ] Scan an asset QR → navigate to asset detail → tap Back → scanner immediately accepts new scans
+- [ ] Capture a note linked to an asset → save → entity selector resets to "unlinked"
+- [ ] Edit an asset name with no network → Alert shown with error message
+- [ ] Edit an idea title with no network → Alert shown with error message
+- [ ] Change idea stage chip with no network → Alert shown with error message
+- [ ] Open a hobby/idea detail with API returning 500 → EmptyState shown (not infinite skeleton)
+- [ ] Mark a schedule done from Home tab → open that asset → overdue/due counts updated immediately
+- [ ] Mark a notification read → UI updates; failure shows Alert
+- [ ] Idea detail Recent Notes card shows actual notes (via separate entries query)
+- [ ] Tap Delete on a comment → confirmation alert appears; Cancel keeps it; Delete removes it
+- [ ] Asset with purchase date but no price → purchase date row visible in Details card
+- [ ] Asset with location details → room/building/property shown in Details card
+
+---
+
+## Phase 12 — Bug Fixes: Error Feedback, Pull-to-Refresh, TypeScript Hygiene ✅ Completed
+
+### Problem Statement
+
+Phase 11 left several silent failure modes, false affordances, and loose TypeScript casts that degraded reliability and user experience without being visible in normal testing.
+
+### Changes Made
+
+**`apps/mobile/app/assets/[id]/schedules.tsx`**
+- Added `Alert` to react-native imports.
+- Added `getMe` query and `householdId` to enable cache invalidation of the activity feed.
+- Added `onSuccess` invalidation for `["activity", householdId]` when a schedule is completed.
+- Added `onError` with `Alert.alert` so failures surface to the user.
+
+**`apps/mobile/components/CommentThread.tsx`**
+- Replaced silent `console.error` with `Alert.alert` in all three mutation `onError` handlers (`save`, `destroy`, `reply`). Users now see a message when comment edits, deletes, or replies fail.
+
+**`apps/mobile/app/(tabs)/index.tsx`**
+- Added `RefreshControl` to react-native import.
+- Wired `refetch`/`isRefetching` from both `dueWork` and `activity` queries.
+- Added `<RefreshControl>` to the home `ScrollView` so users can pull to refresh both sections simultaneously.
+
+**`apps/mobile/app/assets/[id]/comments.tsx`**
+- Added `RefreshControl` to react-native import and `EmptyState` component import.
+- Added `error`, `refetch`, `isRefetching` to the comments `useQuery` destructure.
+- Added an error state branch rendering `EmptyState` when the query fails.
+- Added `<RefreshControl>` to the `ScrollView`.
+
+**`apps/mobile/app/assets/[id]/index.tsx`**
+- Added `refetch` to the asset detail `useQuery` destructure.
+- Changed the error state from a false "Pull down to retry." message to a real `<Button onPress={() => void refetch()}>Retry</Button>` below the `EmptyState`.
+
+**`apps/mobile/app/hobbies/[id]/index.tsx`**
+- Added `RefreshControl` to react-native import.
+- Added `refetch`, `isRefetching` to the hobby detail `useQuery` destructure.
+- Changed the error state body from the false "Pull down to retry." to "Something went wrong."
+- Added `<RefreshControl>` to the success-branch `ScrollView`.
+
+**`apps/mobile/app/ideas/[id]/index.tsx`**
+- Replaced `as never` on `router.push` in sections navigation with `as Parameters<typeof router.push>[0]`.
+- Removed erroneous `any` cast on `idea.links.map((link: any, …)` — TypeScript now correctly infers the element type from the `Idea` type.
+
+**`apps/mobile/app/assets/[id]/canvas.tsx`**, **`apps/mobile/app/ideas/[id]/canvas.tsx`**, **`apps/mobile/app/hobbies/[id]/canvas.tsx`**, **`apps/mobile/app/projects/[id]/canvas.tsx`**
+- Replaced `as never` on all `router.push(\`/canvas/${item.id}\`)` calls with `as Parameters<typeof router.push>[0]`.
+
+**`apps/mobile/app/hobbies/[id]/inventory.tsx`**
+- Replaced `as never` on `router.push(\`/inventory/${item.inventoryItemId}\`)` with `as Parameters<typeof router.push>[0]`.
+
+**`apps/mobile/app/(tabs)/capture.tsx`**
+- Replaced silent `console.warn("Photo upload failed:", uploadErr)` with a user-facing `Alert.alert` that explains the note was saved but the photo attachment failed.
+
+### Phase 12 Verification
+
+- [ ] Mark a schedule done on the asset schedules screen with no network → Alert shown
+- [ ] Mark a schedule done successfully → activity feed on home tab updates immediately (pull to refresh or navigate away and back)
+- [ ] Edit or delete a comment with no network → Alert shown (not silent)
+- [ ] On home tab, pull down → both Due & Overdue and Recent Activity sections refresh
+- [ ] Open asset comments with API error → EmptyState shown; pull down → retries
+- [ ] Open asset detail with API error → EmptyState + Retry button shown; tap Retry → reloads
+- [ ] Open hobby detail with API error → EmptyState shown; pull down → retries
+- [ ] Capture a note with a photo attached when photo upload fails → "Note saved" Alert shown
+- [ ] No TypeScript errors: `npx tsc --noEmit` passes in `apps/mobile`
+
+---
 
 ### Existing Files (modify or reference)
 

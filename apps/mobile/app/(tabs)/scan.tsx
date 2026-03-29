@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Alert, Linking, StyleSheet, View } from "react-native";
+import { Button, Dialog, Divider, Portal, Text, useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BarcodeScanner } from "../../components/BarcodeScanner";
 import { resolveAssetScanTarget } from "../../lib/scan";
-import { lookupAssetByTagMobile, lookupBarcodeMobile } from "../../lib/api";
+import { lookupAssetByTagMobile, lookupBarcodeMobile, type BarcodeLookupResult } from "../../lib/api";
 
 type ScanState = "scanning" | "resolving";
 
@@ -13,6 +13,7 @@ export default function ScanScreen() {
   const theme = useTheme();
   const router = useRouter();
   const [state, setState] = useState<ScanState>("scanning");
+  const [productResult, setProductResult] = useState<BarcodeLookupResult | null>(null);
 
   const handleScanValue = useCallback(
     async (value: string, format: string) => {
@@ -28,6 +29,7 @@ export default function ScanScreen() {
               ? await lookupAssetByTagMobile(assetTarget.tag)
               : { id: assetTarget.assetId };
 
+          setState("scanning");
           router.push(`/assets/${asset.id}`);
           return;
         }
@@ -44,12 +46,8 @@ export default function ScanScreen() {
 
         if (isProductBarcode) {
           const result = await lookupBarcodeMobile(value, format);
-          // Navigate to barcode result — Phase 1 will add a dedicated screen
-          Alert.alert(
-            result.productName ?? result.brand ?? "Unknown product",
-            `Barcode: ${value}\n\nFull product detail screen coming in Phase 1.`,
-            [{ text: "OK", onPress: () => setState("scanning") }]
-          );
+          setProductResult(result);
+          setState("scanning");
           return;
         }
 
@@ -85,6 +83,51 @@ export default function ScanScreen() {
           </Text>
         </View>
       )}
+
+      {/* Product barcode result dialog */}
+      <Portal>
+        <Dialog
+          visible={!!productResult}
+          onDismiss={() => setProductResult(null)}
+        >
+          <Dialog.Title>
+            {productResult?.productName ?? productResult?.brand ?? "Unknown product"}
+          </Dialog.Title>
+          <Dialog.Content>
+            {productResult?.brand ? (
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
+                Brand: {productResult.brand}
+              </Text>
+            ) : null}
+            {productResult?.category ? (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
+                Category: {productResult.category}
+              </Text>
+            ) : null}
+            {productResult?.description ? (
+              <>
+                <Divider style={{ marginVertical: 8 }} />
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {productResult.description}
+                </Text>
+              </>
+            ) : null}
+            {!productResult?.found ? (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
+                No product data found for barcode {productResult?.barcode}.
+              </Text>
+            ) : null}
+          </Dialog.Content>
+          <Dialog.Actions>
+            {productResult?.imageUrl ? (
+              <Button onPress={() => productResult.imageUrl && Linking.openURL(productResult.imageUrl)}>
+                View image
+              </Button>
+            ) : null}
+            <Button onPress={() => setProductResult(null)}>Dismiss</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 }

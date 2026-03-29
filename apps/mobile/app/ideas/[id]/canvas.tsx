@@ -51,7 +51,7 @@ export default function IdeaCanvasScreen() {
             <Card
               mode="outlined"
               style={styles.card}
-              onPress={() => router.push(`/canvas/${item.id}` as never)}
+              onPress={() => router.push(`/canvas/${item.id}` as Parameters<typeof router.push>[0])}
             >
               <Card.Content style={styles.cardContent}>
                 <View style={{ flex: 1 }}>

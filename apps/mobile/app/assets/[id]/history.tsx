@@ -1,5 +1,5 @@
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { ActivityIndicator, Button, Card, Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -19,14 +19,11 @@ export default function AssetHistoryScreen() {
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["asset-activity", id, householdId],
     queryFn: () =>
-      getHouseholdActivity(householdId, { limit: 50 }),
+      getHouseholdActivity(householdId, { limit: 50, entityType: "asset", entityId: id }),
     enabled: !!householdId && !!id,
   });
 
-  // Filter activity to this asset
-  const entries = (data?.entries ?? []).filter(
-    (entry: ActivityLog) => entry.entityId === id
-  );
+  const entries = data?.entries ?? [];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>

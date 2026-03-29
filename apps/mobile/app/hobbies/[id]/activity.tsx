@@ -18,13 +18,11 @@ export default function HobbyActivityScreen() {
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["hobby-activity", id, householdId],
-    queryFn: () => getHouseholdActivity(householdId, { limit: 50 }),
+    queryFn: () => getHouseholdActivity(householdId, { limit: 50, entityType: "hobby", entityId: id }),
     enabled: !!householdId && !!id,
   });
 
-  const entries = (data?.entries ?? []).filter(
-    (entry: ActivityLog) => entry.entityId === id
-  );
+  const entries = data?.entries ?? [];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>

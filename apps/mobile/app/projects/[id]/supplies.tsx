@@ -44,9 +44,6 @@ export default function ProjectSuppliesScreen() {
           keyExtractor={(item: ProjectPhaseSummary) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
-          ListHeaderComponent={
-            project && project.phases.length > 0 && phases.length === 0 ? null : undefined
-          }
           ListEmptyComponent={
             <EmptyState
               icon="🔧"
@@ -55,29 +52,19 @@ export default function ProjectSuppliesScreen() {
             />
           }
           renderItem={({ item }: { item: ProjectPhaseSummary }) => (
-            <Card mode="outlined" style={styles.card}>
+            <Card
+              mode="outlined"
+              style={styles.card}
+              onPress={() => router.push(`/projects/${id}/phases/${item.id}/supplies`)}
+            >
               <Card.Content>
-                <Text variant="titleSmall" style={{ color: theme.colors.onSurface }}>
-                  {item.name}
-                </Text>
-                <View style={styles.supplyRow}>
-                  <View style={styles.stat}>
-                    <Text variant="headlineSmall" style={{ color: theme.colors.primary }}>
-                      {item.procuredSupplyCount}
-                    </Text>
-                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                      procured
-                    </Text>
-                  </View>
-                  <Text variant="titleMedium" style={{ color: theme.colors.onSurfaceVariant }}>/</Text>
-                  <View style={styles.stat}>
-                    <Text variant="headlineSmall" style={{ color: theme.colors.onSurface }}>
-                      {item.supplyCount}
-                    </Text>
-                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                      total
-                    </Text>
-                  </View>
+                <View style={styles.phaseRow}>
+                  <Text variant="titleSmall" style={{ flex: 1, color: theme.colors.onSurface }}>
+                    {item.name}
+                  </Text>
+                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    {item.procuredSupplyCount}/{item.supplyCount} procured ›
+                  </Text>
                 </View>
                 {item.procuredSupplyCount < item.supplyCount && (
                   <Text variant="labelSmall" style={{ color: theme.colors.error, marginTop: 4 }}>
@@ -100,6 +87,5 @@ const styles = StyleSheet.create({
   loader: { flex: 1 },
   list: { padding: 16, paddingTop: 4 },
   card: { marginBottom: 8 },
-  supplyRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
-  stat: { alignItems: "center" },
+  phaseRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 });

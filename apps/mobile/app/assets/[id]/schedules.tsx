@@ -1,9 +1,9 @@
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Card, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAssetDetail, completeSchedule } from "../../../lib/api";
+import { getMe, getAssetDetail, completeSchedule } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
 import { StatusPill } from "../../../components/StatusPill";
 
@@ -12,6 +12,9 @@ export default function AssetSchedulesScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const householdId = me?.households[0]?.id ?? "";
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["asset-detail", id],
@@ -29,6 +32,10 @@ export default function AssetSchedulesScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["dueWork"] });
+      if (householdId) queryClient.invalidateQueries({ queryKey: ["activity", householdId] });
+    },
+    onError: () => {
+      Alert.alert("Error", "Could not mark schedule as done. Please try again.");
     },
   });
 

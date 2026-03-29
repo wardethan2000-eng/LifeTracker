@@ -4,17 +4,16 @@ import { Slot, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform, useColorScheme } from "react-native";
 import { PaperProvider } from "react-native-paper";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { clerkTokenCache } from "../lib/storage";
+import { clerkTokenCache, storage, mmkvGet } from "../lib/storage";
 import { queryClient, setupQueryPersistence } from "../lib/query-client";
 import { lightTheme, darkTheme } from "../lib/theme";
 import { registerClerkTokenGetter, registerDevice } from "../lib/api";
 import { CLERK_PUBLISHABLE_KEY, STORAGE_KEYS } from "../lib/constants";
-import { storage } from "../lib/storage";
 
 // Keep the splash screen visible until we finish checking auth state
 SplashScreen.preventAutoHideAsync();
@@ -180,8 +179,26 @@ function DevBypassGate() {
 // ---------------------------------------------------------------------------
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === "dark" ? darkTheme : lightTheme;
+  const systemColorScheme = useColorScheme();
+  const [colorSchemePref, setColorSchemePref] = useState<"system" | "light" | "dark">(
+    () => mmkvGet<"system" | "light" | "dark">(STORAGE_KEYS.COLOR_SCHEME) ?? "system"
+  );
+
+  // Keep theme in sync when user changes setting from the Settings screen
+  useEffect(() => {
+    const listener = storage.addOnValueChangedListener((changedKey) => {
+      if (changedKey === STORAGE_KEYS.COLOR_SCHEME) {
+        const newPref =
+          mmkvGet<"system" | "light" | "dark">(STORAGE_KEYS.COLOR_SCHEME) ?? "system";
+        setColorSchemePref(newPref);
+      }
+    });
+    return () => listener.remove();
+  }, []);
+
+  const effectiveColorScheme =
+    colorSchemePref === "system" ? systemColorScheme : colorSchemePref;
+  const theme = effectiveColorScheme === "dark" ? darkTheme : lightTheme;
 
   const content = __DEV__ ? (
     <DevBypassGate />
@@ -199,7 +216,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <PaperProvider theme={theme}>
-            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+            <StatusBar style={effectiveColorScheme === "dark" ? "light" : "dark"} />
             {content}
           </PaperProvider>
         </QueryClientProvider>

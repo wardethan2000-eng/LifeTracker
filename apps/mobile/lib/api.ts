@@ -49,6 +49,7 @@ import {
   type EntryType,
   type EntryFlag,
   type EntryEntityType,
+  type UpdateEntryInput,
   type SearchResponse,
   type DueWorkItem,
   type CompleteMaintenanceScheduleInput,
@@ -79,6 +80,8 @@ import {
   type UpdateIdeaInput,
   type PromoteIdeaInput,
   type InventoryItemDetail,
+  projectPhaseSupplyListSchema,
+  type ProjectPhaseSupply,
   type InventoryItemListResponse,
   type InventoryTransaction,
   type CreateInventoryTransactionInput,
@@ -312,6 +315,16 @@ export const deleteEntry = (householdId: string, entryId: string): Promise<void>
     method: "DELETE",
   }).then(() => undefined);
 
+export const updateEntry = (
+  householdId: string,
+  entryId: string,
+  input: UpdateEntryInput
+): Promise<Entry> =>
+  apiRequest(`/v1/households/${householdId}/entries/${entryId}`, entrySchema, {
+    method: "PATCH",
+    body: input,
+  });
+
 // ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------
@@ -339,12 +352,19 @@ export const searchHousehold = (
 
 export const getHouseholdActivity = (
   householdId: string,
-  options: { limit?: number; cursor?: string } = {}
+  options: { limit?: number; cursor?: string; entityType?: string; entityId?: string } = {}
 ): Promise<ActivityLogListResponse> =>
   apiRequest(
     `/v1/households/${householdId}/activity`,
     activityLogListResponseSchema,
-    { params: { limit: options.limit ?? 20, cursor: options.cursor } }
+    {
+      params: {
+        limit: options.limit ?? 20,
+        ...(options.cursor ? { cursor: options.cursor } : {}),
+        ...(options.entityType ? { entityType: options.entityType } : {}),
+        ...(options.entityId ? { entityId: options.entityId } : {}),
+      },
+    }
   );
 
 // ---------------------------------------------------------------------------
@@ -402,8 +422,39 @@ export const confirmAttachmentUpload = (
     { method: "POST", body: {} }
   );
 
+export const getEntityAttachments = (
+  householdId: string,
+  entityType: string,
+  entityId: string
+): Promise<Attachment[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/attachments`,
+    z.array(attachmentSchema),
+    { params: { entityType, entityId } }
+  );
+
+export const getAttachmentDownloadUrl = (
+  householdId: string,
+  attachmentId: string
+): Promise<{ url: string }> =>
+  apiRequest(
+    `/v1/households/${householdId}/attachments/${attachmentId}/download`,
+    z.object({ url: z.string() })
+  );
+
+export const deleteAttachment = (
+  householdId: string,
+  attachmentId: string
+): Promise<void> =>
+  apiRequest(
+    `/v1/households/${householdId}/attachments/${attachmentId}`,
+    z.unknown(),
+    { method: "DELETE" }
+  ).then(() => undefined);
+
 export type { Entry, EntryType, EntryFlag, EntryEntityType, EntryListResponse };
 export type { SearchResponse, DueWorkItem, ActivityLogListResponse, ActivityLog, Attachment, AttachmentUploadResponse };
+export type { BarcodeLookupResult };
 
 // ---------------------------------------------------------------------------
 // Assets (kept from original + enhanced parameter support)
@@ -516,6 +567,16 @@ export const updateProjectTask = (
     `/v1/households/${householdId}/projects/${projectId}/tasks/${taskId}`,
     projectTaskSchema,
     { method: "PATCH", body: input }
+  );
+
+export const getProjectPhaseSupplies = (
+  householdId: string,
+  projectId: string,
+  phaseId: string
+): Promise<ProjectPhaseSupply[]> =>
+  apiRequest(
+    `/v1/households/${householdId}/projects/${projectId}/phases/${phaseId}/supplies`,
+    projectPhaseSupplyListSchema
   );
 
 // ---------------------------------------------------------------------------
@@ -648,7 +709,7 @@ export interface IdeaListOptions {
 export const getHouseholdIdeas = (
   householdId: string,
   options: IdeaListOptions = {}
-): Promise<IdeaSummary[]> =>
+): Promise<{ items: IdeaSummary[]; nextCursor?: string | null | undefined }> =>
   apiRequest(`/v1/households/${householdId}/ideas`, ideaSummaryListSchema, {
     params: {
       ...(options.stage ? { stage: options.stage } : {}),
@@ -659,7 +720,7 @@ export const getHouseholdIdeas = (
       ...(options.limit ? { limit: options.limit } : {}),
       ...(options.cursor ? { cursor: options.cursor } : {}),
     },
-  }).then((r) => r.items);
+  });
 
 export const getIdea = (
   householdId: string,

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ScrollView, StyleSheet, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Card, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getMe, getHouseholdDueWork, getHouseholdActivity, completeSchedule } from "../../lib/api";
@@ -21,13 +22,13 @@ export default function HomeScreen() {
   });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: dueWork, isLoading: dueLoading } = useQuery({
+  const { data: dueWork, isLoading: dueLoading, refetch: refetchDue, isRefetching: dueRefetching } = useQuery({
     queryKey: ["dueWork", householdId],
     queryFn: () => getHouseholdDueWork(householdId, { limit: 10, status: "all" }),
     enabled: !!householdId,
   });
 
-  const { data: activity, isLoading: activityLoading } = useQuery({
+  const { data: activity, isLoading: activityLoading, refetch: refetchActivity, isRefetching: activityRefetching } = useQuery({
     queryKey: ["activity", householdId],
     queryFn: () => getHouseholdActivity(householdId, { limit: 10 }),
     enabled: !!householdId,
@@ -42,9 +43,14 @@ export default function HomeScreen() {
         metadata: {},
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, item) => {
       queryClient.invalidateQueries({ queryKey: ["dueWork", householdId] });
       queryClient.invalidateQueries({ queryKey: ["activity", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["asset-detail", item.assetId] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: () => {
+      Alert.alert("Error", "Could not mark as done. Please try again.");
     },
     onSettled: () => setCompletingId(null),
   });
@@ -52,7 +58,15 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <OfflineBanner />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={dueRefetching || activityRefetching}
+            onRefresh={() => { void refetchDue(); void refetchActivity(); }}
+          />
+        }
+      >
         <View style={styles.header}>
           <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>
             LifeKeeper

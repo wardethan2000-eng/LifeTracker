@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
-import { ActivityIndicator, Chip, Searchbar, Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, Chip, Searchbar, Snackbar, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -46,6 +46,9 @@ export default function SearchScreen() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>(() => loadRecentSearches());
+  const [snackVisible, setSnackVisible] = useState(false);
+
+  const MOBILE_ENTITY_TYPES = new Set(["asset", "project", "hobby", "idea", "entry"]);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
@@ -137,13 +140,12 @@ export default function SearchScreen() {
             <TouchableOpacity
               style={[styles.resultRow, { borderBottomColor: theme.colors.outlineVariant }]}
               onPress={() => {
-                // Navigate to the entity URL if possible
-                const path = item.entityUrl.startsWith("/") ? item.entityUrl : `/${item.entityUrl}`;
-                try {
-                  router.push(path as Parameters<typeof router.push>[0]);
-                } catch {
-                  // Entity URL not in router — silently ignore
+                if (!MOBILE_ENTITY_TYPES.has(item.entityType)) {
+                  setSnackVisible(true);
+                  return;
                 }
+                const path = item.entityUrl.startsWith("/") ? item.entityUrl : `/${item.entityUrl}`;
+                router.push(path as Parameters<typeof router.push>[0]);
               }}
             >
               <Text style={styles.entityIcon}>{ENTITY_ICONS[item.entityType] ?? "🔍"}</Text>
@@ -176,6 +178,13 @@ export default function SearchScreen() {
           </Text>
         </View>
       )}
+      <Snackbar
+        visible={snackVisible}
+        onDismiss={() => setSnackVisible(false)}
+        duration={2500}
+      >
+        Not available in the mobile app yet
+      </Snackbar>
     </SafeAreaView>
   );
 }

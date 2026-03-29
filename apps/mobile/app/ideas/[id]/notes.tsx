@@ -1,10 +1,10 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, Card, Text, TextInput, useTheme } from "react-native-paper";
+import { Button, Card, IconButton, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMe, getEntries, createEntry } from "../../../lib/api";
+import { getMe, getEntries, createEntry, updateEntry, deleteEntry } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
 import { SkeletonCard } from "../../../components/SkeletonCard";
 
@@ -16,15 +16,18 @@ export default function IdeaNotesScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [body, setBody] = useState("");
+  const [editingEntry, setEditingEntry] = useState<{ id: string; body: string } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: entries = [], isLoading, refetch, isRefetching } = useQuery({
+  const { data: entriesData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["idea-notes", householdId, id],
     queryFn: () => getEntries(householdId, { entityType: "idea", entityId: id, limit: 50 }),
     enabled: !!householdId && !!id,
   });
+  const entries = entriesData?.items ?? [];
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -33,6 +36,22 @@ export default function IdeaNotesScreen() {
       queryClient.invalidateQueries({ queryKey: ["idea-notes", householdId, id] });
       setShowCreate(false);
       setBody("");
+    },
+  });
+
+  const { mutate: saveEdit, isPending: editSaving } = useMutation({
+    mutationFn: () => updateEntry(householdId, editingEntry!.id, { body: editingEntry!.body.trim() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["idea-notes", householdId, id] });
+      setEditingEntry(null);
+    },
+  });
+
+  const { mutate: remove, isPending: removing } = useMutation({
+    mutationFn: () => deleteEntry(householdId, deletingId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["idea-notes", householdId, id] });
+      setDeletingId(null);
     },
   });
 
@@ -106,7 +125,7 @@ export default function IdeaNotesScreen() {
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
           ListEmptyComponent={
             <EmptyState
-              icon="📝"
+              icon="ðŸ“"
               title="No notes yet"
               body="Add notes, observations, or thoughts about this idea."
             />
@@ -114,12 +133,55 @@ export default function IdeaNotesScreen() {
           renderItem={({ item }) => (
             <Card mode="outlined" style={styles.card}>
               <Card.Content>
-                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                  {item.body}
-                </Text>
-                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
-                  {new Date(item.createdAt).toLocaleDateString()}
-                </Text>
+                {editingEntry?.id === item.id ? (
+                  <View>
+                    <TextInput
+                      value={editingEntry.body}
+                      onChangeText={(t) => setEditingEntry({ id: item.id, body: t })}
+                      mode="outlined"
+                      multiline
+                      numberOfLines={4}
+                      autoFocus
+                    />
+                    <View style={styles.createActions}>
+                      <Button mode="text" onPress={() => setEditingEntry(null)} textColor={theme.colors.onSurfaceVariant}>Cancel</Button>
+                      <Button
+                        mode="contained"
+                        onPress={() => saveEdit()}
+                        loading={editSaving}
+                        disabled={editSaving || !editingEntry.body.trim()}
+                      >
+                        Save
+                      </Button>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.noteRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
+                        {item.body}
+                      </Text>
+                      <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={styles.noteActions}>
+                      <IconButton icon="pencil-outline" size={16} iconColor={theme.colors.onSurfaceVariant}
+                        onPress={() => setEditingEntry({ id: item.id, body: item.body })} />
+                      <IconButton icon="trash-can-outline" size={16} iconColor={theme.colors.error}
+                        onPress={() => setDeletingId(item.id)} />
+                    </View>
+                  </View>
+                )}
+                {deletingId === item.id && (
+                  <View style={[styles.deleteConfirm, { borderTopColor: theme.colors.outlineVariant }]}>
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurface }}>Delete this note?</Text>
+                    <View style={styles.deleteActions}>
+                      <Button compact onPress={() => setDeletingId(null)}>Keep</Button>
+                      <Button compact onPress={() => remove()} loading={removing} disabled={removing} textColor={theme.colors.error}>Delete</Button>
+                    </View>
+                  </View>
+                )}
               </Card.Content>
             </Card>
           )}
@@ -133,13 +195,17 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   topBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 8,
     paddingTop: 4,
   },
-  createCard: { margin: 16, marginTop: 8 },
+  createCard: { margin: 16, marginBottom: 4 },
   createActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
-  list: { padding: 16, paddingTop: 8, gap: 8 },
-  card: {},
+  list: { padding: 16, paddingTop: 8 },
+  card: { marginBottom: 8 },
+  noteRow: { flexDirection: "row", alignItems: "flex-start" },
+  noteActions: { flexDirection: "column", marginLeft: 4, marginTop: -4 },
+  deleteConfirm: { marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  deleteActions: { flexDirection: "row", justifyContent: "flex-end", gap: 4, marginTop: 2 },
 });

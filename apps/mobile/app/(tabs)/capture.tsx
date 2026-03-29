@@ -1,18 +1,23 @@
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { useState } from "react";
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EntryTypeChips } from "../../components/EntryTypeChips";
 import { FlagChips } from "../../components/FlagChips";
 import { OfflineBanner } from "../../components/OfflineBanner";
+import { EntitySelector, type EntitySelection } from "../../components/EntitySelector";
 import {
   createEntry,
+  requestAttachmentUpload,
+  confirmAttachmentUpload,
   getMe,
   type EntryFlag,
   type EntryType,
+  type EntryEntityType,
 } from "../../lib/api";
 import { useOfflineSync } from "../../hooks/useOfflineSync";
 import { enqueueMutation } from "../../lib/offline-queue";
@@ -30,19 +35,51 @@ export default function CaptureScreen() {
   const [entryType, setEntryType] = useState<EntryType>("note");
   const [flags, setFlags] = useState<EntryFlag[]>([]);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [entity, setEntity] = useState<EntitySelection | null>(null);
+
+  // Resolve final entity fields (fall back to household/home when unlinked)
+  const resolvedEntityType = entity && entity.entityType !== "home" ? entity.entityType : "home";
+  const resolvedEntityId = entity && entity.entityType !== "home" ? entity.entityId : householdId;
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: async () => {
       if (!householdId) throw new Error("No household");
-      return createEntry(householdId, {
+      const entry = await createEntry(householdId, {
         body: body.trim(),
         title: title.trim() || null,
-        entityType: "home",
-        entityId: householdId,
+        entityType: resolvedEntityType as EntryEntityType,
+        entityId: resolvedEntityId,
         entryType,
         flags,
         entryDate: new Date().toISOString(),
       });
+      // Upload attached photo to the selected entity (when online and a real entity is selected)
+      if (photoUri && entity && entity.entityType !== "home") {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(photoUri);
+          const fileSize = fileInfo.exists ? (fileInfo as FileSystem.FileInfo & { size?: number }).size ?? 100000 : 100000;
+          const uploadRes = await requestAttachmentUpload(householdId, {
+            entityType: entity.entityType as "asset" | "project" | "hobby" | "idea",
+            entityId: entity.entityId,
+            filename: `capture_${Date.now()}.jpg`,
+            mimeType: "image/jpeg",
+            fileSize,
+          });
+          await FileSystem.uploadAsync(uploadRes.uploadUrl, photoUri, {
+            httpMethod: "PUT",
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: { "Content-Type": "image/jpeg" },
+          });
+          await confirmAttachmentUpload(householdId, uploadRes.attachment.id);
+        } catch {
+          // Entry saved — photo upload failed non-fatally
+          Alert.alert(
+            "Note saved",
+            "Your note was saved, but the photo couldn't be attached. You can add it from the web dashboard.",
+          );
+        }
+      }
+      return entry;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entries"] });
@@ -52,6 +89,7 @@ export default function CaptureScreen() {
       setEntryType("note");
       setFlags([]);
       setPhotoUri(null);
+      setEntity(null);
     },
     onError: (err) => {
       if (!isOnline) {
@@ -61,8 +99,8 @@ export default function CaptureScreen() {
           body: {
             body: body.trim(),
             title: title.trim() || null,
-            entityType: "home",
-            entityId: householdId,
+            entityType: resolvedEntityType as EntryEntityType,
+            entityId: resolvedEntityId,
             entryType,
             flags,
             entryDate: new Date().toISOString(),
@@ -75,6 +113,7 @@ export default function CaptureScreen() {
         setEntryType("note");
         setFlags([]);
         setPhotoUri(null);
+        setEntity(null);
       } else {
         Alert.alert("Error", err instanceof Error ? err.message : "Failed to save note.");
       }
@@ -109,7 +148,7 @@ export default function CaptureScreen() {
     setPhotoUri(compressed.uri);
   }
 
-  const canSave = !!body.trim() && !saving;
+  const canSave = !!body.trim() && !!householdId && !saving;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -123,6 +162,13 @@ export default function CaptureScreen() {
           Type
         </Text>
         <EntryTypeChips value={entryType} onChange={setEntryType} />
+
+        <Text variant="labelSmall" style={[styles.sectionLabel, { color: theme.colors.onSurfaceVariant }]}>
+          Linked to
+        </Text>
+        {householdId ? (
+          <EntitySelector householdId={householdId} value={entity} onChange={setEntity} />
+        ) : null}
 
         <TextInput
           label="Title (optional)"

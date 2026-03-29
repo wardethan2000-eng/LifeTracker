@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -27,7 +27,7 @@ export default function AssetDetailScreen() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["asset-detail", id],
     queryFn: () => getAssetDetail(id!),
     enabled: !!id,
@@ -40,6 +40,9 @@ export default function AssetDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["asset-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["assets", householdId] });
       setEditingField(null);
+    },
+    onError: (err) => {
+      Alert.alert("Save failed", err instanceof Error ? err.message : "Please try again.");
     },
   });
 
@@ -54,7 +57,10 @@ export default function AssetDetailScreen() {
   if (error || !data) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <EmptyState icon="⚠️" title="Couldn't load asset" body="Pull down to retry." />
+        <EmptyState icon="⚠️" title="Couldn't load asset" body="Something went wrong." />
+        <Button mode="text" onPress={() => void refetch()} style={{ alignSelf: "center" }}>
+          Retry
+        </Button>
       </SafeAreaView>
     );
   }
@@ -182,7 +188,7 @@ export default function AssetDetailScreen() {
         </View>
 
         {/* Details */}
-        {(asset.serialNumber || asset.purchaseDetails || asset.warrantyDetails) && (
+        {(asset.serialNumber || asset.purchaseDetails || asset.purchaseDate || asset.warrantyDetails || asset.locationDetails) && (
           <Card mode="outlined" style={styles.card}>
             <Card.Title title="Details" titleVariant="titleSmall" />
             <Card.Content>
@@ -199,13 +205,20 @@ export default function AssetDetailScreen() {
               {asset.purchaseDetails?.price && (
                 <View style={styles.kvRow}>
                   <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, width: 100 }}>
-                    Purchase
+                    Purchase price
                   </Text>
                   <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
                     ${asset.purchaseDetails.price.toFixed(2)}
-                    {asset.purchaseDate
-                      ? ` on ${new Date(asset.purchaseDate).toLocaleDateString()}`
-                      : ""}
+                  </Text>
+                </View>
+              )}
+              {asset.purchaseDate && (
+                <View style={styles.kvRow}>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, width: 100 }}>
+                    Purchase date
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
+                    {new Date(asset.purchaseDate).toLocaleDateString()}
                   </Text>
                 </View>
               )}
@@ -216,6 +229,18 @@ export default function AssetDetailScreen() {
                   </Text>
                   <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
                     Expires {new Date(asset.warrantyDetails.endDate).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
+              {asset.locationDetails && (asset.locationDetails.room || asset.locationDetails.building || asset.locationDetails.propertyName) && (
+                <View style={styles.kvRow}>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, width: 100 }}>
+                    Location
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
+                    {[asset.locationDetails.room, asset.locationDetails.building, asset.locationDetails.propertyName]
+                      .filter(Boolean)
+                      .join(", ")}
                   </Text>
                 </View>
               )}

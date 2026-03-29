@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Text, useTheme } from "react-native-paper";
+import { Card, Chip, FAB, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -33,9 +33,10 @@ export default function IdeasScreen() {
     enabled: !!householdId,
   });
 
-  const ideas = data ?? [];
+  const ideas = data?.items ?? [];
 
   return (
+    <View style={styles.outerContainer}>
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>
@@ -121,10 +122,18 @@ export default function IdeasScreen() {
         />
       )}
     </SafeAreaView>
+      <FAB
+        icon="plus"
+        label="New idea"
+        style={styles.fab}
+        onPress={() => router.push("/ideas/new")}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: { flex: 1 },
   container: { flex: 1 },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   chips: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
@@ -133,4 +142,5 @@ const styles = StyleSheet.create({
   card: { marginBottom: 8 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   metaRow: { flexDirection: "row", gap: 12, marginTop: 6, flexWrap: "wrap" },
+  fab: { position: "absolute", right: 16, bottom: 24 },
 });

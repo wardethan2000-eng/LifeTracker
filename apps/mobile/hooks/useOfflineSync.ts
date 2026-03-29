@@ -4,6 +4,9 @@ import {
   flushMutations,
   getPendingCount,
   getFailedCount,
+  getFailedMutations,
+  retryMutation,
+  discardMutation,
   type QueuedMutation,
 } from "../lib/offline-queue";
 import { apiRequest } from "../lib/api";
@@ -18,6 +21,11 @@ interface OfflineSyncState {
   isOnline: boolean;
   pendingCount: number;
   failedCount: number;
+  failedMutations: QueuedMutation[];
+  /** Mark a failed mutation as pending again so it will be retried on next flush */
+  retry: (id: string) => void;
+  /** Remove a failed mutation from the queue permanently */
+  discard: (id: string) => void;
   isFlushing: boolean;
 }
 
@@ -48,12 +56,16 @@ export function useOfflineSync(): OfflineSyncState {
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(() => getPendingCount());
   const [failedCount, setFailedCount] = useState(() => getFailedCount());
+  const [failedMutations, setFailedMutations] = useState<QueuedMutation[]>(
+    () => getFailedMutations()
+  );
   const [isFlushing, setIsFlushing] = useState(false);
   const wasOfflineRef = useRef(false);
 
   const refreshCounts = useCallback(() => {
     setPendingCount(getPendingCount());
     setFailedCount(getFailedCount());
+    setFailedMutations(getFailedMutations());
   }, []);
 
   const flush = useCallback(async () => {
@@ -94,5 +106,15 @@ export function useOfflineSync(): OfflineSyncState {
     if (!isFlushing) refreshCounts();
   }, [isFlushing, refreshCounts]);
 
-  return { isOnline, pendingCount, failedCount, isFlushing };
+  const retry = useCallback((id: string) => {
+    retryMutation(id);
+    refreshCounts();
+  }, [refreshCounts]);
+
+  const discard = useCallback((id: string) => {
+    discardMutation(id);
+    refreshCounts();
+  }, [refreshCounts]);
+
+  return { isOnline, pendingCount, failedCount, failedMutations, retry, discard, isFlushing };
 }

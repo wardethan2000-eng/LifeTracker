@@ -18,13 +18,11 @@ export default function IdeaActivityScreen() {
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["idea-activity", id, householdId],
-    queryFn: () => getHouseholdActivity(householdId, { limit: 50 }),
+    queryFn: () => getHouseholdActivity(householdId, { limit: 50, entityType: "idea", entityId: id }),
     enabled: !!householdId && !!id,
   });
 
-  const entries = (data?.entries ?? []).filter(
-    (entry: ActivityLog) => entry.entityId === id
-  );
+  const entries = data?.entries ?? [];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>

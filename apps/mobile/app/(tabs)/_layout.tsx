@@ -1,6 +1,8 @@
 import { Tabs } from "expo-router";
 import { useTheme } from "react-native-paper";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { useQuery } from "@tanstack/react-query";
+import { getMe, getHouseholdNotifications } from "../../lib/api";
 import type { ReactNode } from "react";
 
 type IconProps = { color: string; size: number };
@@ -23,6 +25,17 @@ function MoreIcon({ color, size }: IconProps): ReactNode {
 
 export default function TabsLayout() {
   const theme = useTheme();
+
+  // Unread notification count for the badge on the More tab
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const householdId = me?.households[0]?.id ?? "";
+  const { data: notifData } = useQuery({
+    queryKey: ["notifications-unread-count", householdId],
+    queryFn: () => getHouseholdNotifications(householdId, { status: "unread", limit: 1 }),
+    enabled: !!householdId,
+    staleTime: 60 * 1000, // 1 minute
+  });
+  const unreadCount = notifData?.unreadCount ?? 0;
 
   return (
     <Tabs
@@ -73,6 +86,7 @@ export default function TabsLayout() {
         options={{
           title: "More",
           tabBarIcon: MoreIcon,
+          ...(unreadCount > 0 ? { tabBarBadge: unreadCount } : {}),
         }}
       />
     </Tabs>

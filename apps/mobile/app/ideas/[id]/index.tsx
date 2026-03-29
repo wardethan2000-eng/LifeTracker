@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   Button,
   Card,
@@ -13,9 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMe, getIdea, updateIdea, updateIdeaStage } from "../../lib/api";
-import { SkeletonCard } from "../../components/SkeletonCard";
-import { StatusPill } from "../../components/StatusPill";
+import { getMe, getIdea, updateIdea, updateIdeaStage, getEntries } from "../../../lib/api";
+import { SkeletonCard } from "../../../components/SkeletonCard";
+import { StatusPill } from "../../../components/StatusPill";
+import { EmptyState } from "../../../components/EmptyState";
 
 const STAGES = ["spark", "developing", "ready"] as const;
 
@@ -37,11 +38,18 @@ export default function IdeaDetailScreen() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: idea, isLoading } = useQuery({
+  const { data: idea, isLoading, error } = useQuery({
     queryKey: ["idea", householdId, id],
     queryFn: () => getIdea(householdId, id),
     enabled: !!householdId && !!id,
   });
+
+  const { data: notesData } = useQuery({
+    queryKey: ["idea-notes", householdId, id],
+    queryFn: () => getEntries(householdId, { entityType: "idea", entityId: id, limit: 5 }),
+    enabled: !!householdId && !!id,
+  });
+  const recentNotes = notesData?.items ?? [];
 
   const updateMutation = useMutation({
     mutationFn: (input: { title?: string; description?: string | null }) =>
@@ -51,6 +59,9 @@ export default function IdeaDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["ideas", householdId] });
       setEditingField(null);
     },
+    onError: (err) => {
+      Alert.alert("Save failed", err instanceof Error ? err.message : "Please try again.");
+    },
   });
 
   const stageMutation = useMutation({
@@ -58,6 +69,9 @@ export default function IdeaDetailScreen() {
     onSuccess: (updated) => {
       queryClient.setQueryData(["idea", householdId, id], updated);
       queryClient.invalidateQueries({ queryKey: ["ideas", householdId] });
+    },
+    onError: (err) => {
+      Alert.alert("Update failed", err instanceof Error ? err.message : "Please try again.");
     },
   });
 
@@ -90,10 +104,12 @@ export default function IdeaDetailScreen() {
         </Button>
       </View>
 
-      {isLoading || !idea ? (
+      {isLoading ? (
         <View style={{ padding: 16 }}>
           <SkeletonCard lines={4} />
         </View>
+      ) : error || !idea ? (
+        <EmptyState icon="⚠️" title="Couldn't load idea" body="Pull down to retry." />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {/* Title */}
@@ -240,16 +256,16 @@ export default function IdeaDetailScreen() {
             </Card.Content>
           </Card>
 
-          {/* Notes */}
-          {idea.notes && idea.notes.length > 0 && (
+          {/* Notes preview */}
+          {recentNotes.length > 0 && (
             <Card mode="outlined" style={styles.card}>
-              <Card.Title title="Notes" titleVariant="titleSmall" />
+              <Card.Title title="Recent Notes" titleVariant="titleSmall" />
               <Card.Content>
-                {idea.notes.map((note: any, idx: number) => (
-                  <View key={note.id ?? idx}>
+                {recentNotes.map((note, idx) => (
+                  <View key={note.id}>
                     {idx > 0 && <Divider style={{ marginVertical: 8 }} />}
                     <Text variant="bodySmall" style={{ color: theme.colors.onSurface }}>
-                      {note.content ?? note.body ?? ""}
+                      {note.body}
                     </Text>
                   </View>
                 ))}
@@ -262,7 +278,7 @@ export default function IdeaDetailScreen() {
             <Card mode="outlined" style={styles.card}>
               <Card.Title title="Links" titleVariant="titleSmall" />
               <Card.Content>
-                {idea.links.map((link: any, idx: number) => (
+                {idea.links.map((link, idx: number) => (
                   <View key={link.id ?? idx}>
                     {idx > 0 && <Divider style={{ marginVertical: 6 }} />}
                     <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
@@ -305,7 +321,7 @@ export default function IdeaDetailScreen() {
                 title={label}
                 left={(props) => <List.Icon {...props} icon={icon} />}
                 right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                onPress={() => router.push(`/ideas/${id}/${route}` as never)}
+                onPress={() => router.push(`/ideas/${id}/${route}` as Parameters<typeof router.push>[0])}
               />
             ))}
           </Card>

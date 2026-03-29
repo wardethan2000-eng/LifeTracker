@@ -1,4 +1,4 @@
-import { StyleSheet, View, ScrollView } from "react-native";
+import { RefreshControl, StyleSheet, View, ScrollView } from "react-native";
 import { Card, Text, Button, useTheme, Divider } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getMe, getHobbyDetail } from "../../../lib/api";
 import { StatusPill } from "../../../components/StatusPill";
 import { SkeletonCard } from "../../../components/SkeletonCard";
+import { EmptyState } from "../../../components/EmptyState";
 
 const SUB_SCREENS = [
   { route: "sessions", label: "Sessions", icon: "▶" },
@@ -24,7 +25,7 @@ export default function HobbyDetailScreen() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const householdId = me?.households[0]?.id ?? "";
 
-  const { data: hobby, isLoading } = useQuery({
+  const { data: hobby, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["hobby", householdId, id],
     queryFn: () => getHobbyDetail(householdId, id),
     enabled: !!householdId && !!id,
@@ -44,12 +45,17 @@ export default function HobbyDetailScreen() {
         </Button>
       </View>
 
-      {isLoading || !hobby ? (
+      {isLoading ? (
         <View style={{ padding: 16 }}>
           <SkeletonCard lines={4} />
         </View>
+      ) : error || !hobby ? (
+        <EmptyState icon="⚠️" title="Couldn't load hobby" body="Something went wrong." />
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+        >
           {/* Hero */}
           <View style={styles.hero}>
             <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>

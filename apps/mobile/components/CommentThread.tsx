@@ -4,7 +4,7 @@
  * Handles create, edit, delete for the current user's comments.
  */
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Divider, IconButton, Text, TextInput, useTheme } from "react-native-paper";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
@@ -62,14 +62,16 @@ function CommentItem({
       queryClient.invalidateQueries({ queryKey: actions.queryKey });
       setEditing(false);
     },
+    onError: () => Alert.alert("Error", "Could not save your edit. Please try again."),
   });
 
-  const { mutate: destroy } = useMutation({
+  const { mutate: destroy, isPending: destroying } = useMutation({
     mutationFn: () => actions.onDelete(comment.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: actions.queryKey });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
+    onError: () => Alert.alert("Error", "Could not delete the comment. Please try again."),
   });
 
   const { mutate: reply, isPending: sendingReply } = useMutation({
@@ -79,6 +81,7 @@ function CommentItem({
       setReplying(false);
       setReplyBody("");
     },
+    onError: () => Alert.alert("Error", "Could not post your reply. Please try again."),
   });
 
   const deleted = !!comment.deletedAt;
@@ -174,7 +177,18 @@ function CommentItem({
                   <Button
                     mode="text"
                     compact
-                    onPress={() => destroy()}
+                    onPress={() =>
+                      Alert.alert(
+                        "Delete comment?",
+                        "This cannot be undone.",
+                        [
+                          { text: "Delete", style: "destructive", onPress: () => destroy() },
+                          { text: "Cancel", style: "cancel" },
+                        ]
+                      )
+                    }
+                    loading={destroying}
+                    disabled={destroying}
                     textColor={theme.colors.error}
                     style={styles.actionBtn}
                   >
