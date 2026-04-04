@@ -878,9 +878,10 @@ export const apiRequest = async <T>({
         : { next: cachePolicy.next };
     }
 
-    // Default: 30-second ISR window for all unconfigured GET requests.
-    // Functions that must always be fresh (entries, notifications, scans) opt out explicitly.
-    return { next: { revalidate: 30 } };
+    // Default ISR window. Analytics paths aggregate large data sets and change
+    // slowly, so they get a 10-minute cache. Everything else gets 30 seconds.
+    const isAnalyticsPath = path.includes("/analytics/") || path.includes("/cost-analytics/");
+    return { next: { revalidate: isAnalyticsPath ? 600 : 30 } };
   })();
 
   try {

@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { isFeatureEnabled } from "./lib/feature-flags.js";
 import { authPlugin } from "./plugins/auth.js";
 import { destructiveAuditLogPlugin } from "./plugins/destructive-audit-log.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
@@ -122,7 +123,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   householdInventoryAnalyticsRoutes,
   householdInventoryItemRoutes,
   householdInventoryPurchaseRoutes,
-  householdSpaceRoutes,
+  ...(isFeatureEnabled("FEATURE_SPACES") ? [householdSpaceRoutes] : []),
   householdProjectInventoryRollupRoutes,
   householdInventoryTransactionRoutes,
   householdLinkPreviewRoutes,
@@ -133,7 +134,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   entryRoutes,
   exportRoutes,
   invitationRoutes,
-  webhookRoutes,
+  ...(isFeatureEnabled("FEATURE_WEBHOOKS") ? [webhookRoutes] : []),
   hobbyRoutes,
   hobbySeriesRoutes,
   hobbyRecipeRoutes,
