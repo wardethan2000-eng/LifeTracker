@@ -1,4 +1,16 @@
 import "dotenv/config";
+
+const areQueuesEnabled = (): boolean => {
+  const val = process.env.ENABLE_QUEUES;
+  if (val === undefined) return true;
+  return val === "true" || val === "1" || val === "yes" || val === "on";
+};
+
+if (!areQueuesEnabled()) {
+  console.info("ENABLE_QUEUES=false — notification workers are disabled.");
+  process.exit(0);
+}
+
 import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import { scanComplianceNotifications } from "../lib/compliance-monitor.js";

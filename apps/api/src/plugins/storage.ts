@@ -37,7 +37,33 @@ const getStorageConfig = () => ({
   downloadExpiresSec: Number(process.env.S3_PRESIGN_DOWNLOAD_EXPIRES_SECONDS ?? "3600"),
 });
 
+const isStorageEnabled = (): boolean => {
+  const val = process.env.STORAGE_ENABLED;
+  // Default to enabled unless explicitly set to false/0/no/off.
+  if (val === undefined) return true;
+  return val === "true" || val === "1" || val === "yes" || val === "on";
+};
+
+const makeDisabledStorage = (): StorageService => {
+  const fail = (): never => {
+    const err = Object.assign(new Error("File storage is disabled (STORAGE_ENABLED=false). Enable MinIO/S3 to use attachments."), { statusCode: 503 });
+    throw err;
+  };
+  return {
+    generateUploadUrl: fail,
+    generateDownloadUrl: fail,
+    deleteObject: fail,
+    headObject: fail,
+  };
+};
+
 export const storagePlugin = fp(async (app) => {
+  if (!isStorageEnabled()) {
+    app.log.info("Storage is disabled (STORAGE_ENABLED=false). Attachment endpoints will return 503.");
+    app.decorate("storage", makeDisabledStorage());
+    return;
+  }
+
   const config = getStorageConfig();
 
   const client = new S3Client({

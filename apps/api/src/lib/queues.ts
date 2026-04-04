@@ -21,6 +21,14 @@ export const recurringNotificationScanSchedulerId = "recurring-notification-scan
 export const recurringComplianceScanSchedulerId = "recurring-compliance-scan";
 export const recurringDigestBatchSchedulerId = "recurring-digest-batch";
 
+// When ENABLE_QUEUES=false, all queue operations become no-ops and no Redis
+// connections are established. Useful for minimal dev environments.
+const areQueuesEnabled = (): boolean => {
+  const val = process.env.ENABLE_QUEUES;
+  if (val === undefined) return true;
+  return val === "true" || val === "1" || val === "yes" || val === "on";
+};
+
 let notificationScanQueue: Queue<NotificationScanJobData> | undefined;
 let complianceScanQueue: Queue<ComplianceScanJobData> | undefined;
 let notificationDeliveryQueue: Queue<NotificationDeliveryJobData> | undefined;
@@ -91,6 +99,8 @@ export const getDigestBatchQueue = (): Queue => {
 };
 
 export const enqueueNotificationScan = async (data: NotificationScanJobData = {}) => {
+  if (!areQueuesEnabled()) return;
+
   const queue = getNotificationScanQueue();
 
   return queue.add("scan", data, {
@@ -100,6 +110,8 @@ export const enqueueNotificationScan = async (data: NotificationScanJobData = {}
 };
 
 export const enqueueComplianceScan = async (data: ComplianceScanJobData = {}) => {
+  if (!areQueuesEnabled()) return;
+
   const queue = getComplianceScanQueue();
 
   return queue.add("scan", data, {
@@ -109,6 +121,8 @@ export const enqueueComplianceScan = async (data: ComplianceScanJobData = {}) =>
 };
 
 export const enqueueNotificationDelivery = async (data: NotificationDeliveryJobData) => {
+  if (!areQueuesEnabled()) return;
+
   const queue = getNotificationDeliveryQueue();
 
   return queue.add("deliver", data, {
@@ -119,7 +133,7 @@ export const enqueueNotificationDelivery = async (data: NotificationDeliveryJobD
 };
 
 export const registerRecurringJobSchedulers = async (): Promise<void> => {
-  if (!areRecurringJobsEnabled()) {
+  if (!areQueuesEnabled() || !areRecurringJobsEnabled()) {
     return;
   }
 
