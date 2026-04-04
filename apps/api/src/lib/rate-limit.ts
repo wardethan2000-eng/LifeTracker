@@ -1,6 +1,4 @@
-import { Redis } from "ioredis";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { getRedisConnectionOptions } from "./redis.js";
 
 type RateLimitPolicy = {
   scope: string;
@@ -27,87 +25,25 @@ type RateLimitState = {
 };
 
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
-let rateLimitRedis: Redis | undefined;
-let redisFailureLoggedAt = 0;
 
 const pruneTimestamps = (timestamps: number[], windowMs: number, now: number): number[] => (
   timestamps.filter((timestamp) => now - timestamp < windowMs)
 );
 
-const consumeInMemory = async (scope: string, key: string, windowMs: number): Promise<RateLimitConsumeResult> => {
+const consumeRateLimit = async (scope: string, key: string, windowMs: number): Promise<RateLimitConsumeResult> => {
   const now = Date.now();
   const bucketKey = `${scope}:${key}`;
   const existing = rateLimitBuckets.get(bucketKey);
   const timestamps = pruneTimestamps(existing?.timestamps ?? [], windowMs, now);
   timestamps.push(now);
 
-  rateLimitBuckets.set(bucketKey, {
-    windowMs,
-    timestamps
-  });
+  rateLimitBuckets.set(bucketKey, { windowMs, timestamps });
 
   const oldestTimestamp = timestamps[0] ?? now;
   return {
     count: timestamps.length,
-    resetAt: oldestTimestamp + windowMs
+    resetAt: oldestTimestamp + windowMs,
   };
-};
-
-const getRateLimitRedis = (): Redis => {
-  if (!rateLimitRedis) {
-    rateLimitRedis = new Redis({
-      ...getRedisConnectionOptions(),
-      lazyConnect: true,
-      enableOfflineQueue: false
-    });
-  }
-
-  return rateLimitRedis;
-};
-
-const consumeWithRedis = async (scope: string, key: string, windowMs: number): Promise<RateLimitConsumeResult> => {
-  const redis = getRateLimitRedis();
-  const redisKey = `rate-limit:${scope}:${key}`;
-  const result = await redis.eval(
-    `
-      local current = redis.call("INCR", KEYS[1])
-      if current == 1 then
-        redis.call("PEXPIRE", KEYS[1], ARGV[1])
-      end
-      local ttl = redis.call("PTTL", KEYS[1])
-      return { current, ttl }
-    `,
-    1,
-    redisKey,
-    windowMs.toString()
-  ) as [number, number];
-
-  const count = Number(result[0] ?? 0);
-  const ttl = Number(result[1] ?? windowMs);
-
-  return {
-    count,
-    resetAt: Date.now() + Math.max(ttl, 0)
-  };
-};
-
-const consumeRateLimit = async (scope: string, key: string, windowMs: number): Promise<RateLimitConsumeResult> => {
-  if (process.env.RATE_LIMIT_STORE === "memory" || process.env.NODE_ENV === "test") {
-    return consumeInMemory(scope, key, windowMs);
-  }
-
-  try {
-    return await consumeWithRedis(scope, key, windowMs);
-  } catch (error) {
-    const now = Date.now();
-
-    if (now - redisFailureLoggedAt > 60_000) {
-      redisFailureLoggedAt = now;
-      console.error("Rate limit Redis unavailable, falling back to in-memory limiter.", error);
-    }
-
-    return consumeInMemory(scope, key, windowMs);
-  }
 };
 
 const evaluateRateLimit = async ({ scope, max, windowMs, key }: Omit<RateLimitPolicy, "message">): Promise<RateLimitState> => {
@@ -117,7 +53,7 @@ const evaluateRateLimit = async ({ scope, max, windowMs, key }: Omit<RateLimitPo
   return {
     limited,
     remaining: Math.max(0, max - result.count),
-    resetAt: result.resetAt
+    resetAt: result.resetAt,
   };
 };
 
@@ -145,14 +81,14 @@ export const enforceRateLimit = async (request: FastifyRequest, reply: FastifyRe
     scope: policy.scope,
     limit: policy.max,
     windowMs: policy.windowMs,
-    path: request.url
+    path: request.url,
   }, "Rate limit exceeded");
   void reply.code(429).send({
     message: policy.message,
     retryAfter: retryAfterSeconds,
     scope: policy.scope,
     limit: policy.max,
-    windowSeconds: Math.ceil(policy.windowMs / 1000)
+    windowSeconds: Math.ceil(policy.windowMs / 1000),
   });
   return true;
 };
@@ -164,11 +100,6 @@ export const buildRateLimitKey = (
 
 export const resetRateLimitState = async (): Promise<void> => {
   rateLimitBuckets.clear();
-
-  if (rateLimitRedis) {
-    await rateLimitRedis.quit().catch(() => {});
-    rateLimitRedis = undefined;
-  }
 };
 
 setInterval(() => {
@@ -180,10 +111,7 @@ setInterval(() => {
     if (recent.length === 0) {
       rateLimitBuckets.delete(key);
     } else {
-      rateLimitBuckets.set(key, {
-        windowMs: bucket.windowMs,
-        timestamps: recent
-      });
+      rateLimitBuckets.set(key, { windowMs: bucket.windowMs, timestamps: recent });
     }
   }
 }, 10 * 60 * 1000).unref();
