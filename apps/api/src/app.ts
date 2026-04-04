@@ -80,6 +80,7 @@ import { assetExportRoutes } from "./routes/assets/export.js";
 import { projectExportRoutes } from "./routes/projects/export.js";
 import { scheduleExportRoutes } from "./routes/schedules/export.js";
 import { hobbyExportRoutes } from "./routes/hobbies/export.js";
+import { authRoutes } from "./routes/auth.js";
 import { publicShareRoutes } from "./routes/share-links/public.js";
 import { shareLinkRoutes } from "./routes/share-links/index.js";
 import { webhookRoutes } from "./routes/webhooks/index.js";
@@ -97,6 +98,7 @@ const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPlugin
 };
 
 const publicRoutePlugins: FastifyPluginAsync[] = [
+  authRoutes,
   publicShareRoutes,
   healthRoutes,
   scanRoutes

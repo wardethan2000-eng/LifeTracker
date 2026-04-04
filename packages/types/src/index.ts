@@ -52,7 +52,7 @@ export const assetCategoryValues = [
 
 export const assetVisibilityValues = ["shared", "personal"] as const;
 export const householdRoleValues = ["owner", "member"] as const;
-export const authSourceValues = ["clerk", "dev-bypass"] as const;
+export const authSourceValues = ["better-auth", "dev-bypass"] as const;
 export const notificationTypeValues = ["due_soon", "due", "overdue", "digest", "announcement", "inventory_low_stock", "note_reminder"] as const;
 export const triggerTypeValues = ["interval", "usage", "seasonal", "compound", "one_time"] as const;
 export const notificationChannelValues = ["push", "email", "digest"] as const;
@@ -857,7 +857,7 @@ export type UpdateDisplayPreferencesInput = z.infer<typeof updateDisplayPreferen
 
 export const userProfileSchema = z.object({
   id: z.string().cuid(),
-  clerkUserId: z.string(),
+  clerkUserId: z.string().nullable(),
   email: z.string().email().nullable(),
   displayName: z.string().nullable(),
   notificationPreferences: notificationPreferencesSchema,
