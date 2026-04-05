@@ -362,12 +362,18 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
+      '@electric-sql/pglite':
+        specifier: ^0.4.3
+        version: 0.4.3
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.2(react@18.3.1))
       '@lifekeeper/presets':
         specifier: workspace:*
         version: link:../../packages/presets
+      '@tanstack/react-query':
+        specifier: ^5.66.0
+        version: 5.95.2(react@18.3.1)
       '@tiptap/extension-color':
         specifier: ^3.20.4
         version: 3.20.4(@tiptap/extension-text-style@3.20.4(@tiptap/core@3.20.4(@tiptap/pm@3.20.4)))
@@ -1624,6 +1630,9 @@ packages:
   '@egjs/hammerjs@2.0.17':
     resolution: {integrity: sha512-XQsZgjm2EcVUiZQf11UBJQfmZeEmOW8DpI1gsFeln6w0ae0ii4dMQEQ0kjl6DspdWX1aGY1/loyXnP0JS06e/A==}
     engines: {node: '>=0.8.0'}
+
+  '@electric-sql/pglite@0.4.3':
+    resolution: {integrity: sha512-ichuWTgtd4mOM1G4SpyGJa5trT03lWbMypDV0fUXUCXg5hiHqVAz/bZyV68NqmkLB7WcYmj1RMJVSp8HV/v/ZQ==}
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -9642,6 +9651,8 @@ snapshots:
   '@egjs/hammerjs@2.0.17':
     dependencies:
       '@types/hammerjs': 2.0.46
+
+  '@electric-sql/pglite@0.4.3': {}
 
   '@emnapi/runtime@1.8.1':
     dependencies:
