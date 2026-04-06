@@ -8,6 +8,7 @@ import { useMultiSelect } from "../lib/use-multi-select";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
 import { BulkActionBar } from "./bulk-action-bar";
 import { MaintenanceBulkActions } from "./maintenance-bulk-actions";
+import { useCompletionSlideOver } from "./completion-slide-over-context";
 
 const SCHEDULE_STATUS_PILL: Record<string, string> = {
   overdue: "pill--danger",
@@ -22,6 +23,7 @@ type MaintenanceListWorkspaceProps = {
 
 export function MaintenanceListWorkspace({ householdId, items }: MaintenanceListWorkspaceProps): JSX.Element {
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
+  const { openSlideOver } = useCompletionSlideOver();
 
   const selectedItems = useMemo(
     () => items.filter((item) => isSelected(item.scheduleId)),
@@ -110,7 +112,21 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
                 }
               </td>
               <td>
-                <Link href={`/assets/${item.assetId}`} className="data-table__link">Open Asset</Link>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="button button--sm button--primary"
+                    onClick={() => openSlideOver({
+                      assetId: item.assetId,
+                      assetName: item.assetName,
+                      scheduleId: item.scheduleId,
+                      scheduleName: item.scheduleName,
+                    })}
+                  >
+                    Log
+                  </button>
+                  <Link href={`/assets/${item.assetId}`} className="data-table__link">Open</Link>
+                </div>
               </td>
             </tr>
           ))}

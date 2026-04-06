@@ -10,12 +10,16 @@ import { DashboardAttentionQueue } from "./dashboard-attention-queue";
 export async function DashboardAttentionSection({ householdId }: { householdId: string }) {
   const dashboard = await getDashboardData(householdId);
 
-  const dueWork = dashboard.dueWork.slice(0, 8) as DueWorkItem[];
+  const allDueWork = dashboard.dueWork as DueWorkItem[];
+  const allOverdue = allDueWork.filter((i) => i.status === "overdue");
+  const allDue = allDueWork.filter((i) => i.status === "due");
 
   return (
     <DashboardAttentionQueue
-      overdueItems={dueWork.filter((i) => i.status === "overdue")}
-      dueItems={dueWork.filter((i) => i.status === "due")}
+      overdueItems={allOverdue.slice(0, 5)}
+      dueItems={allDue.slice(0, 5)}
+      totalOverdueCount={allOverdue.length}
+      totalDueCount={allDue.length}
     />
   );
 }

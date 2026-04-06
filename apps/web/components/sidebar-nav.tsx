@@ -33,8 +33,8 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
     case "folder":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>;
-    case "dollar":
-      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>;
+    case "bar-chart":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>;
     case "beaker":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3h15"/><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3"/><path d="M6 14h12"/></svg>;
     case "briefcase":
@@ -90,6 +90,21 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     return () => { cancelled = true; };
   }, [householdId]);
 
+  // Load the notifications unread count asynchronously.
+  useEffect(() => {
+    if (!householdId) return;
+    let cancelled = false;
+    fetch(`/api/households/${householdId}/notifications?limit=1&status=unread`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data: { unreadCount?: number }) => {
+        if (cancelled) return;
+        const count = data.unreadCount ?? 0;
+        if (count > 0) setLiveBadges((prev) => ({ ...prev, notifications: Math.min(count, 99) }));
+      })
+      .catch(() => { /* badge is best-effort */ });
+    return () => { cancelled = true; };
+  }, [householdId]);
+
   const toggleCollapse = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -113,10 +128,13 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <span className="sidebar__collapse-icon">{collapsed ? "»" : "«"}</span>
+        {collapsed ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+        )}
         <span className="sidebar__collapse-label">Collapse</span>
       </button>
-      <div className="sidebar__section-label">Main</div>
       {groups.map((group, groupIndex) => (
         <div key={group.label ?? groupIndex} className="sidebar__group">
           {group.label ? <div className="sidebar__section-label">{group.label}</div> : null}
@@ -131,7 +149,9 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         const isIdeas = item.href === "/ideas";
         const effectiveBadge = item.href === "/maintenance"
           ? (liveBadges.maintenance ?? item.badge ?? 0)
-          : (item.badge ?? 0);
+          : item.href === "/notifications"
+            ? (liveBadges.notifications ?? item.badge ?? 0)
+            : (item.badge ?? 0);
 
         if (isIdeas && householdId) {
           return (

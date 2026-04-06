@@ -8,6 +8,8 @@ import { useCompletionSlideOver } from "./completion-slide-over-context";
 type AttentionQueueProps = {
   overdueItems: DueWorkItem[];
   dueItems: DueWorkItem[];
+  totalOverdueCount: number;
+  totalDueCount: number;
 };
 
 function relativeOverdueLabel(nextDueAt: string | null): string {
@@ -63,8 +65,8 @@ function QueueItem({ item, variant }: { item: DueWorkItem; variant: "overdue" | 
   );
 }
 
-export function DashboardAttentionQueue({ overdueItems, dueItems }: AttentionQueueProps): JSX.Element | null {
-  const totalCount = overdueItems.length + dueItems.length;
+export function DashboardAttentionQueue({ overdueItems, dueItems, totalOverdueCount, totalDueCount }: AttentionQueueProps): JSX.Element | null {
+  const totalCount = totalOverdueCount + totalDueCount;
 
   if (totalCount === 0) {
     return (
@@ -77,38 +79,38 @@ export function DashboardAttentionQueue({ overdueItems, dueItems }: AttentionQue
 
   return (
     <div className="attention-queue">
-      {overdueItems.length > 0 && (
+      {totalOverdueCount > 0 && (
         <div className="attention-queue__group">
           <div className="attention-queue__group-header attention-queue__group-header--overdue">
-            <span className="attention-queue__count">{overdueItems.length}</span>
+            <span className="attention-queue__count">{totalOverdueCount}</span>
             <span>overdue</span>
-            {overdueItems.length > 5 && (
+            {totalOverdueCount > overdueItems.length && (
               <Link href="/maintenance?status=overdue" className="attention-queue__see-all">
-                See all →
+                See all {totalOverdueCount} →
               </Link>
             )}
           </div>
           <div className="attention-queue__items">
-            {overdueItems.slice(0, 5).map((item) => (
+            {overdueItems.map((item) => (
               <QueueItem key={item.scheduleId} item={item} variant="overdue" />
             ))}
           </div>
         </div>
       )}
 
-      {dueItems.length > 0 && (
+      {totalDueCount > 0 && (
         <div className="attention-queue__group">
           <div className="attention-queue__group-header attention-queue__group-header--due">
-            <span className="attention-queue__count">{dueItems.length}</span>
-            <span>{dueItems.length === 1 ? "item" : "items"} due now</span>
-            {dueItems.length > 5 && (
+            <span className="attention-queue__count">{totalDueCount}</span>
+            <span>{totalDueCount === 1 ? "item" : "items"} due now</span>
+            {totalDueCount > dueItems.length && (
               <Link href="/maintenance?status=due" className="attention-queue__see-all">
-                See all →
+                See all {totalDueCount} →
               </Link>
             )}
           </div>
           <div className="attention-queue__items">
-            {dueItems.slice(0, 5).map((item) => (
+            {dueItems.map((item) => (
               <QueueItem key={item.scheduleId} item={item} variant="due" />
             ))}
           </div>
