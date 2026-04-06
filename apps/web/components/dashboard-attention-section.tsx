@@ -20,6 +20,7 @@ export async function DashboardAttentionSection({ householdId }: { householdId: 
       dueItems={allDue.slice(0, 5)}
       totalOverdueCount={allOverdue.length}
       totalDueCount={allDue.length}
+      householdId={householdId}
     />
   );
 }

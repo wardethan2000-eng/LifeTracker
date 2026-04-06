@@ -10,6 +10,7 @@ type AttentionQueueProps = {
   dueItems: DueWorkItem[];
   totalOverdueCount: number;
   totalDueCount: number;
+  householdId: string;
 };
 
 function relativeOverdueLabel(nextDueAt: string | null): string {
@@ -27,7 +28,7 @@ function relativeOverdueLabel(nextDueAt: string | null): string {
   return `${diffMonths} months overdue`;
 }
 
-function QueueItem({ item, variant }: { item: DueWorkItem; variant: "overdue" | "due" }): JSX.Element {
+function QueueItem({ item, variant, householdId }: { item: DueWorkItem; variant: "overdue" | "due"; householdId: string }): JSX.Element {
   const { openSlideOver } = useCompletionSlideOver();
 
   const handleLog = (): void => {
@@ -36,6 +37,7 @@ function QueueItem({ item, variant }: { item: DueWorkItem; variant: "overdue" | 
       assetName: item.assetName,
       scheduleId: item.scheduleId,
       scheduleName: item.scheduleName,
+      householdId,
     });
   };
 
@@ -65,7 +67,7 @@ function QueueItem({ item, variant }: { item: DueWorkItem; variant: "overdue" | 
   );
 }
 
-export function DashboardAttentionQueue({ overdueItems, dueItems, totalOverdueCount, totalDueCount }: AttentionQueueProps): JSX.Element | null {
+export function DashboardAttentionQueue({ overdueItems, dueItems, totalOverdueCount, totalDueCount, householdId }: AttentionQueueProps): JSX.Element | null {
   const totalCount = totalOverdueCount + totalDueCount;
 
   if (totalCount === 0) {
@@ -92,7 +94,7 @@ export function DashboardAttentionQueue({ overdueItems, dueItems, totalOverdueCo
           </div>
           <div className="attention-queue__items">
             {overdueItems.map((item) => (
-              <QueueItem key={item.scheduleId} item={item} variant="overdue" />
+              <QueueItem key={item.scheduleId} item={item} variant="overdue" householdId={householdId} />
             ))}
           </div>
         </div>
@@ -111,7 +113,7 @@ export function DashboardAttentionQueue({ overdueItems, dueItems, totalOverdueCo
           </div>
           <div className="attention-queue__items">
             {dueItems.map((item) => (
-              <QueueItem key={item.scheduleId} item={item} variant="due" />
+              <QueueItem key={item.scheduleId} item={item} variant="due" householdId={householdId} />
             ))}
           </div>
         </div>

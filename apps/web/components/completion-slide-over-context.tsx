@@ -8,6 +8,7 @@ export type SlideOverData = {
   assetName: string;
   scheduleId: string;
   scheduleName: string;
+  householdId: string;
 };
 
 type SlideOverContextType = {

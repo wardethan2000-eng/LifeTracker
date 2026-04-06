@@ -121,6 +121,7 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
                       assetName: item.assetName,
                       scheduleId: item.scheduleId,
                       scheduleName: item.scheduleName,
+                      householdId,
                     })}
                   >
                     Log

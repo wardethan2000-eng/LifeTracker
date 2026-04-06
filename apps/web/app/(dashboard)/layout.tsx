@@ -41,10 +41,10 @@ function buildNavGroups(
     { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
     { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
     { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
+    { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
   ];
   const insights: NavItemDef[] = [
     { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "bar-chart" },
-    { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
     { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
   ];
   const tools: NavItemDef[] = [

@@ -8,6 +8,7 @@ import { useCompletionSlideOver } from "./completion-slide-over-context";
 
 type MaintenanceCalendarProps = {
   items: DueWorkItem[];
+  householdId: string;
 };
 
 type DayCell = {
@@ -77,7 +78,7 @@ function buildCalendarGrid(year: number, month: number, items: DueWorkItem[]): D
   return cells;
 }
 
-export function MaintenanceCalendar({ items }: MaintenanceCalendarProps): JSX.Element {
+export function MaintenanceCalendar({ items, householdId }: MaintenanceCalendarProps): JSX.Element {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -219,7 +220,7 @@ export function MaintenanceCalendar({ items }: MaintenanceCalendarProps): JSX.El
                 <button
                   type="button"
                   className="button button--ghost button--sm"
-                  onClick={() => openSlideOver({ assetId: item.assetId, assetName: item.assetName, scheduleId: item.scheduleId, scheduleName: item.scheduleName })}
+                  onClick={() => openSlideOver({ assetId: item.assetId, assetName: item.assetName, scheduleId: item.scheduleId, scheduleName: item.scheduleName, householdId })}
                 >
                   Log
                 </button>
@@ -244,7 +245,7 @@ export function MaintenanceCalendar({ items }: MaintenanceCalendarProps): JSX.El
                 <button
                   type="button"
                   className="button button--ghost button--sm"
-                  onClick={() => openSlideOver({ assetId: item.assetId, assetName: item.assetName, scheduleId: item.scheduleId, scheduleName: item.scheduleName })}
+                  onClick={() => openSlideOver({ assetId: item.assetId, assetName: item.assetName, scheduleId: item.scheduleId, scheduleName: item.scheduleName, householdId })}
                 >
                   Log
                 </button>

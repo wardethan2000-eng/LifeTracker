@@ -1139,6 +1139,7 @@ export const completeMaintenanceScheduleSchema = z.object({
   completedAt: z.string().datetime().optional(),
   usageValue: z.number().min(0).optional(),
   cost: z.number().min(0).optional(),
+  serviceProviderId: z.string().cuid().optional(),
   applyLinkedParts: z.boolean().default(true),
   metadata: maintenanceLogMetadataSchema.default({})
 });
