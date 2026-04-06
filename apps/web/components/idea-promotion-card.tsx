@@ -41,12 +41,13 @@ type IdeaPromotionCardProps = {
   demotedFromId: string | null;
 };
 
-function getCarryOverPreview(target: IdeaPromotionTarget, stepCount: number): string {
+function getCarryOverPreview(target: IdeaPromotionTarget, stepCount: number, convertSteps: boolean): string {
   switch (target) {
     case "project":
-      return stepCount > 0
-        ? `Title, description, and ${stepCount} step${stepCount === 1 ? "" : "s"} will become project tasks`
-        : "Title and description will be set on the new project";
+      if (stepCount > 0 && convertSteps) {
+        return `${stepCount} step${stepCount === 1 ? "" : "s"} will be created as unphased project tasks.`;
+      }
+      return "Title and description will be set on the new project.";
     case "asset":
       return "Title and description will be set. Category will default to 'other'.";
     case "hobby":
@@ -73,6 +74,7 @@ export function IdeaPromotionCard({
   const [showPromoteForm, setShowPromoteForm] = useState(false);
   const [promoteName, setPromoteName] = useState(title);
   const [promoteDescription, setPromoteDescription] = useState(description ?? "");
+  const [convertStepsToTasks, setConvertStepsToTasks] = useState(true);
   const [isPending, startTransition] = useTransition();
 
   const handleTargetSelect = useCallback(
@@ -92,6 +94,7 @@ export function IdeaPromotionCard({
         target: localTarget,
         name: promoteName.trim() || undefined,
         description: promoteDescription.trim() || undefined,
+        ...(localTarget === "project" && stepCount > 0 ? { convertStepsToTasks } : {}),
       });
       const route = targetRoutes[result.type];
       if (route) {
@@ -174,9 +177,6 @@ export function IdeaPromotionCard({
 
         {showPromoteForm && localTarget && (
           <div className="idea-promote-form">
-            <div className="promotion-preview">
-              {getCarryOverPreview(localTarget, stepCount)}
-            </div>
             <input
               type="text"
               className="input input--sm"
@@ -194,6 +194,31 @@ export function IdeaPromotionCard({
               rows={2}
               style={{ resize: "vertical" }}
             />
+
+            {localTarget === "project" && stepCount > 0 && (
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "0.85rem", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={convertStepsToTasks}
+                  onChange={(e) => setConvertStepsToTasks(e.target.checked)}
+                  disabled={isPending}
+                  style={{ marginTop: 2, flexShrink: 0 }}
+                />
+                <span>
+                  Convert {stepCount} idea step{stepCount === 1 ? "" : "s"} to project tasks
+                  <span style={{ display: "block", color: "var(--ink-muted)", fontSize: "0.78rem", marginTop: 1 }}>
+                    {convertStepsToTasks
+                      ? "Steps will be added as unphased tasks on the new project."
+                      : "Steps will stay on the idea only — not imported."}
+                  </span>
+                </span>
+              </label>
+            )}
+
+            {(localTarget !== "project" || stepCount === 0) && (
+              <p className="promotion-preview">{getCarryOverPreview(localTarget, stepCount, convertStepsToTasks)}</p>
+            )}
+
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"

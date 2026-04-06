@@ -6396,6 +6396,7 @@ export const promoteIdeaSchema = z.object({
   target: ideaPromotionTargetSchema,
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional(),
+  convertStepsToTasks: z.boolean().optional(),
 });
 export type PromoteIdeaInput = z.infer<typeof promoteIdeaSchema>;
 

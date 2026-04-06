@@ -451,7 +451,7 @@ export const ideaRoutes: FastifyPluginAsync = async (app) => {
           },
         });
 
-        if (steps.length > 0) {
+        if (steps.length > 0 && input.convertStepsToTasks !== false) {
           await prisma.projectTask.createMany({
             data: steps.map((step, index) => ({
               projectId: created.id,
