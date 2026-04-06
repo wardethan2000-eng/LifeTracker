@@ -170,19 +170,21 @@ async function ItemDetailContent({ householdId, inventoryItemId }: { householdId
             <aside style={{ display: "grid", gap: 24, alignContent: "start" }}>
               <section className="panel">
                 <div className="panel__header">
-                  <h2>Snapshot</h2>
+                  <h2>Quick Reference</h2>
                 </div>
                 <div className="panel__body--padded">
+                  {item.imageUrl ? (
+                    <a href={item.imageUrl} target="_blank" rel="noreferrer" style={{ display: "block", marginBottom: 16 }}>
+                      <img src={item.imageUrl} alt={item.name} style={{ maxWidth: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 6, border: "1px solid var(--border)" }} />
+                    </a>
+                  ) : null}
                   <dl className="data-list">
-                    <div><dt>Item Type</dt><dd>{item.itemType === "equipment" ? "Equipment" : "Consumable"}</dd></div>
-                    <div><dt>Condition</dt><dd>{formatConditionLabel(item.conditionStatus)}</dd></div>
-                    <div><dt>Storage Location</dt><dd>{item.storageLocation ?? "Not recorded"}</dd></div>
-                    <div><dt>Preferred Supplier</dt><dd>{item.preferredSupplier ?? "Not recorded"}</dd></div>
-                    <div><dt>Supplier Link</dt><dd>{item.supplierUrl ? <a href={item.supplierUrl} className="text-link" target="_blank" rel="noreferrer">Open supplier page</a> : "Not recorded"}</dd></div>
-                    {item.imageUrl ? (
-                      <div><dt>Product Image</dt><dd><a href={item.imageUrl} target="_blank" rel="noreferrer"><img src={item.imageUrl} alt={item.name} style={{ maxWidth: 120, maxHeight: 120, objectFit: "contain", borderRadius: 4, border: "1px solid var(--border)" }} /></a></dd></div>
+                    {item.supplierUrl ? (
+                      <div><dt>Buy Online</dt><dd><a href={item.supplierUrl} className="text-link" target="_blank" rel="noreferrer">Open supplier page ↗</a></dd></div>
                     ) : null}
-                    <div><dt>Expiration Date</dt><dd>{item.expiresAt ? formatDate(item.expiresAt, "Not set") : "Not set"}</dd></div>
+                    {item.expiresAt ? (
+                      <div><dt>Expires</dt><dd>{formatDate(item.expiresAt, "Not set")}</dd></div>
+                    ) : null}
                     <div><dt>Created</dt><dd>{formatDateTime(item.createdAt, "—")}</dd></div>
                     <div><dt>Last Updated</dt><dd>{formatDateTime(item.updatedAt, "—")}</dd></div>
                   </dl>

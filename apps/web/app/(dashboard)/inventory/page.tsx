@@ -99,6 +99,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const searchFilter = typeof params.search === "string" && params.search.length > 0 ? params.search : undefined;
   const categoryFilter = typeof params.category === "string" && params.category.length > 0 ? params.category : undefined;
   const sortParam = typeof params.sort === "string" ? params.sort : undefined;
+  const cursorParam = typeof params.cursor === "string" && params.cursor.length > 0 ? params.cursor : undefined;
 
   const me = await mePromise;
   const household = me.households.find((item) => item.id === householdId) ?? me.households[0];
@@ -131,6 +132,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         searchFilter={searchFilter}
         categoryFilter={categoryFilter}
         sortParam={sortParam}
+        cursor={cursorParam}
       />
     </Suspense>
   );
@@ -145,6 +147,7 @@ type InventoryContentProps = {
   searchFilter: string | undefined;
   categoryFilter: string | undefined;
   sortParam: string | undefined;
+  cursor: string | undefined;
 };
 
 async function InventoryContent({
@@ -155,6 +158,7 @@ async function InventoryContent({
   searchFilter,
   categoryFilter,
   sortParam,
+  cursor,
 }: InventoryContentProps): Promise<JSX.Element> {
   const [t, tCommon] = await Promise.all([
     getTranslations("inventory"),
@@ -166,9 +170,10 @@ async function InventoryContent({
   const inventoryRedirectHref = `/inventory?householdId=${householdId}`;
 
   try {
-    const [{ items }, lowStockItems, shoppingList, spaces] = await Promise.all([
+    const [{ items, nextCursor }, lowStockItems, shoppingList, spaces] = await Promise.all([
       getHouseholdInventory(householdId, {
-        limit: 100,
+        limit: 50,
+        ...(cursor ? { cursor } : {}),
         ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
         ...(searchFilter ? { search: searchFilter } : {}),
         ...(categoryFilter ? { category: categoryFilter } : {}),
@@ -197,6 +202,12 @@ async function InventoryContent({
         .filter((value): value is string => Boolean(value))
     )).sort((left, right) => left.localeCompare(right));
 
+    const getStockStatus = (item: { quantityOnHand: number; reorderThreshold: number | null }): number => {
+      if (item.quantityOnHand <= 0) return 0;
+      if (item.reorderThreshold !== null && item.quantityOnHand <= item.reorderThreshold) return 1;
+      return 2;
+    };
+
     const sortedItems = [...items].sort((a, b) => {
       switch (sortParam) {
         case "name-asc": return a.name.localeCompare(b.name);
@@ -204,6 +215,7 @@ async function InventoryContent({
         case "qty-asc": return a.quantityOnHand - b.quantityOnHand;
         case "qty-desc": return b.quantityOnHand - a.quantityOnHand;
         case "updated-desc": return b.updatedAt.localeCompare(a.updatedAt);
+        case "status-asc": return getStockStatus(a) - getStockStatus(b);
         default: return 0;
       }
     });
@@ -382,7 +394,20 @@ async function InventoryContent({
                               <div className="data-table__primary">{item.preferredSupplier ?? "No supplier"}</div>
                               <div className="data-table__secondary">{formatCurrency(item.unitCost, "No unit cost")}</div>
                             </td>
-                            <td>{item.supplierUrl ? "Saved link" : "—"}</td>
+                            <td>
+                              {item.supplierUrl ? (
+                                <a
+                                  href={item.supplierUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="button button--ghost button--sm"
+                                >
+                                  Buy ↗
+                                </a>
+                              ) : (
+                                <span className="data-table__secondary">—</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -406,7 +431,42 @@ async function InventoryContent({
                 spaces={spaces}
               />
 
-              <InventoryTransactionHistory householdId={householdId} />
+              {(cursor || nextCursor) && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+                  <span className="data-table__secondary">
+                    {nextCursor ? `Showing ${items.length} items — more available` : `Showing ${items.length} items`}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {cursor && (
+                      <Link
+                        href={buildInventoryHref(householdId, {
+                          ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
+                          ...(searchFilter ? { search: searchFilter } : {}),
+                          ...(categoryFilter ? { category: categoryFilter } : {}),
+                          ...(sortParam ? { sort: sortParam } : {}),
+                        })}
+                        className="button button--ghost button--sm"
+                      >
+                        ← First page
+                      </Link>
+                    )}
+                    {nextCursor && (
+                      <Link
+                        href={buildInventoryHref(householdId, {
+                          ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
+                          ...(searchFilter ? { search: searchFilter } : {}),
+                          ...(categoryFilter ? { category: categoryFilter } : {}),
+                          ...(sortParam ? { sort: sortParam } : {}),
+                          cursor: nextCursor,
+                        })}
+                        className="button button--ghost button--sm"
+                      >
+                        Next page →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           ) : <SpacesSection householdId={householdId} />}
         </div>

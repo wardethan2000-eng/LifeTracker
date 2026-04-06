@@ -97,6 +97,7 @@ export function InventoryFilterBar({ currentFilter, categoryOptions = [] }: Inve
         onChange={(e) => pushParams({ sort: e.target.value || null })}
       >
         <option value="">Sort: Default</option>
+        <option value="status-asc">Status: Critical → OK</option>
         <option value="name-asc">Name A–Z</option>
         <option value="name-desc">Name Z–A</option>
         <option value="qty-asc">Qty: Low → High</option>
