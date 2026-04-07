@@ -3245,6 +3245,17 @@ textarea { resize: vertical; }
   grid-column: 1 / -1;
 }
 
+/* Explicit label and input element classes for non-<label> patterns */
+.field__label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.field__input {
+  width: 100%;
+}
+
 /* Styled chevron for all form selects */
 .field select {
   appearance: none;
@@ -3797,6 +3808,47 @@ textarea { resize: vertical; }
   min-height: 104px;
 }
 
+/* Full-width input/select/textarea inside a workbench-field */
+.workbench-field__input {
+  width: 100%;
+}
+
+/* Hint text below a workbench-field */
+.workbench-field__help {
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Two-column layout: main content + narrow aside (idea-workbench) */
+.workbench-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+.workbench-layout__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.workbench-layout__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .workbench-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Inline select inside workbench forms — compact, no full-width */
 .workbench-select {
   appearance: none;
@@ -4282,6 +4334,13 @@ textarea { resize: vertical; }
   font-size: 0.75rem;
   color: var(--ink-muted);
   line-height: 1.4;
+}
+
+/* Checkbox column — fixed narrow width, centered */
+.workbench-table__checkbox {
+  width: 40px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -5679,6 +5738,14 @@ tr:focus-within .data-table__row-actions {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   min-height: 400px;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.dashboard-notepad__loading {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-height: 200px;
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
 
@@ -20488,9 +20555,16 @@ html[data-sidebar-collapsed="true"] .sidebar__group {
   margin-bottom: 24px;
 }
 
-.attention-queue--clear__icon {
+.attention-queue--clear__icon,
+.attention-queue__clear-icon {
   color: var(--success, #16a34a);
   font-size: 1rem;
+}
+
+/* Item list container within an overdue/due group */
+.attention-queue__items {
+  display: flex;
+  flex-direction: column;
 }
 
 /* =========================================================
