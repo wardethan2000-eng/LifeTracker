@@ -5386,6 +5386,47 @@ tr:focus-within .data-table__row-actions {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
   border-radius: 4px;
   height: 18px;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+[data-theme="dark"] .skeleton-bar {
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.8) 100%);
+  border-color: rgba(71, 85, 105, 0.5);
+  box-shadow: none;
+}
+
+/* ── Suspense loading placeholders ─────────────────────────────── */
+
+/* Used as Suspense fallback in asset overview page */
+.panel--loading {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-height: 320px;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* Used as Suspense fallback for the dashboard attention queue */
+.attention-queue--loading {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-height: 80px;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* Used as Suspense fallback for the main dashboard grid */
+.dashboard-grid-loading {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-height: 400px;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
 
 .skeleton__stack {
