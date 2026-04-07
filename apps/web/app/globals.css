@@ -3713,6 +3713,27 @@ textarea { resize: vertical; }
   margin: 0;
 }
 
+/* Toggle row — checkbox + label used in notification preferences */
+.workbench-section__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.workbench-section__toggle:hover {
+  background: var(--surface-alt);
+}
+
+.workbench-section__toggle input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 .workbench-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
