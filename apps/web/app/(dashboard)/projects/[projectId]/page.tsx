@@ -208,8 +208,32 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
 
   const qs = `?householdId=${household.id}`;
 
+  const overviewSkeleton = (
+    <div style={{ display: "grid", gap: 20 }}>
+      <section className="stats-row" aria-hidden="true">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="stat-card">
+            <div className="skeleton-bar" style={{ width: 90, height: 12 }} />
+            <div className="skeleton-bar" style={{ width: 48, height: 28, marginTop: 8 }} />
+            <div className="skeleton-bar" style={{ width: 110, height: 12, marginTop: 8 }} />
+          </div>
+        ))}
+      </section>
+      <section className="panel" aria-hidden="true">
+        <div className="panel__header">
+          <div className="skeleton-bar" style={{ width: 160, height: 18 }} />
+        </div>
+        <div className="panel__body--padded" style={{ display: "grid", gap: 10 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton-bar" style={{ width: "100%", height: 44, borderRadius: 6 }} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+
   return (
-    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading…</div></div>}>
+    <Suspense fallback={overviewSkeleton}>
       <ProjectOverviewContent householdId={household.id} projectId={routeParams.projectId} qs={qs} />
     </Suspense>
   );
