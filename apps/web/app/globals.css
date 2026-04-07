@@ -3087,6 +3087,12 @@ a.stat-card:hover {
   font-size: 0.8rem;
 }
 
+/* Alias — some components use button--small instead of button--sm */
+.button--small {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
 .button:disabled,
 .button[aria-disabled="true"] {
   opacity: 0.45;
@@ -5255,6 +5261,14 @@ tr:focus-within .data-table__row-actions {
 .field:has(.inline-error) textarea {
   border-color: var(--danger);
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* form-error — inline error text below form actions (spaces, inventory forms) */
+.form-error {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--danger);
+  line-height: 1.4;
 }
 
 .field__error-msg {
