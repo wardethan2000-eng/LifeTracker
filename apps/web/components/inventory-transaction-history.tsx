@@ -297,7 +297,7 @@ export function InventoryTransactionHistory({ householdId, inventoryItemId, titl
         </div>
 
         {loading ? (
-          <p className="panel__empty">Loading transaction history…</p>
+          <div aria-hidden="true" style={{ display: "grid", gap: 8, padding: "8px 0" }}>{[1,2,3,4].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 36, borderRadius: 6 }} />)}</div>
         ) : errorMessage && transactions.length === 0 ? (
           <p className="panel__empty">{errorMessage}</p>
         ) : transactions.length === 0 ? (

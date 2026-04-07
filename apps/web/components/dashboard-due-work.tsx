@@ -84,7 +84,7 @@ export async function DashboardDueWork({ dashboardPromise, householdId }: Dashbo
                       </span>
                     </td>
                     <td>
-                      <Link href={`/assets/${item.assetId}`} className="data-table__link">View</Link>
+                      <div className="data-table__row-actions"><Link href={`/assets/${item.assetId}`} className="button button--sm button--ghost">View</Link></div>
                     </td>
                   </tr>
                 );

@@ -1114,7 +1114,7 @@ export function EntryTimeline({
 
       {/* ── Entry list ── */}
       {error ? <p className="workbench-error">{error}</p> : null}
-      {loading ? <p className="panel__empty">Loading entries…</p> : null}
+      {loading ? <div aria-hidden="true" style={{ display: "grid", gap: 8, padding: "8px 0" }}>{[1,2,3].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 44, borderRadius: 6 }} />)}</div> : null}
       {!loading && filteredEntries.length === 0 ? <p className="panel__empty">{emptyMessage}</p> : null}
 
       <div className="entry-timeline">
@@ -1453,7 +1453,7 @@ export function EntryActionableList({
 
       <div className="panel__body--padded entry-actionable-panel__body">
         {error ? <p className="workbench-error">{error}</p> : null}
-        {loading ? <p className="panel__empty">Loading action items…</p> : null}
+        {loading ? <div aria-hidden="true" style={{ display: "grid", gap: 8 }}>{[1,2,3].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 44, borderRadius: 6 }} />)}</div> : null}
         {!loading && groupedByEntity.length === 0 ? <p className="panel__empty">No unresolved actionable entries.</p> : null}
 
         {groupedByEntity.map((group) => (

@@ -333,12 +333,14 @@ export function ProjectPortfolioWorkspace({
                       <td>{project.totalInventoryRemaining}</td>
                       <td>{formatCurrency(project.plannedInventoryCost, "$0.00")}</td>
                       <td>
-                        <Link
-                          href={`/projects/${project.id}?householdId=${householdId}`}
-                          className="data-table__link"
-                        >
-                          Review
-                        </Link>
+                        <div className="data-table__row-actions">
+                          <Link
+                            href={`/projects/${project.id}?householdId=${householdId}`}
+                            className="button button--sm button--ghost"
+                          >
+                            Review
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
