@@ -3043,6 +3043,23 @@ a.stat-card:hover {
   font-size: 0.8rem;
 }
 
+.button:disabled,
+.button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+  transition: transform 60ms;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .text-link {
   color: var(--accent);
   font-weight: 600;
@@ -7402,6 +7419,24 @@ html[data-ui-density="compact"] .resource-layout__aside {
   background: transparent;
   border-color: var(--border);
   color: var(--ink-muted);
+}
+
+.compact-preview__pill--danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.compact-preview__pill--warning {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning);
+}
+
+.compact-preview__pill--success {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .compact-preview__value {
