@@ -190,8 +190,8 @@ export function LogMaintenanceForm({ householdId, assetId, schedules, createLogA
         <InlineError message={errors.cost?.message} size="sm" />
       </label>
       <label className="field">
-        <span>Service Provider Id</span>
-        <input type="text" placeholder="Optional structured provider id" {...register("serviceProviderId")} />
+        <span>Service Provider</span>
+        <input type="text" placeholder="e.g. ABC Auto Repair" {...register("serviceProviderId")} />
         <InlineError message={errors.serviceProviderId?.message} size="sm" />
       </label>
       <label className="field field--full">

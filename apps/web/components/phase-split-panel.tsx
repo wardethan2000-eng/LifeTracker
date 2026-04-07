@@ -900,8 +900,19 @@ function TaskCompactRow({
         )}
         <span className={`task-row__title${isDone ? " task-row__title--done" : ""}`}>{task.title}</span>
         {checklistTotal > 0 && (
-          <span className="task-row__meta" title={`${checklistDone} of ${checklistTotal} sub-steps done`} style={{ fontSize: "0.75rem", color: checklistDone === checklistTotal ? "var(--success)" : "var(--ink-muted)" }}>
-            {checklistDone}/{checklistTotal}
+          <span className="task-row__checklist-progress" title={`${checklistDone} of ${checklistTotal} sub-steps done`}>
+            <span className="task-row__checklist-fraction" style={{ color: checklistDone === checklistTotal ? "var(--success)" : "var(--ink-muted)" }}>
+              {checklistDone}/{checklistTotal}
+            </span>
+            <span className="progress-bar" style={{ width: 48 }}>
+              <span
+                className="progress-bar__fill"
+                style={{
+                  width: `${Math.round((checklistDone / checklistTotal) * 100)}%`,
+                  background: checklistDone === checklistTotal ? "var(--success)" : undefined,
+                }}
+              />
+            </span>
           </span>
         )}
         {assigneeName && (

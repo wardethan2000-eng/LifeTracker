@@ -1833,10 +1833,12 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
 }
 
 .panel__empty {
-  padding: 24px 20px;
+  padding: 28px 20px;
   text-align: center;
   color: var(--ink-muted);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-style: italic;
 }
 
 .inventory-create-panel {
@@ -8267,6 +8269,13 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-size: 0.8rem;
   color: var(--ink-muted);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.hobby-session-card__steps-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .session-detail-stack,
@@ -11351,6 +11360,19 @@ html[data-ui-density="compact"] .resource-layout__aside {
 .task-row__meta {
   font-size: 0.78rem;
   color: var(--ink-muted);
+}
+
+.task-row__checklist-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.task-row__checklist-fraction {
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .task-row__detail {

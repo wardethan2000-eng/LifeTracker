@@ -102,7 +102,22 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
                               <span className={statusBadgeClass(session.status)}>{session.status}</span>
                             </div>
                             <div className="hobby-session-card__meta">
-                              <span>{session.completedStepCount}/{session.stepCount} steps</span>
+                              {session.stepCount > 0 ? (
+                                <span className="hobby-session-card__steps-progress">
+                                  <span>{session.completedStepCount}/{session.stepCount} steps</span>
+                                  <span className="progress-bar" style={{ width: 40, display: "inline-block" }}>
+                                    <span
+                                      className="progress-bar__fill"
+                                      style={{
+                                        width: `${Math.round((session.completedStepCount / session.stepCount) * 100)}%`,
+                                        background: session.completedStepCount === session.stepCount ? "var(--success)" : undefined,
+                                      }}
+                                    />
+                                  </span>
+                                </span>
+                              ) : (
+                                <span>No steps</span>
+                              )}
                               <span>{session.ingredientCount} ingredients</span>
                               {session.rating != null ? <span>{"★".repeat(session.rating)}</span> : null}
                               <span>Started {formatDate(session.startDate)}</span>
