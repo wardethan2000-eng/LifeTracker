@@ -267,12 +267,20 @@ export function ProjectPortfolioWorkspace({
                       </td>
                       <td>{formatDate(project.updatedAt, "Recently")}</td>
                       <td>
-                        <Link
-                          href={`/projects/${project.id}?householdId=${householdId}`}
-                          className="data-table__link"
-                        >
-                          Open
-                        </Link>
+                        <div className="data-table__row-actions">
+                          <Link
+                            href={`/projects/${project.id}/tasks?householdId=${householdId}`}
+                            className="button button--sm button--ghost"
+                          >
+                            Tasks
+                          </Link>
+                          <Link
+                            href={`/projects/${project.id}?householdId=${householdId}`}
+                            className="button button--sm button--primary"
+                          >
+                            Open
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

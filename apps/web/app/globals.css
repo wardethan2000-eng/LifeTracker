@@ -5054,6 +5054,16 @@ tr:focus-within .data-table__row-actions {
   border-color: var(--danger) !important;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
+
+/* Auto-apply error border when an InlineError is present inside a .field —
+   eliminates the need to manually add field--error to every form field */
+.field:has(.inline-error) input,
+.field:has(.inline-error) select,
+.field:has(.inline-error) textarea {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
 .field__error-msg {
   margin-top: 4px;
   font-size: 0.78rem;

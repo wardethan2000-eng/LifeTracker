@@ -278,7 +278,10 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
                 </td>
                 <td>{formatDate(asset.createdAt)}</td>
                 <td>
-                  <Link href={`/assets/${asset.id}`} className="data-table__link">Open</Link>
+                  <div className="data-table__row-actions">
+                    <Link href={`/assets/${asset.id}/maintenance`} className="button button--sm button--ghost">Log</Link>
+                    <Link href={`/assets/${asset.id}`} className="button button--sm button--primary">Open</Link>
+                  </div>
                 </td>
               </tr>
             );
