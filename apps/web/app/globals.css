@@ -4324,6 +4324,25 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
 }
 
+.bulk-action-bar__error {
+  width: 100%;
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+.bulk-action-bar__preview-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  width: 100%;
+}
+
 /* Select-all-pages banner */
 .select-all-pages-banner {
   padding: 8px 14px;
@@ -4474,6 +4493,23 @@ textarea { resize: vertical; }
   margin: 0;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* Span-based kv-grid sub-elements (hobby-workbench preset preview) */
+.kv-grid__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  align-self: center;
+}
+
+.kv-grid__value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+  align-self: center;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
