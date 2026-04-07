@@ -82,7 +82,7 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
   );
 
   if (loading) {
-    return <div className="dashboard-card__empty">Loading…</div>;
+    return <div className="dashboard-card__empty" aria-hidden="true" style={{ display: "grid", gap: 8 }}>{[1, 2].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 36, borderRadius: 6 }} />)}</div>;
   }
 
   const statusLabel =
