@@ -552,6 +552,9 @@ p { margin: 0; color: var(--ink-light); }
 }
 
 .sidebar__section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 20px 14px 5px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -560,6 +563,38 @@ p { margin: 0; color: var(--ink-light); }
   color: #475569;
   border-top: 1px solid rgba(255,255,255,0.06);
   margin-top: 4px;
+}
+
+.sidebar__group-toggle {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity 120ms;
+  flex-shrink: 0;
+}
+
+.sidebar__group-toggle:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.08);
+}
+
+.sidebar__group--collapsed .sidebar__section-label {
+  padding-bottom: 16px;
+}
+
+.sidebar__group--collapsed .sidebar__link {
+  display: none;
+}
+
+.sidebar__group--collapsed .sidebar__link-row {
+  display: none;
 }
 
 .sidebar__footer {
@@ -19834,9 +19869,6 @@ html[data-sidebar-collapsed="true"] .sidebar__group {
 
 .attention-queue {
   margin-bottom: 24px;
-}
-
-.attention-queue__groups {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -19862,31 +19894,38 @@ html[data-sidebar-collapsed="true"] .sidebar__group {
 .attention-queue__group-header--overdue {
   background: var(--red-soft, rgba(220, 38, 38, 0.06));
   color: var(--danger, #dc2626);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(220, 38, 38, 0.15);
 }
 
 .attention-queue__group-header--due {
   background: var(--amber-soft, rgba(217, 119, 6, 0.06));
   color: var(--warning, #d97706);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(217, 119, 6, 0.18);
 }
 
-.attention-queue__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
+.attention-queue__count {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
+.attention-queue__group-label {
+  flex: 1;
+}
+
+/* Item */
 .attention-queue__item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  position: relative;
   border-bottom: 1px solid var(--border);
   transition: background 120ms;
+}
+
+.attention-queue__item--overdue {
+  border-left: 3px solid var(--danger);
+}
+
+.attention-queue__item--due {
+  border-left: 3px solid var(--warning);
 }
 
 .attention-queue__item:last-child {
@@ -19897,22 +19936,90 @@ html[data-sidebar-collapsed="true"] .sidebar__group {
   background: var(--surface-raised);
 }
 
-.attention-queue__asset {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--ink);
-  text-decoration: none;
+/* Urgency bar — thin fill along the bottom of overdue items */
+.attention-queue__urgency-track {
+  position: absolute;
+  bottom: 0;
+  left: 3px; /* offset for border-left */
+  right: 0;
+  height: 2px;
+  background: rgba(220, 38, 38, 0.1);
 }
 
-.attention-queue__asset:hover {
+.attention-queue__urgency-fill {
+  height: 100%;
+  background: rgba(220, 38, 38, 0.45);
+  border-radius: 0 1px 1px 0;
+  transition: width 400ms ease;
+}
+
+.attention-queue__item-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.attention-queue__item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.attention-queue__asset-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attention-queue__asset-link:hover {
+  color: var(--accent);
   text-decoration: underline;
 }
 
-.attention-queue__schedule {
+.attention-queue__schedule-name {
   font-size: 0.75rem;
   color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+.attention-queue__item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Age pill */
+.attention-queue__age-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.attention-queue__age-pill--overdue {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--danger, #dc2626);
+}
+
+.attention-queue__age-pill--due {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--warning, #d97706);
+}
+
+/* Legacy aliases kept for backwards compat */
 .attention-queue__age {
   font-size: 0.75rem;
   color: var(--ink-muted);

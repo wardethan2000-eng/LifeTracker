@@ -65,6 +65,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const quickAddRef = useRef<HTMLButtonElement>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [liveBadges, setLiveBadges] = useState<Record<string, number>>({});
 
   // Restore collapse state from localStorage and sync to <html> data attribute
@@ -73,6 +74,15 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     const isCollapsed = stored === "true";
     setCollapsed(isCollapsed);
     document.documentElement.dataset.sidebarCollapsed = String(isCollapsed);
+
+    const storedGroups = localStorage.getItem("sidebar-collapsed-groups");
+    if (storedGroups) {
+      try {
+        setCollapsedGroups(new Set(JSON.parse(storedGroups) as string[]));
+      } catch {
+        // ignore malformed storage
+      }
+    }
   }, []);
 
   // Load the maintenance badge count asynchronously so it doesn't block server render.
@@ -114,6 +124,19 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     });
   }, []);
 
+  const toggleGroupCollapse = useCallback((groupLabel: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupLabel)) {
+        next.delete(groupLabel);
+      } else {
+        next.add(groupLabel);
+      }
+      localStorage.setItem("sidebar-collapsed-groups", JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }, []);
+
   const handleCloseCapture = useCallback(() => {
     setShowQuickCapture(false);
   }, []);
@@ -135,10 +158,27 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         )}
         <span className="sidebar__collapse-label">Collapse</span>
       </button>
-      {groups.map((group, groupIndex) => (
-        <div key={group.label ?? groupIndex} className="sidebar__group">
-          {group.label ? <div className="sidebar__section-label">{group.label}</div> : null}
-          {group.items.map((item) => {
+      {groups.map((group, groupIndex) => {
+        const isGroupCollapsed = group.label ? collapsedGroups.has(group.label) : false;
+        return (
+        <div key={group.label ?? groupIndex} className={`sidebar__group${isGroupCollapsed ? " sidebar__group--collapsed" : ""}`}>
+          {group.label ? (
+            <div className="sidebar__section-label">
+              <span>{group.label}</span>
+              {!collapsed && (
+                <button
+                  type="button"
+                  className="sidebar__group-toggle"
+                  onClick={() => toggleGroupCollapse(group.label!)}
+                  aria-label={isGroupCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+                  aria-expanded={!isGroupCollapsed}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: isGroupCollapsed ? "rotate(-90deg)" : "none", transition: "transform 180ms ease" }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              )}
+            </div>
+          ) : null}
+          {!isGroupCollapsed && group.items.map((item) => {
         const isAssetsCreatePath = pathname === "/assets/new" || pathname.startsWith("/assets/new/");
         const isActive = item.href === "/"
           ? pathname === "/"
@@ -200,7 +240,8 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         );
       })}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
