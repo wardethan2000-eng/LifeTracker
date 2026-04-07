@@ -3196,6 +3196,29 @@ input::placeholder, textarea::placeholder {
 
 textarea { resize: vertical; }
 
+/* Compact borderless input for inline table cells (idea-workbench materials) */
+.inline-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.875rem;
+  color: var(--ink);
+  width: 100%;
+  transition: border-color 120ms;
+}
+
+.inline-input:hover {
+  border-color: var(--border);
+}
+
+.inline-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.08);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4246,6 +4269,19 @@ textarea { resize: vertical; }
   color: var(--ink-muted);
   font-size: 0.82rem;
   padding: 16px;
+}
+
+/* Stacked inputs / hint text inside a table cell */
+.workbench-table__control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workbench-table__hint {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  line-height: 1.4;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -9531,6 +9567,14 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-size: 0.74rem;
   color: var(--ink-muted);
   margin-top: 3px;
+}
+
+/* "(optional)" label inside a field's <span> — muted, slightly smaller */
+.field__optional {
+  font-size: 0.8em;
+  color: var(--ink-muted);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 .mode-inline-actions {
@@ -16304,6 +16348,11 @@ html[data-ui-density="compact"] .resource-layout__aside {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* Modifier: row that wraps its content (flags grid, reminder inputs) */
+.note-editor__meta-row--wrap {
+  flex-wrap: wrap;
 }
 .note-editor__meta-label {
   font-size: 0.75rem;
