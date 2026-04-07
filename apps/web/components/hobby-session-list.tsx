@@ -3,6 +3,7 @@
 import type { HobbySessionSummary } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
+import { EmptyState } from "./empty-state";
 import { useMemo } from "react";
 import {
   SectionFilterBar,
@@ -77,7 +78,7 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
             <SectionFilterChildren<HobbySessionSummary>>
               {(filteredSessions) => (
                 <>
-                  {sessions.length === 0 ? <p className="panel__empty">No sessions yet. Start your first session to begin tracking.</p> : null}
+                  {sessions.length === 0 ? <EmptyState icon="layers" title="No sessions yet" message="Start your first session to begin tracking your progress." actionLabel="New Session" actionHref={`/hobbies/${hobbyId}/sessions/new`} /> : null}
                   {sessions.length > 0 && filteredSessions.length === 0 ? <p className="panel__empty">No sessions match that search.</p> : null}
                   {filteredSessions.length > 0 ? (
                     <ul className="hobby-session-list">

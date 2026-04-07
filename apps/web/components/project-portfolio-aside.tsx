@@ -38,7 +38,7 @@ export function ProjectPortfolioAside({ householdId, projects, selectedSort }: P
                   <strong>{project.name}</strong>
                   <p>{getRiskLabel(project)}</p>
                 </div>
-                <Link href={`/projects/${project.id}?householdId=${householdId}`} className="data-table__link">Open</Link>
+                <Link href={`/projects/${project.id}?householdId=${householdId}`} className="button button--sm button--ghost">Open</Link>
               </div>
             ))
           )}

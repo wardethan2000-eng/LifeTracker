@@ -2753,7 +2753,7 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
 
 .launch-pad__grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -2842,6 +2842,14 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
   border-color: #fca5a5;
 }
 
+.launch-pad__card--journal .launch-pad__icon {
+  background: #f0f9ff;
+  color: #0284c7;
+}
+.launch-pad__card--journal:hover {
+  border-color: #7dd3fc;
+}
+
 /* Dark theme overrides */
 [data-theme="dark"] .launch-pad__card--ideate .launch-pad__icon {
   background: rgba(124, 58, 237, 0.12);
@@ -2857,6 +2865,9 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
 }
 [data-theme="dark"] .launch-pad__card--pursue .launch-pad__icon {
   background: rgba(220, 38, 38, 0.12);
+}
+[data-theme="dark"] .launch-pad__card--journal .launch-pad__icon {
+  background: rgba(2, 132, 199, 0.12);
 }
 
 /* Responsive: stack on smaller screens */
@@ -11632,7 +11643,7 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .task-toolbar__select {
   flex: 1;
-  padding: 7px 8px;
+  padding: 7px 28px 7px 8px;
   font-size: 0.88rem;
   border: 1px solid color-mix(in srgb, var(--border) 150%, transparent);
   border-radius: 6px;
@@ -11641,6 +11652,11 @@ html[data-ui-density="compact"] .resource-layout__aside {
   font-family: inherit;
   cursor: pointer;
   min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
 }
 
 /* ─── Task groups ─── */
@@ -16563,20 +16579,31 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .dashboard-card__kv {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.dashboard-card__kv > div {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
 }
 
 .dashboard-card__kv dt {
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 .dashboard-card__kv dd {
-  font-size: 0.92rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
   color: var(--ink);
-  margin: 2px 0 0;
+  margin: 4px 0 0;
+  font-family: var(--font-display);
 }
 
 .dashboard-card__list {
