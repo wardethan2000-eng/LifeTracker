@@ -17,6 +17,7 @@ import { BulkActionBar } from "./bulk-action-bar";
 import { ClickToEdit } from "./click-to-edit";
 import { ClickToEditSelect } from "./click-to-edit-select";
 import { useToast } from "./toast-provider";
+import { EmptyState } from "./empty-state";
 import { updateAssetFieldAction } from "../app/actions";
 
 type AssetListWorkspaceProps = {
@@ -101,11 +102,14 @@ export function AssetListWorkspace({ householdId, assets, totalAssets, includeAr
 
   if (assets.length === 0 && !currentSearch && !currentCategory) {
     return (
-      <div className="empty-state">
-        <div className="empty-state__icon" aria-hidden="true">📦</div>
-        <h3 className="empty-state__title">No assets yet</h3>
-        <p className="empty-state__body">Start tracking your home&apos;s assets — appliances, vehicles, tools, and more.</p>
-        <Link href="/assets/new" className="button button--primary">Add your first asset</Link>
+      <div style={{ padding: "32px 24px" }}>
+        <EmptyState
+          icon="box"
+          title="No assets yet"
+          message="Track appliances, vehicles, tools, and equipment — with maintenance schedules, costs, and condition history."
+          actionLabel="Add Your First Asset"
+          actionHref="/assets/new"
+        />
       </div>
     );
   }

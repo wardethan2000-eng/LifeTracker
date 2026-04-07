@@ -293,12 +293,12 @@ export function ProjectCoreFormFields({
           <h3>Core Identity</h3>
         </div>
         <div className="workbench-grid">
-          <label className="field field--full">
+          <label className={`field field--full${errors.name ? " field--error" : ""}`}>
             <span>Project Name</span>
             <input id="project-name" placeholder="Kitchen refresh, roof replacement, spring maintenance" {...register("name")} />
             <InlineError message={errors.name?.message} size="sm" />
           </label>
-          <label className="field">
+          <label className={`field${errors.status ? " field--error" : ""}`}>
             <span>Status</span>
             <select id="project-status" {...register("status")}>
               {projectStatusOptions.map((option) => (
@@ -307,7 +307,7 @@ export function ProjectCoreFormFields({
             </select>
             <InlineError message={errors.status?.message} size="sm" />
           </label>
-          <label className="field field--full">
+          <label className={`field field--full${errors.description ? " field--error" : ""}`}>
             <span>Description</span>
             <textarea
               id="project-description"
@@ -325,17 +325,17 @@ export function ProjectCoreFormFields({
           <h3>Budget & Timeline</h3>
         </div>
         <div className="workbench-grid">
-          <label className="field">
+          <label className={`field${errors.budgetAmount ? " field--error" : ""}`}>
             <span>Budget</span>
             <input id="project-budget" type="number" step="0.01" placeholder="0.00" {...register("budgetAmount")} />
             <InlineError message={errors.budgetAmount?.message} size="sm" />
           </label>
-          <label className="field">
+          <label className={`field${errors.startDate ? " field--error" : ""}`}>
             <span>Start Date</span>
             <input id="project-start-date" type="date" {...register("startDate")} />
             <InlineError message={errors.startDate?.message} size="sm" />
           </label>
-          <label className="field">
+          <label className={`field${errors.targetEndDate ? " field--error" : ""}`}>
             <span>Target End Date</span>
             <input id="project-target-end-date" type="date" {...register("targetEndDate")} />
             <InlineError message={errors.targetEndDate?.message} size="sm" />
@@ -348,7 +348,7 @@ export function ProjectCoreFormFields({
           <h3>Execution Notes</h3>
         </div>
         <div className="workbench-grid">
-          <label className="field field--full">
+          <label className={`field field--full${errors.notes ? " field--error" : ""}`}>
             <span>Notes</span>
             <textarea
               id="project-notes"
