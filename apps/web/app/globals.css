@@ -2693,6 +2693,18 @@ a.stat-card:hover {
   border-color: var(--accent-border);
 }
 
+.pill--info {
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: var(--info-border);
+}
+
+.pill--muted {
+  background: var(--surface-alt);
+  color: var(--ink-muted);
+  border-color: var(--border);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ═══ 16. Dashboard Layout
    ═══════════════════════════════════════════════════════════════════ */
@@ -16162,14 +16174,6 @@ html[data-ui-density="compact"] .resource-layout__aside {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
-}
-.pill--accent {
-  background: var(--accent-bg, #e3f2fd);
-  color: var(--accent);
-}
-.pill--warning {
-  background: #fff3e0;
-  color: #e65100;
 }
 
 /* ─── Pinned Notes Card ─── */
