@@ -2,12 +2,14 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
+import { SkeletonBlock } from "../../../components/skeleton";
 import { InventoryFilterBar } from "../../../components/inventory-filter-bar";
 import { InventoryListWorkspace } from "../../../components/inventory-list-workspace";
 import { InventoryQuickRestock } from "../../../components/inventory-quick-restock";
 import { InventoryValuationReportButton } from "../../../components/report-download-actions";
 import { InventoryShoppingListSection } from "../../../components/inventory-shopping-list-section";
 import { InventoryTransactionHistory } from "../../../components/inventory-transaction-history";
+import { Banner } from "../../../components/banner";
 import { SpacesSection } from "../../../components/spaces-section";
 import { TabNav } from "../../../components/tab-nav";
 import {
@@ -115,13 +117,49 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     );
   }
 
+  const inventorySkeleton = (
+    <>
+      <div className="stats-row">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="stat-card" aria-hidden="true">
+            <SkeletonBlock variant="row" width="sm" />
+            <div style={{ marginTop: 8 }}><SkeletonBlock variant="row" width="xs" /></div>
+          </div>
+        ))}
+      </div>
+      <section className="panel">
+        <div className="panel__body">
+          <table className="data-table" aria-hidden="true">
+            <thead>
+              <tr>
+                <th>Item</th><th>Category</th><th>Stock</th><th>Reorder</th><th>Value</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {[1, 2, 3, 4, 5, 6, 7].map((row) => (
+                <tr key={row}>
+                  <td><SkeletonBlock variant="row" width="lg" /></td>
+                  <td><SkeletonBlock variant="pill" width="sm" /></td>
+                  <td><SkeletonBlock variant="row" width="sm" /></td>
+                  <td><SkeletonBlock variant="row" width="md" /></td>
+                  <td><SkeletonBlock variant="row" width="sm" /></td>
+                  <td><SkeletonBlock variant="button" width="xs" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+
   return (
     <Suspense fallback={
       <>
         <header className="page-header">
           <div><h1>{t("pageTitle")}</h1><p style={{ marginTop: 6 }}>{t("pageSubtitle")}</p></div>
         </header>
-        <div className="page-body"><div className="panel"><div className="panel__empty">Loading inventory…</div></div></div>
+        <div className="page-body">{inventorySkeleton}</div>
       </>
     }>
       <InventoryContent
@@ -277,21 +315,19 @@ async function InventoryContent({
           {(outOfStockCount > 0 || expiredItems.length > 0 || expiringItems.length > 0) && (
             <div style={{ display: "grid", gap: 8, marginBottom: 4 }}>
               {outOfStockCount > 0 && (
-                <p className="note" style={{ background: "var(--danger-bg)", borderColor: "var(--danger-border)", color: "var(--danger)" }}>
-                  <strong>{outOfStockCount} item{outOfStockCount === 1 ? "" : "s"} out of stock.</strong> Review the reorder watchlist below to resupply.
-                </p>
+                <Banner tone="danger" title={`${outOfStockCount} item${outOfStockCount === 1 ? "" : "s"} out of stock`}>
+                  Review the reorder watchlist below to resupply.
+                </Banner>
               )}
               {expiredItems.length > 0 && (
-                <p className="note" style={{ background: "var(--danger-bg)", borderColor: "var(--danger-border)", color: "var(--danger)" }}>
-                  <strong>{expiredItems.length} item{expiredItems.length === 1 ? " has" : "s have"} expired:</strong>{" "}
+                <Banner tone="danger" title={`${expiredItems.length} item${expiredItems.length === 1 ? " has" : "s have"} expired`}>
                   {expiredItems.slice(0, 3).map((item) => item.name).join(", ")}{expiredItems.length > 3 ? ` and ${expiredItems.length - 3} more` : ""}.
-                </p>
+                </Banner>
               )}
               {expiringItems.length > 0 && (
-                <p className="note" style={{ background: "var(--warning-bg)", borderColor: "var(--warning-border)", color: "var(--warning)" }}>
-                  <strong>{expiringItems.length} item{expiringItems.length === 1 ? "" : "s"} expire within 30 days:</strong>{" "}
+                <Banner tone="warning" title={`${expiringItems.length} item${expiringItems.length === 1 ? "" : "s"} expire within 30 days`}>
                   {expiringItems.slice(0, 3).map((item) => item.name).join(", ")}{expiringItems.length > 3 ? ` and ${expiringItems.length - 3} more` : ""}.
-                </p>
+                </Banner>
               )}
             </div>
           )}

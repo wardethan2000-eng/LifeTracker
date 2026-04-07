@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 
-type ToastTone = "info" | "danger";
+type ToastTone = "info" | "success" | "danger";
 
 type ToastOptions = {
   message: string;

@@ -5,6 +5,38 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { ApiError, getDisplayPreferences, getHouseholdHobbies, getMe } from "../../../lib/api";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
+import { SkeletonBlock } from "../../../components/skeleton";
+
+const HobbiesSkeleton = (): JSX.Element => (
+  <>
+    <div className="stats-row">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="stat-card" aria-hidden="true">
+          <SkeletonBlock variant="row" width="sm" />
+          <div style={{ marginTop: 8 }}><SkeletonBlock variant="row" width="xs" /></div>
+        </div>
+      ))}
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px" }}>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <section key={i} className="panel hobby-card" aria-hidden="true">
+          <div className="panel__body--padded" style={{ display: "grid", gap: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <SkeletonBlock variant="row" width="md" />
+              <SkeletonBlock variant="pill" width="xs" />
+            </div>
+            <SkeletonBlock variant="row" width="full" />
+            <SkeletonBlock variant="row" width="lg" />
+            <div style={{ display: "flex", gap: "8px" }}>
+              <SkeletonBlock variant="pill" width="xs" />
+              <SkeletonBlock variant="pill" width="xs" />
+            </div>
+          </div>
+        </section>
+      ))}
+    </div>
+  </>
+);
 
 type HobbiesPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -279,7 +311,7 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
         </div>
 
         {/* List deferred behind Suspense */}
-        <Suspense fallback={<div className="panel"><div className="panel__empty">Loading hobbies…</div></div>}>
+        <Suspense fallback={<HobbiesSkeleton />}>
           <HobbiesListContent
             householdId={household.id}
             selectedStatus={selectedStatus}

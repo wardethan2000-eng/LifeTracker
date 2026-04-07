@@ -7,6 +7,7 @@ import { useMultiSelect } from "../lib/use-multi-select";
 import { formatDate } from "../lib/formatters";
 import { TaskBulkActions } from "./project-bulk-actions";
 import { BulkActionBar } from "./bulk-action-bar";
+import { EmptyState } from "./empty-state";
 
 const TASK_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -56,7 +57,13 @@ export function TaskListWorkspace({
 
   if (fullTasks.length === 0) {
     return (
-      <p className="panel__empty">No full tasks yet. Add tasks above to track detailed progress.</p>
+      <div style={{ padding: "24px" }}>
+        <EmptyState
+          icon="layers"
+          title="No tasks yet"
+          message="Add detailed tasks to track progress, assign work, and manage dependencies."
+        />
+      </div>
     );
   }
 
