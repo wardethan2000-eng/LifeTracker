@@ -9,6 +9,7 @@ import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
 import { BulkActionBar } from "./bulk-action-bar";
 import { MaintenanceBulkActions } from "./maintenance-bulk-actions";
 import { useCompletionSlideOver } from "./completion-slide-over-context";
+import { EmptyState } from "./empty-state";
 
 const SCHEDULE_STATUS_PILL: Record<string, string> = {
   overdue: "pill--danger",
@@ -34,10 +35,12 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
 
   if (items.length === 0) {
     return (
-      <div className="empty-state">
-        <div className="empty-state__icon" aria-hidden="true">✓</div>
-        <h3 className="empty-state__title">All caught up</h3>
-        <p className="empty-state__body">No maintenance work is currently due. Keep up the good work!</p>
+      <div style={{ padding: "32px 24px" }}>
+        <EmptyState
+          icon="wrench"
+          title="All caught up"
+          message="No maintenance work is currently due. Keep up the good work!"
+        />
       </div>
     );
   }

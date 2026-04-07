@@ -22,6 +22,7 @@ import { BulkActionBar } from "./bulk-action-bar";
 import { ClickToEdit } from "./click-to-edit";
 import { ClickToEditSelect } from "./click-to-edit-select";
 import { useToast } from "./toast-provider";
+import { EmptyState } from "./empty-state";
 import { updateProjectFieldAction } from "../app/actions";
 
 type ProjectPortfolioWorkspaceProps = {
@@ -133,11 +134,14 @@ export function ProjectPortfolioWorkspace({
 
         <div className="panel__body">
           {portfolioProjects.length === 0 ? (
-            <div className="panel__body--padded">
-              <p className="panel__empty">
-                No projects match the current filters. Adjust the scope or create a new project to
-                populate the portfolio view.
-              </p>
+            <div style={{ padding: "32px 24px" }}>
+              <EmptyState
+                icon="layers"
+                title="No projects found"
+                message="No projects match the current filters. Adjust the scope or create a new project."
+                actionLabel="New Project"
+                actionHref="/projects/new"
+              />
             </div>
           ) : (
             <table className="data-table">
@@ -286,9 +290,13 @@ export function ProjectPortfolioWorkspace({
         </div>
         <div className="panel__body">
           {portfolioProjects.filter((p) => p.inventoryLineCount > 0).length === 0 ? (
-            <p className="panel__empty">
-              No inventory-linked requirements on the visible projects yet.
-            </p>
+            <div style={{ padding: "20px 24px" }}>
+              <EmptyState
+                icon="box"
+                title="No material requirements yet"
+                message="Link inventory items to project tasks to track material plans here."
+              />
+            </div>
           ) : (
             <table className="data-table">
               <thead>
