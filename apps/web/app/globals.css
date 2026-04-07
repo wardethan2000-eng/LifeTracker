@@ -1753,6 +1753,13 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
   display: grid;
   gap: 4px;
   box-shadow: var(--shadow-sm);
+  transition: box-shadow 150ms, transform 150ms, border-color 150ms;
+}
+
+a.stat-card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
 }
 
 .stat-card__label {
@@ -4299,10 +4306,10 @@ textarea { resize: vertical; }
 .hero-meta-grid dt,
 .schedule-meta dt,
 .log-card__meta dt {
-  font-size: 0.78rem;
-  font-weight: 600;
-
-
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--ink-muted);
   margin: 0 0 4px;
 }
