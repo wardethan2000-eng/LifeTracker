@@ -3,6 +3,7 @@
 import type { HobbyActivityMode, HobbySeriesSummary } from "@lifekeeper/types";
 import Link from "next/link";
 import { useMemo, useState, type JSX } from "react";
+import { EmptyState } from "./empty-state";
 import {
   SectionFilterBar,
   SectionFilterChildren,
@@ -122,9 +123,7 @@ export function HobbySeriesList({ hobbyId, activityMode, series }: HobbySeriesLi
               return (
                 <>
                   {series.length === 0 ? (
-                    <p className="panel__empty">
-                      No series yet. Create one to group repeat batches, tasting lessons, or iterative recipe changes.
-                    </p>
+                    <EmptyState icon="folder" title="No series yet" message="Create one to group repeat batches, tasting lessons, or iterative recipe changes." actionLabel="New Series" actionHref={`/hobbies/${hobbyId}/series/new`} />
                   ) : null}
 
                   {series.length > 0 && visibleSeries.length === 0 ? (

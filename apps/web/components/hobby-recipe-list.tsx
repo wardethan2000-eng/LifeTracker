@@ -3,6 +3,7 @@
 import type { HobbyRecipe } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
+import { EmptyState } from "./empty-state";
 import { createSessionFromRecipeAction } from "../app/actions";
 import { HobbyShoppingListButton } from "./hobby-shopping-list-button";
 import {
@@ -35,7 +36,7 @@ export function HobbyRecipeList({ householdId, hobbyId, recipes }: HobbyRecipeLi
             <SectionFilterChildren<HobbyRecipe>>
               {(filteredRecipes) => (
                 <>
-                  {recipes.length === 0 ? <p className="panel__empty">No recipes yet. Create your first recipe to get started.</p> : null}
+                  {recipes.length === 0 ? <EmptyState icon="beaker" title="No recipes yet" message="Create your first recipe to start tracking your work." actionLabel="New Recipe" actionHref={`/hobbies/${hobbyId}/recipes/new`} /> : null}
                   {recipes.length > 0 && filteredRecipes.length === 0 ? <p className="panel__empty">No recipes match that search.</p> : null}
                   {filteredRecipes.length > 0 ? (
                     <div style={{ display: "grid", gap: "12px" }}>

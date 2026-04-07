@@ -2473,10 +2473,10 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
 .data-table th {
   text-align: left;
   padding: 10px 16px;
-  font-size: 0.78rem;
-  font-weight: 600;
-
-
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--ink-muted);
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
