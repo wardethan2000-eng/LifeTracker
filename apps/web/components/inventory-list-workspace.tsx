@@ -248,7 +248,9 @@ export function InventoryListWorkspace({
                           />
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <InventoryRowMenu householdId={householdId} itemId={item.id} itemName={item.name} />
+                          <div className="data-table__row-actions">
+                            <InventoryRowMenu householdId={householdId} itemId={item.id} itemName={item.name} />
+                          </div>
                         </td>
                       </InventoryEditableRow>
                     );})}

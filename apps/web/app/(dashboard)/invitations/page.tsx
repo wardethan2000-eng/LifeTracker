@@ -146,7 +146,7 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
   }
 
   return (
-    <Suspense fallback={<><PageHeader title="Invitations" /><div className="page-body"><div className="panel"><div className="panel__body--padded"><p className="note">Loading…</p></div></div></div></>}>
+    <Suspense fallback={<><PageHeader title="Invitations" /><div className="page-body"><section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1,2,3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section></div></>}>
       <InvitationsContent householdId={household.id} token={token} />
     </Suspense>
   );

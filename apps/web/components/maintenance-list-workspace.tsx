@@ -115,7 +115,7 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
                 }
               </td>
               <td>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div className="data-table__row-actions">
                   <button
                     type="button"
                     className="button button--sm button--primary"
@@ -129,7 +129,7 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
                   >
                     Log
                   </button>
-                  <Link href={`/assets/${item.assetId}`} className="data-table__link">Open</Link>
+                  <Link href={`/assets/${item.assetId}`} className="button button--sm button--ghost">Open</Link>
                 </div>
               </td>
             </tr>
