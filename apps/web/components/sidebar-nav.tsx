@@ -142,7 +142,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
   }, []);
 
   return (
-    <div className="sidebar__nav">
+    <nav className="sidebar__nav" aria-label="Main navigation">
       {/* Collapse / expand toggle */}
       <button
         type="button"
@@ -200,6 +200,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
                 href={item.href}
                 prefetch={true}
                 className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+                aria-current={isActive ? "page" : undefined}
               >
                 <NavIcon icon={item.icon} />
                 <span className="sidebar__link-label">{item.label}</span>
@@ -232,6 +233,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
             href={item.href}
             prefetch={true}
             className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+            aria-current={isActive ? "page" : undefined}
           >
             <NavIcon icon={item.icon} />
             <span className="sidebar__link-label">{item.label}</span>
@@ -242,6 +244,6 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         </div>
         );
       })}
-    </div>
+    </nav>
   );
 }

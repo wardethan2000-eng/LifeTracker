@@ -139,6 +139,7 @@ export function LinkPreviewDialog({
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Paste a product URL (Home Depot, Amazon, Lowes, etc.)"
+                aria-label="Product URL"
                 disabled={state.phase === "loading"}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleFetch(); } }}
                 autoFocus

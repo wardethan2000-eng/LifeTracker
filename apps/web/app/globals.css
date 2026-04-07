@@ -3184,7 +3184,7 @@ a.stat-card:hover {
   text-decoration: none;
 }
 .btn--primary  { background: var(--accent); color: #fff; border-color: var(--accent); }
-.btn--primary:hover { background: #0f766e; }
+.btn--primary:hover { filter: brightness(0.88); }
 .btn--secondary { background: var(--surface); border-color: var(--border-strong); color: var(--ink); }
 .btn--secondary:hover { background: var(--surface-alt); }
 .btn--ghost    { background: transparent; color: var(--ink-light); border-color: var(--border); }
@@ -15372,7 +15372,6 @@ html[data-ui-density="compact"] .resource-layout__aside {
 
 .canvas-list__card-preview {
   background: var(--bg-muted, #f8f8f8);
-  padding: 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;

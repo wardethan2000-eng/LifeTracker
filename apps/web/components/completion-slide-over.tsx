@@ -92,7 +92,7 @@ export function CompletionSlideOver(): JSX.Element {
       )}
       <aside
         className={`slide-over${isOpen ? " slide-over--open" : ""}`}
-        aria-modal={isOpen}
+        aria-modal="true"
         role="dialog"
         aria-label={isOpen ? `Log completion: ${slideOverData?.scheduleName ?? ""}` : undefined}
       >
