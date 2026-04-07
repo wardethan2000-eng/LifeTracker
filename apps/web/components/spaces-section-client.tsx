@@ -40,6 +40,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from "./ui/dialog";
+import { EmptyState } from "./empty-state";
 
 type SpacesSectionClientProps = {
   householdId: string;
@@ -730,7 +731,7 @@ export function SpacesSectionClient({
       <div className="panel__body">
         {activeView === "tree" ? (
           spaces.length === 0 ? (
-            <p className="panel__empty">No spaces have been added yet.</p>
+            <EmptyState icon="layers" title="No spaces yet" message="Create rooms, zones, or storage areas to organize where your inventory lives." />
           ) : (
             <div style={{ margin: 0, padding: 0, display: "grid", gap: 12 }}>
               <SortableList

@@ -3,6 +3,7 @@ import type { HouseholdDashboard } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { getHouseholdPartsReadiness } from "../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
+import { EmptyState } from "./empty-state";
 
 const DUE_WORK_STATUS_PILL: Record<string, string> = {
   overdue: "pill--danger",
@@ -29,7 +30,7 @@ export async function DashboardDueWork({ dashboardPromise, householdId }: Dashbo
       </div>
       <div className="panel__body">
         {dashboard.dueWork.length === 0 ? (
-          <p className="panel__empty">No due or overdue maintenance right now.</p>
+          <EmptyState icon="wrench" title="All clear" message="No due or overdue maintenance right now. Check the Assets page to review schedules." />
         ) : (
           <table className="data-table">
             <thead>
