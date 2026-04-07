@@ -2499,6 +2499,20 @@ html[data-sidebar-collapsed="true"] .sidebar__quick-add {
   background: linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(240, 253, 250, 0.98));
 }
 
+/* Portfolio risk tone rows */
+.data-table tbody tr.row--danger td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+.data-table tbody tr.row--warning td:first-child {
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+.data-table tbody tr.row--accent td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.data-table tbody tr.row--due td:first-child {
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+
 .data-table tbody tr:last-child td {
   border-bottom: 0;
 }
