@@ -1,17 +1,12 @@
-import type { AssetDetailResponse, CustomPresetProfile, LibraryPreset } from "@lifekeeper/types";
+import type { AssetDetailResponse } from "@lifekeeper/types";
 import type { JSX } from "react";
-import {
-  applyPresetToAssetAction,
-  recordConditionAssessmentAction
-} from "../app/actions";
-import {
-  formatCategoryLabel,
-  formatDateTime
-} from "../lib/formatters";
+import { recordConditionAssessmentAction } from "../app/actions";
+import { formatDateTime } from "../lib/formatters";
 import { getDisplayPreferences } from "../lib/api";
 import {
   AssetInsuranceDetailsCard,
   AssetLocationDetailsCard,
+  AssetProfileFieldsCard,
   AssetPurchaseDetailsCard,
   AssetWarrantyDetailsCard,
 } from "./asset-details-cards";
@@ -19,36 +14,10 @@ import {
 type AssetDetailsTabProps = {
   detail: AssetDetailResponse;
   assetId: string;
-  libraryPresets: LibraryPreset[];
-  customPresets: CustomPresetProfile[];
 };
 
-export async function AssetDetailsTab({ detail, assetId, libraryPresets, customPresets }: AssetDetailsTabProps): Promise<JSX.Element> {
+export async function AssetDetailsTab({ detail, assetId }: AssetDetailsTabProps): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({ pageSize: 25, dateFormat: "US" as const, currencyCode: "USD" }));
-  const matchingPresets = libraryPresets.filter((preset) => preset.category === detail.asset.category);
-  const visibleLibraryPresets = matchingPresets.length > 0 ? matchingPresets : libraryPresets;
-  const visiblePresets = [
-    ...visibleLibraryPresets.map((preset) => ({
-      id: `library-${preset.key}`,
-      sourceLabel: "Library",
-      key: preset.key,
-      category: preset.category,
-      label: preset.label,
-      description: preset.description,
-      metricCount: preset.metricTemplates.length,
-      scheduleCount: preset.scheduleTemplates.length
-    })),
-    ...customPresets.map((preset) => ({
-      id: `custom-${preset.id}`,
-      sourceLabel: "Custom",
-      key: preset.id,
-      category: preset.category,
-      label: preset.label,
-      description: preset.description,
-      metricCount: preset.metricTemplates.length,
-      scheduleCount: preset.scheduleTemplates.length
-    }))
-  ];
   const sortedConditionHistory = [...detail.asset.conditionHistory].sort((left, right) => (
     right.assessedAt.localeCompare(left.assessedAt)
   ));
@@ -125,65 +94,12 @@ export async function AssetDetailsTab({ detail, assetId, libraryPresets, customP
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Profile Fields</h2>
-        </div>
-        <div className="panel__body--padded">
-          {detail.asset.fieldDefinitions.length === 0 ? (
-            <p className="panel__empty">No custom profile fields defined.</p>
-          ) : (
-            <dl className="data-list">
-              {detail.asset.fieldDefinitions.map((field) => {
-                const rawValue = detail.asset.customFields[field.key];
-                const renderedValue = rawValue === null || rawValue === undefined || rawValue === ""
-                  ? "Not set"
-                  : Array.isArray(rawValue)
-                    ? rawValue.join(", ")
-                    : String(rawValue);
-
-                return (
-                  <div key={field.key}>
-                    <dt>{field.label}</dt>
-                    <dd>{renderedValue}</dd>
-                  </div>
-                );
-              })}
-            </dl>
-          )}
-        </div>
-      </section>
-
-      <section className="panel" style={{ gridColumn: "1 / -1" }}>
-        <div className="panel__header">
-          <h2>Preset Browser</h2>
-          <span className="pill">{visiblePresets.length}</span>
-        </div>
-        <div className="preset-grid">
-          {visiblePresets.map((preset) => (
-            <article key={preset.id} className="preset-card">
-              <div>
-                <p className="eyebrow">{preset.sourceLabel} · {formatCategoryLabel(preset.category)}</p>
-                <h3>{preset.label}</h3>
-                <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
-                  {preset.description ?? "No description."}
-                </p>
-              </div>
-              <div className="preset-card__meta">
-                <span>{preset.metricCount} metrics</span>
-                <span>{preset.scheduleCount} schedules</span>
-              </div>
-              {preset.sourceLabel === "Library" ? (
-                <form action={applyPresetToAssetAction}>
-                  <input type="hidden" name="assetId" value={assetId} />
-                  <input type="hidden" name="presetKey" value={preset.key} />
-                  <button type="submit" className="button button--ghost button--sm">Apply</button>
-                </form>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      </section>
+      <AssetProfileFieldsCard
+        assetId={assetId}
+        householdId={detail.asset.householdId}
+        fieldDefinitions={detail.asset.fieldDefinitions}
+        customFields={detail.asset.customFields}
+      />
     </div>
   );
 }

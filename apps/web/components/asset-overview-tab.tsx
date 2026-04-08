@@ -44,11 +44,11 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
           <span className="stat-card__sub">Schedules requiring action</span>
         </div>
         <div className="stat-card stat-card--danger">
-          <span className="stat-card__label">Latest Spend</span>
+          <span className="stat-card__label">Last Service Cost</span>
           <strong className="stat-card__value">
-            {detail.recentLogs[0] ? formatCurrency(detail.recentLogs[0].cost, "$0.00", prefs.currencyCode) : "$0.00"}
+            {detail.recentLogs[0]?.cost ? formatCurrency(detail.recentLogs[0].cost, "—", prefs.currencyCode) : "—"}
           </strong>
-          <span className="stat-card__sub">Most recent labor cost</span>
+          <span className="stat-card__sub">Most recent maintenance log</span>
         </div>
       </section>
 
