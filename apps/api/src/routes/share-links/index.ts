@@ -1,4 +1,4 @@
-﻿import { createShareLinkSchema } from "@lifekeeper/types";
+﻿import { createShareLinkSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
+import type { InventoryItemSummary, SpaceResponse } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { addItemToSpace } from "../app/actions";

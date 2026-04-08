@@ -14,7 +14,7 @@ import {
   updateProjectPhaseSchema,
   updateProjectPhaseSupplySchema,
   updateProjectTaskChecklistItemSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, requireHouseholdMembership, ForbiddenError } from "../../lib/asset-access.js";

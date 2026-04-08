@@ -1,7 +1,7 @@
 ﻿import {
   assetTransferListSchema,
   createAssetTransferSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { Asset, PrismaClient } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";

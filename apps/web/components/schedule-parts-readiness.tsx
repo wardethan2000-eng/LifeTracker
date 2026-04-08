@@ -1,6 +1,6 @@
 "use client";
 
-import type { SchedulePartsReadiness } from "@lifekeeper/types";
+import type { SchedulePartsReadiness } from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { getSchedulePartsReadiness } from "../lib/api";

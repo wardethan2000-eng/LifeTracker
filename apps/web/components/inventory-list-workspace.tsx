@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemConsumption, InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
+import type { InventoryItemConsumption, InventoryItemSummary, SpaceResponse } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";

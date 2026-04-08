@@ -3,7 +3,7 @@ import {
   bulkDeleteIdeasSchema,
   bulkMoveIdeasSchema,
   bulkSetIdeaPrioritySchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";
 import { createActivityLogger } from "../../lib/activity-log.js";

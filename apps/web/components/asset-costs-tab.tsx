@@ -2,7 +2,7 @@
   AssetCostPerUnit,
   AssetCostSummary,
   CostForecast
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { AssetCostCharts } from "./asset-cost-charts";
 import { formatCurrency } from "../lib/formatters";

@@ -3,7 +3,7 @@
   bulkPauseSchedulesSchema,
   bulkSnoozeSchedulesSchema,
   maintenanceTriggerSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { assertMembership } from "../../lib/asset-access.js";
 import { logActivity } from "../../lib/activity-log.js";

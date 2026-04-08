@@ -3,14 +3,14 @@ import {
   createUsageMetricSchema,
   createUsageMetricEntrySchema,
   updateUsageMetricSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";
 import { enqueueNotificationScan } from "../../lib/queues.js";
 import { toUsageMetricResponse, toUsageMetricEntryResponse } from "../../lib/serializers/index.js";
 import { recalculateAssetSchedules } from "../../lib/schedule-state.js";
-import { calculateUsageRate, projectNextDueValue } from "@lifekeeper/utils";
+import { calculateUsageRate, projectNextDueValue } from "@aegis/utils";
 import { notFound } from "../../lib/errors.js";
 import { assetParamsSchema } from "../../lib/schemas.js";
 

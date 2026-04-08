@@ -7,7 +7,7 @@ import {
   getHobbyMetricReadings,
   getMe,
 } from "../../../../../lib/api";
-import type { HobbyMetricReading } from "@lifekeeper/types";
+import type { HobbyMetricReading } from "@aegis/types";
 
 type HobbySectionPageProps = {
   params: Promise<{ hobbyId: string }>;

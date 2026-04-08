@@ -2,8 +2,8 @@ import type { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "LifeKeeper",
-  slug: "lifekeeper",
+  name: "Aegis",
+  slug: "aegis",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     backgroundColor: "#14342b",
   },
   android: {
-    package: "com.lifekeeper.app",
+    package: "com.aegis.app",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#14342b",
@@ -30,7 +30,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
   },
   ios: {
-    bundleIdentifier: "com.lifekeeper.app",
+    bundleIdentifier: "com.aegis.app",
     supportsTablet: false,
   },
   plugins: [
@@ -47,23 +47,23 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-camera",
       {
-        cameraPermission: "Allow LifeKeeper to access your camera for scanning barcodes and taking photos.",
+        cameraPermission: "Allow Aegis to access your camera for scanning barcodes and taking photos.",
       },
     ],
     [
       "expo-image-picker",
       {
-        photosPermission: "Allow LifeKeeper to access your photos to attach them to assets and entries.",
+        photosPermission: "Allow Aegis to access your photos to attach them to assets and entries.",
       },
     ],
   ],
-  scheme: "lifekeeper",
+  scheme: "aegis",
   experiments: {
     typedRoutes: true,
   },
   extra: {
-    apiBaseUrl: process.env.EXPO_PUBLIC_LIFEKEEPER_API_BASE_URL ?? "http://127.0.0.1:4000",
-    devUserId: process.env.EXPO_PUBLIC_LIFEKEEPER_DEV_USER_ID ?? "",
+    apiBaseUrl: process.env.EXPO_PUBLIC_AEGIS_API_BASE_URL ?? "http://127.0.0.1:4000",
+    devUserId: process.env.EXPO_PUBLIC_AEGIS_DEV_USER_ID ?? "",
     clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
     eas: {
       projectId: process.env.EAS_PROJECT_ID ?? "",
@@ -71,7 +71,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   updates: {
     fallbackToCacheTimeout: 0,
-    url: "https://u.expo.dev/lifekeeper",
+    url: "https://u.expo.dev/aegis",
   },
   runtimeVersion: {
     policy: "appVersion",

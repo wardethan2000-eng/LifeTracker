@@ -1,11 +1,11 @@
-import { devFixtureIds } from "@lifekeeper/types";
+import { devFixtureIds } from "@aegis/types";
 
 /**
  * API base URL. In local development this points to the Fastify server at :4000.
  * In production this is overridden by the EAS build environment variable.
  */
 export const API_BASE_URL = (
-  process.env.EXPO_PUBLIC_LIFEKEEPER_API_BASE_URL?.trim() ??
+  process.env.EXPO_PUBLIC_AEGIS_API_BASE_URL?.trim() ??
   "http://127.0.0.1:4000"
 ).replace(/\/+$/, "");
 
@@ -14,7 +14,7 @@ export const API_BASE_URL = (
  * Bypasses Clerk auth entirely during local development.
  */
 export const DEV_USER_ID =
-  process.env.EXPO_PUBLIC_LIFEKEEPER_DEV_USER_ID?.trim() ||
+  process.env.EXPO_PUBLIC_AEGIS_DEV_USER_ID?.trim() ||
   devFixtureIds.ownerUserId;
 
 /**

@@ -23,7 +23,7 @@ import type {
   CompletionCycleRecord,
   ComplianceStatus,
   RegulatoryAssetOption
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { forbidden, notFound } from "../../lib/errors.js";
 
 const householdAnalyticsQuerySchema = z.object({

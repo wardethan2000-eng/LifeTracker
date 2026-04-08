@@ -1,5 +1,5 @@
 {
-  "name": "@lifekeeper/mobile",
+  "name": "@aegis/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.7.2",
-    "@lifekeeper/types": "workspace:*",
+    "@aegis/types": "workspace:*",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/netinfo": "11.4.1",
     "@tanstack/query-async-storage-persister": "^5.95.2",

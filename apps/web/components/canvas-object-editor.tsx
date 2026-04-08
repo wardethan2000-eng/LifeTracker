@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CanvasObject, CanvasObjectCategory } from "@lifekeeper/types";
-import { canvasObjectCategoryValues } from "@lifekeeper/types";
+import type { CanvasObject, CanvasObjectCategory } from "@aegis/types";
+import { canvasObjectCategoryValues } from "@aegis/types";
 import {
   confirmAttachmentUpload,
   createCanvasObject,

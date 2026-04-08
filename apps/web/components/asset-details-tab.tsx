@@ -1,4 +1,4 @@
-import type { AssetDetailResponse, CustomPresetProfile, LibraryPreset } from "@lifekeeper/types";
+import type { AssetDetailResponse, CustomPresetProfile, LibraryPreset } from "@aegis/types";
 import type { JSX } from "react";
 import {
   applyPresetToAssetAction,

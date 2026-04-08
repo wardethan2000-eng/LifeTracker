@@ -1,4 +1,4 @@
-import { hobbyActivityModeSchema, hobbyStatusSchema } from "@lifekeeper/types";
+import { hobbyActivityModeSchema, hobbyStatusSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";

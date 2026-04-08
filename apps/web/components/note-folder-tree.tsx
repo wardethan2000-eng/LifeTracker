@@ -1,6 +1,6 @@
 "use client";
 
-import type { NoteFolder } from "@lifekeeper/types";
+import type { NoteFolder } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
 

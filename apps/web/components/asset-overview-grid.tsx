@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { AssetDetailResponse, AssetTransferList, Entry, OverviewPin } from "@lifekeeper/types";
+import type { AssetDetailResponse, AssetTransferList, Entry, OverviewPin } from "@aegis/types";
 import { updateEntry, removeOverviewPin } from "../lib/api";
 import { useCallback } from "react";
 import type { LayoutItem } from "react-grid-layout";

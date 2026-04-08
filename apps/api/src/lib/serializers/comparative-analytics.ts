@@ -2,7 +2,7 @@ import {
   assetComparisonPayloadSchema,
   memberContributionPayloadSchema,
   yearOverYearPayloadSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toAssetComparisonPayloadResponse = (value: unknown) => assetComparisonPayloadSchema.parse(value);
 

@@ -5,7 +5,7 @@
   householdSummarySchema,
   updateHouseholdMemberSchema,
   updateHouseholdSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { HouseholdRole, Prisma, User } from "@prisma/client";
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";

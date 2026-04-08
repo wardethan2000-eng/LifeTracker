@@ -1,28 +1,28 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: lifekeeper-postgres
+    container_name: aegis-postgres
     environment:
-      POSTGRES_DB: lifekeeper
+      POSTGRES_DB: aegis
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - lifekeeper-postgres-data:/var/lib/postgresql/data
+      - aegis-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lifekeeper"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aegis"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: lifekeeper-redis
+    container_name: aegis-redis
     ports:
       - "6379:6379"
     volumes:
-      - lifekeeper-redis-data:/data
+      - aegis-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -31,7 +31,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: lifekeeper-minio
+    container_name: aegis-minio
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -40,7 +40,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - lifekeeper-minio-data:/data
+      - aegis-minio-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -48,6 +48,6 @@ services:
       retries: 10
 
 volumes:
-  lifekeeper-postgres-data:
-  lifekeeper-redis-data:
-  lifekeeper-minio-data:
+  aegis-postgres-data:
+  aegis-redis-data:
+  aegis-minio-data:

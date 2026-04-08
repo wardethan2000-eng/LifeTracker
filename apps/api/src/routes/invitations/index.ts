@@ -3,7 +3,7 @@ import {
   createInvitationSchema,
   acceptInvitationSchema,
   invitationStatusSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertOwner, assertMembership } from "../../lib/asset-access.js";

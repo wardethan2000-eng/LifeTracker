@@ -8,7 +8,7 @@ import type {
   HobbyPracticeRoutineSummary,
   HobbyPracticeGoalType,
   HobbyPracticeRoutineFrequency,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type JSX } from "react";

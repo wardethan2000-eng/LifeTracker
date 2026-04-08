@@ -31,7 +31,7 @@ const getStorageConfig = () => ({
   region: process.env.S3_REGION ?? "us-east-1",
   accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "minioadmin",
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "minioadmin",
-  bucket: process.env.S3_BUCKET ?? "lifekeeper-attachments",
+  bucket: process.env.S3_BUCKET ?? "aegis-attachments",
   forcePathStyle: parseBoolean(process.env.S3_FORCE_PATH_STYLE ?? "true"),
   uploadExpiresSec: Number(process.env.S3_PRESIGN_UPLOAD_EXPIRES_SECONDS ?? "300"),
   downloadExpiresSec: Number(process.env.S3_PRESIGN_DOWNLOAD_EXPIRES_SECONDS ?? "3600"),

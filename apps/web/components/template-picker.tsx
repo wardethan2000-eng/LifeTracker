@@ -1,6 +1,6 @@
 "use client";
 
-import type { NoteTemplate } from "@lifekeeper/types";
+import type { NoteTemplate } from "@aegis/types";
 import type { JSX } from "react";
 import { useState } from "react";
 

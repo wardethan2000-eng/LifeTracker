@@ -1,6 +1,6 @@
 "use client";
 
-import type { Asset, SpaceResponse } from "@lifekeeper/types";
+import type { Asset, SpaceResponse } from "@aegis/types";
 import type { JSX } from "react";
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import type { AssetProfileFormValues } from "../lib/validation/forms";

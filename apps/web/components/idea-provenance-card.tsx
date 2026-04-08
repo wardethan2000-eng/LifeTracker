@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 import Link from "next/link";
-import type { IdeaPromotionTarget } from "@lifekeeper/types";
+import type { IdeaPromotionTarget } from "@aegis/types";
 import { CollapsibleCard } from "./collapsible-card";
 import { useFormattedDate } from "../lib/formatted-date";
 

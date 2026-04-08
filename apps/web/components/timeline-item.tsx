@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssetTimelineItem } from "@lifekeeper/types";
+import type { AssetTimelineItem } from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useRef, useState } from "react";
 import { formatCurrency, formatDateTime } from "../lib/formatters";

@@ -1,7 +1,7 @@
 "use client";
 
-import type { Asset, AssetCategory, AssetVisibility } from "@lifekeeper/types";
-import { assetCategoryValues, assetVisibilityValues } from "@lifekeeper/types";
+import type { Asset, AssetCategory, AssetVisibility } from "@aegis/types";
+import { assetCategoryValues, assetVisibilityValues } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";

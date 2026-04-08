@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { IdeaCanvasNode } from "@lifekeeper/types";
+import type { IdeaCanvasNode } from "@aegis/types";
 import { batchUpdateCanvasNodes } from "../../../lib/api";
 
 const SYNC_DEBOUNCE_MS = 800;

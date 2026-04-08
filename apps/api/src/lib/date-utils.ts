@@ -1,1 +1,1 @@
-export { toMonthKey, startOfUtcMonth, addUtcMonths, getMonthRange } from "@lifekeeper/utils";
+export { toMonthKey, startOfUtcMonth, addUtcMonths, getMonthRange } from "@aegis/utils";

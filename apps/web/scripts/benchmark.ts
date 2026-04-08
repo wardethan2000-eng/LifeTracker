@@ -5,13 +5,13 @@
  * ISR caching (the `revalidate` optimizations) is disabled in `next dev`.
  * To get real performance numbers, build and start the app first:
  *
- *   pnpm --filter @lifekeeper/web build && pnpm --filter @lifekeeper/web start
+ *   pnpm --filter @aegis/web build && pnpm --filter @aegis/web start
  *
- * Then run:  pnpm --filter @lifekeeper/web benchmark
+ * Then run:  pnpm --filter @aegis/web benchmark
  *
  * Pass --report-only to log violations without exiting 1 (useful for informational CI steps).
  */
-import { devFixtureIds } from "@lifekeeper/types";
+import { devFixtureIds } from "@aegis/types";
 
 const DEMO_USER_ID = devFixtureIds.ownerUserId;
 const DEMO_HOUSEHOLD_ID = devFixtureIds.householdId;
@@ -25,7 +25,7 @@ const WARM_CRITICAL_MS = 1000;
 const reportOnly = process.argv.includes("--report-only");
 
 const webBaseUrl = process.env.BENCHMARK_WEB_URL ?? "http://127.0.0.1:3000";
-const apiBaseUrl = process.env.LIFEKEEPER_API_BASE_URL ?? "http://127.0.0.1:4000";
+const apiBaseUrl = process.env.AEGIS_API_BASE_URL ?? "http://127.0.0.1:4000";
 
 type PageDefinition = {
   label: string;
@@ -147,7 +147,7 @@ const ensureWebServerReachable = async (): Promise<void> => {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Web app is not reachable at ${webBaseUrl}. Run pnpm --filter @lifekeeper/web build && pnpm --filter @lifekeeper/web start first. (${message})`);
+    console.error(`Web app is not reachable at ${webBaseUrl}. Run pnpm --filter @aegis/web build && pnpm --filter @aegis/web start first. (${message})`);
     process.exit(1);
   }
 };

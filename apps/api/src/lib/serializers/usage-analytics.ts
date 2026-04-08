@@ -4,7 +4,7 @@ import {
   metricCorrelationSchema,
   usageCostNormalizationSchema,
   usageRateAnalyticsSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toUsageRateAnalyticsResponse = (payload: {
   metricId: string;

@@ -1,4 +1,4 @@
-# LifeKeeper — Checklist-to-Task Promotion at Phase Level Implementation Specification
+# Aegis — Checklist-to-Task Promotion at Phase Level Implementation Specification
 
 This document is the complete implementation reference for the Phase Checklist-to-Task Promotion feature. This is a single-phase implementation — the scope is small and self-contained.
 

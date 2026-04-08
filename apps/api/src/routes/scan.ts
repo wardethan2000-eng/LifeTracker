@@ -1,4 +1,4 @@
-﻿import { scanResolutionResponseSchema, scanSpaceSummarySchema } from "@lifekeeper/types";
+﻿import { scanResolutionResponseSchema, scanSpaceSummarySchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getSpaceBreadcrumb } from "../lib/spaces.js";

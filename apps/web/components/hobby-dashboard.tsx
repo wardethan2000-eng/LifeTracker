@@ -1,6 +1,6 @@
 "use client";
 
-import type { HobbyPracticeGoalSummary, HobbyPracticeRoutineSummary } from "@lifekeeper/types";
+import type { HobbyPracticeGoalSummary, HobbyPracticeRoutineSummary } from "@aegis/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

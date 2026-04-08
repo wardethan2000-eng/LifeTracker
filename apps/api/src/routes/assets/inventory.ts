@@ -1,5 +1,5 @@
 ﻿import type { Prisma } from "@prisma/client";
-import { createAssetInventoryItemSchema } from "@lifekeeper/types";
+import { createAssetInventoryItemSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { BarcodeLookupResult } from "@lifekeeper/types";
+import type { BarcodeLookupResult } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createInventoryItemAction } from "../app/actions";

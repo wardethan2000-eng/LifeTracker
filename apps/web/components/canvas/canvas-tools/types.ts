@@ -1,4 +1,4 @@
-import type { IdeaCanvasNode, IdeaCanvasEdge, CanvasObjectType } from "@lifekeeper/types";
+import type { IdeaCanvasNode, IdeaCanvasEdge, CanvasObjectType } from "@aegis/types";
 import type { ReactNode } from "react";
 
 // ─── Active Tool Union ───────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
   bulkChangeProjectStatusSchema,
   bulkCompleteTasksSchema,
   bulkReassignTasksSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { assertMembership } from "../../lib/asset-access.js";
 import { createActivityLogger, logActivity } from "../../lib/activity-log.js";

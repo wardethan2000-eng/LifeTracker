@@ -1,6 +1,6 @@
 "use client";
 
-import type { Entry, IdeaCanvas } from "@lifekeeper/types";
+import type { Entry, IdeaCanvas } from "@aegis/types";
 import type { JSX } from "react";
 import { useRouter } from "next/navigation";
 import { CanvasRenderer } from "../../../../components/canvas-renderer";

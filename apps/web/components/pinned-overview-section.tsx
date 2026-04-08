@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import type { Entry, OverviewPin } from "@lifekeeper/types";
+import type { Entry, OverviewPin } from "@aegis/types";
 import { updateEntry, removeOverviewPin } from "../lib/api";
 import { useFormattedDate } from "../lib/formatted-date";
 

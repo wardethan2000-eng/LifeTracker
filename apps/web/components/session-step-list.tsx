@@ -1,6 +1,6 @@
 "use client";
 
-import type { HobbySessionStep } from "@lifekeeper/types";
+import type { HobbySessionStep } from "@aegis/types";
 import { useEffect, useState } from "react";
 import { Card } from "./card";
 import { SortableList } from "./ui/sortable-list";

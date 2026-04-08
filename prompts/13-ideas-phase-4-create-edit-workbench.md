@@ -1,4 +1,4 @@
-# LifeKeeper — Ideas Feature Phase 4: Create & Edit Workbench
+# Aegis — Ideas Feature Phase 4: Create & Edit Workbench
 
 This document covers refactoring the idea creation page and adding an edit mode for existing ideas.
 

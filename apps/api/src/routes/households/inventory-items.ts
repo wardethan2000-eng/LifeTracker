@@ -9,7 +9,7 @@ import {
   inventoryItemTypeSchema,
   mergeInventoryItemsSchema,
   updateInventoryItemSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { sendQrCode } from "../../lib/qr.js";
 import { z } from "zod";
@@ -35,7 +35,7 @@ import {
   toInventoryItemSummaryResponse,
   toLowStockInventoryItemResponse
 } from "../../lib/serializers/index.js";
-import { calculateInventoryDeficit } from "@lifekeeper/utils";
+import { calculateInventoryDeficit } from "@aegis/utils";
 import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { notFound, badRequest } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";

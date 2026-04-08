@@ -1,4 +1,4 @@
-import type { CanvasObjectCategory } from "@lifekeeper/types";
+import type { CanvasObjectCategory } from "@aegis/types";
 
 export interface CanvasObjectPreset {
   key: string;

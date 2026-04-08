@@ -1,4 +1,4 @@
-import type { ProjectPortfolioItem } from "@lifekeeper/types";
+import type { ProjectPortfolioItem } from "@aegis/types";
 import type { JSX } from "react";
 import { formatCurrency } from "../lib/formatters";
 import { buildPortfolioProjects, type ProjectSort } from "./project-portfolio-shared";

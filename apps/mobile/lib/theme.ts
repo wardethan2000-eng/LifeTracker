@@ -4,7 +4,7 @@ import {
   type MD3Theme,
 } from "react-native-paper";
 
-// LifeKeeper brand palette — mirrors CSS custom properties in globals.css
+// Aegis brand palette — mirrors CSS custom properties in globals.css
 const brand = {
   teal: "#0d9488",
   tealDark: "#14342b",

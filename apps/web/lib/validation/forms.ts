@@ -8,7 +8,7 @@ import {
   createProjectSchema,
   spaceTypeSchema,
   updateInventoryItemSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { z } from "zod";
 
 import { normalizeExternalUrl } from "../url";

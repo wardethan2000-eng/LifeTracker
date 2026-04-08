@@ -24,9 +24,9 @@ export default {
   },
   resolve: {
     alias: {
-      "@lifekeeper/presets": resolveFromRoot("../../packages/presets/src/index.ts"),
-      "@lifekeeper/types": resolveFromRoot("../../packages/types/src/index.ts"),
-      "@lifekeeper/utils": resolveFromRoot("../../packages/utils/src/index.ts")
+      "@aegis/presets": resolveFromRoot("../../packages/presets/src/index.ts"),
+      "@aegis/types": resolveFromRoot("../../packages/types/src/index.ts"),
+      "@aegis/utils": resolveFromRoot("../../packages/utils/src/index.ts")
     }
   }
 };

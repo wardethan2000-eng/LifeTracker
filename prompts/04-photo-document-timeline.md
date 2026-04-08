@@ -1,4 +1,4 @@
-# LifeKeeper — Photo/Document Timeline Implementation Specification
+# Aegis — Photo/Document Timeline Implementation Specification
 
 This document is the complete implementation reference for the Photo/Document Timeline feature. It is broken into sequential phases designed to be executed one at a time. Each phase builds on the previous and must be completed before moving to the next.
 

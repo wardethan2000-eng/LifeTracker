@@ -1,4 +1,4 @@
-# LifeKeeper — Project Dashboard / Activity Feed Implementation Specification
+# Aegis — Project Dashboard / Activity Feed Implementation Specification
 
 This document is the complete implementation reference for the Project Activity Feed feature. It is broken into sequential phases designed to be executed one at a time. Each phase builds on the previous and must be completed before moving to the next.
 

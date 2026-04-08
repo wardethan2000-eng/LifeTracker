@@ -1,6 +1,6 @@
 import type {
   AssetDetailResponse,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import {

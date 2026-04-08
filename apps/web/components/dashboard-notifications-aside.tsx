@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Notification } from "@lifekeeper/types";
+import type { Notification } from "@aegis/types";
 import type { JSX } from "react";
 import { markNotificationReadAction } from "../app/actions";
 import { formatDateTime, formatNotificationTone } from "../lib/formatters";

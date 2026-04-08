@@ -1,4 +1,4 @@
-# LifeKeeper — AI Agent Instructions
+# Aegis — AI Agent Instructions
 
 Universal maintenance tracking platform. Turborepo monorepo, TypeScript end-to-end.
 
@@ -7,9 +7,9 @@ Universal maintenance tracking platform. Turborepo monorepo, TypeScript end-to-e
 - `apps/api` — Fastify REST API with Prisma ORM (PostgreSQL)
 - `apps/web` — Next.js App Router dashboard (primary working interface)
 - `apps/mobile` — Expo/React Native shell (future phase)
-- `packages/types` — Shared Zod schemas and TypeScript types (`@lifekeeper/types`)
-- `packages/utils` — Date math, trigger calculation helpers (`@lifekeeper/utils`)
-- `packages/presets` — Asset preset library JSON (`@lifekeeper/presets`)
+- `packages/types` — Shared Zod schemas and TypeScript types (`@aegis/types`)
+- `packages/utils` — Date math, trigger calculation helpers (`@aegis/utils`)
+- `packages/presets` — Asset preset library JSON (`@aegis/presets`)
 - `prisma/` schema lives at `apps/api/prisma/schema.prisma`
 
 ## Commands
@@ -21,9 +21,9 @@ pnpm install                          # install all workspace deps
 pnpm db:generate                      # regenerate Prisma client after schema changes
 pnpm db:migrate                       # run pending migrations
 pnpm db:seed                          # seed dev data (idempotent)
-pnpm --filter @lifekeeper/api dev     # start API on :4000
-pnpm --filter @lifekeeper/web dev     # start web dashboard
-pnpm --filter @lifekeeper/api notifications:scan:now   # scan + deliver notifications locally
+pnpm --filter @aegis/api dev     # start API on :4000
+pnpm --filter @aegis/web dev     # start web dashboard
+pnpm --filter @aegis/api notifications:scan:now   # scan + deliver notifications locally
 ```
 
 Run `pnpm db:generate` after every Prisma schema change before writing code that uses new models. Forgetting this causes TypeScript errors that look like missing properties on `prisma.*` calls.

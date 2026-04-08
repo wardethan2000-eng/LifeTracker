@@ -13,8 +13,8 @@ import {
   entryMeasurementSchema,
   entrySchema,
   type AssetTimelineSourceType
-} from "@lifekeeper/types";
-import { LEGACY_ENTRY_SOURCE_TYPES, parseAssetEntryPayload } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { LEGACY_ENTRY_SOURCE_TYPES, parseAssetEntryPayload } from "@aegis/utils";
 
 type TimelineUserInfo = {
   id: string | null;

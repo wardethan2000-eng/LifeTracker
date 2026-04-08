@@ -13,7 +13,7 @@ import {
   updateHobbyProjectInventoryItemInputSchema,
   updateHobbyProjectMilestoneInputSchema,
   updateHobbyProjectWorkLogInputSchema,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";

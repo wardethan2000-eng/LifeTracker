@@ -6,7 +6,7 @@ import {
   getDashboardPins,
   removeDashboardPin,
 } from "../lib/api";
-import type { CreateDashboardPinInput } from "@lifekeeper/types";
+import type { CreateDashboardPinInput } from "@aegis/types";
 
 type PinButtonProps = {
   entityType: CreateDashboardPinInput["entityType"];

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
-import type { LinkPreviewField, LinkPreviewResponse } from "@lifekeeper/types";
+import type { LinkPreviewField, LinkPreviewResponse } from "@aegis/types";
 import { fetchLinkPreview } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { InlineError } from "./inline-error";

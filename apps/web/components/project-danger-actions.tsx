@@ -6,7 +6,7 @@ import { useState } from "react";
 import { deleteProjectAction } from "../app/actions";
 import { ConfirmDestructiveAction } from "./confirm-destructive-action";
 import { getProjectDeleteImpact } from "../lib/api";
-import type { ProjectDeleteImpact } from "@lifekeeper/types";
+import type { ProjectDeleteImpact } from "@aegis/types";
 
 type ProjectDangerActionsProps = {
   householdId: string;

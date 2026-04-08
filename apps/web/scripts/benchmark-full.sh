@@ -2,10 +2,10 @@
 set -e
 
 echo "Building web app in production mode..."
-pnpm --filter @lifekeeper/web build
+pnpm --filter @aegis/web build
 
 echo "Starting production server in background..."
-pnpm --filter @lifekeeper/web start &
+pnpm --filter @aegis/web start &
 WEB_PID=$!
 
 echo "Waiting for server to be ready..."
@@ -23,7 +23,7 @@ for i in $(seq 1 30); do
 done
 
 echo "Running benchmark..."
-pnpm --filter @lifekeeper/web benchmark
+pnpm --filter @aegis/web benchmark
 
 echo "Stopping production server..."
 kill $WEB_PID 2>/dev/null

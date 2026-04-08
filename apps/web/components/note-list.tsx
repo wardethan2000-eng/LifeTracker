@@ -1,6 +1,6 @@
 "use client";
 
-import type { Entry, NoteFolder } from "@lifekeeper/types";
+import type { Entry, NoteFolder } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { RichEditorDisplay } from "./rich-editor-display";

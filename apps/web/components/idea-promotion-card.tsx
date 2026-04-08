@@ -4,7 +4,7 @@ import type { JSX } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
-import type { IdeaPromotionTarget } from "@lifekeeper/types";
+import type { IdeaPromotionTarget } from "@aegis/types";
 import { promoteIdeaAction, updateIdeaAction } from "../app/actions";
 import { Card } from "./card";
 import { useFormattedDate } from "../lib/formatted-date";

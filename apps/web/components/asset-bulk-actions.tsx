@@ -1,7 +1,7 @@
 "use client";
 
-import type { Asset, AssetCategory, BulkAssetOperationResult } from "@lifekeeper/types";
-import { assetCategoryValues } from "@lifekeeper/types";
+import type { Asset, AssetCategory, BulkAssetOperationResult } from "@aegis/types";
+import { assetCategoryValues } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";

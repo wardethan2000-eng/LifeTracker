@@ -1,4 +1,4 @@
-import type { PresetUsageMetricTemplate } from "@lifekeeper/types";
+import type { PresetUsageMetricTemplate } from "@aegis/types";
 import type { JSX } from "react";
 import { CompactMetricPreview } from "./compact-metric-preview";
 import { ExpandableCard } from "./expandable-card";

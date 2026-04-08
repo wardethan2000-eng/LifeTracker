@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, getProjectDetail, getProjectPhaseSupplies } from "../../../../../lib/api";
 import { EmptyState } from "../../../../../components/EmptyState";
-import type { ProjectPhaseSupply } from "@lifekeeper/types";
+import type { ProjectPhaseSupply } from "@aegis/types";
 
 export default function PhaseSuppliesScreen() {
   const theme = useTheme();

@@ -1,6 +1,6 @@
 "use client";
 
-import type { IdeaCanvasLayer } from "@lifekeeper/types";
+import type { IdeaCanvasLayer } from "@aegis/types";
 import type { JSX } from "react";
 import { useState } from "react";
 

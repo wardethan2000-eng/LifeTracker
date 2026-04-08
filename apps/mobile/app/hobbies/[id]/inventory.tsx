@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, getHobbyDetail } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
-import type { HobbyDetailInventoryLink } from "@lifekeeper/types";
+import type { HobbyDetailInventoryLink } from "@aegis/types";
 
 export default function HobbyInventoryScreen() {
   const theme = useTheme();

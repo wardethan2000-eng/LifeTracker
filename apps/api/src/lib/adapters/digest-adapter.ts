@@ -20,7 +20,7 @@ export const sendDigest = async (options: SendDigestOptions): Promise<void> => {
   const text = [
     `Hi ${options.userName},`,
     "",
-    "Here is your daily LifeKeeper digest:",
+    "Here is your daily Aegis digest:",
     "",
     ...lines,
     "",
@@ -29,7 +29,7 @@ export const sendDigest = async (options: SendDigestOptions): Promise<void> => {
 
   await sendEmail({
     to: options.to,
-    subject: "Your LifeKeeper daily digest",
+    subject: "Your Aegis daily digest",
     text
   });
 };

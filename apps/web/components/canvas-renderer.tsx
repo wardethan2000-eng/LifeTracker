@@ -12,7 +12,7 @@ import type {
   IdeaCanvasNode,
   Entry,
   UpdateCanvasSettingsInput,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { createPortal } from "react-dom";
 import CanvasObjectPicker, { type CanvasObjectPlacement } from "./canvas-object-picker";

@@ -170,7 +170,7 @@ export default function SettingsScreen() {
           <Card.Title title="About" titleVariant="titleSmall" />
           <Divider />
           <List.Item
-            title="LifeKeeper"
+            title="Aegis"
             description={`Version ${appVersion} · Expo SDK 52`}
             left={(props) => <List.Icon {...props} icon="information-outline" color={theme.colors.primary} />}
           />

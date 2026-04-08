@@ -1,5 +1,5 @@
 import type { Attachment as PrismaAttachment } from "@prisma/client";
-import { attachmentSchema } from "@lifekeeper/types";
+import { attachmentSchema } from "@aegis/types";
 import { toShallowUserResponse } from "./users.js";
 
 export const toAttachmentResponse = (

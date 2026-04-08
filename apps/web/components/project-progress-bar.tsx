@@ -1,4 +1,4 @@
-import type { ProjectPhaseProgress } from "@lifekeeper/types";
+import type { ProjectPhaseProgress } from "@aegis/types";
 
 type ProjectProgressBarProps = {
   phases: ProjectPhaseProgress[];

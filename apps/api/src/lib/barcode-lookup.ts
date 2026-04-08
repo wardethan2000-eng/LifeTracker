@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import type { BarcodeLookupResult } from "@lifekeeper/types";
+import type { BarcodeLookupResult } from "@aegis/types";
 
 const UPC_EAN_LENGTHS = new Set([8, 12, 13, 14]);
 const ALL_DIGITS = /^\d+$/;

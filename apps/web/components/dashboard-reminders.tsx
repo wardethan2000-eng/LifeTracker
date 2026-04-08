@@ -1,6 +1,6 @@
 "use client";
 
-import type { Entry } from "@lifekeeper/types";
+import type { Entry } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useCallback, useTransition } from "react";

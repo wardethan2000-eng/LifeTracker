@@ -26,7 +26,7 @@ import type { ShareLink } from "../../../lib/api";
 import { EmptyState } from "../../../components/EmptyState";
 
 const SHARE_BASE_URL =
-  process.env.EXPO_PUBLIC_SHARE_BASE_URL ?? "https://app.lifekeeper.app";
+  process.env.EXPO_PUBLIC_SHARE_BASE_URL ?? "https://app.aegis.app";
 
 function linkUrl(token: string) {
   return `${SHARE_BASE_URL}/share/${token}`;

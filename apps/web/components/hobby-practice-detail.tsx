@@ -6,7 +6,7 @@ import type {
   HobbyPracticeRoutineComplianceSummary,
   HobbyPracticeRoutineSummary,
   HobbySessionSummary,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import Link from "next/link";
 import { LkLineChart } from "./charts";
 import { EntryTimeline } from "./entry-system";

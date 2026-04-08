@@ -8,7 +8,7 @@ import type {
   OnTimeRatePayload,
   OverdueTrendPayload,
   RegulatoryAssetOption
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {

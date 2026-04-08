@@ -1,7 +1,7 @@
 "use client";
 
-import type { AssetCategory } from "@lifekeeper/types";
-import { assetCategoryValues } from "@lifekeeper/types";
+import type { AssetCategory } from "@aegis/types";
+import { assetCategoryValues } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";

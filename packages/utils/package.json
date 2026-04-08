@@ -1,5 +1,5 @@
 {
-  "name": "@lifekeeper/utils",
+  "name": "@aegis/utils",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -23,6 +23,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@lifekeeper/types": "workspace:*"
+    "@aegis/types": "workspace:*"
   }
 }

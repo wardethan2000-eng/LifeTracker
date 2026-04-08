@@ -7,7 +7,7 @@
 			"command": "pnpm",
 			"args": [
 				"--filter",
-				"@lifekeeper/api",
+				"@aegis/api",
 				"dev"
 			],
 			"isBackground": true,
@@ -19,7 +19,7 @@
 			"command": "pnpm",
 			"args": [
 				"--filter",
-				"@lifekeeper/web",
+				"@aegis/web",
 				"dev"
 			],
 			"isBackground": true,

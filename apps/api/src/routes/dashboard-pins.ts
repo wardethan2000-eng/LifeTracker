@@ -1,4 +1,4 @@
-import { createDashboardPinSchema, dashboardPinSchema } from "@lifekeeper/types";
+import { createDashboardPinSchema, dashboardPinSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 
 const MAX_PINS = 8;

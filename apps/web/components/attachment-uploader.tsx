@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import type { Attachment, AttachmentEntityType } from "@lifekeeper/types";
+import type { Attachment, AttachmentEntityType } from "@aegis/types";
 import { requestAttachmentUpload, confirmAttachmentUpload } from "../lib/api";
 import { InlineError } from "./inline-error";
 

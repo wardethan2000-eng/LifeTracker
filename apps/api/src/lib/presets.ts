@@ -1,5 +1,5 @@
 import type { Asset, Prisma, UsageMetric } from "@prisma/client";
-import { presetLibrary } from "@lifekeeper/presets";
+import { presetLibrary } from "@aegis/presets";
 import {
   assetFieldDefinitionsSchema,
   customPresetProfileSchema,
@@ -10,7 +10,7 @@ import {
   type ApplyPresetInput,
   type MaintenanceTrigger,
   type PresetDefinition
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { toInputJsonValue } from "./prisma-json.js";
 import { recalculateScheduleFields } from "./schedule-state.js";
 import type { PrismaExecutor } from "./prisma-types.js";

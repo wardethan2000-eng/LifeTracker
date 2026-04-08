@@ -6,7 +6,7 @@ import { useState } from "react";
 import { deleteInventoryItemAction } from "../app/actions";
 import { ConfirmDestructiveAction } from "./confirm-destructive-action";
 import { getInventoryItemDeleteImpact } from "../lib/api";
-import type { InventoryDeleteImpact } from "@lifekeeper/types";
+import type { InventoryDeleteImpact } from "@aegis/types";
 
 type InventoryDangerActionsProps = {
   householdId: string;

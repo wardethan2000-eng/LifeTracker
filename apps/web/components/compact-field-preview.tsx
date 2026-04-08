@@ -1,4 +1,4 @@
-import type { AssetFieldDefinition } from "@lifekeeper/types";
+import type { AssetFieldDefinition } from "@aegis/types";
 import { CompactPreview } from "./compact-preview";
 
 type CompactFieldPreviewProps = {

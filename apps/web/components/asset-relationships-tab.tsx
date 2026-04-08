@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssetDetailResponse, InventoryItemSummary, ProjectSummary } from "@lifekeeper/types";
+import type { AssetDetailResponse, InventoryItemSummary, ProjectSummary } from "@aegis/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import type { EntryFlag } from "@lifekeeper/types";
+import type { EntryFlag } from "@aegis/types";
 
 const FLAGS: { value: EntryFlag; label: string; icon: string }[] = [
   { value: "important", label: "Important", icon: "⭐" },

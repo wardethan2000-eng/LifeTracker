@@ -5,7 +5,7 @@ import type {
   HobbySession,
   HobbySessionDetail,
   HobbySessionStageDetail,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { useEffect, useMemo, useState, type FormEvent, type JSX } from "react";
 import {
   advanceHobbySession,

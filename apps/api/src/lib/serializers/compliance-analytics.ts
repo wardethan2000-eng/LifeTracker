@@ -4,7 +4,7 @@ import {
   onTimeRatePayloadSchema,
   overdueTrendPayloadSchema,
   regulatoryAssetOptionSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toOnTimeRatePayloadResponse = (value: unknown) => onTimeRatePayloadSchema.parse(value);
 

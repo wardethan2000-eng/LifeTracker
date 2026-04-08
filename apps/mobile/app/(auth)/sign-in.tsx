@@ -43,7 +43,7 @@ export default function SignInScreen() {
         style={styles.inner}
       >
         <Text variant="headlineMedium" style={[styles.title, { color: theme.colors.primary }]}>
-          LifeKeeper
+          Aegis
         </Text>
         <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
           Sign in to your account

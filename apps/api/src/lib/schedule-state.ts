@@ -4,8 +4,8 @@ import {
   notificationConfigSchema,
   maintenanceTriggerSchema,
   type MaintenanceTrigger
-} from "@lifekeeper/types";
-import { calculateNextDue, calculateScheduleStatus } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { calculateNextDue, calculateScheduleStatus } from "@aegis/utils";
 import type { PrismaExecutor } from "./prisma-types.js";
 
 

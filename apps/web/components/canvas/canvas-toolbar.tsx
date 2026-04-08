@@ -1,6 +1,6 @@
 "use client";
 
-import type { CanvasEdgeStyle, CanvasMode, CanvasNodeShape, IdeaCanvasNode } from "@lifekeeper/types";
+import type { CanvasEdgeStyle, CanvasMode, CanvasNodeShape, IdeaCanvasNode } from "@aegis/types";
 import type { ActiveTool } from "./canvas-tools/types";
 import { useState, type JSX } from "react";
 

@@ -11,7 +11,7 @@ import { ProjectProgressBar } from "./project-progress-bar";
 import { AttachmentSection } from "./attachment-section";
 import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
 import { CanvasThumbnail } from "./canvas-thumbnail";
-import type { ProjectPhaseProgress, IdeaCanvasThumbnail } from "@lifekeeper/types";
+import type { ProjectPhaseProgress, IdeaCanvasThumbnail } from "@aegis/types";
 import { useFormattedDate } from "../lib/formatted-date";
 
 type ProjectDashboardProps = {

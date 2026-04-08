@@ -1,4 +1,4 @@
-import type { AssetLabelData } from "@lifekeeper/types";
+import type { AssetLabelData } from "@aegis/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import Link from "next/link";

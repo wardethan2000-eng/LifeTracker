@@ -1,4 +1,4 @@
-# LifeKeeper — Ideas Feature Phase 2: Web API Client & List Page
+# Aegis — Ideas Feature Phase 2: Web API Client & List Page
 
 This document covers the web API client methods and the refactored Ideas list page. It replaces the existing localStorage-based prototype with real API-backed data.
 
@@ -12,7 +12,7 @@ This document covers the web API client methods and the refactored Ideas list pa
 
 Open `apps/web/lib/api.ts`. Add the following methods, following the exact same pattern used by existing methods (e.g., `getHobbies`, `createHobby`, `getProject`, etc.).
 
-Import these schemas from `@lifekeeper/types` at the top of the file (add to the existing import block):
+Import these schemas from `@aegis/types` at the top of the file (add to the existing import block):
 
 ```typescript
 ideaSchema,

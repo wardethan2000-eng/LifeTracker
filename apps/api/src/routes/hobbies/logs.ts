@@ -1,12 +1,12 @@
 ﻿import {
   createHobbyLogInputSchema,
   updateHobbyLogInputSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   HOBBY_LOG_TYPE_PREFIX,
   buildHobbyLogEntryTags,
   mapHobbyLogTypeToEntryType
-} from "@lifekeeper/utils";
+} from "@aegis/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";

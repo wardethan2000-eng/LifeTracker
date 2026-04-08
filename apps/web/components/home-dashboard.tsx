@@ -12,7 +12,7 @@ import { EntryActionableList } from "./entry-system";
 import { removeDashboardPin, saveQuickActionsPreference } from "../lib/api";
 import { PinnedNotesCard } from "./pinned-notes-card";
 import { CanvasDashboardCard } from "./canvas-preview-modal";
-import type { DashboardPin, Entry, IdeaCanvasThumbnail } from "@lifekeeper/types";
+import type { DashboardPin, Entry, IdeaCanvasThumbnail } from "@aegis/types";
 
 /* LaunchPad actions moved back to <LaunchPad /> rendered outside the grid */
 

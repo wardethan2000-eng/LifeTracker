@@ -3,7 +3,7 @@
 import type {
   BulkProjectOperationResult,
   BulkTaskOperationResult,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";

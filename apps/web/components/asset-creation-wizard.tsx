@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssetCategory, LibraryPreset, CustomPresetProfile } from "@lifekeeper/types";
+import type { AssetCategory, LibraryPreset, CustomPresetProfile } from "@aegis/types";
 import type { JSX } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";

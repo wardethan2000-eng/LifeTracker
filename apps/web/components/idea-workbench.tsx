@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useCallback, useState, useTransition } from "react";
-import type { Idea, IdeaCategory, IdeaPriority, IdeaPromotionTarget, IdeaStage } from "@lifekeeper/types";
+import type { Idea, IdeaCategory, IdeaPriority, IdeaPromotionTarget, IdeaStage } from "@aegis/types";
 import { createIdeaAction, updateIdeaAction } from "../app/actions";
 import { AttachmentSection } from "./attachment-section";
 

@@ -2,8 +2,8 @@ import type { MaintenanceLog, MaintenanceLogPart } from "@prisma/client";
 import {
   maintenanceLogPartSchema,
   maintenanceLogSchema
-} from "@lifekeeper/types";
-import { computeLogTotalCost } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { computeLogTotalCost } from "@aegis/utils";
 
 export const toMaintenanceLogPartResponse = (
   part: Pick<MaintenanceLogPart, "id" | "logId" | "inventoryItemId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">

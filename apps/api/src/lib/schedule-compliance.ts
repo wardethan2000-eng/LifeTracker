@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
-import { maintenanceTriggerSchema, type ScheduleComplianceDashboard } from "@lifekeeper/types";
-import { calculateNextDue, MS_PER_DAY } from "@lifekeeper/utils";
+import { maintenanceTriggerSchema, type ScheduleComplianceDashboard } from "@aegis/types";
+import { calculateNextDue, MS_PER_DAY } from "@aegis/utils";
 import { average } from "./analytics-helpers.js";
 
 const categoryLabels: Record<string, string> = {

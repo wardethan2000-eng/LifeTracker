@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemSummary, ProjectPhaseSupply } from "@lifekeeper/types";
+import type { InventoryItemSummary, ProjectPhaseSupply } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { createProjectPhaseSupplyAction } from "../app/actions";

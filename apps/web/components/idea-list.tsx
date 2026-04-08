@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState, useTransition } from "react";
-import type { IdeaCategory, IdeaPriority, IdeaStage, IdeaSummary } from "@lifekeeper/types";
+import type { IdeaCategory, IdeaPriority, IdeaStage, IdeaSummary } from "@aegis/types";
 import { updateIdeaStageAction, deleteIdeaAction, permanentlyDeleteIdeaAction } from "../app/actions";
 import { useMultiSelect } from "../lib/use-multi-select";
 import { useFormattedDate } from "../lib/formatted-date";

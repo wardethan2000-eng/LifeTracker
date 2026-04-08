@@ -4,7 +4,7 @@
  * Used by: CanvasThumbnail component, SVG/PNG export.
  */
 
-import type { IdeaCanvasThumbnailEdge, IdeaCanvasThumbnailNode, CanvasNodeShape, CanvasEdgeStyle } from "@lifekeeper/types";
+import type { IdeaCanvasThumbnailEdge, IdeaCanvasThumbnailNode, CanvasNodeShape, CanvasEdgeStyle } from "@aegis/types";
 import {
   wallPolygonFromLine,
   computeWallPolygonsWithMiters,

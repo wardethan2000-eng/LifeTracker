@@ -7,7 +7,7 @@ import type {
   HobbyPracticeRoutineSummary,
   HobbyRecipe,
   HobbySeriesDetail,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type JSX } from "react";

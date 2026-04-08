@@ -1,4 +1,4 @@
-# LifeKeeper — Ideas Feature Phase 5: Promotion, Demotion, and Cross-Domain Integration
+# Aegis — Ideas Feature Phase 5: Promotion, Demotion, and Cross-Domain Integration
 
 This document covers the promotion and demotion flows that connect Ideas to the rest of the platform (Projects, Assets, Hobbies). It also covers the "demote to idea" entry points on project, asset, and hobby detail pages.
 

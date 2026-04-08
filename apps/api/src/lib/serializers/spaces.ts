@@ -7,7 +7,7 @@ import {
   spaceResponseSchema,
   spaceUtilizationEntrySchema,
   type SpaceResponse
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { toInventoryItemSummaryResponse } from "./inventory.js";
 
 type SpaceParentRecord = Pick<

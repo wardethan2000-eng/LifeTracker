@@ -15,7 +15,7 @@
   updateCanvasNodeSchema,
   updateCanvasSettingsSchema,
   updateIdeaCanvasSchema,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";

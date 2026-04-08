@@ -16,7 +16,7 @@ export default {
   },
   resolve: {
     alias: {
-      "@lifekeeper/types": resolveFromRoot("../types/src/index.ts")
+      "@aegis/types": resolveFromRoot("../types/src/index.ts")
     }
   }
 };

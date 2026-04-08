@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import type { SearchEntityType, SearchResponse, SearchResult, SearchResultGroup } from "@lifekeeper/types";
+import type { SearchEntityType, SearchResponse, SearchResult, SearchResultGroup } from "@aegis/types";
 import { validateEntryTarget } from "./entries.js";
 import { getSpaceBreadcrumb } from "./spaces.js";
 

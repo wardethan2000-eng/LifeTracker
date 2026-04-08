@@ -29,7 +29,7 @@ vi.mock("../lib/date-input-utils", () => ({
   fromHouseholdDateTimeInput: (d: string) => d || new Date().toISOString(),
 }));
 
-vi.mock("@lifekeeper/utils", () => ({
+vi.mock("@aegis/utils", () => ({
   isLegacyImportedEntrySourceType: () => false,
 }));
 

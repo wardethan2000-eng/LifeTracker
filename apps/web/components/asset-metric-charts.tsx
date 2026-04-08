@@ -1,6 +1,6 @@
 "use client";
 
-import type { UsageProjection, UsageCostNormalization } from "@lifekeeper/types";
+import type { UsageProjection, UsageCostNormalization } from "@aegis/types";
 import type { ReactElement } from "react";
 import { LkAreaChart, LkLineChart, formatCurrencyTick, formatDateTick } from "./charts";
 

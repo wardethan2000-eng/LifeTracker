@@ -1,6 +1,6 @@
 "use client";
 
-import type { BarcodeLookupResult } from "@lifekeeper/types";
+import type { BarcodeLookupResult } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useRef, useState } from "react";
 import { lookupBarcode } from "../lib/api";

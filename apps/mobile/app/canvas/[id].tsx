@@ -9,7 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { TouchableOpacity } from "react-native";
-import type { IdeaCanvasNode } from "@lifekeeper/types";
+import type { IdeaCanvasNode } from "@aegis/types";
 import { getCanvas, getMe } from "../../lib/api";
 import { EmptyState } from "../../components/EmptyState";
 

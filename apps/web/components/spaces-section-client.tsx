@@ -8,7 +8,7 @@ import type {
   SpaceResponse,
   SpaceUtilizationEntry,
   SpaceType
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";

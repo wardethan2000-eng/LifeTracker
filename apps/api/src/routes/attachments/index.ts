@@ -4,8 +4,8 @@ import {
   attachmentSchema,
   createAttachmentUploadSchema,
   updateAttachmentSchema,
-} from "@lifekeeper/types";
-import type { AttachmentEntityType } from "@lifekeeper/types";
+} from "@aegis/types";
+import type { AttachmentEntityType } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";

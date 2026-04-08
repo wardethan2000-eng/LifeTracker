@@ -93,7 +93,7 @@ function buildHtml(assets: Asset[]): string {
       ${rows}
     </tbody>
   </table>
-  <p class="footer">LifeKeeper — household asset report</p>
+  <p class="footer">Aegis — household asset report</p>
 </body>
 </html>`;
 }

@@ -5,7 +5,7 @@ import type {
   HobbyDetailInventoryLink,
   HobbyDetailProjectLink,
   HobbyInventoryCategory,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { useState, type FormEvent, type JSX } from "react";
 import {
   createHobbyInventoryCategory,

@@ -3,7 +3,7 @@ import {
   hobbyGoalProgressPayloadSchema,
   hobbyPracticeStreaksPayloadSchema,
   hobbySessionFrequencyPayloadSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toHobbySessionFrequencyPayloadResponse = (value: unknown) => hobbySessionFrequencyPayloadSchema.parse(value);
 

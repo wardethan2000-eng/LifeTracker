@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import type { EntryType } from "@lifekeeper/types";
+import type { EntryType } from "@aegis/types";
 
 const ENTRY_TYPES: { value: EntryType; label: string; icon: string }[] = [
   { value: "note", label: "Note", icon: "📝" },

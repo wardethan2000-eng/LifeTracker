@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
-import { devFixtureIds } from "@lifekeeper/types";
+import { devFixtureIds } from "@aegis/types";
 import { nanoid } from "nanoid";
 import { rebuildSearchIndex } from "../src/lib/search-index.js";
 
@@ -85,8 +85,8 @@ async function main(): Promise<void> {
   await prisma.user.upsert({
     where: { clerkUserId: "dev_clerk_user_primary" },
     update: {
-      email: "demo@lifekeeper.app",
-      displayName: "LifeKeeper Demo",
+      email: "demo@aegis.app",
+      displayName: "Aegis Demo",
       notificationPreferences: {
         pauseAll: false,
         enabledChannels: ["push", "digest"],
@@ -96,8 +96,8 @@ async function main(): Promise<void> {
     create: {
       id: ownerUserId,
       clerkUserId: "dev_clerk_user_primary",
-      email: "demo@lifekeeper.app",
-      displayName: "LifeKeeper Demo",
+      email: "demo@aegis.app",
+      displayName: "Aegis Demo",
       notificationPreferences: {
         pauseAll: false,
         enabledChannels: ["push", "digest"],
@@ -109,7 +109,7 @@ async function main(): Promise<void> {
   await prisma.user.upsert({
     where: { clerkUserId: "dev_clerk_user_member" },
     update: {
-      email: "member@lifekeeper.app",
+      email: "member@aegis.app",
       displayName: "Household Member",
       notificationPreferences: {
         pauseAll: false,
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
     create: {
       id: memberUserId,
       clerkUserId: "dev_clerk_user_member",
-      email: "member@lifekeeper.app",
+      email: "member@aegis.app",
       displayName: "Household Member",
       notificationPreferences: {
         pauseAll: false,
@@ -1883,7 +1883,7 @@ async function main(): Promise<void> {
       id: invitationId,
       householdId,
       invitedByUserId: ownerUserId,
-      email: "invited@lifekeeper.app",
+      email: "invited@aegis.app",
       token: crypto.randomUUID(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       status: "pending"
@@ -1901,7 +1901,7 @@ async function main(): Promise<void> {
       id: acceptedInvitationId,
       householdId,
       invitedByUserId: ownerUserId,
-      email: "member@lifekeeper.app",
+      email: "member@aegis.app",
       token: crypto.randomUUID(),
       expiresAt: new Date("2026-03-13T00:00:00.000Z"),
       status: "accepted",
@@ -1921,7 +1921,7 @@ async function main(): Promise<void> {
     { action: "project.phase.status_updated", entityType: "project_phase", entityId: phasePlanningId, userId: ownerUserId, metadata: { projectId, status: "completed" } },
     { action: "project.budget_category.created", entityType: "project_budget_category", entityId: budgetCabinetryId, userId: ownerUserId, metadata: { projectId, name: "Cabinetry + Finish Materials" } },
     { action: "project.supply.created", entityType: "project_phase_supply", entityId: supplyProtectionId, userId: ownerUserId, metadata: { projectId, phaseId: phaseDemolitionId, name: "Floor protection rolls" } },
-    { action: "member.invited", entityType: "household", entityId: householdId, userId: ownerUserId, metadata: { email: "invited@lifekeeper.app" } },
+    { action: "member.invited", entityType: "household", entityId: householdId, userId: ownerUserId, metadata: { email: "invited@aegis.app" } },
     { action: "hobby.created", entityType: "hobby", entityId: hobbyId, userId: ownerUserId, metadata: { name: "Beer Brewing" } },
     { action: "hobby.session.created", entityType: "hobby_session", entityId: hobbySessionBatch1Id, userId: ownerUserId, metadata: { hobbyId, name: "Batch #1 — American Pale Ale" } },
     { action: "hobby.session.completed", entityType: "hobby_session", entityId: hobbySessionBatch1Id, userId: ownerUserId, metadata: { hobbyId, name: "Batch #1 — American Pale Ale" } },

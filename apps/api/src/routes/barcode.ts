@@ -1,4 +1,4 @@
-import { barcodeLookupRequestSchema, barcodeImageQuerySchema } from "@lifekeeper/types";
+import { barcodeLookupRequestSchema, barcodeImageQuerySchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { applyTier, buildRateLimitKey } from "../lib/rate-limit-tiers.js";
 import { resolveBarcode, detectBarcodeFormat } from "../lib/barcode-lookup.js";

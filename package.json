@@ -1,21 +1,21 @@
 {
-  "name": "lifekeeper",
+  "name": "aegis",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.6.3",
   "scripts": {
     "build": "turbo run build",
-    "benchmark:web": "pnpm --filter @lifekeeper/web benchmark",
+    "benchmark:web": "pnpm --filter @aegis/web benchmark",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "typecheck": "turbo run typecheck",
     "format": "turbo run format",
-    "db:generate": "pnpm --filter @lifekeeper/api prisma:generate",
-    "db:migrate": "pnpm --filter @lifekeeper/api prisma:migrate",
-    "db:seed": "pnpm --filter @lifekeeper/api prisma:seed",
-    "db:repair-project-depths": "pnpm --filter @lifekeeper/api projects:repair-depths"
+    "db:generate": "pnpm --filter @aegis/api prisma:generate",
+    "db:migrate": "pnpm --filter @aegis/api prisma:migrate",
+    "db:seed": "pnpm --filter @aegis/api prisma:seed",
+    "db:repair-project-depths": "pnpm --filter @aegis/api projects:repair-depths"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

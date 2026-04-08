@@ -1,6 +1,6 @@
-# LifeKeeper
+# Aegis
 
-LifeKeeper is a universal maintenance tracking platform for assets across vehicles, homes, equipment, and household-owned systems. This repository contains the Phase 1 monorepo scaffold, shared domain contracts, Prisma schema, and the first API slice for asset CRUD.
+Aegis is a universal maintenance tracking platform for assets across vehicles, homes, equipment, and household-owned systems. This repository contains the Phase 1 monorepo scaffold, shared domain contracts, Prisma schema, and the first API slice for asset CRUD.
 
 ## Workspace layout
 
@@ -19,15 +19,15 @@ LifeKeeper is a universal maintenance tracking platform for assets across vehicl
 4. Generate the Prisma client with `pnpm db:generate`.
 5. Run migrations with `pnpm db:migrate`.
 6. Seed development data with `pnpm db:seed`.
-7. Start the API with `pnpm --filter @lifekeeper/api dev`.
-8. Start the web dashboard with `pnpm --filter @lifekeeper/web dev`.
+7. Start the API with `pnpm --filter @aegis/api dev`.
+8. Start the web dashboard with `pnpm --filter @aegis/web dev`.
 
 If you use Docker locally, you can start PostgreSQL and Redis with:
 
 1. `docker compose -f compose.local.yaml up -d`
 2. `pnpm db:migrate`
 3. `pnpm db:seed`
-4. `pnpm --filter @lifekeeper/api notifications:scan:now`
+4. `pnpm --filter @aegis/api notifications:scan:now`
 
 ## Current phase
 
@@ -82,7 +82,7 @@ Useful local defaults:
 1. Keep the API running at `http://127.0.0.1:4000` or set `LIFEKEEPER_API_BASE_URL` for the web app.
 2. Keep dev auth bypass enabled and use the seeded demo user `clkeeperuser0000000000001`, or set `LIFEKEEPER_DEV_USER_ID`.
 3. Open the web app and use the seeded household `clkeeperhouse000000000001` if you want immediate demo data.
-4. These seeded demo IDs are shared dev fixtures from `@lifekeeper/types` and should not be used as production identifiers.
+4. These seeded demo IDs are shared dev fixtures from `@aegis/types` and should not be used as production identifiers.
 
 Current web flows include:
 
@@ -99,9 +99,9 @@ Recurring background jobs are registered by the worker process. By default, noti
 
 Useful local commands:
 
-1. Start workers with `pnpm --filter @lifekeeper/api notifications:worker`.
-2. Enqueue a scan with `pnpm --filter @lifekeeper/api notifications:scan`.
-3. Run scan plus immediate local log delivery with `pnpm --filter @lifekeeper/api notifications:scan:now`.
+1. Start workers with `pnpm --filter @aegis/api notifications:worker`.
+2. Enqueue a scan with `pnpm --filter @aegis/api notifications:scan`.
+3. Run scan plus immediate local log delivery with `pnpm --filter @aegis/api notifications:scan:now`.
 
 The seed data includes an overdue shared schedule so notification generation can be verified immediately.
 

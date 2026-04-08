@@ -80,7 +80,7 @@ import type {
   UpdateDisplayPreferencesInput,
   CreateProjectTaskDependencyInput,
   UpdateProjectTaskDependencyInput,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   assetCustomFieldsSchema,
   assetFieldDefinitionsSchema,
@@ -89,7 +89,7 @@ import {
   hobbyPresetPipelineStepSchema,
   presetScheduleTemplateSchema,
   presetUsageMetricTemplateSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -245,7 +245,7 @@ import {
   removeAssetInventoryLink,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
-import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@lifekeeper/utils";
+import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@aegis/utils";
 
 const emitRealtimeEvent = async (
   householdId: string | undefined,

@@ -1,4 +1,4 @@
-import type { ThreadedComment } from "@lifekeeper/types";
+import type { ThreadedComment } from "@aegis/types";
 import type { JSX } from "react";
 import {
   createInventoryCommentAction,

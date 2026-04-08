@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { IdeaCanvasNode } from "@lifekeeper/types";
+import type { IdeaCanvasNode } from "@aegis/types";
 import type { ActiveTool } from "../canvas-tools/types";
 
 type UseCanvasKeyboardInput = {

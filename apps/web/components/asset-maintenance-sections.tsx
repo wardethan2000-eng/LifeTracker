@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssetDetailResponse, MaintenanceLog } from "@lifekeeper/types";
+import type { AssetDetailResponse, MaintenanceLog } from "@aegis/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { AttachmentSection } from "./attachment-section";

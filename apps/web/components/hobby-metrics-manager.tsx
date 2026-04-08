@@ -1,6 +1,6 @@
 "use client";
 
-import type { HobbyMetricDefinition, HobbyMetricReading } from "@lifekeeper/types";
+import type { HobbyMetricDefinition, HobbyMetricReading } from "@aegis/types";
 import { useState, type FormEvent, type JSX } from "react";
 import {
   createHobbyMetric,

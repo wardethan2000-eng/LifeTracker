@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { Suspense } from "react";
 import Link from "next/link";
-import { hobbyPresetLibrary } from "@lifekeeper/presets";
+import { hobbyPresetLibrary } from "@aegis/presets";
 import { updateHobbyAction } from "../../../../actions";
 import { HobbyWorkbench } from "../../../../../components/hobby-workbench";
 import { ApiError, getHobbyDetail, getMe } from "../../../../../lib/api";

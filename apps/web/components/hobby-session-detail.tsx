@@ -7,7 +7,7 @@ import type {
   HobbySessionDetail,
   HobbySessionDetailIngredient,
   HobbySessionDetailMetricReading,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition, type FormEvent, type JSX } from "react";
 import {

@@ -17,7 +17,7 @@ export function useAuth(): {
     return {
       isSignedIn: true,
       isLoaded: true,
-      userId: process.env.EXPO_PUBLIC_LIFEKEEPER_DEV_USER_ID ?? "dev-user",
+      userId: process.env.EXPO_PUBLIC_AEGIS_DEV_USER_ID ?? "dev-user",
       signOut: async () => {
         // No-op in dev mode
       },

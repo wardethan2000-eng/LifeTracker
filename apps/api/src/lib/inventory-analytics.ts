@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { toMonthKey } from "@lifekeeper/utils";
+import { toMonthKey } from "@aegis/utils";
 
 type TransactionWithDate = {
   quantity: number;

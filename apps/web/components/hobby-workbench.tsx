@@ -1,5 +1,5 @@
 "use client";
-import type { HobbyActivityMode, HobbyDetail, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@lifekeeper/types";
+import type { HobbyActivityMode, HobbyDetail, HobbyPreset, HobbyStatus, HobbySessionLifecycleMode } from "@aegis/types";
 import { useRouter } from "next/navigation";
 import { useState, type JSX, type FormEvent } from "react";
 import {

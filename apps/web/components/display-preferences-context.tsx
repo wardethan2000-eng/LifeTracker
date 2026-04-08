@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { DisplayPreferences } from "@lifekeeper/types";
+import type { DisplayPreferences } from "@aegis/types";
 import {
   formatDate as rawFormatDate,
   formatDateTime as rawFormatDateTime,

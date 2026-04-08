@@ -1,6 +1,6 @@
 "use client";
 
-import type { ShareLink } from "@lifekeeper/types";
+import type { ShareLink } from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";

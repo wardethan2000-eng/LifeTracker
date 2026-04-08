@@ -3,7 +3,7 @@ import {
   projectPortfolioHealthPayloadSchema,
   projectTaskVelocityPayloadSchema,
   projectTimelinePayloadSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toProjectTimelinePayloadResponse = (value: unknown) => projectTimelinePayloadSchema.parse(value);
 

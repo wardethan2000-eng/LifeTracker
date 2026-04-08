@@ -1,6 +1,6 @@
 "use client";
 
-import type { NoteTemplate } from "@lifekeeper/types";
+import type { NoteTemplate } from "@aegis/types";
 import { useRef, useState } from "react";
 import { createProjectNoteAction } from "../app/actions";
 import { RichEditor } from "./rich-editor";

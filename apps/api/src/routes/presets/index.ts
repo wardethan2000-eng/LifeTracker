@@ -1,10 +1,10 @@
 ﻿import type { Prisma } from "@prisma/client";
-import { presetLibrary } from "@lifekeeper/presets";
+import { presetLibrary } from "@aegis/presets";
 import {
   applyPresetSchema,
   createPresetProfileSchema,
   updatePresetProfileSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, getAccessibleAsset } from "../../lib/asset-access.js";

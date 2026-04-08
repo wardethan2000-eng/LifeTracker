@@ -6,7 +6,7 @@ import {
   householdCostOverviewSchema,
   projectBudgetAnalysisSchema,
   serviceProviderSpendSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toAssetCostSummaryResponse = (value: unknown) => assetCostSummarySchema.parse(value);
 

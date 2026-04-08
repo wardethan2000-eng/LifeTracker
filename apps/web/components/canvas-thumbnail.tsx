@@ -1,6 +1,6 @@
 "use client";
 
-import type { IdeaCanvasThumbnailNode, IdeaCanvasThumbnailEdge } from "@lifekeeper/types";
+import type { IdeaCanvasThumbnailNode, IdeaCanvasThumbnailEdge } from "@aegis/types";
 import { useMemo } from "react";
 import { renderCanvasToSVG } from "../lib/canvas-svg-render";
 

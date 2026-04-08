@@ -1,4 +1,4 @@
-import type { Asset } from "@lifekeeper/types";
+import type { Asset } from "@aegis/types";
 
 const shortDateFmt = (timezone?: string) => new Intl.DateTimeFormat("en-US", { month: "numeric", day: "numeric", year: "numeric", ...(timezone ? { timeZone: timezone } : {}) });
 const monthYearFmt = (timezone?: string) => new Intl.DateTimeFormat("en-US", { month: "numeric", year: "numeric", ...(timezone ? { timeZone: timezone } : {}) });

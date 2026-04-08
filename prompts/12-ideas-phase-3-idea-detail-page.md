@@ -1,4 +1,4 @@
-# LifeKeeper — Ideas Feature Phase 3: Idea Detail Page
+# Aegis — Ideas Feature Phase 3: Idea Detail Page
 
 This document covers the idea detail page — the workspace where a user develops a single idea over time by adding notes, links, materials, and steps.
 

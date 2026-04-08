@@ -1,4 +1,4 @@
-import type { AssetDetailResponse } from "@lifekeeper/types";
+import type { AssetDetailResponse } from "@aegis/types";
 import type { JSX } from "react";
 import {
   createMetricEntryAction,

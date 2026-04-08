@@ -5,8 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createIdeaAction } from "../app/actions";
 
-const STORAGE_KEY = "lifekeeper_ideas";
-const MIGRATED_KEY = "lifekeeper_ideas_migrated";
+const STORAGE_KEY = "aegis_ideas";
+const MIGRATED_KEY = "aegis_ideas_migrated";
 
 type StoredIdea = {
   title?: string;

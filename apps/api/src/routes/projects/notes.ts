@@ -1,12 +1,12 @@
 ﻿import {
   createProjectNoteSchema,
   updateProjectNoteSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   PROJECT_NOTE_CATEGORY_PREFIX,
   buildProjectEntryPayload,
   parseProjectEntryPayload
-} from "@lifekeeper/utils";
+} from "@aegis/utils";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireHouseholdMembership } from "../../lib/asset-access.js";

@@ -6,7 +6,7 @@ import type {
   ScheduleStatus,
   SeasonalTriggerSchema,
   UsageTriggerSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export interface UsageReading {
   metricId: string;

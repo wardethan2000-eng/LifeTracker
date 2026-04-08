@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryPurchaseLine, InventoryShoppingListSummary } from "@lifekeeper/types";
+import type { InventoryPurchaseLine, InventoryShoppingListSummary } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
 import { generateInventoryShoppingListAction, updateInventoryPurchaseLineAction } from "../app/actions";

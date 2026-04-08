@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 import { useCallback, useRef, useState, useTransition } from "react";
-import type { IdeaMaterialItem } from "@lifekeeper/types";
+import type { IdeaMaterialItem } from "@aegis/types";
 import { updateIdeaAction } from "../app/actions";
 import { Card } from "./card";
 

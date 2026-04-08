@@ -1,4 +1,4 @@
-import type { Asset, AssetCategory } from "@lifekeeper/types";
+import type { Asset, AssetCategory } from "@aegis/types";
 import type { JSX } from "react";
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import type { AssetProfileFormValues } from "../lib/validation/forms";

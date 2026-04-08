@@ -1,9 +1,9 @@
-# LifeKeeper UI Design Guide
+# Aegis UI Design Guide
 
 **Version 2.0 — March 2026**
 **Status: Active — all new UI work must follow this guide**
 
-This document is the single source of truth for LifeKeeper's UI architecture, layout patterns, component behavior, and visual language. It is written for GitHub Copilot and human developers alike. Every screen, component, and interaction pattern in the web application is covered here.
+This document is the single source of truth for Aegis's UI architecture, layout patterns, component behavior, and visual language. It is written for GitHub Copilot and human developers alike. Every screen, component, and interaction pattern in the web application is covered here.
 
 ---
 
@@ -31,13 +31,13 @@ This document is the single source of truth for LifeKeeper's UI architecture, la
 
 ### Core principles
 
-LifeKeeper is **not a form-filling application.** Users do not want to navigate to a separate "edit" page, fill out a long form, and click Save just to change an asset's location or a project's status. Every piece of data in the system should be editable where it is read — in the same card, in the same panel, without changing pages.
+Aegis is **not a form-filling application.** Users do not want to navigate to a separate "edit" page, fill out a long form, and click Save just to change an asset's location or a project's status. Every piece of data in the system should be editable where it is read — in the same card, in the same panel, without changing pages.
 
 The product manages genuinely complex data: maintenance schedules, multi-field asset profiles, project phases, inventory, household coordination. Handling that complexity well requires two things that must be kept in constant balance:
 
 **Beauty and intuitiveness.** The interface should feel immediate and responsive. A new user should understand how to navigate it without reading documentation. Visual hierarchy guides the eye: important things are prominent, secondary things are accessible but not in the way. Whitespace and restraint matter as much as information density.
 
-**High customizability.** LifeKeeper users configure everything — custom fields, maintenance schedules, metric templates, project phases, reorder rules. The UI must make customization feel frictionless, not bureaucratic. Inline editing, drag-and-drop reordering, and click-to-edit fields are the primary vehicles for customization. Users should feel like they are directly manipulating data, not submitting forms.
+**High customizability.** Aegis users configure everything — custom fields, maintenance schedules, metric templates, project phases, reorder rules. The UI must make customization feel frictionless, not bureaucratic. Inline editing, drag-and-drop reordering, and click-to-edit fields are the primary vehicles for customization. Users should feel like they are directly manipulating data, not submitting forms.
 
 **Edit where you read.** This is the single most important UX principle in the product. When a user looks at an asset's purchase details, location, or maintenance schedule, they should be able to click into any value and change it without leaving the screen. Navigating to a separate page to edit a metadata field is always wrong. Forms are appropriate only when creating something new from scratch.
 
@@ -94,7 +94,7 @@ Every primary domain workspace tool (Assets, Projects, Hobbies, Ideas) **must** 
 
 ### Interaction model
 
-LifeKeeper supports three inline interaction patterns. Use the right one for the data type:
+Aegis supports three inline interaction patterns. Use the right one for the data type:
 
 #### 1. Click-to-edit (field-level)
 
@@ -133,7 +133,7 @@ CSS: The drag handle cell in a `workbench-table` row uses class `.drag-handle`. 
 
 ### Text economy
 
-**The UI should never explain itself.** LifeKeeper's users are not confused; they do not need walls of text to use the product. Every string rendered in the interface should be evaluated: is this word necessary? Can the user infer this from context?
+**The UI should never explain itself.** Aegis's users are not confused; they do not need walls of text to use the product. Every string rendered in the interface should be evaluated: is this word necessary? Can the user infer this from context?
 
 #### Labels and placeholders
 

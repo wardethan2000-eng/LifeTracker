@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemSummary } from "@lifekeeper/types";
+import type { InventoryItemSummary } from "@aegis/types";
 import type { JSX } from "react";
 import { useRouter } from "next/navigation";
 import { InventoryItemEditForm } from "./inventory-item-edit-form";

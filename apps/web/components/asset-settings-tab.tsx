@@ -6,7 +6,7 @@ import type {
   HouseholdMember,
   LibraryPreset,
   SpaceResponse
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import {
   transferAssetAction,

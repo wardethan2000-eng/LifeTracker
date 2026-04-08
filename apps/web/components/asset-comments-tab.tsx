@@ -1,4 +1,4 @@
-import type { AssetDetailResponse, DateFormat, ThreadedComment } from "@lifekeeper/types";
+import type { AssetDetailResponse, DateFormat, ThreadedComment } from "@aegis/types";
 import type { JSX } from "react";
 import {
   createCommentAction,

@@ -1,6 +1,6 @@
 "use client";
 
-import type { DueWorkItem } from "@lifekeeper/types";
+import type { DueWorkItem } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useMemo } from "react";

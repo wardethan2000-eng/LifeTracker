@@ -1,6 +1,6 @@
 "use client";
 
-import type { BulkIdeaOperationResult, IdeaPriority, IdeaStage, IdeaSummary } from "@lifekeeper/types";
+import type { BulkIdeaOperationResult, IdeaPriority, IdeaStage, IdeaSummary } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";

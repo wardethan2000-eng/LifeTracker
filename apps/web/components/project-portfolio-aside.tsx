@@ -1,4 +1,4 @@
-import type { ProjectPortfolioItem } from "@lifekeeper/types";
+import type { ProjectPortfolioItem } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { formatCurrency } from "../lib/formatters";

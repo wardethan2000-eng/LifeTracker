@@ -1,4 +1,4 @@
-import type { HobbyActivityMode, HobbyStatus } from "@lifekeeper/types";
+import type { HobbyActivityMode, HobbyStatus } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";

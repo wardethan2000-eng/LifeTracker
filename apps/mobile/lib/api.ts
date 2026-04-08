@@ -121,7 +121,7 @@ import {
   type ScheduleComplianceDashboard,
   type HouseholdCostOverview,
   type ShareLink,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { z } from "zod";
 import { API_BASE_URL, DEV_USER_ID } from "./constants";
 

@@ -1,4 +1,4 @@
-import type { AssetTimelineItem } from "@lifekeeper/types";
+import type { AssetTimelineItem } from "@aegis/types";
 
 export const formatDate = (value: string | Date): string => new Intl.DateTimeFormat("en-US", {
   month: "short",

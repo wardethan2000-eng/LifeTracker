@@ -1,4 +1,4 @@
-import type { AssetDetailResponse, AssetTransferList, Entry, OverviewPin } from "@lifekeeper/types";
+import type { AssetDetailResponse, AssetTransferList, Entry, OverviewPin } from "@aegis/types";
 import type { JSX } from "react";
 import { AssetOverviewGrid } from "./asset-overview-grid";
 import type { NccNoteSummary, NccCanvasSummary } from "./notes-canvas-card";

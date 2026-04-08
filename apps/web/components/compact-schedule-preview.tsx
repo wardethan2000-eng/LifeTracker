@@ -1,4 +1,4 @@
-import type { PresetScheduleTemplate } from "@lifekeeper/types";
+import type { PresetScheduleTemplate } from "@aegis/types";
 import { CompactPreview } from "./compact-preview";
 
 type CompactSchedulePreviewProps = {

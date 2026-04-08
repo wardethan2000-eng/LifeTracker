@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type {
   ProjectPhaseProgress,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import {
