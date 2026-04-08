@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 type Metric = {
   id: string;
@@ -34,6 +34,8 @@ export function ScheduleForm({ assetId, metrics, action }: ScheduleFormProps): J
   const [triggerType, setTriggerType] = useState<TriggerType>("interval");
   const [channels, setChannels] = useState<Set<string>>(new Set(["push"]));
   const [expanded, setExpanded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const needsMetric = triggerType === "usage" || triggerType === "compound";
   const hasMetrics = metrics.length > 0;
@@ -59,7 +61,20 @@ export function ScheduleForm({ assetId, metrics, action }: ScheduleFormProps): J
 
   return (
     <div className="panel__body--padded">
-      <form action={action} className="form-grid">
+      <form
+        action={(formData) => {
+          setError(null);
+          startTransition(async () => {
+            try {
+              await action(formData);
+              setExpanded(false);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to create schedule. Please try again.");
+            }
+          });
+        }}
+        className="form-grid"
+      >
         <input type="hidden" name="assetId" value={assetId} />
 
         {/* ── Identity ── */}
@@ -275,9 +290,12 @@ export function ScheduleForm({ assetId, metrics, action }: ScheduleFormProps): J
         </label>
 
         <div className="field field--full inline-actions inline-actions--end">
-          <button type="button" className="button button--ghost" onClick={() => setExpanded(false)}>Cancel</button>
-          <button type="submit" className="button button--primary" disabled={needsMetric && !hasMetrics}>Create Schedule</button>
+          <button type="button" className="button button--ghost" onClick={() => setExpanded(false)} disabled={isPending}>Cancel</button>
+          <button type="submit" className="button button--primary" disabled={isPending || (needsMetric && !hasMetrics)}>
+            {isPending ? "Creating…" : "Create Schedule"}
+          </button>
         </div>
+        {error ? <p className="form-error field field--full">{error}</p> : null}
       </form>
     </div>
   );
