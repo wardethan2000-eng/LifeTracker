@@ -50,6 +50,7 @@ const listInventoryQuerySchema = z.object({
   category: z.string().min(1).max(120).optional(),
   search: z.string().min(1).max(200).optional(),
   lowStock: z.coerce.boolean().optional(),
+  expiringSoon: z.coerce.boolean().optional(),
   itemType: z.enum(["consumable", "equipment"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   cursor: z.string().cuid().optional()
@@ -466,10 +467,13 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
+    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
     const where: Prisma.InventoryItemWhereInput = {
       householdId: params.householdId,
       deletedAt: null,
       ...(query.lowStock ? lowStockWhere : {}),
+      ...(query.expiringSoon ? { expiresAt: { not: null, lte: thirtyDaysFromNow } } : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.itemType ? { itemType: query.itemType } : {}),
       ...(query.search ? {

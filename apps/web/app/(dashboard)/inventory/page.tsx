@@ -175,6 +175,7 @@ async function InventoryContent({
       getHouseholdInventory(householdId, {
         limit: 100,
         ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
+        ...(expiringFilter ? { expiringSoon: true } : {}),
         ...(searchFilter ? { search: searchFilter } : {}),
         ...(categoryFilter ? { category: categoryFilter } : {}),
       }),
@@ -202,17 +203,11 @@ async function InventoryContent({
         .filter((value): value is string => Boolean(value))
     )).sort((left, right) => left.localeCompare(right));
 
-    const nowMs = Date.now();
-    const thirtyDaysMs2 = 30 * 24 * 60 * 60 * 1000;
-    const filteredItems = expiringFilter
-      ? items.filter((item) => {
-          if (!item.expiresAt) return false;
-          const expiresMs = new Date(item.expiresAt).getTime();
-          return expiresMs <= nowMs + thirtyDaysMs2;
-        })
-      : items;
+    const categories = new Set(items.map((item) => item.category).filter(Boolean)).size;
+    const outOfStockCount = items.filter((item) => item.quantityOnHand <= 0).length;
 
-    const sortedItems = [...filteredItems].sort((a, b) => {
+    // items is already server-filtered by expiringSoon when expiringFilter is active
+    const sortedItems = [...items].sort((a, b) => {
       switch (sortParam) {
         case "name-asc": return a.name.localeCompare(b.name);
         case "name-desc": return b.name.localeCompare(a.name);
@@ -246,19 +241,19 @@ async function InventoryContent({
       return left.localeCompare(right);
     });
 
-    const categories = new Set(items.map((item) => item.category).filter(Boolean)).size;
-    const outOfStockCount = items.filter((item) => item.quantityOnHand <= 0).length;
-
-    const now = Date.now();
+    const nowMs = Date.now();
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+    // Banner always fetches from unfiltered data via lowStockItems list;
+    // for expiry we compute from current items (may be pre-filtered by server)
     const expiringItems = items.filter((item) => {
       if (!item.expiresAt) return false;
       const expiresMs = new Date(item.expiresAt).getTime();
-      return expiresMs > now && expiresMs <= now + thirtyDaysMs;
+      return expiresMs > nowMs && expiresMs <= nowMs + thirtyDaysMs;
     });
     const expiredItems = items.filter((item) => {
       if (!item.expiresAt) return false;
-      return new Date(item.expiresAt).getTime() <= now;
+      return new Date(item.expiresAt).getTime() <= nowMs;
     });
 
     return (
