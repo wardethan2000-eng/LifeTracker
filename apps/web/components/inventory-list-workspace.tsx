@@ -29,6 +29,7 @@ type InventoryListWorkspaceProps = {
   highlightId: string | undefined;
   highlightedAnalytics: InventoryItemConsumption | null;
   spaces: SpaceResponse[];
+  initialCycleCountMode?: boolean;
 };
 
 const normalizeUnit = (unit: string): string => unit.trim().toLowerCase();
@@ -42,6 +43,7 @@ export function InventoryListWorkspace({
   highlightId,
   highlightedAnalytics,
   spaces,
+  initialCycleCountMode = false,
 }: InventoryListWorkspaceProps): JSX.Element {
   const { selectedIds, selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
   const { pushToast } = useToast();
@@ -96,7 +98,7 @@ export function InventoryListWorkspace({
 
   const allItems = useMemo(() => groupedItems.flatMap((group) => group.items), [groupedItems]);
   const selectedItems = useMemo(() => allItems.filter((item) => selectedIds.has(item.id)), [allItems, selectedIds]);
-  const [cycleCountMode, setCycleCountMode] = useState(false);
+  const [cycleCountMode, setCycleCountMode] = useState(initialCycleCountMode);
 
   if (cycleCountMode) {
     return (

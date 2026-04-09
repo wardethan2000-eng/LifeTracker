@@ -95,6 +95,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
   const activeTab = typeof params.tab === "string" && params.tab === "spaces" ? "spaces" : "inventory";
+  const cycleCountMode = params.mode === "count";
   const itemTypeFilter = typeof params.itemType === "string" && (params.itemType === "consumable" || params.itemType === "equipment") ? params.itemType : undefined;
   const expiringFilter = params.expiring === "1" || params.expiring === "true";
   const searchFilter = typeof params.search === "string" && params.search.length > 0 ? params.search : undefined;
@@ -133,6 +134,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         searchFilter={searchFilter}
         categoryFilter={categoryFilter}
         sortParam={sortParam}
+        cycleCountMode={cycleCountMode}
       />
     </Suspense>
   );
@@ -148,6 +150,7 @@ type InventoryContentProps = {
   searchFilter: string | undefined;
   categoryFilter: string | undefined;
   sortParam: string | undefined;
+  cycleCountMode: boolean;
 };
 
 async function InventoryContent({
@@ -159,6 +162,7 @@ async function InventoryContent({
   searchFilter,
   categoryFilter,
   sortParam,
+  cycleCountMode,
 }: InventoryContentProps): Promise<JSX.Element> {
   const [t, tCommon] = await Promise.all([
     getTranslations("inventory"),
@@ -265,6 +269,7 @@ async function InventoryContent({
           </div>
           <div className="page-header__actions">
             <InventoryValuationReportButton householdId={householdId} />
+            <Link href={buildInventoryHref(householdId, { mode: "count" })} className="button button--ghost button--sm">Count Inventory</Link>
             <Link href="/inventory/trash" className="button button--ghost button--sm">Trash</Link>
             <Link href={inventoryViewHref} className="button button--primary button--sm">{t("inventoryButton")}</Link>
             <Link href={analyticsViewHref} className="button button--ghost button--sm">{t("analyticsHub")}</Link>
@@ -416,6 +421,7 @@ async function InventoryContent({
                 highlightId={highlightId}
                 highlightedAnalytics={highlightedAnalytics}
                 spaces={spaces}
+                initialCycleCountMode={cycleCountMode}
               />
 
               <InventoryTransactionHistory householdId={householdId} />

@@ -301,7 +301,7 @@ export function SpacesSectionClient({
   const requestRefresh = useCoalescedRefresh();
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [activeView, setActiveView] = useState<SpaceViewMode>("tree");
+  const [activeView, setActiveView] = useState<SpaceViewMode>("map");
   const [lookupValue, setLookupValue] = useState("");
   const [lookupResults, setLookupResults] = useState<SpaceResponse[]>([]);
   const [lookupError, setLookupError] = useState<string | null>(null);
