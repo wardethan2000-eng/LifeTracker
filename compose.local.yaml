@@ -16,19 +16,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: aegis-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - aegis-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   minio:
     image: minio/minio:latest
     container_name: aegis-minio
@@ -49,5 +36,4 @@ services:
 
 volumes:
   aegis-postgres-data:
-  aegis-redis-data:
   aegis-minio-data:

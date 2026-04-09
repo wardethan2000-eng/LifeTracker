@@ -1,5 +1,16 @@
 import "dotenv/config";
-import { Worker } from "bullmq";
+
+const areQueuesEnabled = (): boolean => {
+  const val = process.env.ENABLE_QUEUES;
+  if (val === undefined) return true;
+  return val === "true" || val === "1" || val === "yes" || val === "on";
+};
+
+if (!areQueuesEnabled()) {
+  console.info("ENABLE_QUEUES=false — notification workers are disabled.");
+  process.exit(0);
+}
+
 import { PrismaClient } from "@prisma/client";
 import { scanComplianceNotifications } from "../lib/compliance-monitor.js";
 import { deliverPendingNotification, scanAndCreateNotifications } from "../lib/notifications.js";
@@ -8,19 +19,19 @@ import {
   complianceScanQueueName,
   digestBatchQueueName,
   enqueueNotificationDelivery,
-  registerRecurringJobSchedulers,
   notificationDeliveryQueueName,
   notificationScanQueueName,
+  registerRecurringJobSchedulers,
+  startBoss,
   type ComplianceScanJobData,
   type NotificationDeliveryJobData,
-  type NotificationScanJobData
+  type NotificationScanJobData,
 } from "../lib/queues.js";
-import { getRedisConnectionOptions } from "../lib/redis.js";
 
 const prisma = new PrismaClient();
-const connection = getRedisConnectionOptions();
+const boss = await startBoss();
 
-const scanWorker = new Worker<NotificationScanJobData>(notificationScanQueueName, async (job) => {
+await boss.work<NotificationScanJobData>(notificationScanQueueName, { teamSize: 1 }, async (job) => {
   const result = await scanAndCreateNotifications(prisma, job.data);
 
   await Promise.all(result.createdNotificationIds.map(async (notificationId) => {
@@ -28,9 +39,9 @@ const scanWorker = new Worker<NotificationScanJobData>(notificationScanQueueName
   }));
 
   return result;
-}, { connection, concurrency: 1 });
+});
 
-const complianceWorker = new Worker<ComplianceScanJobData>(complianceScanQueueName, async (job) => {
+await boss.work<ComplianceScanJobData>(complianceScanQueueName, { teamSize: 1 }, async (job) => {
   const result = await scanComplianceNotifications(prisma, job.data);
 
   await Promise.all(result.createdNotificationIds.map(async (notificationId) => {
@@ -38,29 +49,22 @@ const complianceWorker = new Worker<ComplianceScanJobData>(complianceScanQueueNa
   }));
 
   return result;
-}, { connection, concurrency: 1 });
-
-const deliveryWorker = new Worker<NotificationDeliveryJobData>(notificationDeliveryQueueName, async (job) => deliverPendingNotification(prisma, job.data.notificationId), {
-  connection,
-  concurrency: 5
 });
 
-const digestWorker = new Worker(digestBatchQueueName, async () => processDigestBatch(prisma), {
-  connection,
-  concurrency: 1
-});
+await boss.work<NotificationDeliveryJobData>(
+  notificationDeliveryQueueName,
+  { teamSize: 5 },
+  async (job) => deliverPendingNotification(prisma, job.data.notificationId)
+);
 
-const shutdown = async () => {
-  await Promise.all([
-    scanWorker.close(),
-    complianceWorker.close(),
-    deliveryWorker.close(),
-    digestWorker.close()
-  ]);
-  await prisma.$disconnect();
-};
+await boss.work(digestBatchQueueName, { teamSize: 1 }, async () => processDigestBatch(prisma));
 
 await registerRecurringJobSchedulers();
+
+const shutdown = async () => {
+  await boss.stop();
+  await prisma.$disconnect();
+};
 
 process.on("SIGINT", async () => {
   await shutdown();
@@ -72,4 +76,4 @@ process.on("SIGTERM", async () => {
   process.exit(0);
 });
 
-console.info("Notification workers started with recurring schedulers.");
+console.info("Notification workers started (pg-boss) with recurring schedulers.");

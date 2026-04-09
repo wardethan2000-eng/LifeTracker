@@ -336,8 +336,9 @@ enum WebhookDeliveryStatus {
 // A person with an account. Participates in households and authors user-scoped records.
 model User {
   id                      String                @id @default(cuid())
-  clerkUserId             String                @unique
+  clerkUserId             String?               @unique
   email                   String?               @unique
+  emailVerified           Boolean               @default(false)
   displayName             String?
   notificationPreferences Json                  @default("{}")
   displayPreferences      Json                  @default("{}")
@@ -380,6 +381,55 @@ model User {
   dashboardPins          DashboardPin[]
   overviewPins           OverviewPin[]
   deviceTokens           DeviceToken[]
+  authSessions           AuthSession[]
+  authAccounts           AuthAccount[]
+}
+
+// ── BetterAuth tables ─────────────────────────────────────────────────────────
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("auth_session")
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@unique([providerId, accountId])
+  @@map("auth_account")
+}
+
+model AuthVerification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("auth_verification")
 }
 
 // A shared workspace that owns household-scoped assets, projects, inventory, and hobbies.

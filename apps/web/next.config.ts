@@ -12,12 +12,21 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   distDir: process.env.AEGIS_NEXT_DIST_DIR ?? ".next",
   outputFileTracingRoot: path.resolve(currentDirectory, "../../"),
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve ??= {};
     config.resolve.extensionAlias = {
       ...(config.resolve.extensionAlias ?? {}),
       ".js": [".ts", ".tsx", ".js"]
     };
+
+    // PGlite requires async WASM and Web Worker support (client-side only)
+    if (!isServer) {
+      config.experiments = {
+        ...(config.experiments ?? {}),
+        asyncWebAssembly: true,
+        layers: true
+      };
+    }
 
     return config;
   }

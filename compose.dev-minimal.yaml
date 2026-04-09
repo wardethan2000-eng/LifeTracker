@@ -1,0 +1,30 @@
+# Minimal development compose file — Postgres only.
+# Use this when you don't need Redis or MinIO locally.
+#
+#   docker compose -f compose.dev-minimal.yaml up -d
+#
+# Pair with these env vars in apps/api/.env:
+#   ENABLE_QUEUES=false
+#   STORAGE_ENABLED=false
+#   RATE_LIMIT_STORE=memory
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifekeeper-postgres
+    environment:
+      POSTGRES_DB: lifekeeper
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - lifekeeper-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lifekeeper"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lifekeeper-postgres-data:

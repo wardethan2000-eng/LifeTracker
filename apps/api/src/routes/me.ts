@@ -111,23 +111,6 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
 
     await app.prisma.user.delete({ where: { id: userId } });
 
-    // Best-effort Clerk deletion (not available in dev bypass mode).
-    if (request.auth.clerkUserId) {
-      try {
-        const { createClerkClient } = await import("@clerk/backend");
-        const secretKey = process.env.CLERK_SECRET_KEY?.trim();
-
-        if (!secretKey) {
-          app.log.warn("Skipping Clerk user deletion because CLERK_SECRET_KEY is not configured");
-        } else {
-          const clerkClient = createClerkClient({ secretKey });
-          await clerkClient.users.deleteUser(request.auth.clerkUserId);
-        }
-      } catch (err) {
-        app.log.warn({ err }, "Failed to delete Clerk user during account deletion");
-      }
-    }
-
     return reply.code(204).send();
   });
 };
