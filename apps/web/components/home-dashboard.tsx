@@ -77,6 +77,7 @@ type HomeDashboardProps = {
   lowStockCount?: number;
   outOfStockCount?: number;
   expiringCount?: number;
+  pendingOrderCount?: number;
   spaceTotalCount?: number;
   rootSpaceCount?: number;
   pinnedNotes?: Entry[];
@@ -121,6 +122,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
     lowStockCount = 0,
     outOfStockCount = 0,
     expiringCount = 0,
+    pendingOrderCount = 0,
     spaceTotalCount = 0,
     rootSpaceCount = 0,
     pinnedNotes = [],
@@ -429,19 +431,48 @@ export function HomeDashboard(props: HomeDashboardProps) {
     footerLink: { label: "View canvases →", href: `/notes?householdId=${householdId}&tab=canvases` },
   });
 
-  cards.push({
-    key: "inventory",
-    title: "📦 Inventory",
-    content: (
-      <dl className="dashboard-card__kv">
-        <div><dt>Tracked Items</dt><dd>{inventoryTotalCount}</dd></div>
-        <div><dt>Low Stock</dt><dd style={lowStockCount > 0 ? { color: "var(--warning)" } : undefined}>{lowStockCount}</dd></div>
-        <div><dt>Out of Stock</dt><dd style={outOfStockCount > 0 ? { color: "var(--danger)" } : undefined}>{outOfStockCount}</dd></div>
-        {expiringCount > 0 && <div><dt>Expiring Soon</dt><dd style={{ color: "var(--warning)" }}>{expiringCount}</dd></div>}
-      </dl>
-    ),
-    footerLink: { label: "View inventory →", href: `/inventory?householdId=${householdId}` },
-  });
+  if (inventoryTotalCount > 0) {
+    cards.push({
+      key: "inventory",
+      title: "📦 Inventory",
+      content: (
+        <dl className="dashboard-card__kv">
+          <div><dt>Tracked Items</dt><dd>{inventoryTotalCount}</dd></div>
+          <div>
+            <dt>Low Stock</dt>
+            <dd style={lowStockCount > 0 ? { color: "var(--warning)" } : undefined}>
+              {lowStockCount > 0
+                ? <a href={`/inventory?householdId=${householdId}&itemType=consumable&lowStock=1`} style={{ color: "inherit", textDecoration: "none" }}>{lowStockCount}</a>
+                : lowStockCount}
+            </dd>
+          </div>
+          <div>
+            <dt>Out of Stock</dt>
+            <dd style={outOfStockCount > 0 ? { color: "var(--danger)" } : undefined}>
+              {outOfStockCount > 0
+                ? <a href={`/inventory?householdId=${householdId}&outOfStock=1`} style={{ color: "inherit", textDecoration: "none" }}>{outOfStockCount}</a>
+                : outOfStockCount}
+            </dd>
+          </div>
+          {expiringCount > 0 && (
+            <div>
+              <dt>Expiring Soon</dt>
+              <dd style={{ color: "var(--warning)" }}>
+                <a href={`/inventory?householdId=${householdId}&expiring=1`} style={{ color: "inherit", textDecoration: "none" }}>{expiringCount}</a>
+              </dd>
+            </div>
+          )}
+          {pendingOrderCount > 0 && (
+            <div>
+              <dt>Pending Orders</dt>
+              <dd>{pendingOrderCount}</dd>
+            </div>
+          )}
+        </dl>
+      ),
+      footerLink: { label: "View inventory →", href: `/inventory?householdId=${householdId}` },
+    });
+  }
 
   cards.push({
     key: "spaces",

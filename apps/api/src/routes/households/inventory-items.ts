@@ -60,6 +60,10 @@ const inventoryDetailQuerySchema = z.object({
   transactionLimit: z.coerce.number().int().min(1).max(100).default(20)
 });
 
+const inventoryExportQuerySchema = z.object({
+  includeSpaces: z.coerce.boolean().optional()
+});
+
 const bulkInventoryReadinessQuerySchema = z.object({
   scheduleIds: z.string().optional()
 });
@@ -284,6 +288,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/v1/households/:householdId/inventory/export", async (request, reply) => {
     const params = householdParamsSchema.parse(request.params);
+    const query = inventoryExportQuerySchema.parse(request.query);
 
     if (!await requireHouseholdMembership(app.prisma, params.householdId, request.auth.userId, reply)) {
       return;
@@ -297,16 +302,38 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       orderBy: [
         { category: "asc" },
         { name: "asc" }
-      ]
+      ],
+      ...(query.includeSpaces ? {
+        include: {
+          spaceItems: {
+            include: { space: { select: { name: true, shortCode: true } } }
+          }
+        }
+      } : {})
     });
 
+    const spaceColumns = query.includeSpaces ? ["spaceName", "spaceShortCode"] as const : [] as const;
+    const allColumns = [...inventoryExportColumns, ...spaceColumns] as string[];
+
     const csvString = [
-      inventoryExportColumns.join(","),
-      ...items.map((item) => inventoryExportColumns.map((column) => {
-        const value = item[column as keyof typeof item];
-        if (value instanceof Date) return csvValue(value.toISOString().split("T")[0]);
-        return csvValue(value as string | number | boolean | null | undefined);
-      }).join(","))
+      allColumns.join(","),
+      ...items.map((item) => {
+        const baseValues = inventoryExportColumns.map((column) => {
+          const value = item[column as keyof typeof item];
+          if (value instanceof Date) return csvValue(value.toISOString().split("T")[0]);
+          return csvValue(value as string | number | boolean | null | undefined);
+        });
+
+        if (!query.includeSpaces) return baseValues.join(",");
+
+        const spaceItems = (item as typeof item & { spaceItems?: Array<{ space: { name: string; shortCode: string } }> }).spaceItems ?? [];
+        const primarySpace = spaceItems[0]?.space ?? null;
+        const spaceValues = [
+          csvValue(primarySpace?.name ?? null),
+          csvValue(primarySpace?.shortCode ?? null)
+        ];
+        return [...baseValues, ...spaceValues].join(",");
+      })
     ].join("\n");
 
     return reply

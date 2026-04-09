@@ -139,6 +139,22 @@ export default function ScanScreen() {
                 View image
               </Button>
             ) : null}
+            <Button
+              mode="contained"
+              onPress={() => {
+                const p = productResult;
+                setProductResult(null);
+                const query = new URLSearchParams();
+                if (p?.productName) query.set("name", p.productName);
+                else if (p?.brand) query.set("name", p.brand);
+                if (p?.category) query.set("category", p.category);
+                if (p?.brand) query.set("manufacturer", p.brand);
+                if (p?.description) query.set("description", p.description);
+                router.push(`/inventory/new?${query.toString()}`);
+              }}
+            >
+              Add to inventory
+            </Button>
             <Button onPress={() => setProductResult(null)}>Dismiss</Button>
           </Dialog.Actions>
         </Dialog>
