@@ -469,50 +469,51 @@ export function AssetOverviewGrid({
           } satisfies DashboardCardDef,
         ]
       : []),
-    {
-      key: "transfer-history",
-      title: "Transfer History",
-      content:
-        transferHistory.items.length === 0 ? (
-          <p className="dashboard-card__empty">Not transferred.</p>
-        ) : (
-          <div style={{ display: "grid", gap: "16px" }}>
-            {transferHistory.items.map((transfer) => (
-              <article
-                key={transfer.id}
-                style={{
-                  paddingLeft: "18px",
-                  borderLeft: "3px solid var(--border-strong)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  <strong>{transfer.fromUser.displayName ?? "Unknown"}</strong>
-                  <span style={{ color: "var(--ink-muted)" }}>→</span>
-                  <strong>{transfer.toUser.displayName ?? "Unknown"}</strong>
-                  <span className="pill">
-                    {formatTransferTypeLabel(transfer.transferType)}
-                  </span>
-                </div>
-                <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
-                  {formatDateTime(transfer.transferredAt)}
-                </span>
-                {transfer.reason ? (
-                  <p style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>
-                    {transfer.reason}
-                  </p>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        ),
-    },
+    ...(transferHistory.items.length > 0
+      ? [
+          {
+            key: "transfer-history",
+            title: "Transfer History",
+            content: (
+              <div style={{ display: "grid", gap: "16px" }}>
+                {transferHistory.items.map((transfer) => (
+                  <article
+                    key={transfer.id}
+                    style={{
+                      paddingLeft: "18px",
+                      borderLeft: "3px solid var(--border-strong)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                      }}
+                    >
+                      <strong>{transfer.fromUser.displayName ?? "Unknown"}</strong>
+                      <span style={{ color: "var(--ink-muted)" }}>→</span>
+                      <strong>{transfer.toUser.displayName ?? "Unknown"}</strong>
+                      <span className="pill">
+                        {formatTransferTypeLabel(transfer.transferType)}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
+                      {formatDateTime(transfer.transferredAt)}
+                    </span>
+                    {transfer.reason ? (
+                      <p style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>
+                        {transfer.reason}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ),
+          } satisfies DashboardCardDef,
+        ]
+      : []),
     {
       key: "notes-canvas",
       title: "Notes & Canvas",

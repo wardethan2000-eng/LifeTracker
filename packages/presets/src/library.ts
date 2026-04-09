@@ -1171,5 +1171,235 @@ export const presetLibrary = [
       schedule({ key: "consumables", name: "Inspect consumables and replace wear parts", triggerTemplate: { type: "usage", metricKey: "runtime_hours", intervalValue: 100, leadTimeValue: 10 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadValue: 10 }), tags: ["consumables"] }),
       schedule({ key: "firmware_backup", name: "Backup settings or firmware configuration", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["configuration"] })
     ]
+  }),
+  // ─── Appliance ───────────────────────────────────────────────────────────────
+  libraryPreset({
+    key: "appliance-refrigerator",
+    label: "Refrigerator / Freezer",
+    category: "appliance",
+    description: "A maintenance profile for refrigerators and freezers covering water filters, condenser coil cleaning, door seal condition, ice maker service, and periodic temperature verification.",
+    tags: ["appliance", "refrigerator", "kitchen"],
+    suggestedCustomFields: [
+      field({ key: "brand", label: "Brand", type: "string" }),
+      field({ key: "model", label: "Model", type: "string" }),
+      field({ key: "serialNumber", label: "Serial Number", type: "string" }),
+      field({ key: "type", label: "Refrigerator Type", type: "select", options: ["french door", "side-by-side", "top freezer", "bottom freezer", "single door", "counter-depth", "chest freezer", "upright freezer"] }),
+      field({ key: "hasWaterDispenser", label: "Water Dispenser / Ice Maker", type: "boolean", defaultValue: false }),
+      field({ key: "waterFilterModel", label: "Water Filter Model", type: "string" }),
+      field({ key: "condenserLocation", label: "Condenser Coil Location", type: "select", options: ["bottom front (behind kick plate)", "bottom rear", "back panel", "top rear", "none / sealed system"] }),
+      field({ key: "purchaseDate", label: "Purchase Date", type: "date" }),
+      field({ key: "warrantyExpiry", label: "Warranty Expiry", type: "date" })
+    ],
+    metricTemplates: [],
+    scheduleTemplates: [
+      schedule({ key: "water_filter", name: "Replace water filter", description: "An expired water filter stops removing contaminants and can reduce flow to the dispenser and ice maker. Replace on the calendar interval even if the indicator has not lit.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["filters", "water"] }),
+      schedule({ key: "condenser_coil_cleaning", name: "Clean condenser coils", description: "Dusty condenser coils force the compressor to run longer and hotter, raising electricity use and shortening compressor life. Pull out the unit or remove the kick plate and vacuum the coils.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["cleaning", "compressor", "energy"] }),
+      schedule({ key: "door_gasket_inspection", name: "Door gasket inspection and cleaning", description: "A worn or dirty gasket lets cold air escape and causes the compressor to run continuously. Clean the seal with warm soapy water and check for tears, gaps, or sections that no longer spring back.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["seals", "efficiency"] }),
+      schedule({ key: "ice_maker_cleaning", name: "Ice maker cleaning and sanitizing", description: "Ice makers accumulate mineral scale and biofilm that affect taste and eventually block production. Run a cleaning cycle or flush with a food-safe cleaner on a regular schedule.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["ice maker", "sanitizing", "water"] }),
+      schedule({ key: "drain_pan_cleaning", name: "Drain pan and drain tube cleaning", description: "The drain pan collects condensate. Stagnant water in the pan or a blocked drain tube causes odors, mold growth, and water pooling on the floor.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["cleaning", "drainage"] }),
+      schedule({ key: "temperature_check", name: "Refrigerator and freezer temperature verification", description: "Verify fresh food compartment is 35–38°F and freezer is 0°F with a standalone thermometer. Built-in displays do not always reflect true cavity temperature.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["food safety", "temperature"] }),
+      schedule({ key: "door_hinge_leveling", name: "Door alignment and leveling check", description: "Misaligned doors sag over time and prevent gaskets from sealing properly. Check that both doors hang level and that the refrigerator is level front-to-back so the doors swing closed on their own.", triggerTemplate: { type: "interval", intervalDays: 730, leadTimeDays: 30 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30 }), tags: ["alignment", "seals"] })
+    ]
+  }),
+  libraryPreset({
+    key: "appliance-laundry",
+    label: "Washer & Dryer",
+    category: "appliance",
+    description: "A maintenance profile for washing machines and dryers covering drum cleaning, lint management, hose inspections, and dryer vent safety to prevent fires and water damage.",
+    tags: ["appliance", "washer", "dryer", "laundry"],
+    suggestedCustomFields: [
+      field({ key: "washerBrand", label: "Washer Brand", type: "string" }),
+      field({ key: "washerModel", label: "Washer Model", type: "string" }),
+      field({ key: "washerType", label: "Washer Type", type: "select", options: ["front-load", "top-load (agitator)", "top-load (impeller)", "washer-dryer combo", "none"] }),
+      field({ key: "dryerBrand", label: "Dryer Brand", type: "string" }),
+      field({ key: "dryerModel", label: "Dryer Model", type: "string" }),
+      field({ key: "dryerType", label: "Dryer Type", type: "select", options: ["gas", "electric", "heat pump", "washer-dryer combo", "none"] }),
+      field({ key: "ventType", label: "Dryer Vent Configuration", type: "select", options: ["rigid metal duct", "flexible aluminum duct", "indoor exhaust kit (lint trap)", "ventless / condenser"] }),
+      field({ key: "ventLength", label: "Dryer Vent Run Length", type: "string", placeholder: "12 ft" }),
+      field({ key: "waterSupplyHoseType", label: "Washer Supply Hose Type", type: "select", options: ["standard rubber", "reinforced braided stainless", "burst-proof"] })
+    ],
+    metricTemplates: [],
+    scheduleTemplates: [
+      schedule({ key: "washer_drum_clean", name: "Washer drum cleaning cycle", description: "Run a dedicated drum-clean or tub-clean cycle monthly to remove detergent residue, mineral deposits, and bacteria that cause musty odors — especially in front-load machines.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5 }), tags: ["cleaning", "odor", "drum"] }),
+      schedule({ key: "door_gasket_cleaning", name: "Washer door gasket and seal cleaning", description: "The door gasket on front-load washers traps moisture, lint, and detergent. Wipe it dry after every use and do a thorough cleaning monthly to prevent mold and odor buildup.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5 }), tags: ["cleaning", "seals", "mold"] }),
+      schedule({ key: "washer_filter_cleaning", name: "Washer pump filter cleaning", description: "Front-load and some top-load washers have a pump filter that traps lint, coins, and debris. A clogged filter causes slow drainage, odors, and eventually pump failure.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["filters", "drainage"] }),
+      schedule({ key: "dryer_lint_trap", name: "Lint screen deep clean", description: "Fabric softener residue and fine lint invisible to the eye build up on the screen, blocking airflow and increasing drying time. Wash the screen with warm soapy water quarterly to clear residue.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["lint", "airflow", "fire safety"] }),
+      schedule({ key: "dryer_vent_cleaning", name: "Dryer vent duct cleaning", description: "Lint accumulation in the dryer duct is a leading cause of residential fires. A professional or DIY cleaning of the full duct run — from dryer to exterior termination — is essential every 12 months.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 30 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 30, overdueCadenceDays: 14, maxOverdueNotifications: 6 }), tags: ["fire safety", "lint", "vent"], isRegulatory: true }),
+      schedule({ key: "water_supply_hose_inspection", name: "Water supply hose inspection", description: "Washing machine hose failures are one of the most common sources of home water damage. Inspect hoses for bulging, cracking, or rust at fittings, and replace standard rubber hoses every 5 years proactively.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 30 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30 }), tags: ["plumbing", "water damage", "hoses"] }),
+      schedule({ key: "exterior_vent_termination", name: "Exterior vent cap inspection", description: "Check the exterior vent flap or cap for lint buildup, bird nests, or a stuck damper that restricts airflow. A blocked exterior vent dramatically extends drying time and raises fire risk.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["vent", "fire safety", "airflow"] })
+    ]
+  }),
+  libraryPreset({
+    key: "appliance-dishwasher",
+    label: "Dishwasher",
+    category: "appliance",
+    description: "A maintenance profile for dishwashers covering filter cleaning, spray arm service, door seal care, and water supply inspection to maintain wash performance and prevent leaks.",
+    tags: ["appliance", "dishwasher", "kitchen"],
+    suggestedCustomFields: [
+      field({ key: "brand", label: "Brand", type: "string" }),
+      field({ key: "model", label: "Model", type: "string" }),
+      field({ key: "serialNumber", label: "Serial Number", type: "string" }),
+      field({ key: "filterType", label: "Filter Type", type: "select", options: ["manual clean (removable)", "self-cleaning (grinder)"] }),
+      field({ key: "hasWaterSoftener", label: "Built-in Water Softener", type: "boolean", defaultValue: false }),
+      field({ key: "purchaseDate", label: "Purchase Date", type: "date" }),
+      field({ key: "warrantyExpiry", label: "Warranty Expiry", type: "date" })
+    ],
+    metricTemplates: [],
+    scheduleTemplates: [
+      schedule({ key: "filter_cleaning", name: "Clean dishwasher filter", description: "The manual-clean filter at the bottom of the tub traps food particles and grease. A clogged filter recirculates debris onto dishes and causes odors. Remove, rinse, and scrub it monthly.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5 }), tags: ["filter", "cleaning"] }),
+      schedule({ key: "spray_arm_cleaning", name: "Spray arm cleaning and inspection", description: "Food and mineral deposits block the spray arm holes, producing uneven wash coverage and leaving residue on dishes. Remove each arm, flush the holes with a toothpick and water, and check for cracks.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["spray arms", "cleaning", "performance"] }),
+      schedule({ key: "interior_cleaning", name: "Interior tub cleaning and deodorizing", description: "Run a cleaning cycle or place a dishwasher cleaner tablet in the bottom rack to dissolve grease, mineral buildup, and biofilm from the tub walls, drain, and door surfaces.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5 }), tags: ["cleaning", "deodorizing"] }),
+      schedule({ key: "door_gasket_inspection", name: "Door gasket inspection and cleaning", description: "The door seal prevents water from escaping during a cycle. Check for cracking, tears, or sections that feel stiff. Wipe the gasket and the groove it sits in with a damp cloth to remove debris.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["seals", "leaks"] }),
+      schedule({ key: "hard_water_descaling", name: "Hard water descaling treatment", description: "In hard water areas, calcium and mineral scale accumulates on the heating element, interior walls, and spray arms, reducing wash quality and efficiency over time. Run a citric acid or descaling product cycle quarterly.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["hard water", "scale", "efficiency"] }),
+      schedule({ key: "water_supply_inspection", name: "Water supply line and drain hose inspection", description: "Inspect the supply line for kinks, corrosion at fittings, or moisture near the connection. Check the drain hose routing and confirm there are no kinks or sagging low spots that could allow back-siphoning.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["plumbing", "water damage", "hoses"] }),
+      schedule({ key: "door_latch_and_float", name: "Door latch and float switch check", description: "The float switch prevents overfilling by cutting water supply if the tub level is too high. The door latch must engage the micro-switch cleanly. A stuck float or misaligned latch can cause flood or no-fill conditions.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["safety", "mechanical"] })
+    ]
+  }),
+  // ─── Technology ──────────────────────────────────────────────────────────────
+  libraryPreset({
+    key: "technology-home-server-nas",
+    label: "Home Server / NAS",
+    category: "technology",
+    description: "A maintenance profile for home servers, NAS devices, and always-on machines covering drive health, backup integrity, OS updates, physical cleaning, and UPS battery care.",
+    tags: ["technology", "server", "NAS", "storage", "home lab"],
+    suggestedCustomFields: [
+      field({ key: "hostname", label: "Hostname", type: "string" }),
+      field({ key: "os", label: "Operating System", type: "string", placeholder: "TrueNAS SCALE 24.10" }),
+      field({ key: "driveCount", label: "Drive Count", type: "number" }),
+      field({ key: "totalCapacityTB", label: "Total Capacity (TB)", type: "number" }),
+      field({ key: "raidLevel", label: "RAID / Pool Type", type: "select", options: ["RAID 0", "RAID 1", "RAID 5", "RAID 6", "RAID 10", "ZFS RAIDZ1", "ZFS RAIDZ2", "ZFS RAIDZ3", "ZFS Mirror", "unRAID", "JBOD / No RAID", "other"] }),
+      field({ key: "processorModel", label: "Processor", type: "string" }),
+      field({ key: "ramGB", label: "RAM (GB)", type: "number" }),
+      field({ key: "hasUPS", label: "Connected to UPS", type: "boolean", defaultValue: false }),
+      field({ key: "upsModel", label: "UPS Model", type: "string" }),
+      field({ key: "backupDestination", label: "Offsite Backup Destination", type: "string", placeholder: "Backblaze B2, Wasabi, external drive offsite" }),
+      field({ key: "location", label: "Physical Location", type: "string" })
+    ],
+    metricTemplates: [],
+    scheduleTemplates: [
+      schedule({ key: "drive_smart_check", name: "Drive SMART health check", description: "Review SMART attributes for all drives: reallocated sectors, uncorrectable errors, pending sectors, and spin retry counts. A single drive showing early failure indicators warrants immediate replacement before the array degrades.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5 }), tags: ["drives", "health", "SMART"] }),
+      schedule({ key: "backup_verification", name: "Backup integrity verification", description: "Verify that backups are completing successfully and that a test restore works. Unverified backups are not backups. Confirm the most recent backup job succeeded and that critical data can actually be restored.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 5 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 5 }), tags: ["backup", "data integrity"] }),
+      schedule({ key: "os_updates", name: "OS and firmware updates", description: "Apply available OS security patches, NAS firmware updates, and plugin or container updates. Security vulnerabilities on always-on network-connected hardware are a significant risk if left unpatched.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["security", "updates", "firmware"] }),
+      schedule({ key: "dust_cleaning", name: "Dust cleaning and fan inspection", description: "Clean dust filters, fan blades, and heatsink fins. Dust accumulation raises operating temperatures, shortens component life, and can eventually cause thermal shutdowns. Inspect fans for bearing noise.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["cleaning", "cooling", "fans"] }),
+      schedule({ key: "ups_battery_test", name: "UPS battery test and runtime check", description: "Run a self-test on the UPS to verify battery health and confirm runtime is within acceptable range for a graceful shutdown. UPS batteries degrade silently and often fail to hold charge when actually needed.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["UPS", "battery", "power"] }),
+      schedule({ key: "offsite_backup_rotation", name: "Offsite backup rotation or cloud sync verification", description: "Confirm that an offsite or cloud copy of critical data is current and complete. On-site RAID protects against drive failure — it does not protect against fire, theft, or ransomware. Verify the offsite copy independently.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["backup", "offsite", "disaster recovery"] }),
+      schedule({ key: "security_audit", name: "Security and access review", description: "Review active user accounts, API keys, SSH authorized keys, and open network ports. Disable stale credentials and confirm that only expected services are listening on the network.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["security", "access control"] }),
+      schedule({ key: "ssl_cert_renewal", name: "SSL / TLS certificate renewal", description: "Check expiry dates on any SSL/TLS certificates used for web interfaces, reverse proxies, or internal services. An expired certificate breaks access to the interface and may require emergency out-of-band recovery.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 60 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 60, overdueCadenceDays: 7, maxOverdueNotifications: 8 }), tags: ["security", "certificates", "TLS"] }),
+      schedule({ key: "ups_battery_replacement", name: "UPS battery replacement", description: "Replace the UPS battery on a fixed cycle regardless of self-test results. Most sealed lead-acid UPS batteries have a 3–5 year service life before capacity degrades to the point where runtime guarantees are unreliable.", triggerTemplate: { type: "interval", intervalDays: 1460, leadTimeDays: 60 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 60, overdueCadenceDays: 30 }), tags: ["UPS", "battery", "replacement"] })
+    ]
+  }),
+  libraryPreset({
+    key: "technology-network-equipment",
+    label: "Network Equipment",
+    category: "technology",
+    description: "A maintenance profile for home and small-office network equipment including routers, switches, access points, and modems. Covers firmware updates, password hygiene, physical inspection, and ISP contract management.",
+    tags: ["technology", "network", "router", "home lab", "Wi-Fi"],
+    suggestedCustomFields: [
+      field({ key: "routerBrand", label: "Router Brand / Model", type: "string" }),
+      field({ key: "ispProvider", label: "ISP Provider", type: "string" }),
+      field({ key: "connectionType", label: "Connection Type", type: "select", options: ["fiber", "cable (DOCSIS)", "DSL", "fixed wireless", "satellite", "other"] }),
+      field({ key: "downloadSpeedMbps", label: "Subscribed Download Speed (Mbps)", type: "number" }),
+      field({ key: "uploadSpeedMbps", label: "Subscribed Upload Speed (Mbps)", type: "number" }),
+      field({ key: "hasManaged Switch", label: "Managed Switch Present", type: "boolean", defaultValue: false }),
+      field({ key: "apCount", label: "Access Point Count", type: "number" }),
+      field({ key: "hasUPS", label: "Network Equipment on UPS", type: "boolean", defaultValue: false }),
+      field({ key: "ispContractRenewal", label: "ISP Contract Renewal Date", type: "date" }),
+      field({ key: "staticIp", label: "Static IP Address", type: "boolean", defaultValue: false })
+    ],
+    metricTemplates: [],
+    scheduleTemplates: [
+      schedule({ key: "firmware_update", name: "Router and access point firmware update", description: "Apply firmware updates to routers, switches, and access points promptly. Network equipment firmware patches frequently address critical security vulnerabilities that are actively exploited. Enable auto-update if the device supports it, or check manually on a quarterly schedule.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["firmware", "security", "updates"] }),
+      schedule({ key: "password_rotation", name: "Network password and credential rotation", description: "Change the Wi-Fi password, admin console password, and any shared access credentials on an annual cycle. Rotate immediately after any household member change or suspected unauthorized access.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 30 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30 }), tags: ["security", "passwords", "credentials"] }),
+      schedule({ key: "connected_device_audit", name: "Connected device audit", description: "Review the list of devices connected to the network and identify any that should not be present. Unknown devices may indicate unauthorized access or forgotten IoT devices that are no longer needed.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["security", "devices", "audit"] }),
+      schedule({ key: "physical_inspection", name: "Physical inspection and dust cleaning", description: "Inspect network equipment for overheating, indicator light anomalies, and cable condition. Dust intake vents on enclosed routers and switches. Confirm that cables are properly seated and not bent sharply at connectors.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["cleaning", "physical", "cables"] }),
+      schedule({ key: "speed_test", name: "Broadband speed and performance test", description: "Run a speed test to verify you are receiving close to your subscribed speeds. Significant drops may indicate ISP issues, hardware degradation, or configuration drift worth investigating.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["performance", "ISP", "speed"] }),
+      schedule({ key: "ups_battery_test", name: "UPS battery test", description: "Test the UPS that protects network equipment to confirm it will hold through a brief power outage. Network equipment on a UPS prevents link drops that interrupt VoIP calls, home automation, and security cameras during brief outages.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["UPS", "battery", "power"] }),
+      schedule({ key: "isp_contract_review", name: "ISP contract and rate review", description: "Compare your current plan against available options at contract renewal time. ISP pricing and technology availability change frequently, and loyalty rarely produces the best rates.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 60 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 60 }), tags: ["ISP", "contract", "cost"] })
+    ]
+  }),
+  // ─── Vehicle (additional) ────────────────────────────────────────────────────
+  libraryPreset({
+    key: "vehicle-motorcycle",
+    label: "Motorcycle",
+    category: "vehicle",
+    description: "A maintenance profile for motorcycles and scooters covering engine oil, chain or belt service, brake fluid, tire care, seasonal storage, and legal renewals.",
+    tags: ["vehicle", "motorcycle", "bike", "scooter", "two-wheel"],
+    suggestedCustomFields: [
+      field({ key: "year", label: "Year", type: "number" }),
+      field({ key: "make", label: "Make", type: "string" }),
+      field({ key: "model", label: "Model", type: "string" }),
+      field({ key: "vin", label: "VIN", type: "string" }),
+      field({ key: "engineCC", label: "Engine Displacement (cc)", type: "number" }),
+      field({ key: "style", label: "Bike Style", type: "select", options: ["sport", "naked / standard", "cruiser", "touring", "adventure / dual-sport", "dirt / off-road", "scooter", "electric", "other"] }),
+      field({ key: "fuelType", label: "Fuel Type", type: "select", options: ["gasoline", "electric", "other"] }),
+      field({ key: "transmissionType", label: "Transmission", type: "select", options: ["manual (clutch)", "automatic", "DCT", "CVT (scooter)", "single-speed (electric)"] }),
+      field({ key: "finalDrive", label: "Final Drive", type: "select", options: ["chain", "belt", "shaft"] }),
+      field({ key: "frontTireSize", label: "Front Tire Size", type: "string" }),
+      field({ key: "rearTireSize", label: "Rear Tire Size", type: "string" }),
+      field({ key: "oilType", label: "Preferred Oil Type", type: "string" }),
+      field({ key: "licensePlate", label: "License Plate", type: "string" })
+    ],
+    metricTemplates: [
+      metric({ key: "odometer", name: "Odometer", unit: "miles", startingValue: 0 })
+    ],
+    scheduleTemplates: [
+      schedule({ key: "engine_oil", name: "Engine oil and filter", description: "Motorcycles run harder oil temperatures than cars. Most manufacturers specify oil changes at 3,000–5,000 miles or 12 months — whichever comes first. Wet-clutch bikes require motorcycle-specific oil; do not use automotive oil with friction modifiers.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "odometer", intervalValue: 4000, logic: "whichever_first", leadTimeDays: 21, leadTimeValue: 300 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21, upcomingLeadValue: 300 }), tags: ["engine", "fluids", "oil"], quickLogLabel: "Oil changed" }),
+      schedule({ key: "chain_service", name: "Chain cleaning and lubrication", description: "A dry or dirty chain stretches faster and wears sprockets. Clean and lubricate every 300–500 miles and after riding in rain. Check slack against spec — a chain that needs adjustment more often than usual is approaching replacement.", triggerTemplate: { type: "usage", metricKey: "odometer", intervalValue: 400, leadTimeValue: 50 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadValue: 50 }), tags: ["chain", "drivetrain", "lubrication"] }),
+      schedule({ key: "chain_inspection", name: "Chain and sprocket wear inspection", description: "Inspect chain stretch with a ruler or wear indicator tool. Inspect front and rear sprocket teeth for hooked, shark-fin, or worn-flat profiles. Replace chain and both sprockets together — installing a new chain on worn sprockets destroys it quickly.", triggerTemplate: { type: "usage", metricKey: "odometer", intervalValue: 10000, leadTimeValue: 500 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadValue: 500 }), tags: ["chain", "sprockets", "drivetrain", "wear items"] }),
+      schedule({ key: "tire_inspection", name: "Tire pressure and condition check", description: "Check cold tire pressure before every ride. Inspect tread depth, sidewall condition, and look for embedded objects. Motorcycle tire failure at speed is catastrophic — replace tires well before the wear indicators.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["tires", "safety"] }),
+      schedule({ key: "brake_fluid", name: "Brake fluid replacement", description: "DOT brake fluid is hygroscopic and absorbs moisture over time, lowering its boiling point and making the lever feel spongy. Replace the full system every 2 years regardless of appearance.", triggerTemplate: { type: "interval", intervalDays: 730, leadTimeDays: 30 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30 }), tags: ["brakes", "fluids", "safety"] }),
+      schedule({ key: "coolant_service", name: "Coolant inspection and replacement", description: "Liquid-cooled bikes: test coolant concentration and inspect hoses for cracking, softness, or swelling. Replace coolant on the manufacturer's schedule, typically every 2 years.", triggerTemplate: { type: "interval", intervalDays: 730, leadTimeDays: 30 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30 }), tags: ["cooling", "fluids"] }),
+      schedule({ key: "battery_service", name: "Battery maintenance and load test", description: "Motorcycle batteries discharge quickly during storage and do not recover well from deep discharge. Load-test the battery at the start of each season and keep it on a tender during storage.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["battery", "electrical"] }),
+      schedule({ key: "air_filter", name: "Air filter service", description: "Inspect the air filter per the service manual. Paper filters that look grey can still restrict airflow significantly. Bikes ridden in dusty conditions need more frequent attention than paved-only machines.", triggerTemplate: { type: "compound", intervalDays: 730, metricKey: "odometer", intervalValue: 12000, logic: "whichever_first", leadTimeDays: 30, leadTimeValue: 1000 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30, upcomingLeadValue: 1000 }), tags: ["filters", "engine", "air"] }),
+      schedule({ key: "spark_plugs", name: "Spark plug inspection and replacement", description: "Standard plugs typically last 8,000–15,000 miles; iridium plugs last longer. Pull and inspect plugs for fouling, gap wear, or carbon bridging that signals other engine issues.", triggerTemplate: { type: "compound", intervalDays: 730, metricKey: "odometer", intervalValue: 16000, logic: "whichever_first", leadTimeDays: 30, leadTimeValue: 1000 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30, upcomingLeadValue: 1000 }), tags: ["ignition", "spark plugs"] }),
+      schedule({ key: "brake_pads_inspection", name: "Brake pad and rotor inspection", description: "Inspect front and rear brake pads for material thickness. Check rotor surfaces for scoring, heat cracks, and minimum thickness. Worn brakes are a primary safety system failure.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "odometer", intervalValue: 8000, logic: "whichever_first", leadTimeDays: 21, leadTimeValue: 500 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21, upcomingLeadValue: 500 }), tags: ["brakes", "safety", "wear items"] }),
+      schedule({ key: "registration_renewal", name: "Registration and tags renewal", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 30 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 30, overdueCadenceDays: 7, maxOverdueNotifications: 6 }), tags: ["legal", "ownership"] }),
+      schedule({ key: "winter_storage_prep", name: "Winter storage preparation", description: "Before long-term storage: stabilize fuel or drain the carb/tank, change oil, charge and remove or tender the battery, fog the cylinder if applicable, lube cables, and cover the bike.", triggerTemplate: { type: "seasonal", month: 10, day: 15, leadTimeDays: 14 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 14, overdueCadenceDays: 7, maxOverdueNotifications: 4 }), tags: ["seasonal", "storage", "winter"] }),
+      schedule({ key: "spring_recommission", name: "Spring recommission and pre-ride inspection", description: "Reinstall battery, check tire pressure and condition, inspect brake fluid and coolant, verify lights and controls, and take a slow shakedown ride before returning to normal use.", triggerTemplate: { type: "seasonal", month: 3, day: 20, leadTimeDays: 14 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 14, overdueCadenceDays: 7, maxOverdueNotifications: 4 }), tags: ["seasonal", "spring", "commissioning"] })
+    ]
+  }),
+  libraryPreset({
+    key: "vehicle-rv-motorhome",
+    label: "RV / Motorhome",
+    category: "vehicle",
+    description: "A maintenance profile for Class A, B, and C motorhomes and towable RVs covering engine service, generator care, roof and slide-out systems, water and waste systems, propane, and seasonal preparation.",
+    tags: ["vehicle", "RV", "motorhome", "camper", "recreational vehicle"],
+    suggestedCustomFields: [
+      field({ key: "year", label: "Year", type: "number" }),
+      field({ key: "make", label: "Make", type: "string" }),
+      field({ key: "model", label: "Model", type: "string" }),
+      field({ key: "vin", label: "VIN", type: "string" }),
+      field({ key: "rvClass", label: "RV Class / Type", type: "select", options: ["Class A (gas)", "Class A (diesel pusher)", "Class B (camper van)", "Class B+ (extended van)", "Class C", "Super C", "travel trailer", "fifth wheel", "toy hauler", "pop-up / folding camper", "truck camper"] }),
+      field({ key: "chassisBrand", label: "Chassis / Base Vehicle Brand", type: "string" }),
+      field({ key: "engineType", label: "Engine Type", type: "select", options: ["gasoline", "diesel", "electric / hybrid", "N/A (towable)"] }),
+      field({ key: "roofType", label: "Roof Material", type: "select", options: ["EPDM rubber", "TPO membrane", "fiberglass", "aluminum", "other"] }),
+      field({ key: "slideoutCount", label: "Number of Slide-Outs", type: "number" }),
+      field({ key: "generatorBrand", label: "Generator Brand / Model", type: "string" }),
+      field({ key: "freshWaterGal", label: "Fresh Water Tank Capacity (gal)", type: "number" }),
+      field({ key: "blackWaterGal", label: "Black Water Tank Capacity (gal)", type: "number" }),
+      field({ key: "lengthFt", label: "Overall Length (ft)", type: "number" }),
+      field({ key: "licensePlate", label: "License Plate", type: "string" })
+    ],
+    metricTemplates: [
+      metric({ key: "odometer", name: "Odometer", unit: "miles", startingValue: 0 }),
+      metric({ key: "generator_hours", name: "Generator Hours", unit: "hours", startingValue: 0 })
+    ],
+    scheduleTemplates: [
+      schedule({ key: "engine_oil", name: "Engine oil and filter", description: "Motorhomes run heavy chassis loads and are often stored for months between trips. Change oil on both calendar and mileage intervals — sitting oil breaks down as surely as working oil.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "odometer", intervalValue: 7500, logic: "whichever_first", leadTimeDays: 30, leadTimeValue: 500 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 30, upcomingLeadValue: 500 }), tags: ["engine", "fluids", "oil"], quickLogLabel: "Oil changed" }),
+      schedule({ key: "generator_oil", name: "Generator oil change", description: "Onan, Cummins, and similar RV generators specify oil changes every 100–150 hours or annually. Running a generator past its oil change interval in remote locations is a high-consequence failure.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "generator_hours", intervalValue: 100, logic: "whichever_first", leadTimeDays: 21, leadTimeValue: 10 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21, upcomingLeadValue: 10 }), tags: ["generator", "fluids", "oil"], quickLogLabel: "Generator oil changed" }),
+      schedule({ key: "generator_exercise", name: "Generator monthly exercise run", description: "Run the generator under load for at least 2 hours monthly to prevent carburetor varnishing, keep seals lubricated, and confirm it starts and runs properly before you need it in the field.", triggerTemplate: { type: "interval", intervalDays: 30, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["generator", "exercise"] }),
+      schedule({ key: "roof_inspection", name: "Roof inspection and resealing", description: "Walk the entire roof and inspect every seam, vent, skylight, and antenna mount for cracking, separation, or lifted sealant. Roof leaks are the leading cause of RV structural damage. Apply lap sealant as needed.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 30 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 30, overdueCadenceDays: 14, maxOverdueNotifications: 4 }), tags: ["roof", "seals", "water damage"] }),
+      schedule({ key: "slideout_service", name: "Slide-out lubrication and seal inspection", description: "Lubricate slide-out room rails, gear racks, or cables per the manufacturer spec. Inspect the wiper seals for tears, rigidity, or gaps. Dry slideout seals crack and fail, allowing water intrusion and debris entry.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["slide-out", "seals", "lubrication"] }),
+      schedule({ key: "fresh_water_sanitize", name: "Fresh water system sanitization", description: "Flush and sanitize the fresh water tank and lines with a bleach solution, then flush thoroughly with potable water. Stagnant water in an unsanitized tank develops biofilm and taste problems.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["water", "sanitation", "health"] }),
+      schedule({ key: "black_gray_tank_sensors", name: "Black and gray tank sensor cleaning", description: "Tank level sensors foul with residue and give inaccurate readings. Use a tank sensor cleaner or the deep-flush rinse cycle on full trips to keep sensors accurate.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 7 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 7 }), tags: ["tanks", "sensors", "waste"] }),
+      schedule({ key: "lp_gas_system", name: "LP gas system inspection", description: "Inspect LP supply lines, regulator, tank connections, and all appliance connections for leaks using a leak detector solution or sensor. Test all LP appliances. Have the system inspected by a certified technician annually.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 21 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 21, overdueCadenceDays: 14, maxOverdueNotifications: 6 }), tags: ["propane", "safety", "gas"], isRegulatory: true }),
+      schedule({ key: "tire_inspection", name: "Tire pressure, condition, and age check", description: "Check all tires including the spare for correct pressure (use RV-spec inflation charts by load, not the sidewall max). Inspect for sidewall cracking, especially on tires over 5 years old. RV tires age-out before they wear out.", triggerTemplate: { type: "interval", intervalDays: 90, leadTimeDays: 14 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 14 }), tags: ["tires", "safety"] }),
+      schedule({ key: "brake_service", name: "Brake inspection and service", description: "Inspect brake pads, drums, or discs and hydraulic lines. Check trailer brake controller calibration if applicable. RV brakes handle extreme weights; worn brakes on a loaded motorhome are a serious safety hazard.", triggerTemplate: { type: "compound", intervalDays: 365, metricKey: "odometer", intervalValue: 15000, logic: "whichever_first", leadTimeDays: 30, leadTimeValue: 1000 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 30, overdueCadenceDays: 14, maxOverdueNotifications: 4 }), tags: ["brakes", "safety"] }),
+      schedule({ key: "battery_bank_service", name: "House and chassis battery service", description: "Check electrolyte levels and top up with distilled water (flooded batteries). Clean terminals. Load-test the chassis battery and house bank. Test the battery isolator and shore power charging to confirm proper charging behavior.", triggerTemplate: { type: "interval", intervalDays: 180, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["battery", "electrical", "house power"] }),
+      schedule({ key: "shore_power_inspection", name: "Shore power cord and connections inspection", description: "Inspect the 30A or 50A shore power cord for heat damage, cracked insulation, or bent pins. A damaged cord or loose pedestal connection is a fire and shock hazard.", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 21 }, notificationConfig: notification({ ...standardPushDigest, upcomingLeadDays: 21 }), tags: ["electrical", "shore power", "safety"] }),
+      schedule({ key: "registration_renewal", name: "Registration renewal", triggerTemplate: { type: "interval", intervalDays: 365, leadTimeDays: 30 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 30, overdueCadenceDays: 7, maxOverdueNotifications: 6 }), tags: ["legal", "ownership"] }),
+      schedule({ key: "winterization", name: "Winterization", description: "Drain and blow out all water lines, add antifreeze to traps and drain valves, drain the water heater, winterize the toilet, and shut off the water pump. Failure to winterize properly causes expensive pipe and fitting damage.", triggerTemplate: { type: "seasonal", month: 10, day: 1, leadTimeDays: 21 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 21, overdueCadenceDays: 7, maxOverdueNotifications: 6 }), tags: ["seasonal", "winter", "plumbing"] }),
+      schedule({ key: "dewinterization", name: "De-winterization and spring commissioning", description: "Flush antifreeze from the water system, sanitize the fresh water tank, reinstall or reconnect bypassed components, test all appliances, and do a roof and exterior inspection before the first trip of the season.", triggerTemplate: { type: "seasonal", month: 4, day: 1, leadTimeDays: 21 }, notificationConfig: notification({ channels: ["push", "email", "digest"], digest: true, upcomingLeadDays: 21, overdueCadenceDays: 7, maxOverdueNotifications: 4 }), tags: ["seasonal", "spring", "commissioning"] })
+    ]
   })
 ] as const;

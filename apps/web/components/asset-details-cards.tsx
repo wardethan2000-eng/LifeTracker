@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  AssetFieldDefinition,
+  AssetFieldValue,
   DateFormat,
   DispositionDetails,
   InsuranceDetails,
@@ -586,6 +588,261 @@ export function AssetInsuranceDetailsCard({
             <ReadRow label="Disposition Date" value={formatDate(dispositionDetails?.date, "Not set", undefined, dateFormat)} />
             <ReadRow label="Sale Price" value={dispositionDetails?.salePrice !== undefined ? formatCurrency(dispositionDetails.salePrice, "—", currencyCode) : null} />
             <ReadRow label="Buyer Info" value={dispositionDetails?.buyerInfo} />
+          </dl>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─── Profile Fields ──────────────────────────────────────────────────────────
+
+type AssetProfileFieldsCardProps = {
+  assetId: string;
+  householdId: string;
+  fieldDefinitions: AssetFieldDefinition[];
+  customFields: Record<string, AssetFieldValue>;
+};
+
+function renderFieldValue(value: AssetFieldValue): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (Array.isArray(value)) return value.length > 0 ? value.join(", ") : "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
+export function AssetProfileFieldsCard({
+  assetId,
+  householdId,
+  fieldDefinitions,
+  customFields,
+}: AssetProfileFieldsCardProps): JSX.Element {
+  const [editing, setEditing] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  // Local draft state — one entry per field key
+  const [draft, setDraft] = useState<Record<string, AssetFieldValue>>(() => {
+    const init: Record<string, AssetFieldValue> = {};
+    for (const def of fieldDefinitions) {
+      const v = customFields[def.key];
+      init[def.key] = v !== undefined ? v : (def.defaultValue ?? null);
+    }
+    return init;
+  });
+
+  const handleSave = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await updateAssetFieldAction(assetId, householdId, {
+        customFields: draft,
+      });
+      if (result.success) {
+        setEditing(false);
+      } else {
+        setError(result.message);
+      }
+    });
+  };
+
+  const handleCancel = () => {
+    // Reset draft to last saved values
+    const reset: Record<string, AssetFieldValue> = {};
+    for (const def of fieldDefinitions) {
+      const v = customFields[def.key];
+      reset[def.key] = v !== undefined ? v : (def.defaultValue ?? null);
+    }
+    setDraft(reset);
+    setError(null);
+    setEditing(false);
+  };
+
+  const setField = (key: string, value: AssetFieldValue) => {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  if (fieldDefinitions.length === 0) {
+    return (
+      <section className="panel">
+        <div className="panel__header">
+          <h2>Profile Fields</h2>
+        </div>
+        <div className="panel__body--padded">
+          <p className="panel__empty">No custom profile fields defined.</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel__header">
+        <h2>Profile Fields</h2>
+        {!editing && (
+          <button type="button" className="button button--ghost button--xs" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
+      </div>
+      <div className="panel__body--padded">
+        {editing ? (
+          <div>
+            <div className="workbench-grid">
+              {fieldDefinitions.map((def) => {
+                const value = draft[def.key];
+
+                if (def.type === "boolean") {
+                  const boolVal = typeof value === "boolean" ? value : null;
+                  return (
+                    <label key={def.key} className={`field${def.wide ? " field--full" : ""}`}>
+                      <span>{def.label}</span>
+                      <select
+                        className="input"
+                        value={boolVal === null ? "" : boolVal ? "true" : "false"}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setField(def.key, v === "" ? null : v === "true");
+                        }}
+                        disabled={isPending}
+                      >
+                        <option value="">— not set —</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                      </select>
+                    </label>
+                  );
+                }
+
+                if (def.type === "select") {
+                  return (
+                    <label key={def.key} className={`field${def.wide ? " field--full" : ""}`}>
+                      <span>{def.label}</span>
+                      <select
+                        className="input"
+                        value={typeof value === "string" ? value : ""}
+                        onChange={(e) => setField(def.key, e.target.value || null)}
+                        disabled={isPending}
+                      >
+                        <option value="">— not set —</option>
+                        {def.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
+
+                if (def.type === "multiselect") {
+                  const selected = Array.isArray(value) ? value : [];
+                  return (
+                    <fieldset key={def.key} className={`field${def.wide ? " field--full" : ""}`} style={{ border: "none", padding: 0, margin: 0 }}>
+                      <legend style={{ fontSize: "0.82rem", fontWeight: 500, marginBottom: "6px" }}>{def.label}</legend>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        {def.options.map((opt) => (
+                          <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.9rem" }}>
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(opt.value)}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...selected, opt.value]
+                                  : selected.filter((v) => v !== opt.value);
+                                setField(def.key, next.length > 0 ? next : null);
+                              }}
+                              disabled={isPending}
+                            />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  );
+                }
+
+                if (def.type === "textarea") {
+                  return (
+                    <label key={def.key} className="field field--full">
+                      <span>{def.label}</span>
+                      <textarea
+                        className="input"
+                        rows={3}
+                        placeholder={def.placeholder ?? ""}
+                        value={typeof value === "string" ? value : ""}
+                        onChange={(e) => setField(def.key, e.target.value || null)}
+                        disabled={isPending}
+                      />
+                    </label>
+                  );
+                }
+
+                if (def.type === "date") {
+                  return (
+                    <label key={def.key} className={`field${def.wide ? " field--full" : ""}`}>
+                      <span>{def.label}</span>
+                      <input
+                        type="date"
+                        className="input"
+                        value={typeof value === "string" ? toDateInputValue(value) : ""}
+                        onChange={(e) => setField(def.key, e.target.value ? fromDateInputValue(e.target.value) ?? null : null)}
+                        disabled={isPending}
+                      />
+                    </label>
+                  );
+                }
+
+                if (def.type === "number" || def.type === "currency") {
+                  return (
+                    <label key={def.key} className={`field${def.wide ? " field--full" : ""}`}>
+                      <span>{def.label}{def.unit ? ` (${def.unit})` : ""}</span>
+                      <input
+                        type="number"
+                        className="input"
+                        step={def.type === "currency" ? "0.01" : "any"}
+                        placeholder={def.placeholder ?? ""}
+                        value={typeof value === "number" ? value : ""}
+                        onChange={(e) => setField(def.key, e.target.value !== "" ? Number(e.target.value) : null)}
+                        disabled={isPending}
+                      />
+                    </label>
+                  );
+                }
+
+                // string, url — default text input
+                return (
+                  <label key={def.key} className={`field${def.wide ? " field--full" : ""}`}>
+                    <span>{def.label}{def.unit ? ` (${def.unit})` : ""}</span>
+                    <input
+                      type={def.type === "url" ? "url" : "text"}
+                      className="input"
+                      placeholder={def.placeholder ?? ""}
+                      value={typeof value === "string" ? value : ""}
+                      onChange={(e) => setField(def.key, e.target.value || null)}
+                      disabled={isPending}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+            {error && <p style={{ color: "var(--tone-danger, red)", marginTop: 8, fontSize: "0.85rem" }}>{error}</p>}
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button type="button" className="button button--primary button--sm" onClick={handleSave} disabled={isPending}>
+                {isPending ? "Saving…" : "Save"}
+              </button>
+              <button type="button" className="button button--ghost button--sm" onClick={handleCancel} disabled={isPending}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <dl className="data-list">
+            {fieldDefinitions.map((def) => (
+              <div key={def.key}>
+                <dt>{def.label}{def.unit ? ` (${def.unit})` : ""}</dt>
+                <dd style={{ color: !customFields[def.key] && customFields[def.key] !== false && customFields[def.key] !== 0 ? "var(--ink-muted)" : undefined }}>
+                  {renderFieldValue(customFields[def.key] ?? null)}
+                </dd>
+              </div>
+            ))}
           </dl>
         )}
       </div>
