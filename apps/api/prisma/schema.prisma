@@ -66,6 +66,7 @@ enum NotificationType {
   digest
   announcement
   inventory_low_stock
+  inventory_expiring_soon
   note_reminder
 }
 

@@ -62,6 +62,13 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
   const inventoryCount = inventoryData.items.length;
   const lowStockCount = lowStockItems.length;
   const outOfStockCount = inventoryData.items.filter((i) => i.quantityOnHand <= 0).length;
+  const nowMs = Date.now();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const expiringCount = inventoryData.items.filter((i) => {
+    if (!i.expiresAt) return false;
+    const expiresMs = new Date(i.expiresAt).getTime();
+    return expiresMs <= nowMs + thirtyDaysMs;
+  }).length;
 
   const sortedAssets = [...dashboard.assets].sort(
     (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -131,6 +138,7 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
       inventoryTotalCount={inventoryCount}
       lowStockCount={lowStockCount}
       outOfStockCount={outOfStockCount}
+      expiringCount={expiringCount}
       spaceTotalCount={totalSpaceCount}
       rootSpaceCount={rootSpaceCount}
       ideas={recentIdeas.map((idea) => ({

@@ -76,6 +76,7 @@ type HomeDashboardProps = {
   inventoryTotalCount?: number;
   lowStockCount?: number;
   outOfStockCount?: number;
+  expiringCount?: number;
   spaceTotalCount?: number;
   rootSpaceCount?: number;
   pinnedNotes?: Entry[];
@@ -119,6 +120,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
     inventoryTotalCount = 0,
     lowStockCount = 0,
     outOfStockCount = 0,
+    expiringCount = 0,
     spaceTotalCount = 0,
     rootSpaceCount = 0,
     pinnedNotes = [],
@@ -435,6 +437,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
         <div><dt>Tracked Items</dt><dd>{inventoryTotalCount}</dd></div>
         <div><dt>Low Stock</dt><dd style={lowStockCount > 0 ? { color: "var(--warning)" } : undefined}>{lowStockCount}</dd></div>
         <div><dt>Out of Stock</dt><dd style={outOfStockCount > 0 ? { color: "var(--danger)" } : undefined}>{outOfStockCount}</dd></div>
+        {expiringCount > 0 && <div><dt>Expiring Soon</dt><dd style={{ color: "var(--warning)" }}>{expiringCount}</dd></div>}
       </dl>
     ),
     footerLink: { label: "View inventory →", href: `/inventory?householdId=${householdId}` },

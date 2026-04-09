@@ -2006,3 +2006,25 @@ export const rebuildSearchIndex = async (prisma: SearchPrisma, householdId: stri
 };
 
 export const removeSearchIndexEntry = deleteSearchIndexEntry;
+
+/**
+ * Fire-and-forget wrapper that retries the sync up to 3 times with
+ * exponential backoff (1s → 2s → 4s) before logging the final error.
+ * Use this instead of bare `void sync().catch(console.error)` at call sites.
+ */
+export const syncInventoryItemWithRetry = (prisma: SearchPrisma, itemId: string): void => {
+  const attempt = async (retriesLeft: number, delayMs: number): Promise<void> => {
+    try {
+      await syncInventoryItemToSearchIndex(prisma, itemId);
+    } catch (error) {
+      if (retriesLeft > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await attempt(retriesLeft - 1, delayMs * 2);
+      } else {
+        console.error(`[search-index] Failed to sync inventory item ${itemId} after retries:`, error);
+      }
+    }
+  };
+
+  void attempt(3, 1000);
+};

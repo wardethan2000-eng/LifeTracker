@@ -36,7 +36,7 @@ import {
   toLowStockInventoryItemResponse
 } from "../../lib/serializers/index.js";
 import { calculateInventoryDeficit } from "@lifekeeper/utils";
-import { syncInventoryItemToSearchIndex, removeSearchIndexEntry } from "../../lib/search-index.js";
+import { syncInventoryItemToSearchIndex, syncInventoryItemWithRetry, removeSearchIndexEntry } from "../../lib/search-index.js";
 import { notFound, badRequest } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
 
@@ -79,6 +79,8 @@ const inventoryExportColumns = [
   "unitCost",
   "storageLocation",
   "conditionStatus",
+  "expiresAt",
+  "imageUrl",
   "notes"
 ] as const;
 
@@ -98,6 +100,7 @@ const importInventoryItemSchema = z.object({
   unitCost: z.coerce.number().min(0).optional(),
   storageLocation: z.string().max(200).optional(),
   conditionStatus: z.string().max(40).optional(),
+  expiresAt: z.coerce.date().optional(),
   notes: z.string().max(4000).optional()
 });
 
@@ -273,7 +276,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
+    syncInventoryItemWithRetry(app.prisma, item.id);
 
     return reply.code(201).send(toInventoryItemSummaryResponse(item));
   });
@@ -298,7 +301,11 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
 
     const csvString = [
       inventoryExportColumns.join(","),
-      ...items.map((item) => inventoryExportColumns.map((column) => csvValue(item[column])).join(","))
+      ...items.map((item) => inventoryExportColumns.map((column) => {
+        const value = item[column as keyof typeof item];
+        if (value instanceof Date) return csvValue(value.toISOString().split("T")[0]);
+        return csvValue(value as string | number | boolean | null | undefined);
+      }).join(","))
     ].join("\n");
 
     return reply
@@ -420,6 +427,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
               unitCost: item.unitCost ?? null,
               storageLocation: item.storageLocation ?? null,
               conditionStatus: item.conditionStatus ?? null,
+              expiresAt: item.expiresAt ?? null,
               notes: item.notes ?? null
             }
           });
@@ -875,7 +883,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    void syncInventoryItemToSearchIndex(app.prisma, item.id).catch(console.error);
+    syncInventoryItemWithRetry(app.prisma, item.id);
 
     return toInventoryItemSummaryResponse(item);
   });
@@ -917,7 +925,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       }
     });
 
-    void syncInventoryItemToSearchIndex(app.prisma, restored.id).catch(console.error);
+    syncInventoryItemWithRetry(app.prisma, restored.id);
 
     return reply.send(toInventoryItemSummaryResponse(restored));
   });
@@ -954,7 +962,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
         });
 
       void removeSearchIndexEntry(app.prisma, "inventory_item", input.sourceInventoryItemId).catch(console.error);
-      void syncInventoryItemToSearchIndex(app.prisma, params.inventoryItemId).catch(console.error);
+      syncInventoryItemWithRetry(app.prisma, params.inventoryItemId);
 
       return reply.send(inventoryItemMergeResultSchema.parse(result));
     } catch (error) {
@@ -1179,7 +1187,7 @@ export const householdInventoryItemRoutes: FastifyPluginAsync = async (app) => {
       duplicatedFrom: source.id
     });
 
-    void syncInventoryItemToSearchIndex(app.prisma, copy.id).catch(console.error);
+    syncInventoryItemWithRetry(app.prisma, copy.id);
 
     return reply.code(201).send(toInventoryItemSummaryResponse(copy));
   });

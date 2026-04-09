@@ -228,6 +228,18 @@ export function InventoryListWorkspace({
                           <span className={`pill ${quantityOnHand <= 0 ? "pill--danger" : item.lowStock ? "pill--warning" : "pill--success"}`}>
                             {quantityOnHand <= 0 ? "Out" : item.lowStock ? "Low" : "OK"}
                           </span>
+                          {item.expiresAt && (() => {
+                            const expiresMs = new Date(item.expiresAt).getTime();
+                            const nowMs = Date.now();
+                            const daysLeft = Math.ceil((expiresMs - nowMs) / (24 * 60 * 60 * 1000));
+                            if (expiresMs <= nowMs) {
+                              return <span className="pill pill--danger" style={{ marginLeft: 4 }}>Expired</span>;
+                            }
+                            if (daysLeft <= 30) {
+                              return <span className="pill pill--warning" style={{ marginLeft: 4 }}>{daysLeft}d</span>;
+                            }
+                            return null;
+                          })()}
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <ClickToEdit
