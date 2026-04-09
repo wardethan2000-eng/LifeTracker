@@ -528,6 +528,23 @@ function PhaseDetailPanel({
         />
       )}
 
+      {/* ── Danger zone ── */}
+      <div className="phase-detail-danger">
+        <ConfirmActionForm
+          action={deleteProjectPhaseAction}
+          hiddenFields={[
+            { name: "householdId", value: householdId },
+            { name: "projectId", value: projectId },
+            { name: "phaseId", value: phase.id },
+          ]}
+          prompt="Delete this phase and everything attached to it?"
+          triggerLabel="Delete Phase"
+          confirmLabel="Confirm"
+          triggerClassName="button button--danger button--sm"
+          confirmClassName="button button--danger button--sm"
+          cancelClassName="button button--ghost button--sm"
+        />
+      </div>
     </div>
   );
 }
@@ -991,7 +1008,7 @@ function TaskCompactRow({
               ]}
               prompt="Delete this task?"
               triggerLabel="Delete Task"
-              confirmLabel="Yes, delete"
+              confirmLabel="Confirm"
               triggerClassName="button button--danger button--sm"
               confirmClassName="button button--danger button--sm"
               cancelClassName="button button--ghost button--sm"
