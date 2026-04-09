@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemSummary, ScheduleInventoryLinkDetail } from "@lifekeeper/types";
+import type { InventoryItemSummary, ScheduleInventoryLinkDetail } from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {

@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 import { useState } from "react";
 import { getHobbyRecipeShoppingList } from "../lib/api";
-import type { HobbyRecipeShoppingList } from "@lifekeeper/types";
+import type { HobbyRecipeShoppingList } from "@aegis/types";
 
 type HobbyShoppingListButtonProps = {
   householdId: string;

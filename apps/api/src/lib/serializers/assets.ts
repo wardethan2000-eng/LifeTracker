@@ -3,7 +3,7 @@ import {
   assetFieldDefinitionsSchema,
   assetSchema,
   assetTransferSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { toShallowUserResponse } from "./users.js";
 
 type SpaceLocationRelation = {

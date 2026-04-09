@@ -6,7 +6,7 @@ import { AppProviders } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LifeKeeper Dashboard",
+  title: "Aegis Dashboard",
   description: "Household-first maintenance tracking for vehicles, homes, tools, and equipment."
 };
 

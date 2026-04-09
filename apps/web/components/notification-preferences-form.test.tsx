@@ -11,7 +11,7 @@ vi.mock("../app/actions", () => ({
 }));
 
 import { NotificationPreferencesForm } from "./notification-preferences-form";
-import type { NotificationPreferences } from "@lifekeeper/types";
+import type { NotificationPreferences } from "@aegis/types";
 
 const defaultPreferences: NotificationPreferences = {
   pauseAll: false,

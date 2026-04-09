@@ -4,7 +4,7 @@
   updateWebhookEndpointSchema,
   webhookDeliverySchema,
   webhookEndpointSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { dispatchPendingWebhookDeliveries } from "../../lib/domain-events.js";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemConsumption, InventoryItemSummary } from "@lifekeeper/types";
+import type { InventoryItemConsumption, InventoryItemSummary } from "@aegis/types";
 import Link from "next/link";
 import type { JSX, MouseEvent, ReactNode } from "react";
 import { useCallback, useState } from "react";

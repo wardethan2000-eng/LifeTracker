@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { commentSchema } from "@lifekeeper/types";
+import { commentSchema } from "@aegis/types";
 import { toShallowUserResponse } from "./users.js";
 
 export const commentResponseInclude = Prisma.validator<Prisma.CommentInclude>()({

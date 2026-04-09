@@ -1,5 +1,5 @@
-import type { ProjectPortfolioItem } from "@lifekeeper/types";
-import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@lifekeeper/utils";
+import type { ProjectPortfolioItem } from "@aegis/types";
+import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@aegis/utils";
 
 export const projectSortValues = ["risk", "target", "budget", "progress"] as const;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { SpaceResponse } from "@lifekeeper/types";
+import type { SpaceResponse } from "@aegis/types";
 import { useRouter } from "next/navigation";
 import type { JSX, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { useRef, useState } from "react";

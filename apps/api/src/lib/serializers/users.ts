@@ -3,7 +3,7 @@ import {
   notificationPreferencesSchema,
   shallowUserSchema,
   userProfileSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const parseNotificationPreferences = (value: Prisma.JsonValue | null | undefined) =>
   notificationPreferencesSchema.parse(value ?? {});

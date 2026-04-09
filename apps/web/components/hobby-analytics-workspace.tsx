@@ -6,7 +6,7 @@ import type {
   HobbyPracticeStreaksPayload,
   HobbySessionFrequencyPayload,
   HobbySummary
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { chartColors, LkAreaChart, LkBarChart, LkDonutChart, LkLineChart } from "./charts";

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
-import type { ActivityLog } from "@lifekeeper/types";
+import type { ActivityLog } from "@aegis/types";
 import { getDisplayPreferences, getHouseholdActivity, getIdea, getMe } from "../../../../../lib/api";
 import { formatDateTime } from "../../../../../lib/formatters";
 import { getEntityLabel, getEntityUrl, getEntityDisplayName } from "../../../../../lib/entity-url";

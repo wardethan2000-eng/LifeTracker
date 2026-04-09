@@ -8,11 +8,11 @@ import {
   type AssetTimelineItem,
   type ComplianceAuditPdfInput,
   type InventoryValuationPdfInput
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   aggregateCostsByPeriod,
   computeLogTotalCost
-} from "@lifekeeper/utils";
+} from "@aegis/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset, requireHouseholdMembership } from "../../lib/asset-access.js";

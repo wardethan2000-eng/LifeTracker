@@ -1,6 +1,6 @@
 "use client";
 
-import type { SpaceResponse } from "@lifekeeper/types";
+import type { SpaceResponse } from "@aegis/types";
 import type { ChangeEvent, JSX } from "react";
 import { useMemo } from "react";
 import { flattenSpaceOptions } from "../lib/spaces";

@@ -1,4 +1,4 @@
-import { createAssetSchema, devFixtureIds, type AssetDetailResponse, type BarcodeLookupResult } from "@lifekeeper/types";
+import { createAssetSchema, devFixtureIds, type AssetDetailResponse, type BarcodeLookupResult } from "@aegis/types";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { getAssetDetailMobile, lookupAssetByTagMobile, lookupBarcodeMobile } from "./lib/api";
@@ -96,7 +96,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.card}>
-        <Text style={styles.kicker}>LifeKeeper</Text>
+        <Text style={styles.kicker}>Aegis</Text>
         <Text style={styles.heading}>Maintenance without fragmented apps.</Text>
         <Text style={styles.body}>
           Phase 1 mobile scaffolding is connected to the shared monorepo contracts.

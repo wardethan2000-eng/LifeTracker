@@ -1,4 +1,4 @@
-import type { PresetScheduleTemplate } from "@lifekeeper/types";
+import type { PresetScheduleTemplate } from "@aegis/types";
 import type { JSX } from "react";
 import { CompactSchedulePreview } from "./compact-schedule-preview";
 import { ExpandableCard } from "./expandable-card";

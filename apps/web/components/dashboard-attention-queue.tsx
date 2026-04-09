@@ -1,6 +1,6 @@
 "use client";
 
-import type { DueWorkItem } from "@lifekeeper/types";
+import type { DueWorkItem } from "@aegis/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useCompletionSlideOver } from "./completion-slide-over-context";

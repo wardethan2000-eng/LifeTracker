@@ -6,7 +6,7 @@ import {
   hobbyStatusSchema,
   reorderByOrderedIdsSchema,
   type HobbyStatusPipelineStepInput
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { makeHouseholdPreHandler } from "../../plugins/household-context.js";

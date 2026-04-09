@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { InventoryItemSummary } from "@lifekeeper/types";
+import type { InventoryItemSummary } from "@aegis/types";
 import { describe, expect, it, vi } from "vitest";
 
 const actionMocks = vi.hoisted(() => ({

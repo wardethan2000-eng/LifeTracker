@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { JSX } from "react";
-import type { InventoryItemSummary } from "@lifekeeper/types";
+import type { InventoryItemSummary } from "@aegis/types";
 import { createProjectPhaseSupplyAction } from "../app/actions";
 import { formatQuantity } from "../lib/formatters";
 import { LinkPreviewDialog } from "./link-preview-dialog";

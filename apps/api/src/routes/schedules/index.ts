@@ -5,7 +5,7 @@ import {
   createMaintenanceScheduleSchema,
   maintenanceTriggerSchema,
   updateMaintenanceScheduleSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";

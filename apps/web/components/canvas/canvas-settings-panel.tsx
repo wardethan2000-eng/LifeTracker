@@ -1,6 +1,6 @@
 "use client";
 
-import type { UpdateCanvasSettingsInput } from "@lifekeeper/types";
+import type { UpdateCanvasSettingsInput } from "@aegis/types";
 import type { JSX } from "react";
 import { useState } from "react";
 

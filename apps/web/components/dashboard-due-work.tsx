@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { HouseholdDashboard } from "@lifekeeper/types";
+import type { HouseholdDashboard } from "@aegis/types";
 import type { JSX } from "react";
 import { getHouseholdPartsReadiness } from "../lib/api";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";

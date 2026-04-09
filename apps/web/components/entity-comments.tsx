@@ -1,4 +1,4 @@
-import type { DateFormat, ThreadedComment } from "@lifekeeper/types";
+import type { DateFormat, ThreadedComment } from "@aegis/types";
 import type { JSX } from "react";
 import { formatDateTime } from "../lib/formatters";
 import { getDisplayPreferences } from "../lib/api";

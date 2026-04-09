@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import type { ProjectTaskDependency, ProjectTask, TaskDependencyType } from "@lifekeeper/types";
+import type { ProjectTaskDependency, ProjectTask, TaskDependencyType } from "@aegis/types";
 import { useState, useEffect, useCallback } from "react";
 import { getProjectDependencies } from "../lib/api";
 import { createTaskDependencyAction, deleteTaskDependencyAction } from "../app/actions";

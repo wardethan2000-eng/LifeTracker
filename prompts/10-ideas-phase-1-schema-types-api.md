@@ -1,4 +1,4 @@
-# LifeKeeper — Ideas Feature Phase 1: Schema, Types, and API
+# Aegis — Ideas Feature Phase 1: Schema, Types, and API
 
 This document is the complete implementation reference for Phase 1 of the Ideas feature. It covers the Prisma schema, Zod types, API serializers, and API routes. No frontend work in this phase.
 

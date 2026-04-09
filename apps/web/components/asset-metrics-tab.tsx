@@ -1,7 +1,7 @@
 import type {
   AssetMetricCorrelationMatrix,
   AssetDetailResponse,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { createMetricAction } from "../app/actions";

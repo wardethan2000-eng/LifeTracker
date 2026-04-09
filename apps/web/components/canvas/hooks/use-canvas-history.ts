@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import type { IdeaCanvasEdge, IdeaCanvasNode } from "@lifekeeper/types";
+import type { IdeaCanvasEdge, IdeaCanvasNode } from "@aegis/types";
 
 type HistoryEntry = { nodes: IdeaCanvasNode[]; edges: IdeaCanvasEdge[] };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemDetail, SpaceResponse } from "@lifekeeper/types";
+import type { InventoryItemDetail, SpaceResponse } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useState } from "react";

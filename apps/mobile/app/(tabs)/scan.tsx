@@ -21,7 +21,7 @@ export default function ScanScreen() {
       setState("resolving");
 
       try {
-        // Try to resolve as LifeKeeper asset QR/tag first
+        // Try to resolve as Aegis asset QR/tag first
         const assetTarget = resolveAssetScanTarget(value);
         if (assetTarget) {
           const asset =

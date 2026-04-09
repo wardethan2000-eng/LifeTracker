@@ -7,7 +7,7 @@ import type {
   NoteCategory,
   ProjectStatus,
   ProjectTaskStatus
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 type BlueprintFamily = "Home & Operations" | "Event Planning";
 

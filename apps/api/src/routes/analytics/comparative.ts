@@ -10,7 +10,7 @@ import {
   toYearOverYearPayloadResponse
 } from "../../lib/serializers/index.js";
 import { buildCompletionCycleLedger } from "../../services/schedule-adherence.js";
-import type { CompletionCycleRecord } from "@lifekeeper/types";
+import type { CompletionCycleRecord } from "@aegis/types";
 import { forbidden, notFound } from "../../lib/errors.js";
 
 const MAX_YEAR_OVER_YEAR_COMPARISON_YEARS = 5;

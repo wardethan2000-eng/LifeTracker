@@ -1,4 +1,4 @@
-import type { PresetUsageMetricTemplate } from "@lifekeeper/types";
+import type { PresetUsageMetricTemplate } from "@aegis/types";
 import { CompactPreview } from "./compact-preview";
 
 type CompactMetricPreviewProps = {

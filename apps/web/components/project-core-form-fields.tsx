@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { Project, ProjectStatus } from "@lifekeeper/types";
+import type { Project, ProjectStatus } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useState } from "react";

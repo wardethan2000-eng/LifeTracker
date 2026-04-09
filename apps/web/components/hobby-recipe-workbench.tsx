@@ -8,7 +8,7 @@ import type {
   HobbyRecipeStep,
   UpdateHobbyRecipeIngredientInput,
   UpdateHobbyRecipeStepInput,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   createHobbyRecipeIngredient,
   createHobbyRecipeStep,

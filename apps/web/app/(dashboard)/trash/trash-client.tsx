@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { TrashItem } from "@lifekeeper/types";
+import type { TrashItem } from "@aegis/types";
 import {
   restoreAssetByIdAction,
   restoreProjectAction,

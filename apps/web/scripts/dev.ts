@@ -7,7 +7,7 @@ const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(currentDirectory, "..");
 const nextBin = path.resolve(webRoot, "node_modules/next/dist/bin/next");
 const args = process.argv.slice(2);
-const distDir = process.env.LIFEKEEPER_NEXT_DIST_DIR ?? ".next-dev";
+const distDir = process.env.AEGIS_NEXT_DIST_DIR ?? ".next-dev";
 
 rmSync(path.resolve(webRoot, distDir), { recursive: true, force: true });
 
@@ -15,7 +15,7 @@ const child = spawn(process.execPath, ["--max-old-space-size=4096", nextBin, "de
   cwd: webRoot,
   env: {
     ...process.env,
-    LIFEKEEPER_NEXT_DIST_DIR: distDir,
+    AEGIS_NEXT_DIST_DIR: distDir,
   },
   stdio: "inherit",
 });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { IdeaCanvas, IdeaCanvasThumbnailNode, IdeaCanvasThumbnailEdge } from "@lifekeeper/types";
+import type { IdeaCanvas, IdeaCanvasThumbnailNode, IdeaCanvasThumbnailEdge } from "@aegis/types";
 import { getCanvas } from "../lib/api";
 import { CanvasThumbnail } from "./canvas-thumbnail";
 import { CanvasRenderer } from "./canvas-renderer";

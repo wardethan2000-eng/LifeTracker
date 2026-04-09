@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProjectTask } from "@lifekeeper/types";
+import type { ProjectTask } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo } from "react";
 import { useMultiSelect } from "../lib/use-multi-select";

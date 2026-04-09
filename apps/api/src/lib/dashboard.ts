@@ -1,4 +1,4 @@
-import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema, maintenanceTriggerSchema } from "@lifekeeper/types";
+import { assetDetailResponseSchema, dueWorkItemSchema, householdDashboardSchema, maintenanceTriggerSchema } from "@aegis/types";
 import type { PrismaClient } from "@prisma/client";
 import { getAccessibleAsset, getMembership, personalAssetAccessWhere } from "./asset-access.js";
 import { toMaintenanceLogResponse } from "./maintenance-logs.js";

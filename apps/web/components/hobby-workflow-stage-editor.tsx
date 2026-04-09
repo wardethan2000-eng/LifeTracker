@@ -7,7 +7,7 @@ import type {
   HobbyWorkflowChecklistTemplate,
   HobbyWorkflowSupplyTemplate,
   PresetCustomFieldTemplate,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { SortableList, type DragHandleProps } from "./ui/sortable-list";
 

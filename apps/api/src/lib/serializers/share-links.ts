@@ -3,7 +3,7 @@ import {
   publicAssetReportSchema,
   shareLinkSchema,
   type AssetTimelineItem
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toShareLinkResponse = (
   shareLink: Pick<ShareLink, "id" | "householdId" | "assetId" | "createdById" | "token" | "label" | "expiresAt" | "isRevoked" | "viewCount" | "lastViewedAt" | "dateRangeStart" | "dateRangeEnd" | "createdAt" | "updatedAt">

@@ -18,7 +18,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_LIFEKEEPER_API_BASE_URL": "https://api.staging.lifekeeper.app"
+        "EXPO_PUBLIC_AEGIS_API_BASE_URL": "https://api.staging.aegis.app"
       }
     },
     "production": {
@@ -26,7 +26,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_LIFEKEEPER_API_BASE_URL": "https://api.lifekeeper.app"
+        "EXPO_PUBLIC_AEGIS_API_BASE_URL": "https://api.aegis.app"
       }
     }
   },

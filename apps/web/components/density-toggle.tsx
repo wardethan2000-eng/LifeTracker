@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 type Density = "relaxed" | "standard" | "compact";
 
 const densityOptions: Density[] = ["relaxed", "standard", "compact"];
-const storageKey = "lifekeeper-ui-density";
+const storageKey = "aegis-ui-density";
 
 const applyDensity = (density: Density): void => {
   document.documentElement.setAttribute("data-ui-density", density);

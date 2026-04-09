@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Notification } from "@lifekeeper/types";
+import type { Notification } from "@aegis/types";
 import { Suspense, type JSX } from "react";
 import { CursorPaginationControls } from "../../../components/pagination-controls";
 import { getTranslations } from "next-intl/server";

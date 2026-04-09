@@ -6,7 +6,7 @@ import type {
   MaintenanceTrigger,
   Notification,
   ScheduleStatus
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
 const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();

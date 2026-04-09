@@ -3,7 +3,7 @@
  * These run entirely client-side; no server round-trip needed.
  */
 
-import type { IdeaCanvasNode, IdeaCanvasEdge } from "@lifekeeper/types";
+import type { IdeaCanvasNode, IdeaCanvasEdge } from "@aegis/types";
 import { renderCanvasToSVG, type CanvasRenderOptions } from "./canvas-svg-render";
 
 function downloadBlob(blob: Blob, filename: string) {

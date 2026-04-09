@@ -1,6 +1,6 @@
 "use client";
 import { useTransition, useState } from "react";
-import type { NotificationPreferences, UpdateNotificationPreferencesInput } from "@lifekeeper/types";
+import type { NotificationPreferences, UpdateNotificationPreferencesInput } from "@aegis/types";
 import { updateNotificationPreferencesAction } from "../app/actions";
 
 interface NotificationPreferencesFormProps {

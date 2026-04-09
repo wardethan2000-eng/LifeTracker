@@ -4,7 +4,7 @@ import type {
   InventoryTransactionQuery,
   InventoryTransactionWithItem,
   InventoryTransactionType,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { Fragment, type JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";

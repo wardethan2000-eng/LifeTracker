@@ -1,6 +1,6 @@
 ﻿import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { householdUsageHighlightListSchema } from "@lifekeeper/types";
+import { householdUsageHighlightListSchema } from "@aegis/types";
 import {
   bucketUsageRates,
   calculateUsageRate,
@@ -8,7 +8,7 @@ import {
   correlateMetrics,
   detectUsageAnomaly,
   projectMultipleSchedules
-} from "@lifekeeper/utils";
+} from "@aegis/utils";
 import { assertMembership, getAccessibleAsset, personalAssetAccessWhere } from "../../lib/asset-access.js";
 import {
   toAssetMetricCorrelationMatrixResponse,

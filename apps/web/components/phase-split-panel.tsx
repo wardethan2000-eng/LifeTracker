@@ -11,7 +11,7 @@ import type {
   ProjectPhaseSummary,
   ProjectTask,
   ServiceProvider
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   createPhaseChecklistItemAction,
   createProjectExpenseAction,

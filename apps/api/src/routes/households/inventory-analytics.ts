@@ -6,10 +6,10 @@ import {
   inventoryReorderForecastSchema,
   inventoryTurnoverSchema,
   partCommonalitySchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { MS_PER_DAY, toMonthKey } from "@lifekeeper/utils";
+import { MS_PER_DAY, toMonthKey } from "@aegis/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import {
   classifyReorderUrgency,

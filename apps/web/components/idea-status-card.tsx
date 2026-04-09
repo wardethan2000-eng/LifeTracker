@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 import { useCallback, useState, useTransition } from "react";
-import type { IdeaCategory, IdeaPriority, IdeaStage } from "@lifekeeper/types";
+import type { IdeaCategory, IdeaPriority, IdeaStage } from "@aegis/types";
 import { updateIdeaAction, updateIdeaStageAction } from "../app/actions";
 import { useTimezone } from "../lib/timezone-context";
 import { Card } from "./card";

@@ -1,5 +1,5 @@
 import type { CanvasObject as PrismaCanvasObject } from "@prisma/client";
-import { canvasObjectSchema } from "@lifekeeper/types";
+import { canvasObjectSchema } from "@aegis/types";
 
 export const toCanvasObjectResponse = (obj: PrismaCanvasObject) =>
   canvasObjectSchema.parse({

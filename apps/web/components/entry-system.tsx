@@ -10,8 +10,8 @@ import type {
   EntrySurfaceQuery,
   EntryType,
   UpdateEntryInput
-} from "@lifekeeper/types";
-import { isLegacyImportedEntrySourceType } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { isLegacyImportedEntrySourceType } from "@aegis/utils";
 import Link from "next/link";
 import {
   useDeferredValue,

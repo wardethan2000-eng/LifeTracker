@@ -55,7 +55,7 @@ export default async function NotesPage({ searchParams }: { searchParams?: Promi
     <>
       <PageHeader
         title="Notes"
-        subtitle="Capture, organize, and develop your thoughts across all areas of LifeKeeper."
+        subtitle="Capture, organize, and develop your thoughts across all areas of Aegis."
       />
 
       <div className="page-body">

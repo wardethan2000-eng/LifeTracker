@@ -1,8 +1,8 @@
 ﻿import type { HobbyPracticeRoutineFrequency } from "@prisma/client";
-import { hobbyPracticeGoalStatusSchema } from "@lifekeeper/types";
+import { hobbyPracticeGoalStatusSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { addDays, MS_PER_DAY, startOfUtcDay, startOfUtcMonth, startOfUtcWeek, toMonthKey, addUtcMonths } from "@lifekeeper/utils";
+import { addDays, MS_PER_DAY, startOfUtcDay, startOfUtcMonth, startOfUtcWeek, toMonthKey, addUtcMonths } from "@aegis/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import { buildPracticeGoalProgressHistory } from "../../lib/hobby-practice.js";
 import {

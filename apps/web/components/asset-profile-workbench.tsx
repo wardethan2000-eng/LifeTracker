@@ -12,7 +12,7 @@ import type {
   PresetScheduleTemplate,
   PresetUsageMetricTemplate,
   SpaceResponse
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
 import { useEffect, useId, useState } from "react";

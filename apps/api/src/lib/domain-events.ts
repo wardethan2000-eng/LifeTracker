@@ -84,9 +84,9 @@ export const dispatchPendingWebhookDeliveries = async (
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-lifekeeper-event": delivery.domainEvent.eventType,
-          "x-lifekeeper-delivery": delivery.id,
-          ...(signature ? { "x-lifekeeper-signature": signature } : {})
+          "x-aegis-event": delivery.domainEvent.eventType,
+          "x-aegis-delivery": delivery.id,
+          ...(signature ? { "x-aegis-signature": signature } : {})
         },
         body: payload
       });

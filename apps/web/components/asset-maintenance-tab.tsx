@@ -1,4 +1,4 @@
-import type { AssetDetailResponse, HouseholdMember } from "@lifekeeper/types";
+import type { AssetDetailResponse, HouseholdMember } from "@aegis/types";
 import type { JSX } from "react";
 import {
   completeScheduleAction,

@@ -4,8 +4,8 @@ import {
   type CompletionCycleRecord,
   type ComplianceStatus,
   type NotificationPreferences
-} from "@lifekeeper/types";
-import { MS_PER_DAY, addDays } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { MS_PER_DAY, addDays } from "@aegis/utils";
 import { buildCompletionCycleLedger } from "../services/schedule-adherence.js";
 import type { PrismaExecutor } from "./prisma-types.js";
 

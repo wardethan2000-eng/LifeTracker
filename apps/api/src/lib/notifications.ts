@@ -11,8 +11,8 @@ import {
   notificationConfigSchema,
   notificationPreferencesSchema,
   type NotificationPreferences
-} from "@lifekeeper/types";
-import { addDays } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { addDays } from "@aegis/utils";
 import { toNotificationResponse } from "./serializers/index.js";
 import { sendEmail } from "./adapters/email-adapter.js";
 import { sendPush } from "./adapters/push-adapter.js";

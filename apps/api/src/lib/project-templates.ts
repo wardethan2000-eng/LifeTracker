@@ -1,5 +1,5 @@
 import type { Prisma, ProjectAssetRelationship, ProjectStatus } from "@prisma/client";
-import { MS_PER_DAY } from "@lifekeeper/utils";
+import { MS_PER_DAY } from "@aegis/utils";
 
 type SnapshotAssetLink = {
   assetId: string;

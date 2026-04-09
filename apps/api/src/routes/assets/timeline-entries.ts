@@ -1,8 +1,8 @@
 ﻿import {
   createAssetTimelineEntrySchema,
   updateAssetTimelineEntrySchema
-} from "@lifekeeper/types";
-import { ASSET_CATEGORY_PREFIX, buildAssetEntryPayload, parseAssetEntryPayload } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { ASSET_CATEGORY_PREFIX, buildAssetEntryPayload, parseAssetEntryPayload } from "@aegis/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getAccessibleAsset } from "../../lib/asset-access.js";

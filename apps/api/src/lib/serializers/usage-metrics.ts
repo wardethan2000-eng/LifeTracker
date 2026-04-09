@@ -2,7 +2,7 @@ import type { UsageMetric, UsageMetricEntry } from "@prisma/client";
 import {
   usageMetricEntrySchema,
   usageMetricResponseSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 export const toUsageMetricResponse = (
   metric: Pick<UsageMetric, "id" | "assetId" | "name" | "unit" | "currentValue" | "lastRecordedAt" | "createdAt" | "updatedAt">

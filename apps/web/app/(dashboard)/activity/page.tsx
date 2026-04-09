@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
-import type { ActivityLog } from "@lifekeeper/types";
+import type { ActivityLog } from "@aegis/types";
 import { HouseholdCsvExportButton } from "../../../components/asset-export-actions";
 import { ApiError, getDisplayPreferences, getHouseholdActivity, getMe } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/formatters";

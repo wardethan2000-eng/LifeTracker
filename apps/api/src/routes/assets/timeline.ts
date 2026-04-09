@@ -1,4 +1,4 @@
-﻿import { assetTimelineQuerySchema, conditionEntrySchema } from "@lifekeeper/types";
+﻿import { assetTimelineQuerySchema, conditionEntrySchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { assertMembership, getAccessibleAsset } from "../../lib/asset-access.js";
 import { toEntryBackedTimelineItem, toTimelineItem } from "../../lib/serializers/index.js";

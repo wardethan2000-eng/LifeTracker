@@ -1,5 +1,5 @@
 import { Prisma, type HobbyPracticeGoal, type HobbyPracticeRoutine, type PrismaClient } from "@prisma/client";
-import { addDays, addUtcMonths, startOfUtcDay, startOfUtcMonth, startOfUtcWeek } from "@lifekeeper/utils";
+import { addDays, addUtcMonths, startOfUtcDay, startOfUtcMonth, startOfUtcWeek } from "@aegis/utils";
 
 type PracticePrisma = PrismaClient | Prisma.TransactionClient;
 

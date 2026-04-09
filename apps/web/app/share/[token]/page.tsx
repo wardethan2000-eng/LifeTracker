@@ -45,7 +45,7 @@ export default async function PublicSharePage({ params }: PublicSharePageProps):
     return (
       <main className="public-report">
         <header className="public-report__header">
-          <div className="public-report__brand">LifeKeeper</div>
+          <div className="public-report__brand">Aegis</div>
           <h1 className="public-report__title">Shared Asset Report</h1>
           <p style={{ margin: "8px 0 0 0", color: "var(--ink-muted)" }}>Generated {formatDateTime(report.generatedAt)}</p>
         </header>
@@ -138,7 +138,7 @@ export default async function PublicSharePage({ params }: PublicSharePageProps):
         <div style={{ textAlign: "center", display: "grid", gap: 12 }}>
           <h1 className="public-report__title" style={{ margin: 0 }}>{message}</h1>
           <p style={{ margin: 0, color: "var(--ink-muted)" }}>
-            <Link href="/" className="text-link">Return to LifeKeeper</Link>
+            <Link href="/" className="text-link">Return to Aegis</Link>
           </p>
         </div>
       </main>

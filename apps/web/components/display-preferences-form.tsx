@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { DisplayPreferences, UpdateDisplayPreferencesInput } from "@lifekeeper/types";
+import type { DisplayPreferences, UpdateDisplayPreferencesInput } from "@aegis/types";
 import { updateDisplayPreferencesAction } from "../app/actions";
 import { formatDate, formatCurrency } from "../lib/formatters";
 

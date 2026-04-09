@@ -1,4 +1,4 @@
-import type { DueWorkItem } from "@lifekeeper/types";
+import type { DueWorkItem } from "@aegis/types";
 import { getDashboardData } from "./dashboard-data";
 import { DashboardAttentionQueue } from "./dashboard-attention-queue";
 

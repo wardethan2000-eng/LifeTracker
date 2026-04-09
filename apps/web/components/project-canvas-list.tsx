@@ -1,6 +1,6 @@
 "use client";
 
-import type { IdeaCanvasThumbnail } from "@lifekeeper/types";
+import type { IdeaCanvasThumbnail } from "@aegis/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";

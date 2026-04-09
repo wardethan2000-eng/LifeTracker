@@ -17,7 +17,7 @@ import {
   spaceUtilizationListSchema,
   updateSpaceGeneralItemInputSchema,
   updateSpaceInputSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { sendQrCode } from "../../lib/qr.js";
 import { z } from "zod";

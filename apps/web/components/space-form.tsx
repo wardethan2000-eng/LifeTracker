@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { SpaceResponse } from "@lifekeeper/types";
+import type { SpaceResponse } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";

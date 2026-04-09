@@ -6,7 +6,7 @@ import { useState } from "react";
 import { archiveHobbyAction, deleteHobbyAction, restoreHobbyAction } from "../app/actions";
 import { ConfirmDestructiveAction } from "./confirm-destructive-action";
 import { getHobbyDeleteImpact } from "../lib/api";
-import type { HobbyDeleteImpact } from "@lifekeeper/types";
+import type { HobbyDeleteImpact } from "@aegis/types";
 
 type HobbyDangerActionsProps = {
   householdId: string;

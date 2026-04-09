@@ -1,5 +1,5 @@
 /**
- * Shared test helpers for LifeKeeper API tests.
+ * Shared test helpers for Aegis API tests.
  *
  * Usage:
  *   import { buildApp, householdId, userId, mockPrismaBase } from "./helpers.js";

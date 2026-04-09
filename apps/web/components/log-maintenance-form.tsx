@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { BarcodeLookupResult } from "@lifekeeper/types";
+import type { BarcodeLookupResult } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";

@@ -1,4 +1,4 @@
-# LifeKeeper Mobile App — Development Plan
+# Aegis Mobile App — Development Plan
 
 > **Platform:** Android-first (Expo/React Native)  
 > **Status:** Planning  
@@ -28,7 +28,7 @@
 
 ## Vision & Design Philosophy
 
-The LifeKeeper mobile app is a **capture-first companion** to the web dashboard. The web dashboard is the analytics, management, and configuration surface. The mobile app optimizes for speed of input when the user is physically with the thing they're tracking — in the garage, at the workbench, in the field.
+The Aegis mobile app is a **capture-first companion** to the web dashboard. The web dashboard is the analytics, management, and configuration surface. The mobile app optimizes for speed of input when the user is physically with the thing they're tracking — in the garage, at the workbench, in the field.
 
 ### Core Principles
 
@@ -57,7 +57,7 @@ Field use (garage, workshop, attic, marina, shed) often means spotty or no conne
 - Same data model and domain language as the web app
 - UI follows native Android conventions: bottom tab bar, swipe gestures, FAB for primary action, Material Design components
 - Not a web wrapper — a native experience that feels right on Android
-- Shared Zod schemas from `@lifekeeper/types` validate all API responses — zero type duplication
+- Shared Zod schemas from `@aegis/types` validate all API responses — zero type duplication
 
 #### 4. Progressive Disclosure
 
@@ -75,14 +75,14 @@ Field use (garage, workshop, attic, marina, shed) often means spotty or no conne
 |----------|--------|-----------|
 | Runtime | **Expo SDK 52+** | Already scaffolded in `apps/mobile/`. Managed workflow, OTA updates, native module support via config plugins. |
 | Navigation | **Expo Router** | File-based routing mirrors the Next.js web app conventions. Automatic deep linking for QR scans. Built on React Navigation internally. |
-| UI Framework | **React Native Paper** | Material Design 3 components (buttons, inputs, cards, dialogs, FABs, search bars, chips, menus). Themed to LifeKeeper's palette. Dramatically faster than building every component from scratch. |
+| UI Framework | **React Native Paper** | Material Design 3 components (buttons, inputs, cards, dialogs, FABs, search bars, chips, menus). Themed to Aegis's palette. Dramatically faster than building every component from scratch. |
 | State & Cache | **TanStack Query (React Query)** | Server state cache with background refetch, stale-while-revalidate, optimistic updates, and built-in offline persistence support. |
 | Offline Reads | **React Query `persistQueryClient`** + **AsyncStorage** | Entire query cache serialized to disk. App boots with stale data instantly, then revalidates in background. |
 | Offline Writes | **MMKV mutation queue** | Custom queue stores pending mutations in MMKV (fast synchronous KV store). Flushes in order when connectivity returns. |
 | Auth | **Clerk Expo SDK** + `x-dev-user-id` bypass | Matches the API's existing hybrid auth. Development mode requires zero sign-in friction. |
 | Fast KV Store | **MMKV** | Synchronous reads/writes for mutation queue, user preferences, recent searches. 30x faster than AsyncStorage for small values. |
 | Build & Deploy | **EAS Build** + **EAS Update (OTA)** | Cloud builds with managed signing. Over-the-air JS updates push without Play Store review. Free tier available. |
-| Shared Types | **`@lifekeeper/types`** (workspace) | Zod schemas validate API responses on mobile. Same contract as the web app. |
+| Shared Types | **`@aegis/types`** (workspace) | Zod schemas validate API responses on mobile. Same contract as the web app. |
 | Camera & Media | **expo-camera** + **expo-image-picker** + **expo-image-manipulator** | Barcode scanning (already working), photo capture from camera/gallery, client-side compression before upload. |
 | File System | **expo-file-system** | Offline photo storage before upload. Document directory for cached media. |
 | Push Notifications | **expo-notifications** + **FCM** (Firebase Cloud Messaging) | Push notifications for maintenance due/overdue, reminders, and digest summaries. |
@@ -188,7 +188,7 @@ apps/mobile/
 │
 └── lib/                                 # Non-React utilities
     ├── api.ts                           # Full typed API client (mirrors web's api.ts)
-    ├── theme.ts                         # React Native Paper theme (LifeKeeper palette)
+    ├── theme.ts                         # React Native Paper theme (Aegis palette)
     ├── query-client.ts                  # TanStack Query config + offline persistence
     ├── offline-queue.ts                 # MMKV mutation queue (enqueue, flush, retry)
     ├── scan.ts                          # Barcode/QR scan resolution (existing, enhanced)
@@ -407,7 +407,7 @@ After initial sign-in, offer fingerprint/face unlock for returning to the app (u
 
 ### React Native Paper Theme
 
-Map LifeKeeper's CSS custom properties to Paper's theme tokens:
+Map Aegis's CSS custom properties to Paper's theme tokens:
 
 ```typescript
 // lib/theme.ts
@@ -543,7 +543,7 @@ Run `pnpm install` from monorepo root.
 
 - Create `lib/theme.ts` with light and dark themes (see Theming section)
 - Wrap app in `<PaperProvider theme={theme}>`
-- Verify Paper components render with LifeKeeper colors
+- Verify Paper components render with Aegis colors
 
 #### 0.4 — Build API Client Foundation
 
@@ -590,20 +590,20 @@ Run `pnpm install` from monorepo root.
   - `preview` — staging build, internal distribution
   - `production` — Play Store build
 - Create/update `app.config.ts`:
-  - Android package: `com.lifekeeper.app`
+  - Android package: `com.aegis.app`
   - Splash screen, adaptive icon
   - Runtime version policy for OTA updates
   - Extra config for API base URL per environment
 
 ### Verification
 
-- [ ] `pnpm --filter @lifekeeper/mobile dev` → opens in Expo Dev Client
+- [ ] `pnpm --filter @aegis/mobile dev` → opens in Expo Dev Client
 - [ ] App boots → auth gate → sign-in (or dev bypass) → empty tab bar with 5 tabs
-- [ ] Paper components render with LifeKeeper teal/cream theme
+- [ ] Paper components render with Aegis teal/cream theme
 - [ ] `getMe()` call succeeds and returns user/household data
 - [ ] React Query cache persists across app restart (kill + relaunch)
 - [ ] Toggle airplane mode → "pending sync" banner logic works (no mutations yet, but infrastructure is ready)
-- [ ] `pnpm --filter @lifekeeper/mobile typecheck` passes
+- [ ] `pnpm --filter @aegis/mobile typecheck` passes
 
 ---
 
@@ -984,7 +984,7 @@ Refactor the existing BarcodeScanner component into the Expo Router structure wi
 - Uses `useColorScheme()` hook + user preference in MMKV
 
 **Splash Screen:**
-- LifeKeeper logo on teal background
+- Aegis logo on teal background
 - `expo-splash-screen` with auto-hide on auth check complete
 
 ### 3D: Full Entity Creation Forms
@@ -1397,7 +1397,7 @@ Full replacement of the Phase 1 placeholder stub:
 **Bug:** `updateEntry` was never added to the mobile API client, so editing an existing journal entry / note was impossible regardless of what the UI did.
 
 **Fix:**
-- Imported `type UpdateEntryInput` from `@lifekeeper/types`.
+- Imported `type UpdateEntryInput` from `@aegis/types`.
 - Added `updateEntry(householdId, entryId, input: UpdateEntryInput): Promise<Entry>` — calls `PATCH /v1/households/:id/entries/:id` and validates with `entrySchema`.
 
 ### 10B — Inline edit/delete on all 4 notes screens
@@ -1908,7 +1908,7 @@ Added "Export" entry to the **Insights** section of `apps/mobile/app/(tabs)/more
 | **No canvas editing on mobile** | Touch-based node/edge editing is too complex for the initial release. Read-only canvas viewer is sufficient. Full editing stays on web. |
 | **No rich text editor on mobile** | Entry body is plain text on mobile. React Native rich text editors are unreliable and add significant complexity. Web handles rich text editing. |
 | **Charts deferred to Phase 4** | Analytics are read-only summaries initially. Full chart rendering is Phase 4 polish work. |
-| **Shared API client pattern** | Mobile `lib/api.ts` mirrors web's `lib/api.ts` method signatures, same Zod schemas from `@lifekeeper/types`, same error handling pattern. This ensures parity and makes it easy to port API calls between platforms. |
+| **Shared API client pattern** | Mobile `lib/api.ts` mirrors web's `lib/api.ts` method signatures, same Zod schemas from `@aegis/types`, same error handling pattern. This ensures parity and makes it easy to port API calls between platforms. |
 | **React Native Paper over custom UI** | A feature-rich app with ~40 screens needs buttons, inputs, dialogs, lists, menus, chips, FABs, and search bars. Building all from scratch with `StyleSheet.create()` would multiply development time. Paper provides these with theming support. |
 | **MMKV for mutation queue** | AsyncStorage is async and slow for frequent reads/writes. MMKV is synchronous and 30x faster — critical for the mutation queue which is read/written on every network change and app launch. |
 | **Last-write-wins conflict resolution** | Simple, predictable, and correct for 90%+ of mobile use cases (single-user household or non-overlapping edits). Full CRDT/OT is overkill. Entry body conflicts surface both versions for manual resolution. |

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { archiveAssetAction, softDeleteAssetAction, unarchiveAssetAction } from "../app/actions";
 import { ConfirmDestructiveAction } from "./confirm-destructive-action";
 import { getAssetDeleteImpact } from "../lib/api";
-import type { AssetDeleteImpact } from "@lifekeeper/types";
+import type { AssetDeleteImpact } from "@aegis/types";
 
 type AssetDangerActionsProps = {
   householdId: string;

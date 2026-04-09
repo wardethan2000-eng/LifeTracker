@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Attachment, AttachmentEntityType } from "@lifekeeper/types";
+import type { Attachment, AttachmentEntityType } from "@aegis/types";
 import { fetchAttachments } from "../lib/api";
 import { AttachmentGallery } from "./attachment-gallery";
 import { AttachmentUploader } from "./attachment-uploader";

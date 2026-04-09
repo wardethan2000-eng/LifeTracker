@@ -1,6 +1,6 @@
 "use client";
 
-import type { Entry, HobbySeriesComparison, HobbySessionSummary } from "@lifekeeper/types";
+import type { Entry, HobbySeriesComparison, HobbySessionSummary } from "@aegis/types";
 import Link from "next/link";
 import { useMemo, useState, type JSX } from "react";
 import { useFormattedDate } from "../lib/formatted-date";

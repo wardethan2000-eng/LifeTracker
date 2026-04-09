@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
-import type { HobbyPreset } from "@lifekeeper/types";
-import { hobbyPresetLibrary } from "@lifekeeper/presets";
+import type { HobbyPreset } from "@aegis/types";
+import { hobbyPresetLibrary } from "@aegis/presets";
 
 export type HobbyPresetDefinition = {
   fieldDefinitions: unknown[];

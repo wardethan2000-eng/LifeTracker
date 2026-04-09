@@ -8,9 +8,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
-      "@lifekeeper/types": ["../../packages/types/src/index.ts"],
-      "@lifekeeper/utils": ["../../packages/utils/src/index.ts"],
-      "@lifekeeper/presets": ["../../packages/presets/src/index.ts"]
+      "@aegis/types": ["../../packages/types/src/index.ts"],
+      "@aegis/utils": ["../../packages/utils/src/index.ts"],
+      "@aegis/presets": ["../../packages/presets/src/index.ts"]
     }
   },
   "include": [

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Entry } from "@lifekeeper/types";
+import type { Entry } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createEntry, getEntries, updateEntry } from "../lib/api";

@@ -1,4 +1,4 @@
-﻿import { searchQuerySchema, searchResponseSchema } from "@lifekeeper/types";
+﻿import { searchQuerySchema, searchResponseSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { assertMembership } from "../../lib/asset-access.js";
 import { applyTier } from "../../lib/rate-limit-tiers.js";

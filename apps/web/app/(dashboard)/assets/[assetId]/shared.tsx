@@ -8,7 +8,7 @@ import type {
   UsageProjection,
   UsageRateAnalytics,
   EnhancedUsageProjection
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import {
   formatCurrency,

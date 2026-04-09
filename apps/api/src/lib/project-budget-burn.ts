@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from "@lifekeeper/utils";
+import { MS_PER_DAY } from "@aegis/utils";
 
 export type ProjectBudgetBurnCadence = "day" | "month";
 

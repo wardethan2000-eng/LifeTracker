@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssetTimelineEntry } from "@lifekeeper/types";
+import type { AssetTimelineEntry } from "@aegis/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { useCallback, useState, useTransition } from "react";

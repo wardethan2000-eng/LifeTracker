@@ -1,4 +1,4 @@
-import type { SpaceResponse, SpaceType } from "@lifekeeper/types";
+import type { SpaceResponse, SpaceType } from "@aegis/types";
 
 export const spaceTypeLabels: Record<SpaceType, string> = {
   building: "Building",

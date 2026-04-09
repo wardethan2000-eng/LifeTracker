@@ -1,5 +1,5 @@
 ﻿import type { Prisma, PrismaClient } from "@prisma/client";
-import { maintenanceTriggerSchema } from "@lifekeeper/types";
+import { maintenanceTriggerSchema } from "@aegis/types";
 import { average } from "../../lib/analytics-helpers.js";
 import {
   aggregateCostsByPeriod,
@@ -9,7 +9,7 @@ import {
   MS_PER_DAY,
   startOfUtcMonth,
   addUtcMonths
-} from "@lifekeeper/utils";
+} from "@aegis/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership, getAccessibleAsset } from "../../lib/asset-access.js";

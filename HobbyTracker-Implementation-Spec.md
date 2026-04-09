@@ -1,4 +1,4 @@
-# LifeKeeper — Hobby Tracker Feature Implementation Specification
+# Aegis — Hobby Tracker Feature Implementation Specification
 
 This document is the complete implementation reference for the Hobby Tracker feature. It is broken into sequential phases designed to be executed one at a time using GitHub Copilot Agent mode (Claude Sonnet 4). Each phase builds on the previous and must be completed before moving to the next.
 
@@ -1135,9 +1135,9 @@ Custom fields for this recipe:
 
 ### 6.4 Export and registration
 
-Export `hobbyPresetLibrary` from the `@lifekeeper/presets` package. Update `packages/presets/src/index.ts` (or create it if it does not exist) to re-export from both `library.ts` (asset presets) and `hobby-library.ts` (hobby presets).
+Export `hobbyPresetLibrary` from the `@aegis/presets` package. Update `packages/presets/src/index.ts` (or create it if it does not exist) to re-export from both `library.ts` (asset presets) and `hobby-library.ts` (hobby presets).
 
-In the API hobby preset helper (`apps/api/src/lib/hobby-presets.ts`), import `hobbyPresetLibrary` from `@lifekeeper/presets` and implement the lookup and application logic.
+In the API hobby preset helper (`apps/api/src/lib/hobby-presets.ts`), import `hobbyPresetLibrary` from `@aegis/presets` and implement the lookup and application logic.
 
 ---
 

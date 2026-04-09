@@ -1,5 +1,5 @@
 import type { InventoryTransaction, PrismaClient } from "@prisma/client";
-import type { InventoryTransactionReferenceLink } from "@lifekeeper/types";
+import type { InventoryTransactionReferenceLink } from "@aegis/types";
 
 type TransactionReferenceRecord = Pick<InventoryTransaction, "referenceType" | "referenceId">;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { HobbySessionSummary } from "@lifekeeper/types";
+import type { HobbySessionSummary } from "@aegis/types";
 import type { JSX } from "react";
 import Link from "next/link";
 import { EmptyState } from "./empty-state";

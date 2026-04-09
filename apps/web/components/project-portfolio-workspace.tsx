@@ -1,7 +1,7 @@
 "use client";
 
-import type { ProjectPortfolioItem, ProjectStatus } from "@lifekeeper/types";
-import { projectStatusValues } from "@lifekeeper/types";
+import type { ProjectPortfolioItem, ProjectStatus } from "@aegis/types";
+import { projectStatusValues } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";

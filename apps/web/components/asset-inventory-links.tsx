@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssetInventoryLinkSummary } from "@lifekeeper/types";
+import type { AssetInventoryLinkSummary } from "@aegis/types";
 import type { JSX, FormEvent } from "react";
 import { useState } from "react";
 import {

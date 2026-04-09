@@ -1,6 +1,6 @@
 ﻿import { z } from "zod";
 import type { FastifyPluginAsync } from "fastify";
-import { startOfUtcMonth, addUtcMonths } from "@lifekeeper/utils";
+import { startOfUtcMonth, addUtcMonths } from "@aegis/utils";
 import { assertMembership } from "../../lib/asset-access.js";
 import { computeScheduleCompliance } from "../../lib/schedule-compliance.js";
 import { toScheduleComplianceDashboardResponse } from "../../lib/serializers/index.js";

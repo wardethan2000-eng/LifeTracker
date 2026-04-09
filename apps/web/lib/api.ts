@@ -572,7 +572,7 @@ import {
   type HobbyDeleteImpact,
   trashListResponseSchema,
   type TrashListResponse,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { normalizeExternalUrl } from "./url";
 
 type Schema<T> = {
@@ -762,12 +762,12 @@ export class ApiError extends Error {
   }
 }
 
-const apiBaseUrl = process.env.LIFEKEEPER_API_BASE_URL
-  ?? process.env.NEXT_PUBLIC_LIFEKEEPER_API_BASE_URL
+const apiBaseUrl = process.env.AEGIS_API_BASE_URL
+  ?? process.env.NEXT_PUBLIC_AEGIS_API_BASE_URL
   ?? "http://127.0.0.1:4000";
 
-const devUserId = process.env.LIFEKEEPER_DEV_USER_ID
-  ?? process.env.NEXT_PUBLIC_LIFEKEEPER_DEV_USER_ID
+const devUserId = process.env.AEGIS_DEV_USER_ID
+  ?? process.env.NEXT_PUBLIC_AEGIS_DEV_USER_ID
   ?? devFixtureIds.ownerUserId;
 
 const parseJson = async (response: Response): Promise<unknown> => {
@@ -1561,7 +1561,7 @@ export const downloadInventoryValuationPdf = async (householdId: string): Promis
 };
 
 export const downloadHouseholdJson = async (householdId: string): Promise<void> => {
-  await downloadFileFromProxy(`/v1/households/${householdId}/export/json`, `lifekeeper-export-${householdId}.json`);
+  await downloadFileFromProxy(`/v1/households/${householdId}/export/json`, `aegis-export-${householdId}.json`);
 };
 
 export const createShareLink = async (

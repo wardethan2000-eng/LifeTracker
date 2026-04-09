@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { registerDeviceBodySchema } from "@lifekeeper/types";
+import { registerDeviceBodySchema } from "@aegis/types";
 
 const deviceParamsSchema = z.object({
   deviceId: z.string().cuid(),

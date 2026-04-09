@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { Attachment } from "@lifekeeper/types";
+import type { Attachment } from "@aegis/types";
 import { addOverviewPin, deleteAttachment, getAttachmentDownloadUrl, getOverviewPins, removeOverviewPin, updateAttachment } from "../lib/api";
 import { AttachmentLightbox } from "./attachment-lightbox";
 

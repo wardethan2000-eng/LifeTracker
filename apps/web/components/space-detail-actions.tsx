@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemSummary, SpaceResponse } from "@lifekeeper/types";
+import type { InventoryItemSummary, SpaceResponse } from "@aegis/types";
 import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";

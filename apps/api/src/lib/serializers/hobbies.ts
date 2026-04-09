@@ -41,8 +41,8 @@ import {
   hobbySummarySchema,
   hobbySchema,
   inventoryItemSummarySchema
-} from "@lifekeeper/types";
-import { HOBBY_LOG_TYPE_PREFIX } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { HOBBY_LOG_TYPE_PREFIX } from "@aegis/utils";
 
 export const toHobbyResponse = (hobby: {
   id: string;

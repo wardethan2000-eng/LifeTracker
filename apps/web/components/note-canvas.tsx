@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, type ChangeEvent } from "react";
-import type { ProjectNote } from "@lifekeeper/types";
+import type { ProjectNote } from "@aegis/types";
 import {
   createProjectNoteAction,
   deleteProjectNoteAction,

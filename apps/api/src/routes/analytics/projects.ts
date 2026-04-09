@@ -1,4 +1,4 @@
-﻿import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@lifekeeper/utils";
+﻿import { calculateProjectRiskScore, getProjectDaysToTarget, isProjectAtRisk, isProjectLate } from "@aegis/utils";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";

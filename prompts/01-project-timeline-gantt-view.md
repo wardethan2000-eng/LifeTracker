@@ -1,4 +1,4 @@
-# LifeKeeper — Project Timeline / Gantt View Implementation Specification
+# Aegis — Project Timeline / Gantt View Implementation Specification
 
 This document is the complete implementation reference for the Project Timeline / Gantt View feature. It is broken into sequential phases designed to be executed one at a time. Each phase builds on the previous and must be completed before moving to the next.
 

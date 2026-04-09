@@ -69,7 +69,7 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>
-            LifeKeeper
+            Aegis
           </Text>
           {me?.households[0] && (
             <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>

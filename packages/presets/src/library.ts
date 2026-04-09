@@ -4,7 +4,7 @@ import type {
   PresetCustomFieldTemplate,
   PresetScheduleTemplate,
   PresetUsageMetricTemplate
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 const field = (
   input: Omit<PresetCustomFieldTemplate, "required" | "options" | "wide" | "order"> & Partial<Pick<PresetCustomFieldTemplate, "required" | "options" | "wide" | "order">>

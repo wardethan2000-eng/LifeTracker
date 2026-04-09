@@ -9,7 +9,7 @@ import type {
   LocationDetails,
   PurchaseDetails,
   WarrantyDetails,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { useState, useTransition } from "react";
 import { updateAssetFieldAction } from "../app/actions";

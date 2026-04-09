@@ -37,8 +37,8 @@ import {
   maintenanceLogPartSchema,
   partCommonalitySchema,
   projectInventoryItemSchema
-} from "@lifekeeper/types";
-import type { InventoryTransactionReferenceLink } from "@lifekeeper/types";
+} from "@aegis/types";
+import type { InventoryTransactionReferenceLink } from "@aegis/types";
 import {
   calculateInventoryDeficit,
   calculateInventoryTotalValue,

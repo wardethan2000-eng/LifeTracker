@@ -3,7 +3,7 @@ import type {
   HobbyPresetMetricTemplate,
   HobbyPresetPipelineStep,
   HobbyPresetRecipeField,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 
 const hobbyPreset = (input: HobbyPreset): HobbyPreset => ({ ...input });
 

@@ -1,4 +1,4 @@
-﻿import { linkPreviewRequestSchema } from "@lifekeeper/types";
+﻿import { linkPreviewRequestSchema } from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { assertMembership } from "../../lib/asset-access.js";
 import { extractLinkPreview, normalizeLinkPreviewUrl } from "../../lib/link-preview.js";

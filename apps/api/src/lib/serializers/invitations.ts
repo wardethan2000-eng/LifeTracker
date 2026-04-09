@@ -1,4 +1,4 @@
-import { householdInvitationSchema } from "@lifekeeper/types";
+import { householdInvitationSchema } from "@aegis/types";
 
 export const toInvitationResponse = (invitation: {
   id: string;

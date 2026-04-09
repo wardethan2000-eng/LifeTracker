@@ -1,4 +1,4 @@
-import type { AssetTimelineQuery } from "@lifekeeper/types";
+import type { AssetTimelineQuery } from "@aegis/types";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { AssetHistoryTab } from "../../../../../components/asset-history-tab";

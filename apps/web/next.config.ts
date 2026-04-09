@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   devIndicators: false,
   reactStrictMode: true,
-  distDir: process.env.LIFEKEEPER_NEXT_DIST_DIR ?? ".next",
+  distDir: process.env.AEGIS_NEXT_DIST_DIR ?? ".next",
   outputFileTracingRoot: path.resolve(currentDirectory, "../../"),
   webpack: (config) => {
     config.resolve ??= {};

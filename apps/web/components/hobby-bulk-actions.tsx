@@ -1,6 +1,6 @@
 "use client";
 
-import type { BulkHobbySessionOperationResult, HobbySessionSummary } from "@lifekeeper/types";
+import type { BulkHobbySessionOperationResult, HobbySessionSummary } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";

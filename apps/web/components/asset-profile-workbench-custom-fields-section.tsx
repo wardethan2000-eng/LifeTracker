@@ -1,4 +1,4 @@
-import type { AssetFieldDefinition, AssetFieldType, AssetFieldValue } from "@lifekeeper/types";
+import type { AssetFieldDefinition, AssetFieldType, AssetFieldValue } from "@aegis/types";
 import type { JSX } from "react";
 import { Fragment } from "react";
 import { CompactFieldPreview } from "./compact-field-preview";

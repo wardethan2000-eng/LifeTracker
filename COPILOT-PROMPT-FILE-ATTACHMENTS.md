@@ -74,7 +74,7 @@ S3_ENDPOINT=http://localhost:9000
 S3_REGION=us-east-1
 S3_ACCESS_KEY_ID=minioadmin
 S3_SECRET_ACCESS_KEY=minioadmin
-S3_BUCKET=lifekeeper-attachments
+S3_BUCKET=aegis-attachments
 S3_FORCE_PATH_STYLE=true
 S3_PRESIGN_UPLOAD_EXPIRES_SECONDS=300
 S3_PRESIGN_DOWNLOAD_EXPIRES_SECONDS=3600
@@ -97,7 +97,7 @@ Also add to `apps/web/.env.example`:
 Install in the API workspace only:
 
 ```bash
-pnpm --filter @lifekeeper/api add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+pnpm --filter @aegis/api add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 ```
 
 No new dependencies for the web app. The upload uses the browser's native `fetch` API with the pre-signed URL. No S3 SDK runs in the browser.
@@ -223,7 +223,7 @@ const getStorageConfig = () => ({
   region: process.env.S3_REGION ?? "us-east-1",
   accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "minioadmin",
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "minioadmin",
-  bucket: process.env.S3_BUCKET ?? "lifekeeper-attachments",
+  bucket: process.env.S3_BUCKET ?? "aegis-attachments",
   forcePathStyle: parseBoolean(process.env.S3_FORCE_PATH_STYLE ?? "true"),
   uploadExpiresSec: Number(process.env.S3_PRESIGN_UPLOAD_EXPIRES_SECONDS ?? "300"),
   downloadExpiresSec: Number(process.env.S3_PRESIGN_DOWNLOAD_EXPIRES_SECONDS ?? "3600"),
@@ -505,7 +505,7 @@ const toAttachmentResponse = (
 });
 ```
 
-(Note: the `Attachment` type here is the Prisma-generated model type from `@prisma/client`, not the Zod type from `@lifekeeper/types`.)
+(Note: the `Attachment` type here is the Prisma-generated model type from `@prisma/client`, not the Zod type from `@aegis/types`.)
 
 ### 7.5 Helper: validate entity ownership
 
@@ -675,7 +675,7 @@ File: `apps/web/lib/api.ts`
 
 ### 8.1 Imports
 
-Add to the existing import block from `@lifekeeper/types`:
+Add to the existing import block from `@aegis/types`:
 
 ```typescript
 import {
@@ -687,7 +687,7 @@ import {
   type AttachmentEntityType,
   type CreateAttachmentUploadInput,
   type UpdateAttachmentInput,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 ```
 
 ### 8.2 Methods

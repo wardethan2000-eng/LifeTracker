@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { EntryEntityType } from "@lifekeeper/types";
+import type { EntryEntityType } from "@aegis/types";
 
 type EntryPrisma = PrismaClient | Prisma.TransactionClient;
 

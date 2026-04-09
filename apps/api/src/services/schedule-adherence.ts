@@ -4,8 +4,8 @@ import {
   maintenanceTriggerSchema,
   type CompletionCycleRecord,
   type MaintenanceTrigger
-} from "@lifekeeper/types";
-import { MS_PER_DAY, addDays, calculateNextDue, calculateUsageRate } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { MS_PER_DAY, addDays, calculateNextDue, calculateUsageRate } from "@aegis/utils";
 import type { PrismaExecutor } from "../lib/prisma-types.js";
 
 

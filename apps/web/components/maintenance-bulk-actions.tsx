@@ -1,6 +1,6 @@
 "use client";
 
-import type { BulkScheduleOperationResult, DueWorkItem } from "@lifekeeper/types";
+import type { BulkScheduleOperationResult, DueWorkItem } from "@aegis/types";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";

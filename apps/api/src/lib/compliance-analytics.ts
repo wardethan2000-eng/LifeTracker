@@ -1,4 +1,4 @@
-import type { CompletionCycleRecord } from "@lifekeeper/types";
+import type { CompletionCycleRecord } from "@aegis/types";
 
 export type ComplianceSummary = {
   totalCycles: number;

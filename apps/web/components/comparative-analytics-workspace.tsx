@@ -5,7 +5,7 @@ import type {
   AssetComparisonPayload,
   MemberContributionPayload,
   YearOverYearPayload
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {

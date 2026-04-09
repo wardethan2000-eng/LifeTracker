@@ -1,6 +1,6 @@
 "use client";
 
-import type { Asset } from "@lifekeeper/types";
+import type { Asset } from "@aegis/types";
 import type { JSX } from "react";
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";

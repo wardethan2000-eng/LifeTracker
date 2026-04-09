@@ -1,6 +1,6 @@
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import type { ActivityLog } from "@lifekeeper/types";
+import type { ActivityLog } from "@aegis/types";
 
 function actionLabel(action: string): string {
   return action

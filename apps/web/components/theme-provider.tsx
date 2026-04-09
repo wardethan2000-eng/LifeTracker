@@ -13,7 +13,7 @@ type ThemeContextValue = {
   toggleTheme: () => void;
 };
 
-const storageKey = "lifekeeper-theme";
+const storageKey = "aegis-theme";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const getStoredTheme = (): ThemePreference => {

@@ -5,8 +5,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // ────────────────────────────────────────────────────────────────────
 //
 // Note: deliverToAdapter / deliverPendingNotification tests require
-// importing notifications.ts which in turn imports @lifekeeper/types.
-// @lifekeeper/types has a pre-existing TDZ bug (projectStatusSchema
+// importing notifications.ts which in turn imports @aegis/types.
+// @aegis/types has a pre-existing TDZ bug (projectStatusSchema
 // used before its declaration at line 747) that prevents those imports
 // from loading in the test environment. Those tests are covered by the
 // integration test suite instead.

@@ -1,6 +1,6 @@
 "use client";
 
-import type { InventoryItemSummary } from "@lifekeeper/types";
+import type { InventoryItemSummary } from "@aegis/types";
 import type { JSX } from "react";
 import { useDeferredValue, useMemo, useState } from "react";
 import { createQuickRestockAction } from "../app/actions";

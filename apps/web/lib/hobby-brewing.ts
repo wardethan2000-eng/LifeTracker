@@ -1,4 +1,4 @@
-import type { HobbyDetail } from "@lifekeeper/types";
+import type { HobbyDetail } from "@aegis/types";
 
 type BrewingHobbyLike = Pick<HobbyDetail, "hobbyType" | "name" | "description" | "customFields">;
 

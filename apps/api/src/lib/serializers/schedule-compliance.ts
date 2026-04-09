@@ -1,3 +1,3 @@
-import { scheduleComplianceDashboardSchema } from "@lifekeeper/types";
+import { scheduleComplianceDashboardSchema } from "@aegis/types";
 
 export const toScheduleComplianceDashboardResponse = (value: unknown) => scheduleComplianceDashboardSchema.parse(value);

@@ -7,13 +7,13 @@ import {
   type InventoryTransactionType,
   type SchedulePartReadinessItem,
   type SchedulePartsReadiness
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import {
   applyInventoryDelta,
   calculateInventoryDeficit,
   calculateInventoryTotalValue,
   isInventoryLowStock
-} from "@lifekeeper/utils";
+} from "@aegis/utils";
 import type { PrismaExecutor } from "./prisma-types.js";
 
 export {

@@ -1,4 +1,4 @@
-import type { ProjectStatus } from "@lifekeeper/types";
+import type { ProjectStatus } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";

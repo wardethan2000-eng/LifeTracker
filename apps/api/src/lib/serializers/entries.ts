@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { actionableEntryGroupSchema, entryMeasurementSchema, entrySchema } from "@lifekeeper/types";
+import { actionableEntryGroupSchema, entryMeasurementSchema, entrySchema } from "@aegis/types";
 import type { EntryEntityContext } from "../entries.js";
 import { toShallowUserResponse } from "./users.js";
 

@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 import { useState, useTransition } from "react";
-import type { InventoryItemSummary, ProjectPhaseSupply } from "@lifekeeper/types";
+import type { InventoryItemSummary, ProjectPhaseSupply } from "@aegis/types";
 import {
   deleteProjectPhaseSupplyAction,
   toggleProjectPhaseSupplyPurchasedAction,

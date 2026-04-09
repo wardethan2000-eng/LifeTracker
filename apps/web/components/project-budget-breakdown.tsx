@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProjectBudgetCategorySummary, ProjectExpense, ProjectPhaseDetail } from "@lifekeeper/types";
+import type { ProjectBudgetCategorySummary, ProjectExpense, ProjectPhaseDetail } from "@aegis/types";
 import {
   createProjectBudgetCategoryAction,
   deleteProjectBudgetCategoryAction,

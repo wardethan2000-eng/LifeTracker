@@ -1,4 +1,4 @@
-﻿import { activityLogQuerySchema } from "@lifekeeper/types";
+﻿import { activityLogQuerySchema } from "@aegis/types";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { householdParamsSchema } from "../../lib/schemas.js";

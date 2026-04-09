@@ -2,7 +2,7 @@
   displayPreferencesSchema,
   meResponseSchema,
   updateDisplayPreferencesSchema
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { FastifyPluginAsync } from "fastify";
 import { toUserProfileResponse } from "../lib/serializers/index.js";
 import { notFound } from "../lib/errors.js";

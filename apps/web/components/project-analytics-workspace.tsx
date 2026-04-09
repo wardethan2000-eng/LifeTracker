@@ -6,7 +6,7 @@ import type {
   ProjectSummary,
   ProjectTaskVelocityPayload,
   ProjectTimelinePayload
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { LkAreaChart, LkBarChart, LkDonutChart, LkLineChart } from "./charts";

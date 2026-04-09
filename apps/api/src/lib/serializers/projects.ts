@@ -16,8 +16,8 @@ import {
   projectTaskChecklistItemSchema,
   projectTaskSchema,
   projectTaskDependencySchema
-} from "@lifekeeper/types";
-import { parseProjectEntryPayload } from "@lifekeeper/utils";
+} from "@aegis/types";
+import { parseProjectEntryPayload } from "@aegis/utils";
 import { buildProjectTaskGraphSummary } from "../project-task-graph.js";
 import { toShallowUserResponse } from "./users.js";
 

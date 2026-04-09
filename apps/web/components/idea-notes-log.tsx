@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 import { useCallback, useRef, useState, useTransition } from "react";
-import type { IdeaNoteItem } from "@lifekeeper/types";
+import type { IdeaNoteItem } from "@aegis/types";
 import { addIdeaNoteAction, removeIdeaNoteAction } from "../app/actions";
 import { useTimezone } from "../lib/timezone-context";
 import { Card } from "./card";

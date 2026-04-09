@@ -1,4 +1,4 @@
-# LifeKeeper — Ideas Feature Phase 6: Polish, Migration, and Cleanup
+# Aegis — Ideas Feature Phase 6: Polish, Migration, and Cleanup
 
 This document covers final polish, the localStorage-to-API migration helper, accessibility, responsive behavior, and cleanup of prototype code.
 
@@ -10,15 +10,15 @@ This document covers final polish, the localStorage-to-API migration helper, acc
 
 ## 6.1 localStorage migration helper
 
-Users who used the prototype may have ideas stored in `localStorage` under the key `lifekeeper_ideas`. These should not be silently lost.
+Users who used the prototype may have ideas stored in `localStorage` under the key `aegis_ideas`. These should not be silently lost.
 
 ### Migration component
 
 Create `apps/web/components/idea-local-migration.tsx` — a **client component**.
 
 **Behavior:**
-1. On mount, check `localStorage` for the `lifekeeper_ideas` key
-2. If ideas exist and have not been migrated (check a separate `lifekeeper_ideas_migrated` flag):
+1. On mount, check `localStorage` for the `aegis_ideas` key
+2. If ideas exist and have not been migrated (check a separate `aegis_ideas_migrated` flag):
    - Show a banner at the top of the Ideas list page:
      ```
      ┌──────────────────────────────────────────────────────────────┐
@@ -37,12 +37,12 @@ Create `apps/web/components/idea-local-migration.tsx` — a **client component**
      - `promotionTarget` from the stored `escalateTo` field (if "project", "asset", or "hobby")
      - `stage: "spark"`
    - Show progress: "Importing 3/5..."
-   - On completion, set `lifekeeper_ideas_migrated = "true"` in localStorage
+   - On completion, set `aegis_ideas_migrated = "true"` in localStorage
    - Show success: "All ideas imported!"
    - Refresh the idea list
 
 4. On "Dismiss":
-   - Set `lifekeeper_ideas_migrated = "true"` in localStorage
+   - Set `aegis_ideas_migrated = "true"` in localStorage
    - Hide the banner
    - The localStorage data is preserved but the banner won't show again
 
@@ -215,7 +215,7 @@ After migration support is in place, clean up residual prototype patterns:
 
 1. **Remove the `STORAGE_KEY` constant** from `idea-list.tsx` and `idea-workbench.tsx` — all localStorage access should now be isolated in `idea-local-migration.tsx`.
 
-2. **Remove the `StoredIdea` type** from both files — the real `Idea` and `IdeaSummary` types from `@lifekeeper/types` replace it.
+2. **Remove the `StoredIdea` type** from both files — the real `Idea` and `IdeaSummary` types from `@aegis/types` replace it.
 
 3. **Remove the `saveIdea()` function** from `idea-workbench.tsx` — replaced by API calls.
 

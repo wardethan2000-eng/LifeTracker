@@ -1,4 +1,4 @@
-import { noteFolderSchema, noteTemplateSchema } from "@lifekeeper/types";
+import { noteFolderSchema, noteTemplateSchema } from "@aegis/types";
 import { parseTags } from "../prisma-json.js";
 
 const parseFlags = (value: unknown): string[] => {

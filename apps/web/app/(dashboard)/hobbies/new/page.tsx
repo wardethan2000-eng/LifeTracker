@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import { createHobbyAction } from "../../../actions";
 import { HobbyWorkbench } from "../../../../components/hobby-workbench";
 import { getMe } from "../../../../lib/api";
-import { hobbyPresetLibrary } from "@lifekeeper/presets";
+import { hobbyPresetLibrary } from "@aegis/presets";
 import Link from "next/link";
 
 export default async function NewHobbyPage(): Promise<JSX.Element> {

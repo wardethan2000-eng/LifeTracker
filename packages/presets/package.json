@@ -1,5 +1,5 @@
 {
-  "name": "@lifekeeper/presets",
+  "name": "@aegis/presets",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,6 +16,6 @@
     "format": "echo format not configured"
   },
   "dependencies": {
-    "@lifekeeper/types": "workspace:*"
+    "@aegis/types": "workspace:*"
   }
 }

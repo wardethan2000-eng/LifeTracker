@@ -1,6 +1,6 @@
 "use client";
 
-import type { HobbySeriesDetail, HobbySessionSummary } from "@lifekeeper/types";
+import type { HobbySeriesDetail, HobbySessionSummary } from "@aegis/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent, type JSX } from "react";

@@ -6,7 +6,7 @@ import type {
   ProjectTimelinePhase,
   ProjectTimelineTask,
   ProjectTimelineEvent,
-} from "@lifekeeper/types";
+} from "@aegis/types";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {

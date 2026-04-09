@@ -1,4 +1,4 @@
-import type { BarcodeLookupResult } from "@lifekeeper/types";
+import type { BarcodeLookupResult } from "@aegis/types";
 import type { JSX } from "react";
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 

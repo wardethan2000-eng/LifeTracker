@@ -1,6 +1,6 @@
 # Web App
 
-This workspace now contains the initial Next.js scaffold for the LifeKeeper web interface.
+This workspace now contains the initial Next.js scaffold for the Aegis web interface.
 
 ## Current scope
 
@@ -13,7 +13,7 @@ This workspace now contains the initial Next.js scaffold for the LifeKeeper web 
 ## Run locally
 
 1. Install workspace dependencies from the repository root with `pnpm install`.
-2. Start the web app with `pnpm --filter @lifekeeper/web dev`.
+2. Start the web app with `pnpm --filter @aegis/web dev`.
 3. Open the local Next.js URL shown in the terminal.
 
 ## Next steps

@@ -6,7 +6,7 @@ import * as SecureStore from "expo-secure-store";
  * Used for: mutation queue, upload queue, recent searches, user preferences.
  * Synchronous reads/writes — significantly faster than AsyncStorage for small values.
  */
-export const storage = new MMKV({ id: "lifekeeper-storage" });
+export const storage = new MMKV({ id: "aegis-storage" });
 
 // ---------------------------------------------------------------------------
 // Clerk token cache (SecureStore-backed)
