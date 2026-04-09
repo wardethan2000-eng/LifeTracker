@@ -1,7 +1,7 @@
 "use client";
 
 import type { NoteTemplate } from "@lifekeeper/types";
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { createProjectNoteAction } from "../app/actions";
 import { RichEditor } from "./rich-editor";
 import { TemplatePicker } from "./template-picker";
@@ -16,6 +16,8 @@ type NoteCreateFormProps = {
 export function NoteCreateForm({ householdId, projectId, phases, templates = [] }: NoteCreateFormProps) {
   const [body, setBody] = useState("");
   const [showPicker, setShowPicker] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -27,16 +29,22 @@ export function NoteCreateForm({ householdId, projectId, phases, templates = [] 
     setShowPicker(false);
   };
 
-  return (
-    <form
-      ref={formRef}
-      action={async (formData: FormData) => {
-        formData.set("body", body);
+  const handleSubmit = (formData: FormData) => {
+    formData.set("body", body);
+    setError(null);
+    startTransition(async () => {
+      try {
         await createProjectNoteAction(formData);
         setBody("");
         formRef.current?.reset();
-      }}
-    >
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save note. Please try again.");
+      }
+    });
+  };
+
+  return (
+    <form ref={formRef} action={handleSubmit}>
       <input type="hidden" name="householdId" value={householdId} />
       <input type="hidden" name="projectId" value={projectId} />
 
@@ -99,7 +107,10 @@ export function NoteCreateForm({ householdId, projectId, phases, templates = [] 
         />
       </div>
       <div className="inline-actions">
-        <button type="submit" className="button">Save Note</button>
+        <button type="submit" className="button" disabled={isPending}>
+          {isPending ? "Saving…" : "Save Note"}
+        </button>
+        {error ? <p className="form-error">{error}</p> : null}
       </div>
     </form>
   );

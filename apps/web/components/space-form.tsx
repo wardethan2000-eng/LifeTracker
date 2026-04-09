@@ -92,12 +92,12 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
 
   return (
     <form onSubmit={onSubmit} noValidate className="form-grid">
-      <label className="field field--full">
+      <label className={`field field--full${errors.name ? " field--error" : ""}`}>
         <span>Name</span>
         <input type="text" {...register("name")} />
         <InlineError message={errors.name?.message} size="sm" />
       </label>
-      <label className="field">
+      <label className={`field${errors.type ? " field--error" : ""}`}>
         <span>Type</span>
         <select {...register("type")}>
           {Object.entries(spaceTypeLabels).map(([value, label]) => (
@@ -106,7 +106,7 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
         </select>
         <InlineError message={errors.type?.message} size="sm" />
       </label>
-      <label className="field">
+      <label className={`field${errors.parentSpaceId ? " field--error" : ""}`}>
         <span>Parent Space</span>
         <select {...register("parentSpaceId")}>
           <option value="">Root level</option>
@@ -118,12 +118,12 @@ export function SpaceForm({ householdId, spaces, initialSpace, initialParentSpac
         </select>
         <InlineError message={errors.parentSpaceId?.message} size="sm" />
       </label>
-      <label className="field field--full">
+      <label className={`field field--full${errors.description ? " field--error" : ""}`}>
         <span>Description</span>
         <textarea rows={3} {...register("description")} />
         <InlineError message={errors.description?.message} size="sm" />
       </label>
-      <label className="field field--full">
+      <label className={`field field--full${errors.notes ? " field--error" : ""}`}>
         <span>Notes</span>
         <textarea rows={4} {...register("notes")} />
         <InlineError message={errors.notes?.message} size="sm" />

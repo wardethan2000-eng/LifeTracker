@@ -13,6 +13,7 @@ import { InventorySection } from "./inventory-section";
 import { ClickToEdit } from "./click-to-edit";
 import { QuantityStepper } from "./quantity-stepper";
 import { useToast } from "./toast-provider";
+import { EmptyState } from "./empty-state";
 import { updateInventoryItemFieldAction } from "../app/actions";
 
 type InventoryGroup = {
@@ -136,7 +137,15 @@ export function InventoryListWorkspace({
       )}
     >
       {allItems.length === 0 ? (
-        <p className="panel__empty">No inventory items found for this household yet.</p>
+        <div className="panel__body--padded">
+          <EmptyState
+            icon="box"
+            title="No inventory items yet"
+            message="Track consumables and equipment — quantities, reorder points, costs, and more."
+            actionLabel="Add First Item"
+            actionHref="/inventory/new"
+          />
+        </div>
       ) : (
         <div className="inventory-groups">
           <BulkActionBar selectedCount={selectedCount} onClearSelection={clearSelection} />
@@ -253,7 +262,9 @@ export function InventoryListWorkspace({
                           />
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <InventoryRowMenu householdId={householdId} itemId={item.id} itemName={item.name} />
+                          <div className="data-table__row-actions">
+                            <InventoryRowMenu householdId={householdId} itemId={item.id} itemName={item.name} />
+                          </div>
                         </td>
                       </InventoryEditableRow>
                     );})}

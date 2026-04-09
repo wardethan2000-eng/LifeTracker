@@ -139,7 +139,7 @@ export function EntityCanvasList({
 
       {loading && canvases.length === 0 ? (
         <div className="canvas-list__empty">
-          <p>Loading canvases…</p>
+          <div aria-hidden="true" style={{ display: "grid", gap: 8 }}>{[1, 2, 3].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 44, borderRadius: 6 }} />)}</div>
         </div>
       ) : canvases.length === 0 ? (
         <div className="empty-state">

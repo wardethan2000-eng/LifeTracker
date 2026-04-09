@@ -3,6 +3,7 @@
 import type { HobbySessionSummary } from "@lifekeeper/types";
 import type { JSX } from "react";
 import Link from "next/link";
+import { EmptyState } from "./empty-state";
 import { useMemo } from "react";
 import {
   SectionFilterBar,
@@ -77,7 +78,7 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
             <SectionFilterChildren<HobbySessionSummary>>
               {(filteredSessions) => (
                 <>
-                  {sessions.length === 0 ? <p className="panel__empty">No sessions yet. Start your first session to begin tracking.</p> : null}
+                  {sessions.length === 0 ? <EmptyState icon="layers" title="No sessions yet" message="Start your first session to begin tracking your progress." actionLabel="New Session" actionHref={`/hobbies/${hobbyId}/sessions/new`} /> : null}
                   {sessions.length > 0 && filteredSessions.length === 0 ? <p className="panel__empty">No sessions match that search.</p> : null}
                   {filteredSessions.length > 0 ? (
                     <ul className="hobby-session-list">
@@ -102,7 +103,22 @@ export function HobbySessionList({ hobbyId, householdId, sessions }: HobbySessio
                               <span className={statusBadgeClass(session.status)}>{session.status}</span>
                             </div>
                             <div className="hobby-session-card__meta">
-                              <span>{session.completedStepCount}/{session.stepCount} steps</span>
+                              {session.stepCount > 0 ? (
+                                <span className="hobby-session-card__steps-progress">
+                                  <span>{session.completedStepCount}/{session.stepCount} steps</span>
+                                  <span className="progress-bar" style={{ width: 40, display: "inline-block" }}>
+                                    <span
+                                      className="progress-bar__fill"
+                                      style={{
+                                        width: `${Math.round((session.completedStepCount / session.stepCount) * 100)}%`,
+                                        background: session.completedStepCount === session.stepCount ? "var(--success)" : undefined,
+                                      }}
+                                    />
+                                  </span>
+                                </span>
+                              ) : (
+                                <span>No steps</span>
+                              )}
                               <span>{session.ingredientCount} ingredients</span>
                               {session.rating != null ? <span>{"★".repeat(session.rating)}</span> : null}
                               <span>Started {formatDate(session.startDate)}</span>

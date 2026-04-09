@@ -155,7 +155,7 @@ async function MaintenanceListContent({
           </div>
           <div className="panel__body">
             {view === "calendar" ? (
-              <MaintenanceCalendar items={filteredDueWork} />
+              <MaintenanceCalendar items={filteredDueWork} householdId={householdId} />
             ) : (
               <MaintenanceListWorkspace householdId={householdId} items={pagedDueWork} />
             )}

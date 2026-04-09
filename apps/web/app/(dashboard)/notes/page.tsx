@@ -59,7 +59,18 @@ export default async function NotesPage({ searchParams }: { searchParams?: Promi
       />
 
       <div className="page-body">
-        <Suspense fallback={<div className="panel"><div className="panel__empty">Loading notes…</div></div>}>
+        <Suspense fallback={
+          <div className="panel" aria-hidden="true">
+            <div className="panel__header">
+              <div className="skeleton-bar" style={{ width: 120, height: 20 }} />
+            </div>
+            <div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />
+              ))}
+            </div>
+          </div>
+        }>
           <NotesContent householdId={household.id} initialTab={initialTab} />
         </Suspense>
       </div>

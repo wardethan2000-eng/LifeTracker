@@ -3,7 +3,7 @@
 import type { AssetTimelineEntry } from "@lifekeeper/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useTransition } from "react";
 
 type TimelineEntryFormProps = {
   assetId: string;
@@ -49,6 +49,8 @@ export function TimelineEntryForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [formKey, setFormKey] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const initialCategory = editEntry?.category ?? "";
   const [selectedCategory, setSelectedCategory] = useState(
     categoryOptions.includes(initialCategory as (typeof categoryOptions)[number]) ? initialCategory : ""
@@ -74,15 +76,21 @@ export function TimelineEntryForm({
     router.push(`/assets/${assetId}${query ? `?${query}` : ""}`);
   }, [assetId, onCancel, router, searchParams]);
 
-  const submitAction = async (formData: FormData): Promise<void> => {
-    if (editEntry && updateAction) {
-      await updateAction(formData);
-    } else {
-      await createAction(formData);
-    }
-
-    setFormKey((current) => current + 1);
-    handleCancel();
+  const submitAction = (formData: FormData): void => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        if (editEntry && updateAction) {
+          await updateAction(formData);
+        } else {
+          await createAction(formData);
+        }
+        setFormKey((current) => current + 1);
+        handleCancel();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save entry. Please try again.");
+      }
+    });
   };
 
   return (
@@ -187,11 +195,12 @@ export function TimelineEntryForm({
         </label>
 
         <div className="field field--full inline-actions">
-          <button type="submit" className="button button--primary">
-            {editEntry ? "Update Entry" : "Save Entry"}
+          <button type="submit" className="button button--primary" disabled={isPending}>
+            {isPending ? "Saving…" : editEntry ? "Update Entry" : "Save Entry"}
           </button>
-          <button type="button" className="button button--ghost" onClick={handleCancel}>Cancel</button>
+          <button type="button" className="button button--ghost" onClick={handleCancel} disabled={isPending}>Cancel</button>
         </div>
+        {error ? <p className="form-error field field--full">{error}</p> : null}
       </form>
     </div>
   );

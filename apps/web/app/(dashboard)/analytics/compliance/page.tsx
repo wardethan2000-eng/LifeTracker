@@ -80,7 +80,7 @@ export default async function ComplianceAnalyticsPage({ searchParams }: Complian
   }
 
   return (
-    <Suspense fallback={<><header className="page-header"><h1>Schedule &amp; Compliance Analytics</h1></header><div className="page-body"><div className="panel"><div className="panel__body--padded"><p className="note">Loading analytics…</p></div></div></div></>}>
+    <Suspense fallback={<><header className="page-header"><h1>Schedule &amp; Compliance Analytics</h1></header><div className="page-body"><div className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 16 }}><div className="skeleton-bar" style={{ width: "100%", height: 180, borderRadius: 8 }} /><div style={{ display: "flex", gap: 8 }}>{[1,2,3,4].map((i) => <div key={i} className="skeleton-bar" style={{ flex: 1, height: 56, borderRadius: 8 }} />)}</div><div className="skeleton-bar" style={{ width: "100%", height: 120, borderRadius: 8 }} /></div></div></div></>}>
       <ComplianceAnalyticsContent householdId={household.id} households={me.households} selectedHouseholdId={household.id} />
     </Suspense>
   );

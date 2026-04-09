@@ -76,7 +76,7 @@ export default async function SpaceDetailPage({ params, searchParams }: SpaceDet
   }
 
   return (
-    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading space…</div></div>}>
+    <Suspense fallback={<section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1, 2, 3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section>}>
       <SpaceContent
         householdId={household.id}
         spaceId={spaceId}

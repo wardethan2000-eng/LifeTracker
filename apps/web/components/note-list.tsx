@@ -44,7 +44,7 @@ export function NoteList({
       </div>
 
       {loading ? (
-        <div className="note-list__loading">Loading…</div>
+        <div className="note-list__loading" aria-hidden="true" style={{ display: "grid", gap: 8 }}>{[1, 2, 3].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 36, borderRadius: 6 }} />)}</div>
       ) : entries.length === 0 ? (
         <div className="note-list__empty">
           <p>No notes yet.{activeFolder ? ` Create one in "${activeFolder.name}".` : " Use the quick capture above to get started."}</p>

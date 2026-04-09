@@ -118,19 +118,19 @@ function NotificationTable({ notifications }: { notifications: Notification[] })
               <td><span className="pill">{notification.channel}</span></td>
               <td>{formatDateTime(notification.scheduledFor)}</td>
               <td>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div className="data-table__row-actions">
                   {targetHref && (
-                    <Link href={targetHref} className="data-table__link">View</Link>
+                    <Link href={targetHref} className="button button--sm button--ghost">View</Link>
                   )}
                   {!notification.readAt && notification.status !== "read" ? (
                     <form action={markNotificationReadAction}>
                       <input type="hidden" name="notificationId" value={notification.id} />
-                      <button type="submit" className="button button--ghost button--sm">Mark Read</button>
+                      <button type="submit" className="button button--sm button--primary">Mark Read</button>
                     </form>
                   ) : (
                     <form action={markNotificationUnreadAction}>
                       <input type="hidden" name="notificationId" value={notification.id} />
-                      <button type="submit" className="button button--ghost button--sm">Undo</button>
+                      <button type="submit" className="button button--sm button--ghost">Undo</button>
                     </form>
                   )}
                 </div>
@@ -179,8 +179,33 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     );
   }
 
+  const notificationsSkeleton = (
+    <section className="panel">
+      <div className="panel__header">
+        <div className="skeleton-bar" style={{ width: 160, height: 20 }} />
+      </div>
+      <div className="panel__body">
+        <table className="data-table" aria-hidden="true">
+          <tbody>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <tr key={i}>
+                <td><div className="skeleton-bar" style={{ width: 56, height: 22, borderRadius: 12 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 80, height: 22, borderRadius: 12 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 200, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 280, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 54, height: 22, borderRadius: 12 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 100, height: 14 }} /></td>
+                <td><div className="skeleton-bar" style={{ width: 80, height: 30, borderRadius: 6 }} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+
   return (
-    <Suspense fallback={<><header className="page-header"><h1>{t("pageTitle")}</h1></header><div className="page-body"><div className="panel"><div className="panel__body--padded"><p className="note">Loading notifications…</p></div></div></div></>}>
+    <Suspense fallback={<><header className="page-header"><h1>{t("pageTitle")}</h1></header><div className="page-body">{notificationsSkeleton}</div></>}>
       <NotificationsContent
         householdId={household.id}
         status={status}

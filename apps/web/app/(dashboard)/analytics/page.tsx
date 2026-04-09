@@ -607,32 +607,37 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           ))}
         </nav>
 
-        <section className="panel" style={{ marginBottom: 24 }}>
+        {tab === "costs" ? renderCostsTab() : null}
+        {tab === "inventory" ? renderInventoryTab() : null}
+        {tab === "compliance" ? renderComplianceTab() : null}
+        {tab === "usage" ? renderUsageTab() : null}
+
+        <section className="panel" style={{ marginTop: 24 }}>
           <div className="panel__header">
-            <h2>Dedicated Analytics Workspaces</h2>
+            <h2>Deep-Dive Reports</h2>
           </div>
           <div className="panel__body--padded">
-            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
               {[
                 {
                   href: `/analytics/compliance?householdId=${household.id}`,
-                  title: "Compliance",
-                  description: "Investigate on-time performance, late work, and risk by category or asset."
+                  title: "Compliance Report",
+                  description: "Full asset-level on-time performance and risk scoring."
                 },
                 {
                   href: `/analytics/comparative?householdId=${household.id}`,
-                  title: "Comparative",
-                  description: "Compare assets, seasonal cost shifts, and household member contribution patterns."
+                  title: "Comparative Report",
+                  description: "Asset comparisons, seasonal shifts, and member contributions."
                 },
                 {
                   href: `/analytics/projects?householdId=${household.id}`,
-                  title: "Projects",
-                  description: "Timeline tracking, budget burn analysis, and task velocity."
+                  title: "Projects Report",
+                  description: "Budget burn, timeline tracking, and task velocity."
                 },
                 {
                   href: `/analytics/hobbies?householdId=${household.id}`,
-                  title: "Hobbies",
-                  description: "Session trends, practice streaks, and goal tracking."
+                  title: "Hobbies Report",
+                  description: "Session trends, practice streaks, and goal progress."
                 }
               ].map((link) => (
                 <Link
@@ -640,27 +645,27 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   href={link.href}
                   className="text-link"
                   style={{
-                    display: "grid",
-                    gap: 8,
-                    padding: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "12px 16px",
                     border: "1px solid var(--border)",
                     borderRadius: "var(--radius-lg)",
                     textDecoration: "none",
                     color: "inherit"
                   }}
                 >
-                  <strong style={{ fontSize: "1rem" }}>{link.title}</strong>
-                  <span style={{ color: "var(--ink-muted)", lineHeight: 1.5 }}>{link.description}</span>
+                  <div>
+                    <strong style={{ fontSize: "0.9rem", display: "block" }}>{link.title}</strong>
+                    <span style={{ color: "var(--ink-muted)", fontSize: "0.82rem", lineHeight: 1.4 }}>{link.description}</span>
+                  </div>
+                  <span style={{ color: "var(--ink-muted)", flexShrink: 0 }}>→</span>
                 </Link>
               ))}
             </div>
           </div>
         </section>
-
-        {tab === "costs" ? renderCostsTab() : null}
-        {tab === "inventory" ? renderInventoryTab() : null}
-        {tab === "compliance" ? renderComplianceTab() : null}
-        {tab === "usage" ? renderUsageTab() : null}
       </div>
     </>
   );

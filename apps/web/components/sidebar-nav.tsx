@@ -33,8 +33,8 @@ const NavIcon = ({ icon }: { icon: string }): JSX.Element => {
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
     case "folder":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>;
-    case "dollar":
-      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>;
+    case "bar-chart":
+      return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>;
     case "beaker":
       return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3h15"/><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3"/><path d="M6 14h12"/></svg>;
     case "briefcase":
@@ -65,6 +65,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const quickAddRef = useRef<HTMLButtonElement>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [liveBadges, setLiveBadges] = useState<Record<string, number>>({});
 
   // Restore collapse state from localStorage and sync to <html> data attribute
@@ -73,6 +74,15 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     const isCollapsed = stored === "true";
     setCollapsed(isCollapsed);
     document.documentElement.dataset.sidebarCollapsed = String(isCollapsed);
+
+    const storedGroups = localStorage.getItem("sidebar-collapsed-groups");
+    if (storedGroups) {
+      try {
+        setCollapsedGroups(new Set(JSON.parse(storedGroups) as string[]));
+      } catch {
+        // ignore malformed storage
+      }
+    }
   }, []);
 
   // Load the maintenance badge count asynchronously so it doesn't block server render.
@@ -90,6 +100,21 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     return () => { cancelled = true; };
   }, [householdId]);
 
+  // Load the notifications unread count asynchronously.
+  useEffect(() => {
+    if (!householdId) return;
+    let cancelled = false;
+    fetch(`/api/households/${householdId}/notifications?limit=1&status=unread`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data: { unreadCount?: number }) => {
+        if (cancelled) return;
+        const count = data.unreadCount ?? 0;
+        if (count > 0) setLiveBadges((prev) => ({ ...prev, notifications: Math.min(count, 99) }));
+      })
+      .catch(() => { /* badge is best-effort */ });
+    return () => { cancelled = true; };
+  }, [householdId]);
+
   const toggleCollapse = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -99,12 +124,25 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
     });
   }, []);
 
+  const toggleGroupCollapse = useCallback((groupLabel: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupLabel)) {
+        next.delete(groupLabel);
+      } else {
+        next.add(groupLabel);
+      }
+      localStorage.setItem("sidebar-collapsed-groups", JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }, []);
+
   const handleCloseCapture = useCallback(() => {
     setShowQuickCapture(false);
   }, []);
 
   return (
-    <div className="sidebar__nav">
+    <nav className="sidebar__nav" aria-label="Main navigation">
       {/* Collapse / expand toggle */}
       <button
         type="button"
@@ -113,14 +151,34 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <span className="sidebar__collapse-icon">{collapsed ? "»" : "«"}</span>
+        {collapsed ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+        )}
         <span className="sidebar__collapse-label">Collapse</span>
       </button>
-      <div className="sidebar__section-label">Main</div>
-      {groups.map((group, groupIndex) => (
-        <div key={group.label ?? groupIndex} className="sidebar__group">
-          {group.label ? <div className="sidebar__section-label">{group.label}</div> : null}
-          {group.items.map((item) => {
+      {groups.map((group, groupIndex) => {
+        const isGroupCollapsed = group.label ? collapsedGroups.has(group.label) : false;
+        return (
+        <div key={group.label ?? groupIndex} className={`sidebar__group${isGroupCollapsed ? " sidebar__group--collapsed" : ""}`}>
+          {group.label ? (
+            <div className="sidebar__section-label">
+              <span>{group.label}</span>
+              {!collapsed && (
+                <button
+                  type="button"
+                  className="sidebar__group-toggle"
+                  onClick={() => toggleGroupCollapse(group.label!)}
+                  aria-label={isGroupCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+                  aria-expanded={!isGroupCollapsed}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: isGroupCollapsed ? "rotate(-90deg)" : "none", transition: "transform 180ms ease" }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              )}
+            </div>
+          ) : null}
+          {!isGroupCollapsed && group.items.map((item) => {
         const isAssetsCreatePath = pathname === "/assets/new" || pathname.startsWith("/assets/new/");
         const isActive = item.href === "/"
           ? pathname === "/"
@@ -131,7 +189,9 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         const isIdeas = item.href === "/ideas";
         const effectiveBadge = item.href === "/maintenance"
           ? (liveBadges.maintenance ?? item.badge ?? 0)
-          : (item.badge ?? 0);
+          : item.href === "/notifications"
+            ? (liveBadges.notifications ?? item.badge ?? 0)
+            : (item.badge ?? 0);
 
         if (isIdeas && householdId) {
           return (
@@ -140,6 +200,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
                 href={item.href}
                 prefetch={true}
                 className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+                aria-current={isActive ? "page" : undefined}
               >
                 <NavIcon icon={item.icon} />
                 <span className="sidebar__link-label">{item.label}</span>
@@ -172,6 +233,7 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
             href={item.href}
             prefetch={true}
             className={`sidebar__link${isActive ? " sidebar__link--active" : ""}`}
+            aria-current={isActive ? "page" : undefined}
           >
             <NavIcon icon={item.icon} />
             <span className="sidebar__link-label">{item.label}</span>
@@ -180,7 +242,8 @@ export function SidebarNav({ groups, householdId }: SidebarNavProps): JSX.Elemen
         );
       })}
         </div>
-      ))}
-    </div>
+        );
+      })}
+    </nav>
   );
 }

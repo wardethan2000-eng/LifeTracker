@@ -338,6 +338,10 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
         logData.cost = input.cost;
       }
 
+      if (input.serviceProviderId !== undefined) {
+        logData.serviceProviderId = input.serviceProviderId;
+      }
+
       const log = await tx.maintenanceLog.create({ data: logData });
 
       if (input.applyLinkedParts && existing.inventoryItems.length > 0) {

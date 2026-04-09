@@ -53,7 +53,7 @@ export default async function TrashPage(): Promise<JSX.Element> {
   }
 
   return (
-    <Suspense fallback={<main className="trash-page"><h1 className="trash-page__title">Trash</h1><p className="note">Loading…</p></main>}>
+    <Suspense fallback={<main className="trash-page" aria-hidden="true"><h1 className="trash-page__title">Trash</h1><div style={{ display: "grid", gap: 12, marginTop: 16 }}>{[1,2,3].map((i) => <div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />)}</div></main>}>
       <TrashContent householdId={householdId} />
     </Suspense>
   );

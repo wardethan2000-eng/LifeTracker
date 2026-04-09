@@ -333,7 +333,7 @@ function PhaseDetailPanel({
 
   const subTabs: { id: PhaseSubTab; label: string; count?: number }[] = [
     { id: "tasks", label: "Tasks", count: phase.tasks.length },
-    { id: "checklist", label: "Checklist", count: phase.checklistItemCount },
+    { id: "checklist", label: "Milestones", count: phase.checklistItemCount },
     { id: "supplies", label: "Supplies", count: phase.supplies.length },
     { id: "expenses", label: "Expenses", count: phase.expenses.length },
     { id: "photos", label: "Photos" },
@@ -468,6 +468,9 @@ function PhaseDetailPanel({
 
       {subTab === "checklist" && (
         <div style={{ padding: "8px 0" }}>
+          <p style={{ fontSize: "0.82rem", color: "var(--ink-muted)", marginBottom: 8 }}>
+            Phase-level go/no-go gates. Check these off before advancing to the next phase.
+          </p>
           <ProjectChecklist
             items={phase.checklistItems}
             householdId={householdId}
@@ -477,8 +480,8 @@ function PhaseDetailPanel({
             addAction={createPhaseChecklistItemAction}
             toggleAction={updatePhaseChecklistItemAction}
             deleteAction={deletePhaseChecklistItemAction}
-            addPlaceholder="Add a readiness check"
-            emptyMessage="No checklist items yet."
+            addPlaceholder="Add milestone or go/no-go check"
+            emptyMessage="No milestones yet. Add acceptance criteria that must be met before this phase is done."
             onReorder={(orderedIds) => reorderPhaseChecklistItems(householdId, projectId, phase.id, orderedIds)}
           />
         </div>
@@ -849,6 +852,18 @@ function TaskCompactRow({
 }) {
   const isDone = task.status === "completed";
 
+  const assignee = task.assignedToId
+    ? householdMembers.find((m) => m.userId === task.assignedToId)
+    : null;
+  const assigneeName = assignee?.user?.displayName ?? assignee?.user?.email ?? null;
+
+  const checklistTotal = task.checklistItems.length;
+  const checklistDone = task.checklistItems.filter((i) => i.isCompleted).length;
+
+  const blockingTaskNames = (task.blockingTaskIds ?? [])
+    .map((id) => dependencyCandidates.find((t) => t.id === id)?.title ?? "a task")
+    .slice(0, 2);
+
   const handleCheckToggle = useCallback(() => {
     const form = new FormData();
     form.set("householdId", householdId);
@@ -901,10 +916,38 @@ function TaskCompactRow({
           </>
         )}
         <span className={`task-row__title${isDone ? " task-row__title--done" : ""}`}>{task.title}</span>
-        <span className="task-row__meta">{task.assignedToId ? "👤" : ""}</span>
+        {checklistTotal > 0 && (
+          <span className="task-row__checklist-progress" title={`${checklistDone} of ${checklistTotal} sub-steps done`}>
+            <span className="task-row__checklist-fraction" style={{ color: checklistDone === checklistTotal ? "var(--success)" : "var(--ink-muted)" }}>
+              {checklistDone}/{checklistTotal}
+            </span>
+            <span className="progress-bar" style={{ width: 48 }}>
+              <span
+                className="progress-bar__fill"
+                style={{
+                  width: `${Math.round((checklistDone / checklistTotal) * 100)}%`,
+                  background: checklistDone === checklistTotal ? "var(--success)" : undefined,
+                }}
+              />
+            </span>
+          </span>
+        )}
+        {assigneeName && (
+          <span className="task-row__meta" style={{ fontSize: "0.75rem", color: "var(--ink-muted)", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={assigneeName}>
+            {assigneeName}
+          </span>
+        )}
         <span className="task-row__meta">{task.dueDate ? formatDate(task.dueDate) : ""}</span>
-        <div style={{ display: "flex", gap: 4 }}>
-          {task.isBlocked && <span className="pill pill--warning" style={{ fontSize: "0.72rem" }}>Blocked</span>}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {task.isBlocked && (
+            <span
+              className="pill pill--warning"
+              style={{ fontSize: "0.72rem" }}
+              title={blockingTaskNames.length > 0 ? `Waiting on: ${blockingTaskNames.join(", ")}${(task.blockingTaskIds?.length ?? 0) > 2 ? " and more" : ""}` : "Blocked by an incomplete predecessor"}
+            >
+              Blocked{blockingTaskNames.length > 0 ? `: ${blockingTaskNames[0]}${(task.blockingTaskIds?.length ?? 0) > 1 ? ` +${(task.blockingTaskIds?.length ?? 0) - 1}` : ""}` : ""}
+            </span>
+          )}
           {task.isCriticalPath && <span className="pill pill--accent" style={{ fontSize: "0.72rem" }}>Critical</span>}
         </div>
       </div>

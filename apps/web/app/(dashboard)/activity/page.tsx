@@ -196,7 +196,21 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
         </section>
 
         {/* Activity list — deferred */}
-        <Suspense fallback={<div className="panel"><div className="panel__empty">Loading activity…</div></div>}>
+        <Suspense fallback={
+          <section className="panel" aria-hidden="true">
+            <div className="panel__body">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} style={{ display: "flex", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border)", alignItems: "flex-start" }}>
+                  <div className="skeleton-bar" style={{ width: 90, height: 12, flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: "grid", gap: 6 }}>
+                    <div className="skeleton-bar" style={{ width: "60%", height: 14 }} />
+                    <div className="skeleton-bar" style={{ width: "40%", height: 12 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        }>
           <ActivityListContent
             householdId={household.id}
             entityType={entityType}

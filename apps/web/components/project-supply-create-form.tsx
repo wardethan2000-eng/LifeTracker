@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { JSX } from "react";
 import type { InventoryItemSummary } from "@lifekeeper/types";
 import { createProjectPhaseSupplyAction } from "../app/actions";
@@ -30,6 +30,8 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
   const [prefill, setPrefill] = useState<SupplyPrefill>(emptyPrefill);
   const [prefillKey, setPrefillKey] = useState(0);
   const [showLinkPreview, setShowLinkPreview] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const categoryListId = `project-supply-category-${phaseId}`;
 
   return (
@@ -53,7 +55,21 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
           onCancel={() => setShowLinkPreview(false)}
         />
       )}
-      <form action={createProjectPhaseSupplyAction} key={prefillKey}>
+      <form
+        key={prefillKey}
+        action={(formData) => {
+          setError(null);
+          startTransition(async () => {
+            try {
+              await createProjectPhaseSupplyAction(formData);
+              setPrefill(emptyPrefill);
+              setPrefillKey((k) => k + 1);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to add supply. Please try again.");
+            }
+          });
+        }}
+      >
         <input type="hidden" name="householdId" value={householdId} />
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="phaseId" value={phaseId} />
@@ -114,10 +130,13 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
           </label>
         </div>
         <div className="inline-actions" style={{ marginTop: 16 }}>
-          <button type="button" className="button" onClick={() => setShowLinkPreview(true)}>
+          <button type="button" className="button" onClick={() => setShowLinkPreview(true)} disabled={isPending}>
             Add from Link
           </button>
-          <button type="submit" className="button">Add Supply</button>
+          <button type="submit" className="button button--primary" disabled={isPending}>
+            {isPending ? "Adding…" : "Add Supply"}
+          </button>
+          {error ? <p className="form-error">{error}</p> : null}
         </div>
       </form>
     </div>

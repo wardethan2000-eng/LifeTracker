@@ -41,12 +41,19 @@ export class AnalyticsPanelBoundary extends Component<AnalyticsPanelBoundaryProp
 
 export function AnalyticsPanelSkeleton({ title }: { title: string }): ReactNode {
   return (
-    <section className="panel">
+    <section className="panel" aria-busy="true" aria-label={`Loading ${title}`}>
       <div className="panel__header">
         <h2>{title}</h2>
       </div>
-      <div className="panel__body">
-        <p className="panel__empty">Loading analytics panel...</p>
+      <div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>
+        <div className="skeleton-bar" style={{ width: "100%", height: 120, borderRadius: 6 }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton-bar" style={{ height: 64, borderRadius: 6 }} />
+          ))}
+        </div>
+        <div className="skeleton-bar" style={{ width: "70%", height: 14, borderRadius: 4 }} />
+        <div className="skeleton-bar" style={{ width: "50%", height: 14, borderRadius: 4 }} />
       </div>
     </section>
   );

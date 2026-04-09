@@ -1,6 +1,7 @@
 import type { AssetDetailResponse, AssetTransferList, Entry, OverviewPin } from "@lifekeeper/types";
 import type { JSX } from "react";
 import { AssetOverviewGrid } from "./asset-overview-grid";
+import { AssetHeroEditor } from "./asset-hero-editor";
 import type { NccNoteSummary, NccCanvasSummary } from "./notes-canvas-card";
 import { formatCurrency } from "../lib/formatters";
 import { getDisplayPreferences, getLayoutPreference } from "../lib/api";
@@ -27,6 +28,22 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
 
   return (
     <div style={{ display: "grid", gap: "24px" }}>
+      <section className="panel">
+        <div className="panel__body--padded">
+          <AssetHeroEditor
+            asset={{
+              id: detail.asset.id,
+              householdId: detail.asset.householdId,
+              name: detail.asset.name,
+              manufacturer: detail.asset.manufacturer ?? null,
+              model: detail.asset.model ?? null,
+              description: detail.asset.description ?? null,
+              serialNumber: detail.asset.serialNumber ?? null,
+            }}
+          />
+        </div>
+      </section>
+
       <section className="stats-row">
         <div className="stat-card stat-card--accent">
           <span className="stat-card__label">Condition</span>

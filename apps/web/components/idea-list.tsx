@@ -9,6 +9,7 @@ import { useMultiSelect } from "../lib/use-multi-select";
 import { useFormattedDate } from "../lib/formatted-date";
 import { BulkActionBar } from "./bulk-action-bar";
 import { IdeaBulkActions } from "./idea-bulk-actions";
+import { EmptyState } from "./empty-state";
 
 type ViewMode = "board" | "table";
 
@@ -149,11 +150,14 @@ export function IdeaList({ ideas, householdId }: IdeaListProps): JSX.Element {
 
   if (ideas.length === 0) {
     return (
-      <div className="empty-state">
-        <p className="empty-state__icon">💡</p>
-        <p className="empty-state__title">No ideas yet</p>
-        <p className="empty-state__body">Capture your first spark to get started.</p>
-        <Link href="/ideas/new" className="button button--primary">New Idea</Link>
+      <div style={{ padding: "32px 0" }}>
+        <EmptyState
+          icon="lightbulb"
+          title="No ideas yet"
+          message="Capture sparks of inspiration before they fade — then develop them into plans or projects."
+          actionLabel="New Idea"
+          actionHref="/ideas/new"
+        />
       </div>
     );
   }

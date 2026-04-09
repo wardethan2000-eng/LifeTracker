@@ -122,7 +122,7 @@ export function CanvasDashboardCard({ householdId, canvas }: CanvasDashboardCard
         type="button"
         className="canvas-dash-card"
         onClick={() => setPreviewOpen(true)}
-        title={`Preview ${canvas.name}`}
+        aria-label={`Preview ${canvas.name}`}
       >
         <div className="canvas-dash-card__thumb">
           <CanvasThumbnail

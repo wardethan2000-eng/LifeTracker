@@ -1139,6 +1139,7 @@ export const completeMaintenanceScheduleSchema = z.object({
   completedAt: z.string().datetime().optional(),
   usageValue: z.number().min(0).optional(),
   cost: z.number().min(0).optional(),
+  serviceProviderId: z.string().cuid().optional(),
   applyLinkedParts: z.boolean().default(true),
   metadata: maintenanceLogMetadataSchema.default({})
 });
@@ -6395,6 +6396,7 @@ export const promoteIdeaSchema = z.object({
   target: ideaPromotionTargetSchema,
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional(),
+  convertStepsToTasks: z.boolean().optional(),
 });
 export type PromoteIdeaInput = z.infer<typeof promoteIdeaSchema>;
 

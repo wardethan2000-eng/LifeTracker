@@ -41,13 +41,14 @@ function buildNavGroups(
     { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
     { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
     { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
+    { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
   ];
   const insights: NavItemDef[] = [
-    { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "dollar" },
-    { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
+    { href: "/analytics", label: "Analytics", translationKey: "analytics", icon: "bar-chart" },
     { href: "/activity", label: "Activity", translationKey: "activity", icon: "pulse" },
   ];
   const tools: NavItemDef[] = [
+    { href: "/notifications", label: "Notifications", translationKey: "notifications", icon: "bell" },
     { href: "/trash", label: "Trash", translationKey: "trash", icon: "trash" },
   ];
 
@@ -56,7 +57,7 @@ function buildNavGroups(
     { label: t("nav.groupCapture"), items: capture.map((d) => item(d)) },
     { label: t("nav.groupManage"), items: manage.map((d) => item(d, d.href === "/maintenance" ? badges.maintenance : undefined)) },
     { label: t("nav.groupInsights"), items: insights.map((d) => item(d)) },
-    { label: null, items: tools.map((d) => item(d)) },
+    { label: null, items: tools.map((d) => item(d, d.href === "/notifications" ? badges.notifications : undefined)) },
   ];
 }
 

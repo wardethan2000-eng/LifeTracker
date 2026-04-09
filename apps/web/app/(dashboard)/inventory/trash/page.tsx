@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ApiError, getHouseholdInventoryTrash, getMe } from "../../../../lib/api";
 import { formatDate } from "../../../../lib/formatters";
+import { InventoryTrashActions } from "../../../../components/inventory-trash-actions";
 
 export default async function InventoryTrashPage(): Promise<JSX.Element> {
   const user = await getMe();
@@ -13,7 +14,7 @@ export default async function InventoryTrashPage(): Promise<JSX.Element> {
   }
 
   return (
-    <Suspense fallback={<div className="panel"><div className="panel__empty">Loading trash…</div></div>}>
+    <Suspense fallback={<section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1, 2, 3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section>}>
       <TrashContent householdId={householdId} />
     </Suspense>
   );
@@ -37,7 +38,9 @@ async function TrashContent({ householdId }: { householdId: string }): Promise<J
       <div className="page-header">
         <div>
           <h1>Inventory Trash</h1>
-          <p className="data-table__secondary">Soft-deleted inventory items. These can be restored or permanently removed.</p>
+          <p className="data-table__secondary">
+            Soft-deleted items. Restore to bring them back, or permanently delete to remove all data.
+          </p>
         </div>
         <Link href="/inventory" className="button button--ghost button--sm">← Back to Inventory</Link>
       </div>
@@ -54,6 +57,7 @@ async function TrashContent({ householdId }: { householdId: string }): Promise<J
                   <th>Category</th>
                   <th>Last Stock</th>
                   <th>Deleted</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -65,9 +69,16 @@ async function TrashContent({ householdId }: { householdId: string }): Promise<J
                         {[item.partNumber, item.manufacturer].filter(Boolean).join(" • ") || "—"}
                       </div>
                     </td>
-                    <td>{item.category}</td>
+                    <td>{item.category ?? "—"}</td>
                     <td>{item.quantityOnHand} {item.unit}</td>
                     <td>{formatDate(item.updatedAt, "—")}</td>
+                    <td>
+                      <InventoryTrashActions
+                        householdId={householdId}
+                        itemId={item.id}
+                        itemName={item.name}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

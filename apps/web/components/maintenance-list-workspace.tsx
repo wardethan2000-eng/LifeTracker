@@ -8,6 +8,8 @@ import { useMultiSelect } from "../lib/use-multi-select";
 import { formatCategoryLabel, formatDueLabel } from "../lib/formatters";
 import { BulkActionBar } from "./bulk-action-bar";
 import { MaintenanceBulkActions } from "./maintenance-bulk-actions";
+import { useCompletionSlideOver } from "./completion-slide-over-context";
+import { EmptyState } from "./empty-state";
 
 const SCHEDULE_STATUS_PILL: Record<string, string> = {
   overdue: "pill--danger",
@@ -22,6 +24,7 @@ type MaintenanceListWorkspaceProps = {
 
 export function MaintenanceListWorkspace({ householdId, items }: MaintenanceListWorkspaceProps): JSX.Element {
   const { selectedCount, isSelected, toggleItem, toggleGroup, clearSelection } = useMultiSelect();
+  const { openSlideOver } = useCompletionSlideOver();
 
   const selectedItems = useMemo(
     () => items.filter((item) => isSelected(item.scheduleId)),
@@ -32,10 +35,12 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
 
   if (items.length === 0) {
     return (
-      <div className="empty-state">
-        <div className="empty-state__icon" aria-hidden="true">✓</div>
-        <h3 className="empty-state__title">All caught up</h3>
-        <p className="empty-state__body">No maintenance work is currently due. Keep up the good work!</p>
+      <div style={{ padding: "32px 24px" }}>
+        <EmptyState
+          icon="wrench"
+          title="All caught up"
+          message="No maintenance work is currently due. Keep up the good work!"
+        />
       </div>
     );
   }
@@ -110,7 +115,22 @@ export function MaintenanceListWorkspace({ householdId, items }: MaintenanceList
                 }
               </td>
               <td>
-                <Link href={`/assets/${item.assetId}`} className="data-table__link">Open Asset</Link>
+                <div className="data-table__row-actions">
+                  <button
+                    type="button"
+                    className="button button--sm button--primary"
+                    onClick={() => openSlideOver({
+                      assetId: item.assetId,
+                      assetName: item.assetName,
+                      scheduleId: item.scheduleId,
+                      scheduleName: item.scheduleName,
+                      householdId,
+                    })}
+                  >
+                    Log
+                  </button>
+                  <Link href={`/assets/${item.assetId}`} className="button button--sm button--ghost">Open</Link>
+                </div>
               </td>
             </tr>
           ))}

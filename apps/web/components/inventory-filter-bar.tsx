@@ -90,30 +90,41 @@ export function InventoryFilterBar({ currentFilter, categoryOptions = [] }: Inve
       />
 
       {categoryOptions.length > 0 && (
-        <select
-          className="inventory-filter-bar__select"
-          value={currentCategory}
-          onChange={(e) => pushParams({ category: e.target.value || null })}
-        >
-          <option value="">All Categories</option>
-          {categoryOptions.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        <div className="select-wrapper">
+          <select
+            className="inventory-filter-bar__select"
+            value={currentCategory}
+            onChange={(e) => pushParams({ category: e.target.value || null })}
+          >
+            <option value="">All Categories</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
       )}
 
-      <select
-        className="inventory-filter-bar__select"
-        value={currentSort}
-        onChange={(e) => pushParams({ sort: e.target.value || null })}
-      >
-        <option value="">Sort: Default</option>
-        <option value="name-asc">Name A–Z</option>
-        <option value="name-desc">Name Z–A</option>
-        <option value="qty-asc">Qty: Low → High</option>
-        <option value="qty-desc">Qty: High → Low</option>
-        <option value="updated-desc">Recently Updated</option>
-      </select>
+      <div className="select-wrapper">
+        <select
+          className="inventory-filter-bar__select"
+          value={currentSort}
+          onChange={(e) => pushParams({ sort: e.target.value || null })}
+        >
+          <option value="">Sort: Default</option>
+          <option value="status-asc">Status: Critical → OK</option>
+          <option value="name-asc">Name A–Z</option>
+          <option value="name-desc">Name Z–A</option>
+          <option value="qty-asc">Qty: Low → High</option>
+          <option value="qty-desc">Qty: High → Low</option>
+          <option value="updated-desc">Recently Updated</option>
+        </select>
+      </div>
+
+      {(currentCategory || currentSort || currentFilter !== "all") && (
+        <span className="filter-bar__active-badge">
+          {[currentFilter !== "all" ? 1 : 0, currentCategory ? 1 : 0, currentSort ? 1 : 0].reduce((a, b) => a + b, 0)} active
+        </span>
+      )}
     </div>
   );
 }

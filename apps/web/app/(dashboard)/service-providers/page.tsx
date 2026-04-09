@@ -70,7 +70,7 @@ export default async function ServiceProvidersPage({ searchParams }: ServiceProv
             </div>
           </section>
 
-          <Suspense fallback={<div className="panel"><div className="panel__empty">Loading providers…</div></div>}>
+          <Suspense fallback={<section className="panel" aria-hidden="true"><div className="panel__body" style={{ padding: 0 }}>{[1,2,3,4].map((i) => (<div key={i} style={{ display: "flex", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}><div className="skeleton-bar" style={{ width: 160, height: 16 }} /><div className="skeleton-bar" style={{ width: 120, height: 16 }} /><div className="skeleton-bar" style={{ flex: 1, height: 16 }} /><div className="skeleton-bar" style={{ width: 60, height: 28, borderRadius: 6 }} /></div>))}</div></section>}>
             <ProvidersListContent householdId={household.id} highlightId={highlightId} />
           </Suspense>
         </div>
