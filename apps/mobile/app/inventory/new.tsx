@@ -8,7 +8,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { getMe, createInventoryItem } from "../../lib/api";
@@ -19,14 +19,15 @@ export default function CreateInventoryItemScreen() {
   const theme = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const params = useLocalSearchParams<{ name?: string; category?: string; manufacturer?: string; unit?: string; description?: string }>();
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(params.name ?? "");
   const [quantity, setQuantity] = useState("1");
-  const [unit, setUnit] = useState("each");
-  const [category, setCategory] = useState("");
+  const [unit, setUnit] = useState(params.unit ?? "each");
+  const [category, setCategory] = useState(params.category ?? "");
   const [storageLocation, setStorageLocation] = useState("");
   const [reorderThreshold, setReorderThreshold] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(params.description ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });

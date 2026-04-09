@@ -771,6 +771,96 @@ export const scanAndCreateNotifications = async (
     }
   }
 
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const expiringItems = await prisma.inventoryItem.findMany({
+    where: {
+      deletedAt: null,
+      quantityOnHand: { gt: 0 },
+      expiresAt: {
+        not: null,
+        lte: thirtyDaysFromNow
+      },
+      ...(options.householdId ? { householdId: options.householdId } : {})
+    },
+    include: {
+      household: {
+        select: {
+          members: {
+            select: {
+              userId: true,
+              user: {
+                select: {
+                  id: true,
+                  notificationPreferences: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  for (const item of expiringItems) {
+    if (!item.expiresAt) continue;
+
+    const recipients = getHouseholdRecipients(item as LowStockCandidate);
+    const isExpired = item.expiresAt.getTime() <= now.getTime();
+    const daysUntilExpiry = Math.ceil((item.expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+    const expiryDateStr = item.expiresAt.toISOString().split("T")[0];
+
+    for (const recipient of recipients) {
+      const channels = resolveChannels(recipient.preferences.enabledChannels, recipient.preferences);
+
+      for (const channel of channels) {
+        const recentExpiry = await prisma.notification.findFirst({
+          where: {
+            userId: recipient.userId,
+            householdId: item.householdId,
+            channel,
+            type: "inventory_expiring_soon",
+            createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+            dedupeKey: { startsWith: `${recipient.userId}:${channel}:${item.id}:inventory-expiring-soon:` }
+          },
+          select: { id: true }
+        });
+
+        if (recentExpiry) continue;
+
+        const title = isExpired ? `Expired: ${item.name}` : `Expiring soon: ${item.name}`;
+        const body = isExpired
+          ? `${item.name} expired on ${expiryDateStr}. You have ${formatQuantityValue(item.quantityOnHand)} ${item.unit} remaining.`
+          : `${item.name} expires in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? "" : "s"} (${expiryDateStr}).`;
+
+        const notification = await prisma.notification.create({
+          data: {
+            userId: recipient.userId,
+            householdId: item.householdId,
+            dedupeKey: `${recipient.userId}:${channel}:${item.id}:inventory-expiring-soon:${expiryDateStr}`,
+            type: "inventory_expiring_soon",
+            channel,
+            status: "pending",
+            title,
+            body,
+            scheduledFor: now,
+            escalationLevel: 0,
+            payload: {
+              entityType: "inventory_item",
+              entityId: item.id,
+              itemName: item.name,
+              expiresAt: expiryDateStr,
+              daysUntilExpiry,
+              isExpired,
+              createdAt: now.toISOString()
+            } as Prisma.InputJsonValue
+          }
+        });
+
+        createdNotificationIds.push(notification.id);
+      }
+    }
+  }
+
   const projects = await prisma.project.findMany({
     where: {
       deletedAt: null,

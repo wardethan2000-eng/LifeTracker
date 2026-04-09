@@ -185,8 +185,18 @@ function PurchaseEditForm({ purchase, onSave, onCancel }: PurchaseEditFormProps)
 export function InventoryShoppingListSection({ householdId, shoppingList, redirectTo }: InventoryShoppingListSectionProps): JSX.Element {
   const [collapsed, setCollapsed] = useState(true);
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null);
+  const [purchaseSearch, setPurchaseSearch] = useState("");
   const requestRefresh = useCoalescedRefresh();
   const { pushToast } = useToast();
+
+  const searchLower = purchaseSearch.trim().toLowerCase();
+  const filteredPurchases = searchLower
+    ? shoppingList.purchases.filter(
+        (purchase) =>
+          (purchase.supplierName ?? "").toLowerCase().includes(searchLower) ||
+          purchase.lines.some((line) => line.inventoryItem.name.toLowerCase().includes(searchLower))
+      )
+    : shoppingList.purchases;
 
   const handleDeletePurchase = useCallback(async (purchaseId: string) => {
     try {
@@ -231,8 +241,21 @@ export function InventoryShoppingListSection({ householdId, shoppingList, redire
           {shoppingList.purchaseCount === 0 ? (
             <p className="panel__empty">No active reorder carts yet. Generate one from the low-stock watchlist or use Quick Restock below.</p>
           ) : (
+          <>
+            <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)" }}>
+              <input
+                type="search"
+                placeholder="Search by supplier or item name…"
+                value={purchaseSearch}
+                onChange={(e) => setPurchaseSearch(e.target.value)}
+                style={{ width: "100%", maxWidth: 360 }}
+                className="input"
+              />
+            </div>
           <div className="purchase-group-list">
-            {shoppingList.purchases.map((purchase) => (
+            {filteredPurchases.length === 0 ? (
+              <p className="panel__empty">No purchases match "{purchaseSearch}".</p>
+            ) : filteredPurchases.map((purchase) => (
               <section key={purchase.id} className="purchase-group">
                 <div className="purchase-group__header">
                   <div className="purchase-group__identity">
@@ -301,6 +324,7 @@ export function InventoryShoppingListSection({ householdId, shoppingList, redire
               </section>
             ))}
           </div>
+          </>
         )}
         </div>
       )}

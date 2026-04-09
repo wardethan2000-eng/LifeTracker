@@ -2414,6 +2414,7 @@ export const getHouseholdInventory = async (
   householdId: string,
   options?: {
     lowStock?: boolean;
+    expiringSoon?: boolean;
     category?: string;
     search?: string;
     itemType?: string;
@@ -2425,6 +2426,10 @@ export const getHouseholdInventory = async (
 
   if (options?.lowStock !== undefined) {
     query.set("lowStock", String(options.lowStock));
+  }
+
+  if (options?.expiringSoon) {
+    query.set("expiringSoon", "true");
   }
 
   if (options?.category) {

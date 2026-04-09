@@ -301,7 +301,7 @@ export function SpacesSectionClient({
   const requestRefresh = useCoalescedRefresh();
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [activeView, setActiveView] = useState<SpaceViewMode>("tree");
+  const [activeView, setActiveView] = useState<SpaceViewMode>("map");
   const [lookupValue, setLookupValue] = useState("");
   const [lookupResults, setLookupResults] = useState<SpaceResponse[]>([]);
   const [lookupError, setLookupError] = useState<string | null>(null);
@@ -327,6 +327,7 @@ export function SpacesSectionClient({
   const [importResult, setImportResult] = useState<ImportSpacesResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [orderedSpaces, setOrderedSpaces] = useState<SpaceResponse[]>(spaces);
+  const [spaceSearch, setSpaceSearch] = useState("");
   useEffect(() => { setOrderedSpaces(spaces); }, [spaces]);
   const allSpaceIds = collectSpaceIds(spaces);
   const allSpaces = flattenSpaces(spaces);
@@ -733,23 +734,68 @@ export function SpacesSectionClient({
             <p className="panel__empty">No spaces have been added yet.</p>
           ) : (
             <div style={{ margin: 0, padding: 0, display: "grid", gap: 12 }}>
-              <SortableList
-                items={orderedSpaces}
-                onReorder={(newIds) => {
-                  const reordered = newIds.map((id) => orderedSpaces.find((s) => s.id === id)!);
-                  setOrderedSpaces(reordered);
-                  reorderSpaces(householdId, newIds);
-                }}
-                renderItem={(space, dragHandleProps) => (
-                  <SpaceTreeNode
-                    householdId={householdId}
-                    space={space}
-                    selectedIds={selectedIds}
-                    onToggleSelected={handleToggleSelected}
-                    dragHandleProps={dragHandleProps}
+              <div style={{ padding: "8px 16px 0" }}>
+                <input
+                  type="search"
+                  className="inventory-filter-bar__search"
+                  style={{ width: "100%", maxWidth: 320 }}
+                  placeholder="Filter spaces by name…"
+                  value={spaceSearch}
+                  onChange={(e) => setSpaceSearch(e.target.value)}
+                />
+              </div>
+              {(() => {
+                const searchLower = spaceSearch.toLowerCase().trim();
+                const visibleSpaces = searchLower
+                  ? flattenSpaces(orderedSpaces).filter((s) =>
+                      s.name.toLowerCase().includes(searchLower) ||
+                      s.shortCode.toLowerCase().includes(searchLower) ||
+                      (s.description ?? "").toLowerCase().includes(searchLower)
+                    )
+                  : orderedSpaces;
+
+                if (visibleSpaces.length === 0) {
+                  return <p className="panel__empty" style={{ padding: "0 16px 16px" }}>No spaces match "{spaceSearch}".</p>;
+                }
+
+                if (searchLower) {
+                  return (
+                    <div style={{ padding: "0 16px", display: "grid", gap: 8 }}>
+                      {visibleSpaces.map((space) => (
+                        <Link
+                          key={space.id}
+                          href={`/inventory/spaces/${space.id}?householdId=${householdId}`}
+                          className="space-lookup__result"
+                        >
+                          <strong>{space.shortCode}</strong>
+                          <span>{space.name}</span>
+                          <span className="data-table__secondary">{getSpaceTypeLabel(space.type)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  );
+                }
+
+                return (
+                  <SortableList
+                    items={visibleSpaces}
+                    onReorder={(newIds) => {
+                      const reordered = newIds.map((id) => orderedSpaces.find((s) => s.id === id)!);
+                      setOrderedSpaces(reordered);
+                      reorderSpaces(householdId, newIds);
+                    }}
+                    renderItem={(space, dragHandleProps) => (
+                      <SpaceTreeNode
+                        householdId={householdId}
+                        space={space}
+                        selectedIds={selectedIds}
+                        onToggleSelected={handleToggleSelected}
+                        dragHandleProps={dragHandleProps}
+                      />
+                    )}
                   />
-                )}
-              />
+                );
+              })()}
             </div>
           )
         ) : null}

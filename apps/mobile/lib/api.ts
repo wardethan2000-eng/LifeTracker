@@ -3,6 +3,10 @@ import {
   assetPageSchema,
   assetSchema,
   barcodeLookupResultSchema,
+  scanResolutionResponseSchema,
+  type ScanResolutionAsset,
+  type ScanResolutionSpace,
+  type ScanResolutionInventoryItem,
   entrySchema,
   entryListResponseSchema,
   searchResponseSchema,
@@ -462,6 +466,9 @@ export type { BarcodeLookupResult };
 
 export const lookupAssetByTagMobile = (tag: string): Promise<Asset> =>
   apiRequest(`/v1/assets/lookup`, assetSchema, { params: { tag } });
+
+export const resolveScanTagMobile = (tag: string): Promise<ScanResolutionAsset | ScanResolutionSpace | ScanResolutionInventoryItem> =>
+  apiRequest(`/v1/scan/resolve`, scanResolutionResponseSchema, { params: { tag } });
 
 export const getAssetDetailMobile = (assetId: string): Promise<AssetDetailResponse> =>
   apiRequest(`/v1/assets/${assetId}`, assetDetailResponseSchema);

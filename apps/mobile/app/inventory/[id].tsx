@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   Button,
@@ -29,10 +29,17 @@ const QUICK_ACTIONS: { type: TransactionType; label: string; icon: string }[] = 
 export default function InventoryItemDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, action } = useLocalSearchParams<{ id: string; action?: string }>();
   const queryClient = useQueryClient();
 
   const [activeAction, setActiveAction] = useState<TransactionType | null>(null);
+
+  // Auto-open action panel when arriving via QR scan with ?action= param
+  useEffect(() => {
+    if (action === "consume" || action === "purchase" || action === "adjust") {
+      setActiveAction(action as TransactionType);
+    }
+  }, [action]);
   const [qty, setQty] = useState("1");
   const [txNotes, setTxNotes] = useState("");
 

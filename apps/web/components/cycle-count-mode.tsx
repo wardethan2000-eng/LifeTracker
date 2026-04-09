@@ -2,7 +2,7 @@
 
 import type { InventoryItemSummary } from "@lifekeeper/types";
 import type { JSX } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { bulkAdjustInventoryItems } from "../lib/api";
 import { useToast } from "./toast-provider";
@@ -13,11 +13,22 @@ type CycleCountModeProps = {
   onExit: () => void;
 };
 
+const lastCountedKey = (householdId: string): string => `cycle-count:${householdId}:lastAt`;
+
 export function CycleCountMode({ householdId, items, onExit }: CycleCountModeProps): JSX.Element {
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [lastCountedAt, setLastCountedAt] = useState<string | null>(null);
   const router = useRouter();
   const { pushToast } = useToast();
+
+  useEffect(() => {
+    try {
+      setLastCountedAt(localStorage.getItem(lastCountedKey(householdId)));
+    } catch {
+      // localStorage unavailable (e.g. SSR or private browsing)
+    }
+  }, [householdId]);
 
   const setCount = useCallback((itemId: string, value: string) => {
     setCounts((prev) => ({ ...prev, [itemId]: value }));
@@ -41,6 +52,11 @@ export function CycleCountMode({ householdId, items, onExit }: CycleCountModePro
           newQuantity: parseFloat(counts[item.id] ?? "0"),
         })),
       });
+      try {
+        localStorage.setItem(lastCountedKey(householdId), new Date().toISOString());
+      } catch {
+        // ignore
+      }
       pushToast({ message: `Updated ${changedItems.length} item${changedItems.length === 1 ? "" : "s"} from cycle count.` });
       router.refresh();
       onExit();
@@ -58,6 +74,7 @@ export function CycleCountMode({ householdId, items, onExit }: CycleCountModePro
           <h3>Cycle Count Mode</h3>
           <p className="data-table__secondary">
             Enter actual quantities. {changedItems.length} item{changedItems.length === 1 ? "" : "s"} changed.
+            {lastCountedAt ? ` • Last counted ${new Date(lastCountedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}` : ""}
           </p>
         </div>
       </div>

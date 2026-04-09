@@ -8,6 +8,7 @@ import {
   getHouseholdLowStockInventory,
   getHouseholdProjectStatusCounts,
   getHouseholdSpacesTree,
+  getInventoryShoppingList,
   getLayoutPreference,
   getQuickActionsPreference,
 } from "../lib/api";
@@ -33,6 +34,7 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
     hobbyData,
     inventoryData,
     lowStockItems,
+    shoppingList,
     savedQuickActionIds,
     pinnedNotes,
     canvases,
@@ -46,6 +48,7 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
     getHouseholdHobbies(householdId, { limit: 1 }).catch(() => ({ items: [], nextCursor: null })),
     getHouseholdInventory(householdId, { limit: 20 }).catch(() => ({ items: [], nextCursor: null })),
     getHouseholdLowStockInventory(householdId).catch(() => []),
+    getInventoryShoppingList(householdId).catch(() => null),
     getQuickActionsPreference().catch(() => null),
     // 30-second ISR is fine for pinned notes — pinning state is stable.
     getEntries(householdId, { flags: ["pinned"], limit: 10, cacheOptions: { revalidate: 30 } }).catch(() => ({ items: [], nextCursor: null })),
@@ -61,7 +64,15 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
 
   const inventoryCount = inventoryData.items.length;
   const lowStockCount = lowStockItems.length;
+  const pendingOrderCount = shoppingList?.purchaseCount ?? 0;
   const outOfStockCount = inventoryData.items.filter((i) => i.quantityOnHand <= 0).length;
+  const nowMs = Date.now();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const expiringCount = inventoryData.items.filter((i) => {
+    if (!i.expiresAt) return false;
+    const expiresMs = new Date(i.expiresAt).getTime();
+    return expiresMs <= nowMs + thirtyDaysMs;
+  }).length;
 
   const sortedAssets = [...dashboard.assets].sort(
     (a, b) => (b.overdueScheduleCount - a.overdueScheduleCount) || (b.dueScheduleCount - a.dueScheduleCount)
@@ -131,6 +142,8 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
       inventoryTotalCount={inventoryCount}
       lowStockCount={lowStockCount}
       outOfStockCount={outOfStockCount}
+      expiringCount={expiringCount}
+      pendingOrderCount={pendingOrderCount}
       spaceTotalCount={totalSpaceCount}
       rootSpaceCount={rootSpaceCount}
       ideas={recentIdeas.map((idea) => ({

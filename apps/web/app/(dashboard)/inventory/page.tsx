@@ -95,7 +95,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const highlightId = typeof params.highlight === "string" ? params.highlight : undefined;
   const activeTab = typeof params.tab === "string" && params.tab === "spaces" ? "spaces" : "inventory";
+  const cycleCountMode = params.mode === "count";
   const itemTypeFilter = typeof params.itemType === "string" && (params.itemType === "consumable" || params.itemType === "equipment") ? params.itemType : undefined;
+  const expiringFilter = params.expiring === "1" || params.expiring === "true";
   const searchFilter = typeof params.search === "string" && params.search.length > 0 ? params.search : undefined;
   const categoryFilter = typeof params.category === "string" && params.category.length > 0 ? params.category : undefined;
   const sortParam = typeof params.sort === "string" ? params.sort : undefined;
@@ -128,9 +130,11 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         highlightId={highlightId}
         activeTab={activeTab}
         itemTypeFilter={itemTypeFilter}
+        expiringFilter={expiringFilter}
         searchFilter={searchFilter}
         categoryFilter={categoryFilter}
         sortParam={sortParam}
+        cycleCountMode={cycleCountMode}
       />
     </Suspense>
   );
@@ -142,9 +146,11 @@ type InventoryContentProps = {
   highlightId: string | undefined;
   activeTab: string;
   itemTypeFilter: string | undefined;
+  expiringFilter: boolean;
   searchFilter: string | undefined;
   categoryFilter: string | undefined;
   sortParam: string | undefined;
+  cycleCountMode: boolean;
 };
 
 async function InventoryContent({
@@ -152,15 +158,18 @@ async function InventoryContent({
   highlightId,
   activeTab,
   itemTypeFilter,
+  expiringFilter,
   searchFilter,
   categoryFilter,
   sortParam,
+  cycleCountMode,
 }: InventoryContentProps): Promise<JSX.Element> {
   const [t, tCommon] = await Promise.all([
     getTranslations("inventory"),
     getTranslations("common"),
   ]);
   const isEquipmentView = itemTypeFilter === "equipment";
+  const currentFilterTab = expiringFilter ? "expiring" as const : (itemTypeFilter as "consumable" | "equipment" | undefined) ?? "all" as const;
   const inventoryViewHref = buildInventoryHref(householdId, itemTypeFilter ? { itemType: itemTypeFilter } : undefined);
   const analyticsViewHref = `/analytics?tab=inventory&householdId=${householdId}`;
   const inventoryRedirectHref = `/inventory?householdId=${householdId}`;
@@ -170,6 +179,7 @@ async function InventoryContent({
       getHouseholdInventory(householdId, {
         limit: 100,
         ...(itemTypeFilter ? { itemType: itemTypeFilter } : {}),
+        ...(expiringFilter ? { expiringSoon: true } : {}),
         ...(searchFilter ? { search: searchFilter } : {}),
         ...(categoryFilter ? { category: categoryFilter } : {}),
       }),
@@ -197,6 +207,10 @@ async function InventoryContent({
         .filter((value): value is string => Boolean(value))
     )).sort((left, right) => left.localeCompare(right));
 
+    const categories = new Set(items.map((item) => item.category).filter(Boolean)).size;
+    const outOfStockCount = items.filter((item) => item.quantityOnHand <= 0).length;
+
+    // items is already server-filtered by expiringSoon when expiringFilter is active
     const sortedItems = [...items].sort((a, b) => {
       switch (sortParam) {
         case "name-asc": return a.name.localeCompare(b.name);
@@ -231,19 +245,19 @@ async function InventoryContent({
       return left.localeCompare(right);
     });
 
-    const categories = new Set(items.map((item) => item.category).filter(Boolean)).size;
-    const outOfStockCount = items.filter((item) => item.quantityOnHand <= 0).length;
-
-    const now = Date.now();
+    const nowMs = Date.now();
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+    // Banner always fetches from unfiltered data via lowStockItems list;
+    // for expiry we compute from current items (may be pre-filtered by server)
     const expiringItems = items.filter((item) => {
       if (!item.expiresAt) return false;
       const expiresMs = new Date(item.expiresAt).getTime();
-      return expiresMs > now && expiresMs <= now + thirtyDaysMs;
+      return expiresMs > nowMs && expiresMs <= nowMs + thirtyDaysMs;
     });
     const expiredItems = items.filter((item) => {
       if (!item.expiresAt) return false;
-      return new Date(item.expiresAt).getTime() <= now;
+      return new Date(item.expiresAt).getTime() <= nowMs;
     });
 
     return (
@@ -255,6 +269,7 @@ async function InventoryContent({
           </div>
           <div className="page-header__actions">
             <InventoryValuationReportButton householdId={householdId} />
+            <Link href={buildInventoryHref(householdId, { mode: "count" })} className="button button--ghost button--sm">Count Inventory</Link>
             <Link href="/inventory/trash" className="button button--ghost button--sm">Trash</Link>
             <Link href={inventoryViewHref} className="button button--primary button--sm">{t("inventoryButton")}</Link>
             <Link href={analyticsViewHref} className="button button--ghost button--sm">{t("analyticsHub")}</Link>
@@ -272,13 +287,15 @@ async function InventoryContent({
               {expiredItems.length > 0 && (
                 <p className="note" style={{ background: "var(--danger-bg)", borderColor: "var(--danger-border)", color: "var(--danger)" }}>
                   <strong>{expiredItems.length} item{expiredItems.length === 1 ? " has" : "s have"} expired:</strong>{" "}
-                  {expiredItems.slice(0, 3).map((item) => item.name).join(", ")}{expiredItems.length > 3 ? ` and ${expiredItems.length - 3} more` : ""}.
+                  {expiredItems.slice(0, 3).map((item) => item.name).join(", ")}{expiredItems.length > 3 ? ` and ${expiredItems.length - 3} more` : ""}.{" "}
+                  <Link href={buildInventoryHref(householdId, { expiring: "1" })} className="text-link">View expiring items →</Link>
                 </p>
               )}
               {expiringItems.length > 0 && (
                 <p className="note" style={{ background: "var(--warning-bg)", borderColor: "var(--warning-border)", color: "var(--warning)" }}>
                   <strong>{expiringItems.length} item{expiringItems.length === 1 ? "" : "s"} expire within 30 days:</strong>{" "}
-                  {expiringItems.slice(0, 3).map((item) => item.name).join(", ")}{expiringItems.length > 3 ? ` and ${expiringItems.length - 3} more` : ""}.
+                  {expiringItems.slice(0, 3).map((item) => item.name).join(", ")}{expiringItems.length > 3 ? ` and ${expiringItems.length - 3} more` : ""}.{" "}
+                  <Link href={buildInventoryHref(householdId, { expiring: "1" })} className="text-link">View expiring items →</Link>
                 </p>
               )}
             </div>
@@ -330,7 +347,7 @@ async function InventoryContent({
 
           {activeTab === "inventory" ? (
             <>
-              <InventoryFilterBar currentFilter={itemTypeFilter ?? "all"} categoryOptions={categoryOptions} />
+              <InventoryFilterBar currentFilter={currentFilterTab} categoryOptions={categoryOptions} />
 
               {!isEquipmentView ? (
                 <>
@@ -404,6 +421,7 @@ async function InventoryContent({
                 highlightId={highlightId}
                 highlightedAnalytics={highlightedAnalytics}
                 spaces={spaces}
+                initialCycleCountMode={cycleCountMode}
               />
 
               <InventoryTransactionHistory householdId={householdId} />

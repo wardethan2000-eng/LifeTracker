@@ -5,7 +5,7 @@ import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type InventoryFilterBarProps = {
-  currentFilter: "all" | "consumable" | "equipment";
+  currentFilter: "all" | "consumable" | "equipment" | "expiring";
   categoryOptions?: string[];
 };
 
@@ -30,8 +30,12 @@ export function InventoryFilterBar({ currentFilter, categoryOptions = [] }: Inve
     router.push(`/inventory?${params.toString()}`);
   }, [router, searchParams]);
 
-  const setFilter = useCallback((value: "all" | "consumable" | "equipment") => {
-    pushParams({ itemType: value === "all" ? null : value });
+  const setFilter = useCallback((value: "all" | "consumable" | "equipment" | "expiring") => {
+    if (value === "expiring") {
+      pushParams({ itemType: null, expiring: "1" });
+    } else {
+      pushParams({ itemType: value === "all" ? null : value, expiring: null });
+    }
   }, [pushParams]);
 
   useEffect(() => {
@@ -67,6 +71,13 @@ export function InventoryFilterBar({ currentFilter, categoryOptions = [] }: Inve
           onClick={() => setFilter("equipment")}
         >
           Equipment
+        </button>
+        <button
+          type="button"
+          className={`inventory-filter-bar__tab${currentFilter === "expiring" ? " inventory-filter-bar__tab--active" : ""}`}
+          onClick={() => setFilter("expiring")}
+        >
+          Expiring
         </button>
       </div>
 

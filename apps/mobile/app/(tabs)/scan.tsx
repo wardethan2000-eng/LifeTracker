@@ -4,8 +4,8 @@ import { Button, Dialog, Divider, Portal, Text, useTheme } from "react-native-pa
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BarcodeScanner } from "../../components/BarcodeScanner";
-import { resolveAssetScanTarget } from "../../lib/scan";
-import { lookupAssetByTagMobile, lookupBarcodeMobile, type BarcodeLookupResult } from "../../lib/api";
+import { resolveAssetScanTarget, resolveInventoryOrSpaceScanTag } from "../../lib/scan";
+import { lookupAssetByTagMobile, lookupBarcodeMobile, resolveScanTagMobile, type BarcodeLookupResult } from "../../lib/api";
 
 type ScanState = "scanning" | "resolving";
 
@@ -31,6 +31,21 @@ export default function ScanScreen() {
 
           setState("scanning");
           router.push(`/assets/${asset.id}`);
+          return;
+        }
+
+        // Try to resolve as inventory item or space scan tag
+        const inventoryOrSpaceTag = resolveInventoryOrSpaceScanTag(value);
+        if (inventoryOrSpaceTag) {
+          const resolution = await resolveScanTagMobile(inventoryOrSpaceTag);
+          setState("scanning");
+          if (resolution.type === "inventory_item") {
+            router.push(`/inventory/${resolution.id}?action=consume`);
+          } else if (resolution.type === "space") {
+            router.push(`/inventory/spaces/${resolution.id}`);
+          } else {
+            router.push(`/assets/${resolution.id}`);
+          }
           return;
         }
 
@@ -124,6 +139,22 @@ export default function ScanScreen() {
                 View image
               </Button>
             ) : null}
+            <Button
+              mode="contained"
+              onPress={() => {
+                const p = productResult;
+                setProductResult(null);
+                const query = new URLSearchParams();
+                if (p?.productName) query.set("name", p.productName);
+                else if (p?.brand) query.set("name", p.brand);
+                if (p?.category) query.set("category", p.category);
+                if (p?.brand) query.set("manufacturer", p.brand);
+                if (p?.description) query.set("description", p.description);
+                router.push(`/inventory/new?${query.toString()}`);
+              }}
+            >
+              Add to inventory
+            </Button>
             <Button onPress={() => setProductResult(null)}>Dismiss</Button>
           </Dialog.Actions>
         </Dialog>
