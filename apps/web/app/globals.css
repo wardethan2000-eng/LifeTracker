@@ -6810,6 +6810,52 @@ tr:focus-within .data-table__row-actions {
    ═══ 46. Project Domain
    ═══════════════════════════════════════════════════════════════════ */
 
+/* --- Collapsible filter bar --- */
+.collapsible-filter-bar {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface);
+  margin-bottom: 4px;
+}
+
+.collapsible-filter-bar__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+  transition: color 150ms;
+}
+
+.collapsible-filter-bar__toggle:hover {
+  color: var(--ink);
+}
+
+.collapsible-filter-bar__label {
+  flex: 1;
+  text-align: left;
+}
+
+.collapsible-filter-bar__chevron {
+  transition: transform 200ms ease;
+}
+
+.collapsible-filter-bar--open .collapsible-filter-bar__chevron {
+  transform: rotate(180deg);
+}
+
+.collapsible-filter-bar__body {
+  padding: 0 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+
 .project-filter-panel__body {
   display: grid;
   gap: 16px;
@@ -17024,6 +17070,12 @@ html[data-ui-density="compact"] .resource-layout__aside {
   border-radius: 12px;
   overflow: hidden;
   height: 100%;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.dashboard-card--swap-target {
+  border-color: var(--accent-border, var(--accent));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .dashboard-card__header {

@@ -19,7 +19,6 @@ import {
 import { ProjectProgressBar } from "./project-progress-bar";
 import { ProjectBulkActions } from "./project-bulk-actions";
 import { BulkActionBar } from "./bulk-action-bar";
-import { ClickToEdit } from "./click-to-edit";
 import { ClickToEditSelect } from "./click-to-edit-select";
 import { useToast } from "./toast-provider";
 import { EmptyState } from "./empty-state";
@@ -192,13 +191,12 @@ export function ProjectPortfolioWorkspace({
                         />
                       </td>
                       <td>
-                        <ClickToEdit
-                          value={name}
-                          required
-                          disabled={saving.has(`${project.id}:name`)}
-                          aria-label={`Edit name of ${project.name}`}
-                          onSave={(v) => { void handleSave(project.id, "name", v); }}
-                        />
+                        <Link
+                          href={`/projects/${project.id}?householdId=${householdId}`}
+                          className="data-table__link"
+                        >
+                          {name}
+                        </Link>
                         <div className="data-table__secondary">
                           {project.depth > 0 && (
                             <span style={{ marginRight: 6, opacity: 0.7 }}>Sub-project ·</span>
@@ -273,12 +271,6 @@ export function ProjectPortfolioWorkspace({
                             className="button button--sm button--ghost"
                           >
                             Tasks
-                          </Link>
-                          <Link
-                            href={`/projects/${project.id}?householdId=${householdId}`}
-                            className="button button--sm button--primary"
-                          >
-                            Open
                           </Link>
                         </div>
                       </td>

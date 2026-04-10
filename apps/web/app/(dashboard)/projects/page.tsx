@@ -6,6 +6,7 @@ import { getTranslations } from "next-intl/server";
 import { ProjectPortfolioAside } from "../../../components/project-portfolio-aside";
 import { ProjectPortfolioStats } from "../../../components/project-portfolio-stats";
 import { ProjectPortfolioWorkspace } from "../../../components/project-portfolio-workspace";
+import { ProjectFilterBar } from "../../../components/project-filter-bar";
 import { ApiError, getDisplayPreferences, getHouseholdProjectPortfolioPaginated, getHouseholdProjectStatusCounts, getMe } from "../../../lib/api";
 import { OffsetPaginationControls } from "../../../components/pagination-controls";
 
@@ -250,13 +251,16 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
         </header>
 
         <div className="page-body">
-          <section className="panel project-filter-panel">
-            <div className="panel__header">
-              <h2>{t("portfolioControls")}</h2>
-            </div>
-            <div className="panel__body--padded project-filter-bar">
-              <form method="GET" className="project-filter-form inline-filter-form">
-                <input type="hidden" name="householdId" value={household.id} />
+          <ProjectFilterBar
+            hasActiveFilters={!!(rawSearchQuery || selectedStatus || selectedSort !== "risk")}
+            activeFilterSummary={[
+              rawSearchQuery ? `"${rawSearchQuery}"` : "",
+              selectedStatus ? projectStatusLabels[selectedStatus] : "",
+              selectedSort !== "risk" ? projectSortLabels[selectedSort] : "",
+            ].filter(Boolean).join(" · ")}
+          >
+            <form method="GET" className="project-filter-form inline-filter-form">
+              <input type="hidden" name="householdId" value={household.id} />
                 <div className="inline-filter-form__group">
                   <div className="search-input-wrapper">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -288,32 +292,31 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps):
                 </div>
               </form>
 
-              <div className="filter-strip" aria-label="Project status filters">
+            <div className="filter-strip" aria-label="Project status filters">
+              <Link
+                href={buildProjectsHref({ householdId: household.id, query: rawSearchQuery, sort: selectedSort })}
+                className={`filter-chip${selectedStatus === undefined ? " filter-chip--active" : ""}`}
+              >
+                <span>All</span>
+                <strong>{allProjectsCount}</strong>
+              </Link>
+              {statusCounts.map((item) => (
                 <Link
-                  href={buildProjectsHref({ householdId: household.id, query: rawSearchQuery, sort: selectedSort })}
-                  className={`filter-chip${selectedStatus === undefined ? " filter-chip--active" : ""}`}
+                  key={item.status}
+                  href={buildProjectsHref({
+                    householdId: household.id,
+                    status: item.status,
+                    query: rawSearchQuery,
+                    sort: selectedSort
+                  })}
+                  className={`filter-chip${selectedStatus === item.status ? " filter-chip--active" : ""}`}
                 >
-                  <span>All</span>
-                  <strong>{allProjectsCount}</strong>
+                  <span>{projectStatusLabels[item.status]}</span>
+                  <strong>{item.count}</strong>
                 </Link>
-                {statusCounts.map((item) => (
-                  <Link
-                    key={item.status}
-                    href={buildProjectsHref({
-                      householdId: household.id,
-                      status: item.status,
-                      query: rawSearchQuery,
-                      sort: selectedSort
-                    })}
-                    className={`filter-chip${selectedStatus === item.status ? " filter-chip--active" : ""}`}
-                  >
-                    <span>{projectStatusLabels[item.status]}</span>
-                    <strong>{item.count}</strong>
-                  </Link>
-                ))}
-              </div>
+              ))}
             </div>
-          </section>
+          </ProjectFilterBar>
 
           <Suspense fallback={<ProjectStatsSkeleton />}>
             <ProjectPortfolioStats
