@@ -6,6 +6,7 @@ import {
   createMaintenanceLogSchema,
   createSpaceInputSchema,
   createProjectSchema,
+  failureSeverityValues,
   spaceTypeSchema,
   updateInventoryItemSchema
 } from "@aegis/types";
@@ -222,6 +223,12 @@ export const maintenanceLogFormSchema = createMaintenanceLogSchema.extend({
   laborRate: optionalNumberInput(createMaintenanceLogSchema.shape.laborRate.unwrap()),
   difficultyRating: optionalNumberInput(createMaintenanceLogSchema.shape.difficultyRating.unwrap()),
   performedBy: optionalTrimmedText(createMaintenanceLogSchema.shape.performedBy.unwrap()),
+  failureMode: optionalTrimmedText(createMaintenanceLogSchema.shape.failureMode.unwrap()),
+  symptom: optionalTrimmedText(createMaintenanceLogSchema.shape.symptom.unwrap()),
+  rootCause: optionalTrimmedText(createMaintenanceLogSchema.shape.rootCause.unwrap()),
+  severity: z.enum(["", ...failureSeverityValues]).transform((v) => v === "" ? undefined : v).pipe(z.enum(failureSeverityValues).optional()),
+  isRepeatFailure: z.boolean().default(false),
+  relatedLogId: z.string().cuid().or(z.literal("")).optional(),
   applyLinkedParts: z.boolean().default(true),
   parts: z.array(maintenanceLogPartFormSchema).default([])
 });

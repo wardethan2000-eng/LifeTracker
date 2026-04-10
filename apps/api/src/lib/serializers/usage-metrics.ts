@@ -14,9 +14,11 @@ export const toUsageMetricResponse = (
 });
 
 export const toUsageMetricEntryResponse = (
-  entry: Pick<UsageMetricEntry, "id" | "metricId" | "value" | "recordedAt" | "source" | "notes" | "createdAt" | "updatedAt">
+  entry: Pick<UsageMetricEntry, "id" | "metricId" | "value" | "recordedAt" | "source" | "notes" | "costPerUnit" | "totalCost" | "createdAt" | "updatedAt">
 ) => usageMetricEntrySchema.parse({
   ...entry,
+  costPerUnit: entry.costPerUnit ?? null,
+  totalCost: entry.totalCost ?? null,
   recordedAt: entry.recordedAt.toISOString(),
   createdAt: entry.createdAt.toISOString(),
   updatedAt: entry.updatedAt.toISOString()

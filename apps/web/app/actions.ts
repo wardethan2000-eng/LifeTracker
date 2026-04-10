@@ -80,6 +80,12 @@ import type {
   UpdateDisplayPreferencesInput,
   CreateProjectTaskDependencyInput,
   UpdateProjectTaskDependencyInput,
+  CreateProcedureInput,
+  UpdateProcedureInput,
+  CreateLoanInput,
+  UpdateLoanInput,
+  CreatePlaybookInput,
+  UpdatePlaybookInput,
 } from "@aegis/types";
 import {
   assetCustomFieldsSchema,
@@ -243,6 +249,15 @@ import {
   removeProjectAsset,
   addAssetInventoryLink,
   removeAssetInventoryLink,
+  createProcedure,
+  updateProcedure,
+  deleteProcedure,
+  createLoan,
+  updateLoan,
+  deleteLoan,
+  createPlaybook,
+  updatePlaybook,
+  deletePlaybook,
 } from "../lib/api";
 import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@aegis/utils";
@@ -1735,6 +1750,11 @@ export async function createMetricEntryAction(formData: FormData): Promise<void>
     input.notes = notes;
   }
 
+  const costPerUnit = getOptionalNumber(formData, "costPerUnit");
+  const totalCost = getOptionalNumber(formData, "totalCost");
+  if (costPerUnit !== undefined) input.costPerUnit = costPerUnit;
+  if (totalCost !== undefined) input.totalCost = totalCost;
+
   await createMetricEntry(assetId, metricId, input);
   revalidateAssetPaths(assetId);
   revalidatePath("/maintenance");
@@ -1827,6 +1847,20 @@ export async function createLogAction(formData: FormData): Promise<void> {
   if (serviceProviderId) {
     input.serviceProviderId = serviceProviderId;
   }
+
+  const failureMode = getOptionalString(formData, "failureMode");
+  const symptom = getOptionalString(formData, "symptom");
+  const rootCause = getOptionalString(formData, "rootCause");
+  const severity = getOptionalString(formData, "severity");
+  const isRepeatFailure = getOptionalString(formData, "isRepeatFailure");
+  const relatedLogId = getOptionalString(formData, "relatedLogId");
+
+  if (failureMode) input.failureMode = failureMode;
+  if (symptom) input.symptom = symptom;
+  if (rootCause) input.rootCause = rootCause;
+  if (severity) input.severity = severity as CreateMaintenanceLogInput["severity"];
+  if (isRepeatFailure === "true") input.isRepeatFailure = true;
+  if (relatedLogId) input.relatedLogId = relatedLogId;
 
   if (parts.length > 0) {
     input.parts = parts;
@@ -2327,6 +2361,9 @@ export async function createScheduleAction(formData: FormData): Promise<void> {
   if (estimatedMinutes !== undefined) {
     input.estimatedMinutes = Math.trunc(estimatedMinutes);
   }
+
+  const procedureId = getOptionalString(formData, "procedureId");
+  if (procedureId) input.procedureId = procedureId;
 
   await createSchedule(assetId, input);
   revalidateAssetPaths(assetId);
@@ -3997,4 +4034,142 @@ export async function removeAssetInventoryLinkAction(formData: FormData): Promis
 
   await removeAssetInventoryLink(assetId, inventoryItemId);
   revalidatePath(`/assets/${assetId}`, "layout");
+}
+
+// ── Procedures ──────────────────────────────────────────────────────
+
+export async function createProcedureAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const title = getRequiredString(formData, "title");
+  const description = getOptionalString(formData, "description");
+  const estimatedMinutes = getOptionalNumber(formData, "estimatedMinutes");
+
+  const input: CreateProcedureInput = {
+    title,
+    ...(description ? { description } : {}),
+    ...(estimatedMinutes !== undefined ? { estimatedMinutes } : {}),
+  };
+
+  await createProcedure(householdId, input);
+  revalidatePath("/procedures", "layout");
+}
+
+export async function updateProcedureAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const procedureId = getRequiredString(formData, "procedureId");
+  const title = getOptionalString(formData, "title");
+  const description = getOptionalString(formData, "description");
+  const estimatedMinutes = getOptionalNumber(formData, "estimatedMinutes");
+
+  const input: UpdateProcedureInput = {};
+  if (title !== undefined) input.title = title;
+  if (description !== undefined) input.description = description;
+  if (estimatedMinutes !== undefined) input.estimatedMinutes = estimatedMinutes;
+
+  await updateProcedure(householdId, procedureId, input);
+  revalidatePath("/procedures", "layout");
+}
+
+export async function deleteProcedureAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const procedureId = getRequiredString(formData, "procedureId");
+
+  await deleteProcedure(householdId, procedureId);
+  revalidatePath("/procedures", "layout");
+}
+
+// ── Loans ───────────────────────────────────────────────────────────
+
+export async function createLoanAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const entityType = getRequiredString(formData, "entityType") as "asset" | "inventory_item";
+  const entityId = getRequiredString(formData, "entityId");
+  const borrowerName = getRequiredString(formData, "borrowerName");
+  const lentAtRaw = getOptionalString(formData, "lentAt");
+  const expectedReturnAtRaw = getOptionalString(formData, "expectedReturnAt");
+  const notes = getOptionalString(formData, "notes");
+
+  const input: CreateLoanInput = {
+    entityType,
+    entityId,
+    borrowerName,
+    ...(lentAtRaw ? { lentAt: new Date(lentAtRaw).toISOString() } : {}),
+    ...(expectedReturnAtRaw ? { expectedReturnAt: new Date(expectedReturnAtRaw).toISOString() } : {}),
+    ...(notes ? { notes } : {}),
+  };
+
+  await createLoan(householdId, input);
+  revalidatePath("/loans", "layout");
+}
+
+export async function updateLoanAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const loanId = getRequiredString(formData, "loanId");
+  const returnedAtRaw = getOptionalString(formData, "returnedAt");
+  const notes = getOptionalString(formData, "notes");
+
+  const input: UpdateLoanInput = {};
+  if (returnedAtRaw !== undefined) input.returnedAt = returnedAtRaw;
+  if (notes !== undefined) input.notes = notes;
+
+  await updateLoan(householdId, loanId, input);
+  revalidatePath("/loans", "layout");
+}
+
+export async function deleteLoanAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const loanId = getRequiredString(formData, "loanId");
+
+  await deleteLoan(householdId, loanId);
+  revalidatePath("/loans", "layout");
+}
+
+// ── Playbooks ───────────────────────────────────────────────────────
+
+export async function createPlaybookAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const title = getRequiredString(formData, "title");
+  const description = getOptionalString(formData, "description");
+  const triggerMonth = getOptionalNumber(formData, "triggerMonth");
+  const triggerDay = getOptionalNumber(formData, "triggerDay");
+  const leadDays = getOptionalNumber(formData, "leadDays");
+
+  const input: CreatePlaybookInput = {
+    title,
+    ...(description ? { description } : {}),
+    ...(triggerMonth !== undefined ? { triggerMonth } : {}),
+    ...(triggerDay !== undefined ? { triggerDay } : {}),
+    ...(leadDays !== undefined ? { leadDays } : {}),
+  };
+
+  await createPlaybook(householdId, input);
+  revalidatePath("/playbooks", "layout");
+}
+
+export async function updatePlaybookAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const playbookId = getRequiredString(formData, "playbookId");
+  const title = getOptionalString(formData, "title");
+  const description = getOptionalString(formData, "description");
+  const triggerMonth = getOptionalNumber(formData, "triggerMonth");
+  const triggerDay = getOptionalNumber(formData, "triggerDay");
+  const leadDays = getOptionalNumber(formData, "leadDays");
+
+  const input: UpdatePlaybookInput = {};
+  if (title !== undefined) input.title = title;
+  if (description !== undefined) input.description = description;
+  if (triggerMonth !== undefined) input.triggerMonth = triggerMonth;
+  if (triggerDay !== undefined) input.triggerDay = triggerDay;
+  if (leadDays !== undefined) input.leadDays = leadDays;
+
+  await updatePlaybook(householdId, playbookId, input);
+  revalidatePath("/playbooks", "layout");
+}
+
+export async function deletePlaybookAction(formData: FormData): Promise<void> {
+  const householdId = getRequiredString(formData, "householdId");
+  const playbookId = getRequiredString(formData, "playbookId");
+
+  await deletePlaybook(householdId, playbookId);
+  revalidatePath("/playbooks", "layout");
 }

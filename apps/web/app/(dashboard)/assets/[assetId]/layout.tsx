@@ -25,6 +25,7 @@ const assetTabs = (assetId: string) => [
   { id: "relationships", label: "Relationships", href: `/assets/${assetId}/relationships` },
   { id: "metrics", label: "Metrics", href: `/assets/${assetId}/metrics` },
   { id: "costs", label: "Costs", href: `/assets/${assetId}/costs` },
+  { id: "tco", label: "TCO", href: `/assets/${assetId}/tco` },
   { id: "inventory", label: "Inventory", href: `/assets/${assetId}/inventory` },
   { id: "notes", label: "Notes", href: `/assets/${assetId}/notes` },
   { id: "canvas", label: "Canvas", href: `/assets/${assetId}/canvas` },

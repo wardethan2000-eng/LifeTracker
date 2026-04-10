@@ -207,7 +207,9 @@ export const usageMetricRoutes: FastifyPluginAsync = async (app) => {
         value: input.value,
         recordedAt,
         source: input.source ?? "manual",
-        notes: input.notes ?? null
+        notes: input.notes ?? null,
+        costPerUnit: input.costPerUnit ?? null,
+        totalCost: input.totalCost ?? null
       }
     });
 

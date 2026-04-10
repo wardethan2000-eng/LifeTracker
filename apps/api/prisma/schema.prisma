@@ -34,6 +34,7 @@ enum AssetCategory {
   appliance
   hvac
   technology
+  utility
   other
 }
 
@@ -329,6 +330,20 @@ enum WebhookDeliveryStatus {
   failed
 }
 
+// Classifies the severity of a maintenance failure for root-cause analysis.
+enum FailureSeverity {
+  minor
+  moderate
+  major
+  critical
+}
+
+// Polymorphic entity type for items that can be loaned out.
+enum LoanEntityType {
+  asset
+  inventory_item
+}
+
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  CORE — USERS & HOUSEHOLDS                                      ║
 // ╚══════════════════════════════════════════════════════════════════╝
@@ -477,6 +492,9 @@ model Household {
   domainEvents     DomainEvent[]
   webhookEndpoints WebhookEndpoint[]
   canvasObjects    CanvasObject[]
+  procedures       Procedure[]
+  loans            Loan[]
+  playbooks        Playbook[]
 
   @@index([createdById])
 }
@@ -503,6 +521,7 @@ model Space {
   itemHistory    SpaceItemHistory[]
   scanLogs       SpaceScanLog[]
   assets         Asset[]
+  playbookItems  PlaybookItem[]
 
   @@unique([householdId, shortCode])
   @@index([householdId, parentSpaceId])
@@ -580,6 +599,8 @@ model Asset {
   transfers            AssetTransfer[]
   shareLinks           ShareLink[]
   hobbyLinks           HobbyAsset[]
+  procedureLinks       ProcedureAsset[]
+  playbookItems        PlaybookItem[]
 
   @@index([householdId, isArchived])
   @@index([householdId, deletedAt])
@@ -645,6 +666,8 @@ model UsageMetricEntry {
   recordedAt DateTime    @default(now())
   source     String      @default("manual")
   notes      String?
+  costPerUnit Float?     // Cost per unit for utility/resource metering (e.g. $/kWh)
+  totalCost  Float?      // Total cost for this reading period
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   metric     UsageMetric @relation(fields: [metricId], references: [id], onDelete: Cascade)
@@ -657,6 +680,7 @@ model MaintenanceSchedule {
   id                 String           @id @default(cuid())
   assetId            String
   metricId           String?          // Metric used when the trigger depends on usage
+  procedureId        String?          // Optional link to a how-to procedure
   name               String
   description        String?
   triggerType        TriggerType
@@ -675,6 +699,7 @@ model MaintenanceSchedule {
   updatedAt          DateTime         @updatedAt
   asset              Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
   metric             UsageMetric?     @relation(fields: [metricId], references: [id], onDelete: SetNull)
+  procedure          Procedure?       @relation(fields: [procedureId], references: [id], onDelete: SetNull)
   assignedToId       String?
   logs               MaintenanceLog[]
   notifications      Notification[]
@@ -686,6 +711,7 @@ model MaintenanceSchedule {
   @@index([assetId, isActive, nextDueAt])
   @@index([assetId, deletedAt])
   @@index([metricId])
+  @@index([procedureId])
   @@index([nextDueAt])
   @@index([assignedToId])
 }
@@ -763,6 +789,13 @@ model MaintenanceLog {
   difficultyRating  Int?
   performedBy       String?
   metadata          Json                 @default("{}")
+  // Failure tracking fields for root-cause analysis
+  failureMode       String?              // What component/subsystem failed
+  symptom           String?              // What the user observed
+  rootCause         String?              // Why it failed (diagnosis)
+  severity          FailureSeverity?     // Impact classification
+  isRepeatFailure   Boolean              @default(false)
+  relatedLogId      String?              // Self-ref to a previous occurrence of the same failure
   deletedAt         DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
@@ -770,6 +803,8 @@ model MaintenanceLog {
   schedule          MaintenanceSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   completedBy       User                 @relation("MaintenanceLogUser", fields: [completedById], references: [id], onDelete: Restrict)
   serviceProvider   ServiceProvider?     @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+  relatedLog        MaintenanceLog?      @relation("FailureChain", fields: [relatedLogId], references: [id], onDelete: SetNull)
+  relatedFailures   MaintenanceLog[]     @relation("FailureChain")
   parts             MaintenanceLogPart[]
 
   @@index([assetId, completedAt])
@@ -777,6 +812,7 @@ model MaintenanceLog {
   @@index([scheduleId])
   @@index([completedById])
   @@index([serviceProviderId])
+  @@index([relatedLogId])
 }
 
 // A part or material line item consumed during a MaintenanceLog entry.
@@ -1029,6 +1065,8 @@ model InventoryItem {
   revisions          InventoryItemRevision[]
   comments           Comment[]
   spaceItemHistory   SpaceItemHistory[]
+  procedureTools     ProcedureTool[]
+  playbookItems      PlaybookItem[]
 
   @@index([householdId])
   @@index([householdId, deletedAt])
@@ -2351,6 +2389,183 @@ model HobbyMetricReading {
 
   @@index([metricDefinitionId, readingDate])
   @@index([sessionId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PROCEDURES — Reusable step-by-step reference documents         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A versioned, reusable how-to document that any household member can follow.
+model Procedure {
+  id               String              @id @default(cuid())
+  householdId      String
+  title            String
+  description      String?
+  estimatedMinutes Int?
+  version          Int                 @default(1)
+  isArchived       Boolean             @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  household        Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  steps            ProcedureStep[]
+  assetLinks       ProcedureAsset[]
+  toolItems        ProcedureTool[]
+  scheduleLinks    MaintenanceSchedule[]
+  playbookItems    PlaybookItem[]
+
+  @@index([householdId])
+  @@index([householdId, deletedAt])
+}
+
+// An ordered instruction step within a Procedure.
+model ProcedureStep {
+  id               String    @id @default(cuid())
+  procedureId      String
+  sortOrder        Int
+  instruction      String
+  notes            String?
+  estimatedMinutes Int?
+  warningText      String?   // Safety or caution note for this step
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  procedure        Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@index([procedureId, sortOrder])
+}
+
+// Links a Procedure to an Asset it applies to (many-to-many).
+model ProcedureAsset {
+  id          String    @id @default(cuid())
+  procedureId String
+  assetId     String
+  createdAt   DateTime  @default(now())
+  procedure   Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([procedureId, assetId])
+}
+
+// Links a Procedure to an InventoryItem needed as a tool or supply.
+model ProcedureTool {
+  id              String        @id @default(cuid())
+  procedureId     String
+  inventoryItemId String
+  quantity        Float         @default(1)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  procedure       Procedure     @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([procedureId, inventoryItemId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LOANS — Track items lent to people outside the household       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A record of an asset or inventory item lent to someone.
+model Loan {
+  id               String         @id @default(cuid())
+  householdId      String
+  entityType       LoanEntityType // asset | inventory_item
+  entityId         String         // FK to Asset.id or InventoryItem.id
+  borrowerName     String
+  borrowerContact  String?
+  quantity         Float?         // Applies to inventory items only
+  notes            String?
+  lentAt           DateTime
+  expectedReturnAt DateTime?
+  returnedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  household        Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([householdId, returnedAt])
+  @@index([householdId, entityType, entityId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PLAYBOOKS — Seasonal / recurring cross-domain checklists       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// A household-level recurring checklist that orchestrates tasks across assets, spaces, and inventory.
+model Playbook {
+  id           String         @id @default(cuid())
+  householdId  String
+  title        String
+  description  String?
+  triggerMonth Int?           // 1-12 for seasonal scheduling
+  triggerDay   Int?           // 1-31 day of month
+  leadDays     Int            @default(7)
+  isActive     Boolean        @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  household    Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items        PlaybookItem[]
+  runs         PlaybookRun[]
+
+  @@index([householdId])
+  @@index([householdId, deletedAt])
+}
+
+// A single checklist item in a Playbook, optionally linked to an entity.
+model PlaybookItem {
+  id              String         @id @default(cuid())
+  playbookId      String
+  sortOrder       Int
+  label           String
+  notes           String?
+  assetId         String?
+  inventoryItemId String?
+  procedureId     String?
+  spaceId         String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  playbook        Playbook       @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  asset           Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  procedure       Procedure?     @relation(fields: [procedureId], references: [id], onDelete: SetNull)
+  space           Space?         @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  runItems        PlaybookRunItem[]
+
+  @@index([playbookId, sortOrder])
+}
+
+// A single execution (run) of a Playbook for a specific season or occasion.
+model PlaybookRun {
+  id          String            @id @default(cuid())
+  playbookId  String
+  title       String?           // e.g. "Winter Prep 2026"
+  startedAt   DateTime          @default(now())
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  playbook    Playbook          @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  items       PlaybookRunItem[]
+
+  @@index([playbookId])
+}
+
+// Completion tracking for an individual playbook item within a run.
+model PlaybookRunItem {
+  id             String       @id @default(cuid())
+  runId          String
+  playbookItemId String
+  isCompleted    Boolean      @default(false)
+  completedAt    DateTime?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  run            PlaybookRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  playbookItem   PlaybookItem @relation(fields: [playbookItemId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([playbookItemId])
 }
 
 // A dated journal entry for a Hobby, optionally attached to a particular session.

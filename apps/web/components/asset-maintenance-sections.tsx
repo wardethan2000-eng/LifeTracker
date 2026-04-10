@@ -28,6 +28,7 @@ const SCHEDULE_STATUS_PILL: Record<string, string> = {
 
 type AssetMaintenanceSectionsProps = {
   detail: AssetDetailResponse;
+  procedures?: { id: string; title: string }[];
   createScheduleAction: (formData: FormData) => void | Promise<void>;
   completeScheduleAction: (formData: FormData) => void | Promise<void>;
   toggleScheduleActiveAction: (formData: FormData) => void | Promise<void>;
@@ -74,6 +75,7 @@ const renderLogSummary = (
 
 export function AssetMaintenanceSections({
   detail,
+  procedures,
   createScheduleAction,
   completeScheduleAction,
   toggleScheduleActiveAction,
@@ -159,6 +161,7 @@ export function AssetMaintenanceSections({
         <ScheduleForm
           assetId={detail.asset.id}
           metrics={detail.metrics.map((metric) => ({ id: metric.id, name: metric.name, unit: metric.unit }))}
+          procedures={procedures}
           action={createScheduleAction}
         />
       </Card>

@@ -88,6 +88,10 @@ import { webhookRoutes } from "./routes/webhooks/index.js";
 import { layoutPreferenceRoutes } from "./routes/layout-preferences.js";
 import { dashboardPinRoutes } from "./routes/dashboard-pins.js";
 import { overviewPinRoutes } from "./routes/overview-pins.js";
+import { procedureRoutes } from "./routes/procedures/index.js";
+import { loanRoutes } from "./routes/loans/index.js";
+import { playbookRoutes } from "./routes/playbooks/index.js";
+import { tcoRoutes } from "./routes/cost-analytics/tco.js";
 import { ensureLegacyEntriesMigrated } from "./services/legacy-migration.js";
 import { enforceRateLimit } from "./lib/rate-limit.js";
 import { applyTier } from "./lib/rate-limit-tiers.js";
@@ -158,7 +162,10 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   assetExportRoutes,
   projectExportRoutes,
   scheduleExportRoutes,
-  hobbyExportRoutes
+  hobbyExportRoutes,
+  procedureRoutes,
+  loanRoutes,
+  playbookRoutes
 ];
 
 // Analytics routes registered in a dedicated sub-scope so a preHandler hook can apply
@@ -169,7 +176,8 @@ const householdAnalyticsRoutePlugins: FastifyPluginAsync[] = [
   hobbyAnalyticsRoutes,
   projectAnalyticsRoutes,
   costAnalyticsRoutes,
-  projectBudgetAnalyticsRoutes
+  projectBudgetAnalyticsRoutes,
+  tcoRoutes
 ];
 
 const assetRoutePlugins: FastifyPluginAsync[] = [

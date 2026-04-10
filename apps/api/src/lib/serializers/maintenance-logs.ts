@@ -15,7 +15,7 @@ export const toMaintenanceLogPartResponse = (
 });
 
 export const toMaintenanceLogResponse = (
-  log: Pick<MaintenanceLog, "id" | "assetId" | "scheduleId" | "completedById" | "serviceProviderId" | "title" | "notes" | "completedAt" | "usageValue" | "cost" | "laborHours" | "laborRate" | "difficultyRating" | "performedBy" | "metadata" | "createdAt" | "updatedAt">,
+  log: Pick<MaintenanceLog, "id" | "assetId" | "scheduleId" | "completedById" | "serviceProviderId" | "title" | "notes" | "completedAt" | "usageValue" | "cost" | "laborHours" | "laborRate" | "difficultyRating" | "performedBy" | "metadata" | "failureMode" | "symptom" | "rootCause" | "severity" | "isRepeatFailure" | "relatedLogId" | "createdAt" | "updatedAt">,
   parts: Pick<MaintenanceLogPart, "id" | "logId" | "inventoryItemId" | "name" | "partNumber" | "quantity" | "unitCost" | "supplier" | "notes" | "createdAt" | "updatedAt">[] = []
 ) => {
   const partResponses = parts.map(toMaintenanceLogPartResponse);
@@ -48,6 +48,12 @@ export const toMaintenanceLogResponse = (
     difficultyRating: log.difficultyRating,
     performedBy: log.performedBy,
     metadata: log.metadata,
+    failureMode: log.failureMode ?? null,
+    symptom: log.symptom ?? null,
+    rootCause: log.rootCause ?? null,
+    severity: log.severity ?? null,
+    isRepeatFailure: log.isRepeatFailure,
+    relatedLogId: log.relatedLogId ?? null,
     parts: partResponses,
     totalPartsCost: costBreakdown.partsCost,
     totalLaborCost,

@@ -47,6 +47,7 @@ export const assetCategoryValues = [
   "appliance",
   "hvac",
   "technology",
+  "utility",
   "other"
 ] as const;
 
@@ -124,6 +125,8 @@ export const entryFlagValues = ["important", "actionable", "resolved", "pinned",
 export const entrySortByValues = ["entryDate", "createdAt", "title"] as const;
 export const bodyFormatValues = ["plain_text", "rich_text"] as const;
 export const webhookDeliveryStatusValues = ["pending", "delivered", "failed"] as const;
+export const failureSeverityValues = ["minor", "moderate", "major", "critical"] as const;
+export const loanEntityTypeValues = ["asset", "inventory_item"] as const;
 
 export const assetCategorySchema = z.enum(assetCategoryValues);
 export const assetVisibilitySchema = z.enum(assetVisibilityValues);
@@ -137,6 +140,8 @@ export const entryFlagSchema = z.enum(entryFlagValues);
 export const entrySortBySchema = z.enum(entrySortByValues);
 export const bodyFormatSchema = z.enum(bodyFormatValues);
 export const webhookDeliveryStatusSchema = z.enum(webhookDeliveryStatusValues);
+export const failureSeveritySchema = z.enum(failureSeverityValues);
+export const loanEntityTypeSchema = z.enum(loanEntityTypeValues);
 export const authSourceSchema = z.enum(authSourceValues);
 export const notificationTypeSchema = z.enum(notificationTypeValues);
 export const triggerTypeSchema = z.enum(triggerTypeValues);
@@ -486,6 +491,8 @@ export const usageMetricEntrySchema = z.object({
   recordedAt: z.string().datetime(),
   source: z.string(),
   notes: z.string().nullable(),
+  costPerUnit: z.number().nullable().default(null),
+  totalCost: z.number().nullable().default(null),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 });
@@ -494,7 +501,9 @@ export const createUsageMetricEntrySchema = z.object({
   value: z.number(),
   recordedAt: z.string().datetime().optional(),
   source: z.string().max(80).default("manual"),
-  notes: z.string().max(2000).optional()
+  notes: z.string().max(2000).optional(),
+  costPerUnit: z.number().min(0).optional(),
+  totalCost: z.number().min(0).optional()
 });
 
 export const usageProjectionSchema = z.object({
@@ -1011,7 +1020,8 @@ export const createMaintenanceScheduleSchema = z.object({
   estimatedCost: z.number().min(0).optional(),
   estimatedMinutes: z.number().int().min(0).optional(),
   isRegulatory: z.boolean().optional(),
-  assignedToId: z.string().cuid().optional()
+  assignedToId: z.string().cuid().optional(),
+  procedureId: z.string().cuid().optional()
 });
 
 export const updateMaintenanceScheduleSchema = z.object({
@@ -1026,7 +1036,8 @@ export const updateMaintenanceScheduleSchema = z.object({
   isActive: z.boolean().optional(),
   isRegulatory: z.boolean().optional(),
   lastCompletedAt: z.string().datetime().optional(),
-  assignedToId: z.string().cuid().nullable().optional()
+  assignedToId: z.string().cuid().nullable().optional(),
+  procedureId: z.string().cuid().nullable().optional()
 });
 
 export const shallowUserSchema = z.object({
@@ -1077,6 +1088,7 @@ export const maintenanceScheduleSchema = z.object({
   id: z.string().cuid(),
   assetId: z.string().cuid(),
   metricId: z.string().cuid().nullable(),
+  procedureId: z.string().cuid().nullable().default(null),
   name: z.string(),
   description: z.string().nullable(),
   triggerType: triggerTypeSchema,
@@ -1116,7 +1128,14 @@ export const createMaintenanceLogSchema = z.object({
   performedBy: z.string().min(1).max(200).optional(),
   applyLinkedParts: z.boolean().default(true),
   metadata: maintenanceLogMetadataSchema.default({}),
-  parts: z.array(createMaintenanceLogPartSchema).optional()
+  parts: z.array(createMaintenanceLogPartSchema).optional(),
+  // Failure tracking
+  failureMode: z.string().max(200).optional(),
+  symptom: z.string().max(500).optional(),
+  rootCause: z.string().max(500).optional(),
+  severity: failureSeveritySchema.optional(),
+  isRepeatFailure: z.boolean().default(false),
+  relatedLogId: z.string().cuid().optional()
 });
 
 export const updateMaintenanceLogSchema = z.object({
@@ -1130,7 +1149,14 @@ export const updateMaintenanceLogSchema = z.object({
   laborRate: z.number().min(0).optional(),
   difficultyRating: z.number().int().min(1).max(5).optional(),
   performedBy: z.string().min(1).max(200).nullable().optional(),
-  metadata: maintenanceLogMetadataSchema.optional()
+  metadata: maintenanceLogMetadataSchema.optional(),
+  // Failure tracking
+  failureMode: z.string().max(200).nullable().optional(),
+  symptom: z.string().max(500).nullable().optional(),
+  rootCause: z.string().max(500).nullable().optional(),
+  severity: failureSeveritySchema.nullable().optional(),
+  isRepeatFailure: z.boolean().optional(),
+  relatedLogId: z.string().cuid().nullable().optional()
 });
 
 export const completeMaintenanceScheduleSchema = z.object({
@@ -1160,6 +1186,13 @@ export const maintenanceLogSchema = z.object({
   difficultyRating: z.number().int().min(1).max(5).nullable().default(null),
   performedBy: z.string().nullable().default(null),
   metadata: maintenanceLogMetadataSchema,
+  // Failure tracking
+  failureMode: z.string().nullable().default(null),
+  symptom: z.string().nullable().default(null),
+  rootCause: z.string().nullable().default(null),
+  severity: failureSeveritySchema.nullable().default(null),
+  isRepeatFailure: z.boolean().default(false),
+  relatedLogId: z.string().cuid().nullable().default(null),
   parts: z.array(maintenanceLogPartSchema).default([]),
   totalPartsCost: z.number().default(0),
   totalLaborCost: z.number().nullable().default(null),
@@ -6518,4 +6551,339 @@ export const deviceTokenSchema = z.object({
 
 export type RegisterDeviceBody = z.infer<typeof registerDeviceBodySchema>;
 export type DeviceToken = z.infer<typeof deviceTokenSchema>;
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PROCEDURES                                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+export const procedureStepSchema = z.object({
+  id: z.string().cuid(),
+  procedureId: z.string().cuid(),
+  sortOrder: z.number().int(),
+  instruction: z.string(),
+  notes: z.string().nullable(),
+  estimatedMinutes: z.number().int().nullable(),
+  warningText: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type ProcedureStep = z.infer<typeof procedureStepSchema>;
+
+export const createProcedureStepSchema = z.object({
+  instruction: z.string().min(1).max(2000),
+  notes: z.string().max(2000).optional(),
+  estimatedMinutes: z.number().int().min(0).optional(),
+  warningText: z.string().max(500).optional(),
+  sortOrder: z.number().int().optional()
+});
+export type CreateProcedureStepInput = z.infer<typeof createProcedureStepSchema>;
+
+export const updateProcedureStepSchema = createProcedureStepSchema.partial();
+export type UpdateProcedureStepInput = z.infer<typeof updateProcedureStepSchema>;
+
+export const procedureToolSchema = z.object({
+  id: z.string().cuid(),
+  procedureId: z.string().cuid(),
+  inventoryItemId: z.string().cuid(),
+  quantity: z.number(),
+  notes: z.string().nullable(),
+  inventoryItem: z.object({
+    id: z.string().cuid(),
+    name: z.string(),
+    unit: z.string()
+  }).optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type ProcedureTool = z.infer<typeof procedureToolSchema>;
+
+export const procedureAssetSchema = z.object({
+  id: z.string().cuid(),
+  procedureId: z.string().cuid(),
+  assetId: z.string().cuid(),
+  asset: z.object({
+    id: z.string().cuid(),
+    name: z.string(),
+    category: assetCategorySchema
+  }).optional(),
+  createdAt: z.string().datetime()
+});
+export type ProcedureAsset = z.infer<typeof procedureAssetSchema>;
+
+export const procedureSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  estimatedMinutes: z.number().int().nullable(),
+  version: z.number().int(),
+  isArchived: z.boolean(),
+  steps: z.array(procedureStepSchema).default([]),
+  assetLinks: z.array(procedureAssetSchema).default([]),
+  toolItems: z.array(procedureToolSchema).default([]),
+  deletedAt: z.string().datetime().nullable().default(null),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type Procedure = z.infer<typeof procedureSchema>;
+
+export const procedureSummarySchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  estimatedMinutes: z.number().int().nullable(),
+  version: z.number().int(),
+  isArchived: z.boolean(),
+  stepCount: z.number().int(),
+  assetCount: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type ProcedureSummary = z.infer<typeof procedureSummarySchema>;
+
+export const createProcedureSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  estimatedMinutes: z.number().int().min(0).optional(),
+  steps: z.array(createProcedureStepSchema).optional(),
+  assetIds: z.array(z.string().cuid()).optional(),
+  tools: z.array(z.object({
+    inventoryItemId: z.string().cuid(),
+    quantity: z.number().min(0).default(1),
+    notes: z.string().max(500).optional()
+  })).optional()
+});
+export type CreateProcedureInput = z.infer<typeof createProcedureSchema>;
+
+export const updateProcedureSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  estimatedMinutes: z.number().int().min(0).nullable().optional(),
+  isArchived: z.boolean().optional()
+});
+export type UpdateProcedureInput = z.infer<typeof updateProcedureSchema>;
+
+export const reorderProcedureStepsSchema = z.object({
+  orderedIds: z.array(z.string().cuid()).min(1)
+});
+export type ReorderProcedureStepsInput = z.infer<typeof reorderProcedureStepsSchema>;
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LOANS                                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+export const loanSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  entityType: loanEntityTypeSchema,
+  entityId: z.string().cuid(),
+  borrowerName: z.string(),
+  borrowerContact: z.string().nullable(),
+  quantity: z.number().nullable(),
+  notes: z.string().nullable(),
+  lentAt: z.string().datetime(),
+  expectedReturnAt: z.string().datetime().nullable(),
+  returnedAt: z.string().datetime().nullable(),
+  entityName: z.string().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type Loan = z.infer<typeof loanSchema>;
+
+export const createLoanSchema = z.object({
+  entityType: loanEntityTypeSchema,
+  entityId: z.string().cuid(),
+  borrowerName: z.string().min(1).max(200),
+  borrowerContact: z.string().max(200).optional(),
+  quantity: z.number().min(0).optional(),
+  notes: z.string().max(2000).optional(),
+  lentAt: z.string().datetime().optional(),
+  expectedReturnAt: z.string().datetime().optional()
+});
+export type CreateLoanInput = z.infer<typeof createLoanSchema>;
+
+export const updateLoanSchema = z.object({
+  borrowerName: z.string().min(1).max(200).optional(),
+  borrowerContact: z.string().max(200).nullable().optional(),
+  quantity: z.number().min(0).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  expectedReturnAt: z.string().datetime().nullable().optional(),
+  returnedAt: z.string().datetime().nullable().optional()
+});
+export type UpdateLoanInput = z.infer<typeof updateLoanSchema>;
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PLAYBOOKS                                                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+export const playbookItemSchema = z.object({
+  id: z.string().cuid(),
+  playbookId: z.string().cuid(),
+  sortOrder: z.number().int(),
+  label: z.string(),
+  notes: z.string().nullable(),
+  assetId: z.string().cuid().nullable(),
+  inventoryItemId: z.string().cuid().nullable(),
+  procedureId: z.string().cuid().nullable(),
+  spaceId: z.string().cuid().nullable(),
+  asset: z.object({ id: z.string(), name: z.string(), category: assetCategorySchema }).nullable().optional(),
+  inventoryItem: z.object({ id: z.string(), name: z.string() }).nullable().optional(),
+  procedure: z.object({ id: z.string(), title: z.string() }).nullable().optional(),
+  space: z.object({ id: z.string(), name: z.string() }).nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type PlaybookItem = z.infer<typeof playbookItemSchema>;
+
+export const createPlaybookItemSchema = z.object({
+  label: z.string().min(1).max(300),
+  notes: z.string().max(2000).optional(),
+  sortOrder: z.number().int().optional(),
+  assetId: z.string().cuid().optional(),
+  inventoryItemId: z.string().cuid().optional(),
+  procedureId: z.string().cuid().optional(),
+  spaceId: z.string().cuid().optional()
+});
+export type CreatePlaybookItemInput = z.infer<typeof createPlaybookItemSchema>;
+
+export const updatePlaybookItemSchema = createPlaybookItemSchema.partial();
+export type UpdatePlaybookItemInput = z.infer<typeof updatePlaybookItemSchema>;
+
+export const playbookSchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  triggerMonth: z.number().int().min(1).max(12).nullable(),
+  triggerDay: z.number().int().min(1).max(31).nullable(),
+  leadDays: z.number().int(),
+  isActive: z.boolean(),
+  items: z.array(playbookItemSchema).default([]),
+  deletedAt: z.string().datetime().nullable().default(null),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type Playbook = z.infer<typeof playbookSchema>;
+
+export const playbookSummarySchema = z.object({
+  id: z.string().cuid(),
+  householdId: z.string().cuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  triggerMonth: z.number().int().nullable(),
+  triggerDay: z.number().int().nullable(),
+  leadDays: z.number().int(),
+  isActive: z.boolean(),
+  itemCount: z.number().int(),
+  lastRunAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type PlaybookSummary = z.infer<typeof playbookSummarySchema>;
+
+export const createPlaybookSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  triggerMonth: z.number().int().min(1).max(12).optional(),
+  triggerDay: z.number().int().min(1).max(31).optional(),
+  leadDays: z.number().int().min(0).max(90).default(7),
+  items: z.array(createPlaybookItemSchema).optional()
+});
+export type CreatePlaybookInput = z.infer<typeof createPlaybookSchema>;
+
+export const updatePlaybookSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  triggerMonth: z.number().int().min(1).max(12).nullable().optional(),
+  triggerDay: z.number().int().min(1).max(31).nullable().optional(),
+  leadDays: z.number().int().min(0).max(90).optional(),
+  isActive: z.boolean().optional()
+});
+export type UpdatePlaybookInput = z.infer<typeof updatePlaybookSchema>;
+
+export const playbookRunItemSchema = z.object({
+  id: z.string().cuid(),
+  runId: z.string().cuid(),
+  playbookItemId: z.string().cuid(),
+  isCompleted: z.boolean(),
+  completedAt: z.string().datetime().nullable(),
+  notes: z.string().nullable(),
+  playbookItem: playbookItemSchema.optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type PlaybookRunItem = z.infer<typeof playbookRunItemSchema>;
+
+export const playbookRunSchema = z.object({
+  id: z.string().cuid(),
+  playbookId: z.string().cuid(),
+  title: z.string().nullable(),
+  startedAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+  notes: z.string().nullable(),
+  items: z.array(playbookRunItemSchema).default([]),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type PlaybookRun = z.infer<typeof playbookRunSchema>;
+
+export const createPlaybookRunSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  notes: z.string().max(2000).optional()
+});
+export type CreatePlaybookRunInput = z.infer<typeof createPlaybookRunSchema>;
+
+export const updatePlaybookRunItemSchema = z.object({
+  isCompleted: z.boolean().optional(),
+  notes: z.string().max(2000).nullable().optional()
+});
+export type UpdatePlaybookRunItemInput = z.infer<typeof updatePlaybookRunItemSchema>;
+
+export const reorderPlaybookItemsSchema = z.object({
+  orderedIds: z.array(z.string().cuid()).min(1)
+});
+export type ReorderPlaybookItemsInput = z.infer<typeof reorderPlaybookItemsSchema>;
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  TOTAL COST OF OWNERSHIP                                         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+export const tcoBreakdownSchema = z.object({
+  purchasePrice: z.number(),
+  maintenanceCost: z.number(),
+  partsCost: z.number(),
+  laborCost: z.number(),
+  projectExpenses: z.number(),
+  totalCost: z.number(),
+  monthsOwned: z.number().int(),
+  costPerMonth: z.number(),
+  costPerYear: z.number()
+});
+export type TcoBreakdown = z.infer<typeof tcoBreakdownSchema>;
+
+export const tcoCostTimelineEntrySchema = z.object({
+  date: z.string().datetime(),
+  cumulativeCost: z.number(),
+  source: z.string(),
+  label: z.string(),
+  amount: z.number()
+});
+export type TcoCostTimelineEntry = z.infer<typeof tcoCostTimelineEntrySchema>;
+
+export const tcoResponseSchema = z.object({
+  assetId: z.string().cuid(),
+  breakdown: tcoBreakdownSchema,
+  timeline: z.array(tcoCostTimelineEntrySchema),
+  failureSummary: z.array(z.object({
+    failureMode: z.string(),
+    count: z.number().int(),
+    totalCost: z.number(),
+    lastOccurrence: z.string().datetime()
+  })).default([])
+});
+export type TcoResponse = z.infer<typeof tcoResponseSchema>;
+
+export type FailureSeverity = z.infer<typeof failureSeveritySchema>;
+export type LoanEntityType = z.infer<typeof loanEntityTypeSchema>;
 

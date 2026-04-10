@@ -119,6 +119,14 @@ export async function AssetMetricPanel({ assetId, metric }: AssetMetricPanelProp
                 placeholder="Trip complete, service visit, seasonal reading"
               />
             </label>
+            <label className="field">
+              <span>Cost per Unit</span>
+              <input type="number" name="costPerUnit" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label className="field">
+              <span>Total Cost</span>
+              <input type="number" name="totalCost" min="0" step="0.01" placeholder="0.00" />
+            </label>
             <button type="submit" className="button button--primary">
               Add Entry
             </button>

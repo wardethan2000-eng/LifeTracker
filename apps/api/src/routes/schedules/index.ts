@@ -165,6 +165,10 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
       data.estimatedMinutes = input.estimatedMinutes;
     }
 
+    if (input.procedureId !== undefined) {
+      data.procedureId = input.procedureId;
+    }
+
     if (input.assignedToId !== undefined) {
       const membership = await app.prisma.householdMember.findUnique({
         where: { householdId_userId: { householdId: asset.householdId, userId: input.assignedToId } }
@@ -479,6 +483,10 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.isRegulatory !== undefined) {
       data.isRegulatory = input.isRegulatory;
+    }
+
+    if (input.procedureId !== undefined) {
+      data.procedureId = input.procedureId;
     }
 
     if (input.lastCompletedAt !== undefined) {

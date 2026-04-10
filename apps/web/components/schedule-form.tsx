@@ -9,9 +9,15 @@ type Metric = {
   unit: string;
 };
 
+type ProcedureOption = {
+  id: string;
+  title: string;
+};
+
 type ScheduleFormProps = {
   assetId: string;
   metrics: Metric[];
+  procedures?: ProcedureOption[];
   action: (formData: FormData) => void | Promise<void>;
 };
 
@@ -30,7 +36,7 @@ const monthNames = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-export function ScheduleForm({ assetId, metrics, action }: ScheduleFormProps): JSX.Element {
+export function ScheduleForm({ assetId, metrics, procedures, action }: ScheduleFormProps): JSX.Element {
   const [triggerType, setTriggerType] = useState<TriggerType>("interval");
   const [channels, setChannels] = useState<Set<string>>(new Set(["push"]));
   const [expanded, setExpanded] = useState(false);
@@ -288,6 +294,18 @@ export function ScheduleForm({ assetId, metrics, action }: ScheduleFormProps): J
           <span>Estimated Time (minutes)</span>
           <input type="number" name="estimatedMinutes" min="0" step="1" placeholder="Minutes per occurrence" />
         </label>
+
+        {procedures && procedures.length > 0 ? (
+          <label className="field field--full">
+            <span>Linked Procedure</span>
+            <select name="procedureId">
+              <option value="">None</option>
+              {procedures.map((p) => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <div className="field field--full inline-actions inline-actions--end">
           <button type="button" className="button button--ghost" onClick={() => setExpanded(false)} disabled={isPending}>Cancel</button>

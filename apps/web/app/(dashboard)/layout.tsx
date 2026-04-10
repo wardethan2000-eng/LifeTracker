@@ -41,6 +41,9 @@ function buildNavGroups(
     { href: "/projects", label: "Projects", translationKey: "projects", icon: "folder" },
     { href: "/hobbies", label: "Hobbies", translationKey: "hobbies", icon: "beaker" },
     { href: "/maintenance", label: "Maintenance", translationKey: "maintenance", icon: "wrench" },
+    { href: "/procedures", label: "Procedures", translationKey: "procedures", icon: "clipboard-list" },
+    { href: "/playbooks", label: "Playbooks", translationKey: "playbooks", icon: "calendar-check" },
+    { href: "/loans", label: "Loans", translationKey: "loans", icon: "arrow-swap" },
     { href: "/service-providers", label: "Providers", translationKey: "providers", icon: "briefcase" },
   ];
   const insights: NavItemDef[] = [

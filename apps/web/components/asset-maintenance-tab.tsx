@@ -14,9 +14,10 @@ import { formatDueLabel } from "../lib/formatters";
 type AssetMaintenanceTabProps = {
   detail: AssetDetailResponse;
   householdMembers: HouseholdMember[];
+  procedures?: { id: string; title: string }[];
 };
 
-export async function AssetMaintenanceTab({ detail, householdMembers }: AssetMaintenanceTabProps): Promise<JSX.Element> {
+export async function AssetMaintenanceTab({ detail, householdMembers, procedures }: AssetMaintenanceTabProps): Promise<JSX.Element> {
   const overdueCount = detail.schedules.filter((schedule) => schedule.status === "overdue").length;
   const dueCount = detail.schedules.filter((schedule) => schedule.status === "due").length;
   const upcomingCount = detail.schedules.filter((schedule) => schedule.status === "upcoming").length;
@@ -29,6 +30,7 @@ export async function AssetMaintenanceTab({ detail, householdMembers }: AssetMai
       <div className="resource-layout__primary">
         <AssetMaintenanceSections
           detail={detail}
+          procedures={procedures}
           createScheduleAction={createScheduleAction}
           completeScheduleAction={completeScheduleAction}
           toggleScheduleActiveAction={toggleScheduleActiveAction}

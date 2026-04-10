@@ -59,6 +59,12 @@ export function LogMaintenanceForm({ householdId, assetId, schedules, createLogA
       cost: "",
       serviceProviderId: "",
       notes: "",
+      failureMode: "",
+      symptom: "",
+      rootCause: "",
+      severity: "",
+      isRepeatFailure: false,
+      relatedLogId: "",
       applyLinkedParts: true,
       parts: [createEmptyPart()]
     }
@@ -118,6 +124,13 @@ export function LogMaintenanceForm({ householdId, assetId, schedules, createLogA
       if (values.cost !== undefined) formData.set("cost", String(values.cost));
       if (values.serviceProviderId) formData.set("serviceProviderId", values.serviceProviderId);
       if (values.notes) formData.set("notes", values.notes);
+
+      if (values.failureMode) formData.set("failureMode", values.failureMode);
+      if (values.symptom) formData.set("symptom", values.symptom);
+      if (values.rootCause) formData.set("rootCause", values.rootCause);
+      if (values.severity) formData.set("severity", values.severity);
+      if (values.isRepeatFailure) formData.set("isRepeatFailure", "true");
+      if (values.relatedLogId) formData.set("relatedLogId", values.relatedLogId);
 
       for (const part of values.parts ?? []) {
         formData.append("partName", part.name ?? "");
@@ -199,6 +212,39 @@ export function LogMaintenanceForm({ householdId, assetId, schedules, createLogA
         <textarea rows={3} placeholder="Service notes or findings" {...register("notes")} />
         <InlineError message={errors.notes?.message} size="sm" />
       </label>
+
+      {/* Failure Tracking */}
+      <label className="field">
+        <span>Failure Mode</span>
+        <input type="text" placeholder="e.g. Belt wear, Seal leak" {...register("failureMode")} />
+        <InlineError message={errors.failureMode?.message} size="sm" />
+      </label>
+      <label className="field">
+        <span>Severity</span>
+        <select {...register("severity")}>
+          <option value="">—</option>
+          <option value="minor">Minor</option>
+          <option value="moderate">Moderate</option>
+          <option value="major">Major</option>
+          <option value="critical">Critical</option>
+        </select>
+        <InlineError message={errors.severity?.message} size="sm" />
+      </label>
+      <label className="field field--full">
+        <span>Symptom</span>
+        <input type="text" placeholder="What was observed before failure?" {...register("symptom")} />
+        <InlineError message={errors.symptom?.message} size="sm" />
+      </label>
+      <label className="field field--full">
+        <span>Root Cause</span>
+        <input type="text" placeholder="Underlying cause of the failure" {...register("rootCause")} />
+        <InlineError message={errors.rootCause?.message} size="sm" />
+      </label>
+      <label className="field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" {...register("isRepeatFailure")} />
+        <span>Repeat failure</span>
+      </label>
+
       <div className="field field--full" style={{ marginBottom: 8 }}>
         <span style={{ display: "block", marginBottom: 4, fontSize: "0.85rem", color: "var(--ink-muted)" }}>Look Up Part by Barcode</span>
         <BarcodeLookupField onResult={handleBarcodeResult} />

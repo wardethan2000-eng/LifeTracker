@@ -572,6 +572,32 @@ import {
   type HobbyDeleteImpact,
   trashListResponseSchema,
   type TrashListResponse,
+  procedureSchema,
+  procedureSummarySchema,
+  loanSchema,
+  playbookSchema,
+  playbookSummarySchema,
+  playbookRunSchema,
+  tcoResponseSchema,
+  type Procedure,
+  type ProcedureSummary,
+  type CreateProcedureInput,
+  type UpdateProcedureInput,
+  type CreateProcedureStepInput,
+  type UpdateProcedureStepInput,
+  type ReorderProcedureStepsInput,
+  type Loan,
+  type CreateLoanInput,
+  type UpdateLoanInput,
+  type Playbook,
+  type PlaybookSummary,
+  type PlaybookRun,
+  type CreatePlaybookInput,
+  type UpdatePlaybookInput,
+  type CreatePlaybookItemInput,
+  type UpdatePlaybookItemInput,
+  type ReorderPlaybookItemsInput,
+  type TcoResponse,
 } from "@aegis/types";
 import { normalizeExternalUrl } from "./url";
 
@@ -6517,3 +6543,102 @@ export const purgeAllTrash = async (householdId: string, olderThanDays?: number)
   const params = olderThanDays !== undefined ? `?olderThanDays=${olderThanDays}` : "";
   await apiRequest({ path: `/v1/households/${householdId}/trash${params}`, method: "DELETE" });
 };
+
+// ── Procedures ──────────────────────────────────────────────────────
+
+export const getHouseholdProcedures = async (householdId: string): Promise<ProcedureSummary[]> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures`, schema: z.array(procedureSummarySchema), cachePolicy: { next: { revalidate: 30 } } });
+
+export const getProcedure = async (householdId: string, procedureId: string): Promise<Procedure> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}`, schema: procedureSchema, cachePolicy: { next: { revalidate: 30 } } });
+
+export const createProcedure = async (householdId: string, input: CreateProcedureInput): Promise<Procedure> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures`, method: "POST", body: input, schema: procedureSchema });
+
+export const updateProcedure = async (householdId: string, procedureId: string, input: UpdateProcedureInput): Promise<Procedure> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}`, method: "PATCH", body: input, schema: procedureSchema });
+
+export const deleteProcedure = async (householdId: string, procedureId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}`, method: "DELETE" });
+};
+
+export const addProcedureStep = async (householdId: string, procedureId: string, input: CreateProcedureStepInput): Promise<Procedure> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}/steps`, method: "POST", body: input, schema: procedureSchema });
+
+export const updateProcedureStep = async (householdId: string, procedureId: string, stepId: string, input: UpdateProcedureStepInput): Promise<Procedure> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}/steps/${stepId}`, method: "PATCH", body: input, schema: procedureSchema });
+
+export const deleteProcedureStep = async (householdId: string, procedureId: string, stepId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}/steps/${stepId}`, method: "DELETE" });
+};
+
+export const reorderProcedureSteps = async (householdId: string, procedureId: string, input: ReorderProcedureStepsInput): Promise<Procedure> =>
+  apiRequest({ path: `/v1/households/${householdId}/procedures/${procedureId}/steps/reorder`, method: "POST", body: input, schema: procedureSchema });
+
+// ── Loans ───────────────────────────────────────────────────────────
+
+export const getHouseholdLoans = async (householdId: string, status?: "active" | "returned" | "all"): Promise<Loan[]> => {
+  const params = status ? `?status=${status}` : "";
+  return apiRequest({ path: `/v1/households/${householdId}/loans${params}`, schema: z.array(loanSchema), cachePolicy: { next: { revalidate: 30 } } });
+};
+
+export const getLoan = async (householdId: string, loanId: string): Promise<Loan> =>
+  apiRequest({ path: `/v1/households/${householdId}/loans/${loanId}`, schema: loanSchema, cachePolicy: { next: { revalidate: 30 } } });
+
+export const createLoan = async (householdId: string, input: CreateLoanInput): Promise<Loan> =>
+  apiRequest({ path: `/v1/households/${householdId}/loans`, method: "POST", body: input, schema: loanSchema });
+
+export const updateLoan = async (householdId: string, loanId: string, input: UpdateLoanInput): Promise<Loan> =>
+  apiRequest({ path: `/v1/households/${householdId}/loans/${loanId}`, method: "PATCH", body: input, schema: loanSchema });
+
+export const deleteLoan = async (householdId: string, loanId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/loans/${loanId}`, method: "DELETE" });
+};
+
+// ── Playbooks ───────────────────────────────────────────────────────
+
+export const getHouseholdPlaybooks = async (householdId: string): Promise<PlaybookSummary[]> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks`, schema: z.array(playbookSummarySchema), cachePolicy: { next: { revalidate: 30 } } });
+
+export const getPlaybook = async (householdId: string, playbookId: string): Promise<Playbook> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}`, schema: playbookSchema, cachePolicy: { next: { revalidate: 30 } } });
+
+export const createPlaybook = async (householdId: string, input: CreatePlaybookInput): Promise<Playbook> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks`, method: "POST", body: input, schema: playbookSchema });
+
+export const updatePlaybook = async (householdId: string, playbookId: string, input: UpdatePlaybookInput): Promise<Playbook> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}`, method: "PATCH", body: input, schema: playbookSchema });
+
+export const deletePlaybook = async (householdId: string, playbookId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}`, method: "DELETE" });
+};
+
+export const addPlaybookItem = async (householdId: string, playbookId: string, input: CreatePlaybookItemInput): Promise<Playbook> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/items`, method: "POST", body: input, schema: playbookSchema });
+
+export const updatePlaybookItem = async (householdId: string, playbookId: string, itemId: string, input: UpdatePlaybookItemInput): Promise<Playbook> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/items/${itemId}`, method: "PATCH", body: input, schema: playbookSchema });
+
+export const deletePlaybookItem = async (householdId: string, playbookId: string, itemId: string): Promise<void> => {
+  await apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/items/${itemId}`, method: "DELETE" });
+};
+
+export const reorderPlaybookItems = async (householdId: string, playbookId: string, input: ReorderPlaybookItemsInput): Promise<Playbook> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/items/reorder`, method: "POST", body: input, schema: playbookSchema });
+
+export const startPlaybookRun = async (householdId: string, playbookId: string): Promise<PlaybookRun> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/runs`, method: "POST", schema: playbookRunSchema });
+
+export const getPlaybookRuns = async (householdId: string, playbookId: string): Promise<PlaybookRun[]> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/runs`, schema: z.array(playbookRunSchema), cachePolicy: { next: { revalidate: 30 } } });
+
+export const getPlaybookRun = async (householdId: string, playbookId: string, runId: string): Promise<PlaybookRun> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/runs/${runId}`, schema: playbookRunSchema, cachePolicy: { next: { revalidate: 30 } } });
+
+export const completePlaybookRunItem = async (householdId: string, playbookId: string, runId: string, itemId: string): Promise<PlaybookRun> =>
+  apiRequest({ path: `/v1/households/${householdId}/playbooks/${playbookId}/runs/${runId}/items/${itemId}/complete`, method: "POST", schema: playbookRunSchema });
+
+// ── TCO ─────────────────────────────────────────────────────────────
+
+export const getAssetTco = async (assetId: string): Promise<TcoResponse> =>
+  apiRequest({ path: `/v1/assets/${assetId}/cost-analytics/tco`, schema: tcoResponseSchema, cachePolicy: { next: { revalidate: 60 } } });

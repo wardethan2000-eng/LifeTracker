@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import { AssetMaintenanceTab } from "../../../../../components/asset-maintenance-tab";
 import {
   getAssetDetail,
-  getHouseholdMembers
+  getHouseholdMembers,
+  getHouseholdProcedures
 } from "../../../../../lib/api";
 
 type AssetMaintenancePageProps = {
@@ -22,7 +23,10 @@ export default async function AssetMaintenancePage({ params }: AssetMaintenanceP
 
 async function MaintenanceContent({ assetId }: { assetId: string }): Promise<JSX.Element> {
   const detail = await getAssetDetail(assetId);
-  const householdMembers = await getHouseholdMembers(detail.asset.householdId);
+  const [householdMembers, procedures] = await Promise.all([
+    getHouseholdMembers(detail.asset.householdId),
+    getHouseholdProcedures(detail.asset.householdId)
+  ]);
 
-  return <AssetMaintenanceTab detail={detail} householdMembers={householdMembers} />;
+  return <AssetMaintenanceTab detail={detail} householdMembers={householdMembers} procedures={procedures.map((p) => ({ id: p.id, title: p.title }))} />;
 }

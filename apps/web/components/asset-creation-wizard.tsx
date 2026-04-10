@@ -16,6 +16,7 @@ const CATEGORY_TILES: Array<{ value: AssetCategory; emoji: string; label: string
   { value: "marine", emoji: "⛵", label: "Marine" },
   { value: "aircraft", emoji: "✈️", label: "Aircraft" },
   { value: "technology", emoji: "💻", label: "Technology" },
+  { value: "utility", emoji: "⚡", label: "Utility" },
   { value: "other", emoji: "📦", label: "Other" },
 ];
 
@@ -54,6 +55,10 @@ const CATEGORY_QUICK_FIELDS: Record<AssetCategory, Array<{ name: string; label: 
   technology: [
     { name: "manufacturer", label: "Manufacturer", placeholder: "e.g. Apple, Dell" },
     { name: "model", label: "Model", placeholder: "e.g. MacBook Pro M3" },
+  ],
+  utility: [
+    { name: "manufacturer", label: "Provider", placeholder: "e.g. Duke Energy, City Water" },
+    { name: "model", label: "Account / Meter", placeholder: "e.g. Account #12345" },
   ],
   other: [
     { name: "manufacturer", label: "Manufacturer", placeholder: "Optional" },

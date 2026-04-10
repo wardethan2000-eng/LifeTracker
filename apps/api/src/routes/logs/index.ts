@@ -197,6 +197,30 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
       data.performedBy = input.performedBy;
     }
 
+    if (input.failureMode !== undefined) {
+      data.failureMode = input.failureMode;
+    }
+
+    if (input.symptom !== undefined) {
+      data.symptom = input.symptom;
+    }
+
+    if (input.rootCause !== undefined) {
+      data.rootCause = input.rootCause;
+    }
+
+    if (input.severity !== undefined) {
+      data.severity = input.severity;
+    }
+
+    if (input.isRepeatFailure !== undefined) {
+      data.isRepeatFailure = input.isRepeatFailure;
+    }
+
+    if (input.relatedLogId !== undefined) {
+      data.relatedLogId = input.relatedLogId;
+    }
+
     let inventoryWarnings: string[] = [];
 
     const log = await app.prisma.$transaction(async (tx) => {
@@ -362,6 +386,30 @@ export const maintenanceLogRoutes: FastifyPluginAsync = async (app) => {
 
     if (input.performedBy !== undefined) {
       data.performedBy = input.performedBy;
+    }
+
+    if (input.failureMode !== undefined) {
+      data.failureMode = input.failureMode;
+    }
+
+    if (input.symptom !== undefined) {
+      data.symptom = input.symptom;
+    }
+
+    if (input.rootCause !== undefined) {
+      data.rootCause = input.rootCause;
+    }
+
+    if (input.severity !== undefined) {
+      data.severity = input.severity;
+    }
+
+    if (input.isRepeatFailure !== undefined) {
+      data.isRepeatFailure = input.isRepeatFailure;
+    }
+
+    if (input.relatedLogId !== undefined) {
+      data.relatedLogId = input.relatedLogId;
     }
 
     if (input.metadata !== undefined) {

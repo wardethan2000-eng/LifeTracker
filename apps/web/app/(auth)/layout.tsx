@@ -25,7 +25,7 @@ export default function AuthLayout({ children }: { children: ReactNode }): JSX.E
         }}
       >
         <div style={{ marginBottom: "1.5rem", textAlign: "center" }}>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 600, margin: 0 }}>LifeKeeper</h1>
+          <h1 style={{ fontSize: "1.25rem", fontWeight: 600, margin: 0 }}>Aegis</h1>
         </div>
         {children}
       </div>
