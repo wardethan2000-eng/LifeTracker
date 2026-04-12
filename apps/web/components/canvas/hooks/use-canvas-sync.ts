@@ -34,6 +34,7 @@ export function useCanvasSync({
         y2: u.y2,
         width: u.width,
         height: u.height,
+        rotation: u.rotation,
       })),
     });
   }, [householdId, canvasId]);

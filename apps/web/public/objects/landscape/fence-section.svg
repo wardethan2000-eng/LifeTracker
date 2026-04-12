@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- fence section (top-down view) -->
+  <rect x="2" y="4" width="156" height="12" fill="#c8a860" stroke="#8a6830"/>
+  <!-- posts -->
+  <rect x="2" y="2" width="8" height="16" rx="1" fill="#a08040" stroke="#8a6830"/>
+  <rect x="38" y="2" width="8" height="16" rx="1" fill="#a08040" stroke="#8a6830"/>
+  <rect x="76" y="2" width="8" height="16" rx="1" fill="#a08040" stroke="#8a6830"/>
+  <rect x="114" y="2" width="8" height="16" rx="1" fill="#a08040" stroke="#8a6830"/>
+  <rect x="150" y="2" width="8" height="16" rx="1" fill="#a08040" stroke="#8a6830"/>
+</svg>

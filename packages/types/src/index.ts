@@ -5870,6 +5870,7 @@ export const ideaCanvasNodeSchema = z.object({
   strokeColor: z.string().nullable(),
   fillColor: z.string().nullable(),
   strokeWidth: z.number(),
+  fontSize: z.number(),
   shape: canvasNodeShapeSchema,
   objectType: canvasObjectTypeSchema,
   rotation: z.number(),
@@ -5888,6 +5889,8 @@ export const ideaCanvasNodeSchema = z.object({
   pointBy: z.number().nullable().optional(),
   // Freehand / polyline data
   pointsJson: z.string().nullable().optional(),
+  // Group assignment
+  groupId: z.string().nullable().optional(),
   // Layer assignment
   layerId: z.string().nullable().optional(),
   createdAt: z.string(),
@@ -5929,6 +5932,9 @@ export const ideaCanvasSchema = z.object({
   physicalUnit: z.string().nullable(),
   backgroundImageUrl: z.string().nullable(),
   backgroundImageOpacity: z.number().default(0.5),
+  backgroundImageX: z.number().default(0),
+  backgroundImageY: z.number().default(0),
+  backgroundImageScale: z.number().default(1),
   snapToGrid: z.boolean(),
   gridSize: z.number(),
   canvasMode: canvasModeSchema,
@@ -5971,6 +5977,7 @@ export const ideaCanvasThumbnailNodeSchema = z.object({
   strokeColor: z.string().nullable(),
   fillColor: z.string().nullable(),
   strokeWidth: z.number(),
+  fontSize: z.number().optional(),
   rotation: z.number(),
   sortOrder: z.number(),
   label: z.string(),
@@ -5983,6 +5990,7 @@ export const ideaCanvasThumbnailNodeSchema = z.object({
   pointBy: z.number().nullable().optional(),
   wallThickness: z.number().optional(),
   wallAngle: z.number().nullable().optional(),
+  groupId: z.string().nullable().optional(),
 });
 export type IdeaCanvasThumbnailNode = z.infer<typeof ideaCanvasThumbnailNodeSchema>;
 
@@ -6030,6 +6038,9 @@ export const updateCanvasSettingsSchema = z.object({
   physicalUnit: canvasPhysicalUnitSchema.nullable().optional(),
   backgroundImageUrl: z.string().max(1000).nullable().optional(),
   backgroundImageOpacity: z.number().min(0).max(1).optional(),
+  backgroundImageX: z.number().optional(),
+  backgroundImageY: z.number().optional(),
+  backgroundImageScale: z.number().min(0.01).max(100).optional(),
   snapToGrid: z.boolean().optional(),
   gridSize: z.number().int().min(8).max(200).optional(),
   showDimensions: z.boolean().optional(),
@@ -6051,6 +6062,7 @@ export const createCanvasNodeSchema = z.object({
   strokeColor: z.string().max(30).optional(),
   fillColor: z.string().max(30).optional(),
   strokeWidth: z.number().int().min(1).max(20).default(1),
+  fontSize: z.number().int().min(8).max(72).default(14),
   shape: canvasNodeShapeSchema.default("rectangle"),
   objectType: canvasObjectTypeSchema.default("flowchart"),
   rotation: z.number().default(0),
@@ -6069,6 +6081,8 @@ export const createCanvasNodeSchema = z.object({
   pointBy: z.number().optional().nullable(),
   // Freehand / polyline data
   pointsJson: z.string().max(50000).optional().nullable(),
+  // Group assignment
+  groupId: z.string().optional().nullable(),
   // Layer assignment
   layerId: z.string().optional().nullable(),
 });
@@ -6088,6 +6102,7 @@ export const updateCanvasNodeSchema = z.object({
   strokeColor: z.string().max(30).optional().nullable(),
   fillColor: z.string().max(30).optional().nullable(),
   strokeWidth: z.number().int().min(1).max(20).optional(),
+  fontSize: z.number().int().min(8).max(72).optional(),
   shape: canvasNodeShapeSchema.optional(),
   objectType: canvasObjectTypeSchema.optional(),
   rotation: z.number().optional(),
@@ -6105,6 +6120,8 @@ export const updateCanvasNodeSchema = z.object({
   pointBy: z.number().optional().nullable(),
   // Freehand / polyline data
   pointsJson: z.string().max(50000).optional().nullable(),
+  // Group assignment
+  groupId: z.string().optional().nullable(),
   // Layer assignment
   layerId: z.string().optional().nullable(),
 });
@@ -6122,6 +6139,7 @@ export const batchUpdateCanvasNodesSchema = z.object({
     wallAngle: z.number().optional().nullable(),
     sortOrder: z.number().int().optional(),
     layerId: z.string().optional().nullable(),
+    groupId: z.string().optional().nullable(),
   })).min(1).max(200),
 });
 export type BatchUpdateCanvasNodesInput = z.infer<typeof batchUpdateCanvasNodesSchema>;
@@ -6144,7 +6162,7 @@ export type UpdateCanvasEdgeInput = z.infer<typeof updateCanvasEdgeSchema>;
 
 export const canvasObjectCategoryValues = [
   "vehicle", "furniture", "cabinet", "appliance", "structure",
-  "tool", "person", "electronics", "custom",
+  "tool", "person", "electronics", "landscape", "custom",
 ] as const;
 export const canvasObjectCategorySchema = z.enum(canvasObjectCategoryValues);
 export type CanvasObjectCategory = z.infer<typeof canvasObjectCategorySchema>;

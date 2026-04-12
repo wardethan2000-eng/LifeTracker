@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- driveway (top-down view) -->
+  <rect x="4" y="4" width="92" height="192" rx="3" fill="#a0a0a0" stroke="#787878"/>
+  <!-- surface texture lines -->
+  <line x1="30" y1="4" x2="30" y2="196" stroke="#909090" stroke-width="0.5" stroke-dasharray="8 12"/>
+  <line x1="50" y1="4" x2="50" y2="196" stroke="#909090" stroke-width="0.5"/>
+  <line x1="70" y1="4" x2="70" y2="196" stroke="#909090" stroke-width="0.5" stroke-dasharray="8 12"/>
+  <!-- edge marking -->
+  <line x1="10" y1="4" x2="10" y2="196" stroke="#b0b0b0" stroke-width="1"/>
+  <line x1="90" y1="4" x2="90" y2="196" stroke="#b0b0b0" stroke-width="1"/>
+</svg>

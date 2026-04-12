@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- conifer canopy (top-down, roughly circular with pointed edges) -->
+  <polygon points="30,4 52,30 48,50 38,70 22,70 12,50 8,30" fill="#3d8840" stroke="#285828"/>
+  <circle cx="30" cy="38" r="18" fill="#4a9a50" stroke="none" opacity="0.4"/>
+  <!-- trunk -->
+  <circle cx="30" cy="40" r="4" fill="#8a6530" stroke="#6a4520"/>
+</svg>

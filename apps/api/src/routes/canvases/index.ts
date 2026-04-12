@@ -21,7 +21,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { assertMembership } from "../../lib/asset-access.js";
 import { createActivityLogger } from "../../lib/activity-log.js";
-import { generateCanvasPdf } from "../../lib/pdf-canvas.js";
+import { generateCanvasPdf, readImageSize } from "../../lib/pdf-canvas.js";
 import { notFound } from "../../lib/errors.js";
 import { softDeleteData } from "../../lib/soft-delete.js";
 import { householdParamsSchema as householdParams } from "../../lib/schemas.js";
@@ -41,12 +41,14 @@ function serializeNode(n: {
   id: string; canvasId: string; entryId: string | null; label: string; body: string | null;
   x: number; y: number; x2: number; y2: number; width: number; height: number;
   color: string | null; strokeColor: string | null; fillColor: string | null; strokeWidth: number;
+  fontSize?: number;
   shape: string; objectType: string; rotation: number; sortOrder: number; imageUrl: string | null;
   maskJson?: string | null;
   wallThickness?: number; wallAngle?: number | null; wallHeight?: number | null; physicalLength?: number | null;
   parentNodeId?: string | null;
   pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
   pointsJson?: string | null;
+  groupId?: string | null;
   layerId?: string | null;
   createdAt: Date; updatedAt: Date;
 }) {
@@ -77,11 +79,13 @@ type CanvasWithRelations = {
     id: string; canvasId: string; entryId: string | null; label: string; body: string | null;
     x: number; y: number; x2: number; y2: number; width: number; height: number;
     color: string | null; strokeColor: string | null; fillColor: string | null; strokeWidth: number;
+    fontSize?: number;
     shape: string; objectType: string; rotation: number; sortOrder: number; imageUrl: string | null;
     maskJson?: string | null;
     wallThickness?: number; wallAngle?: number | null; physicalLength?: number | null;
     parentNodeId?: string | null;
     pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
+    groupId?: string | null;
     layerId?: string | null;
     createdAt: Date; updatedAt: Date;
   }>;
@@ -227,14 +231,61 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     });
     if (!canvas) return notFound(reply, "Canvas");
 
+    const nodes = (canvas as unknown as CanvasWithRelations).nodes;
     const ppu = canvas.gridSize > 0 ? canvas.gridSize : null;
+
+    // Resolve background image from S3 if stored as attachment reference
+    let backgroundImage: Parameters<typeof generateCanvasPdf>[0]["backgroundImage"];
+    if (canvas.backgroundImageUrl?.startsWith("attachment:")) {
+      const attachmentId = canvas.backgroundImageUrl.slice("attachment:".length);
+      const attachment = await app.prisma.attachment.findFirst({
+        where: { id: attachmentId, householdId, deletedAt: null },
+      });
+      if (attachment) {
+        const buf = await app.storage.getObjectBuffer(attachment.storageKey);
+        if (buf) {
+          const dims = readImageSize(buf);
+          if (dims) {
+            backgroundImage = {
+              buffer: buf,
+              x: canvas.backgroundImageX,
+              y: canvas.backgroundImageY,
+              scale: canvas.backgroundImageScale,
+              opacity: canvas.backgroundImageOpacity,
+              naturalWidth: dims.width,
+              naturalHeight: dims.height,
+            };
+          }
+        }
+      }
+    }
+
+    // Resolve node images from S3 (only for image/object nodes with attachment references)
+    const nodeImages = new Map<string, Buffer>();
+    const imageNodes = nodes.filter(
+      (n) => (n.objectType === "image" || n.objectType === "object") && n.imageUrl?.startsWith("attachment:"),
+    );
+    await Promise.all(
+      imageNodes.map(async (n) => {
+        const attachmentId = n.imageUrl!.slice("attachment:".length);
+        const attachment = await app.prisma.attachment.findFirst({
+          where: { id: attachmentId, householdId, deletedAt: null },
+        });
+        if (!attachment) return;
+        const buf = await app.storage.getObjectBuffer(attachment.storageKey);
+        if (buf) nodeImages.set(n.id, buf);
+      }),
+    );
+
     const doc = generateCanvasPdf({
       name: canvas.name,
       canvasMode: canvas.canvasMode,
       physicalUnit: canvas.physicalUnit,
       pixelsPerUnit: ppu,
       showDimensions: canvas.showDimensions,
-      nodes: (canvas as unknown as CanvasWithRelations).nodes.map((n) => ({
+      backgroundImage,
+      nodeImages: nodeImages.size > 0 ? nodeImages : undefined,
+      nodes: nodes.map((n) => ({
         id: n.id,
         x: n.x,
         y: n.y,
@@ -258,6 +309,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         pointBx: n.pointBx,
         pointBy: n.pointBy,
         wallThickness: n.wallThickness ?? null,
+        fontSize: n.fontSize ?? 14,
       })),
       edges: (canvas as unknown as CanvasWithRelations).edges.map((e) => ({
         sourceNodeId: e.sourceNodeId,
@@ -375,6 +427,9 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.physicalUnit !== undefined) data.physicalUnit = input.physicalUnit;
     if (input.backgroundImageUrl !== undefined) data.backgroundImageUrl = input.backgroundImageUrl;
     if (input.backgroundImageOpacity !== undefined) data.backgroundImageOpacity = input.backgroundImageOpacity;
+    if (input.backgroundImageX !== undefined) data.backgroundImageX = input.backgroundImageX;
+    if (input.backgroundImageY !== undefined) data.backgroundImageY = input.backgroundImageY;
+    if (input.backgroundImageScale !== undefined) data.backgroundImageScale = input.backgroundImageScale;
     if (input.snapToGrid !== undefined) data.snapToGrid = input.snapToGrid;
     if (input.gridSize !== undefined) data.gridSize = input.gridSize;
     if (input.showDimensions !== undefined) data.showDimensions = input.showDimensions;

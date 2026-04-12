@@ -27,11 +27,17 @@ export interface CanvasToolbarProps {
   onChangeFillColor: (color: string) => void;
   onChangeStrokeColor: (color: string) => void;
   onChangeStrokeWidth: (width: number) => void;
+  onChangeFontSize: (size: number) => void;
   onChangeEdgeStyle: (style: CanvasEdgeStyle) => void;
   onDeleteSelected: () => void;
   // Layer ordering
   onBringForward?: () => void;
   onSendBackward?: () => void;
+  // Alignment (multi-select)
+  onAlignNodes?: (axis: "left" | "center-h" | "right" | "top" | "center-v" | "bottom" | "distribute-h" | "distribute-v") => void;
+  // Snap to grid
+  onToggleSnap?: () => void;
+  snapEnabled?: boolean;
   // Wall-specific actions
   onChangeWallHeight?: (height: number | null) => void;
   /** Physical unit string (e.g. "ft", "m") for displaying wall length */
@@ -85,13 +91,14 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     canvasMode,
     selectedCount, selectedEdgeId, singleSelected, allFlowchartSelected, selectedEdge,
     onStartEdge, onChangeColor, onChangeShape, onChangeFillColor,
-    onChangeStrokeColor, onChangeStrokeWidth, onChangeEdgeStyle, onDeleteSelected,
+    onChangeStrokeColor, onChangeStrokeWidth, onChangeFontSize, onChangeEdgeStyle, onDeleteSelected,
     onChangeWallHeight, physicalUnit, pixelsPerUnit,
     onUndo, onRedo, zoom, onZoomIn, onZoomOut, onFitToView,
     objectPickerOpen, onToggleObjectPicker, showSettings,
     onToggleLayerPanel, showLayerPanel,
     onExportSVG, onExportPNG, onExportPDF,
     onBringForward, onSendBackward,
+    onAlignNodes, onToggleSnap, snapEnabled = false,
     simplified = false,
   } = props;
 
@@ -261,6 +268,11 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
           title={hasPhysicalUnits ? "Define room polygon — click points, double-click to close" : "Set physical units first"}>
           ⬡ Room
         </button>
+        <button type="button" className={btn("calibrate")}
+          onClick={() => onToolChange("calibrate")}
+          title="Set scale — draw a line on the image, then enter its real-world length">
+          📐 Calibrate
+        </button>
       </div>
       <div className="idea-canvas__toolbar-divider" />
 
@@ -323,13 +335,20 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
             </>
           ) : singleSelected.objectType === "flowchart" ? (
             <>
-              <select className="idea-canvas__tool-select"
-                value={singleSelected.color ?? ""}
-                onChange={(e) => onChangeColor(e.target.value || null)} title="Fill color">
-                {NODE_COLORS.map((c) => (
-                  <option key={c.value ?? ""} value={c.value ?? ""}>{c.label}</option>
-                ))}
-              </select>
+              {NODE_COLORS.filter((c) => c.value !== null).map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  className="idea-canvas__color-swatch"
+                  style={{ background: c.value! }}
+                  title={c.label}
+                  onClick={() => onChangeFillColor(c.value!)}
+                />
+              ))}
+              <input type="color" className="idea-canvas__color-picker"
+                value={singleSelected.color ?? singleSelected.fillColor ?? "#dbeafe"}
+                onChange={(e) => onChangeFillColor(e.target.value)}
+                title="Custom fill color" />
               <select className="idea-canvas__tool-select"
                 value={singleSelected.shape ?? "rectangle"}
                 onChange={(e) => onChangeShape(e.target.value as CanvasNodeShape)} title="Shape">
@@ -355,6 +374,13 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
               </select>
             </>
           ) : null}
+          {singleSelected.objectType === "flowchart" || singleSelected.objectType === "text" || singleSelected.objectType === "room" ? (
+            <select className="idea-canvas__tool-select"
+              value={singleSelected.fontSize ?? 14}
+              onChange={(e) => onChangeFontSize(parseInt(e.target.value))} title="Font size">
+              {[10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map((s) => <option key={s} value={s}>{s}px</option>)}
+            </select>
+          ) : null}
         </>
       ) : null}
       {selectedEdgeId && selectedEdge ? (
@@ -373,8 +399,27 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
       {selectedCount > 0 && (onBringForward || onSendBackward) ? (
         <>
           <div className="idea-canvas__toolbar-divider" />
-          {onBringForward ? <button type="button" className="idea-canvas__tool-btn" onClick={onBringForward} title="Bring forward">⬆</button> : null}
-          {onSendBackward ? <button type="button" className="idea-canvas__tool-btn" onClick={onSendBackward} title="Send backward">⬇</button> : null}
+          {onBringForward ? <button type="button" className="idea-canvas__tool-btn" onClick={onBringForward} title="Bring forward (])">⬆</button> : null}
+          {onSendBackward ? <button type="button" className="idea-canvas__tool-btn" onClick={onSendBackward} title="Send backward ([)">⬇</button> : null}
+        </>
+      ) : null}
+      {selectedCount > 1 && onAlignNodes ? (
+        <>
+          <div className="idea-canvas__toolbar-divider" />
+          <div className="idea-canvas__tool-group idea-canvas__align-group">
+            <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("left")} title="Align left edges">⊢L</button>
+            <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("center-h")} title="Center horizontally">⊣⊢</button>
+            <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("right")} title="Align right edges">R⊣</button>
+            <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("top")} title="Align top edges">⊤T</button>
+            <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("center-v")} title="Center vertically">⊥⊤</button>
+            <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("bottom")} title="Align bottom edges">B⊥</button>
+            {selectedCount > 2 ? (
+              <>
+                <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("distribute-h")} title="Distribute horizontally">↔</button>
+                <button type="button" className="idea-canvas__tool-btn" onClick={() => onAlignNodes("distribute-v")} title="Distribute vertically">↕</button>
+              </>
+            ) : null}
+          </div>
         </>
       ) : null}
 
@@ -402,6 +447,17 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
       <span className="idea-canvas__zoom-label">{Math.round(zoom * 100)}%</span>
       <button type="button" className="idea-canvas__tool-btn" onClick={onZoomIn} title="Zoom in">+</button>
       <button type="button" className="idea-canvas__tool-btn" onClick={onFitToView} title="Fit all to view">Fit</button>
+      {onToggleSnap ? (
+        <>
+          <div className="idea-canvas__toolbar-divider" />
+          <button type="button"
+            className={`idea-canvas__tool-btn${snapEnabled ? " idea-canvas__tool-btn--active" : ""}`}
+            onClick={onToggleSnap}
+            title={snapEnabled ? "Snap to grid: on (click to disable)" : "Snap to grid: off (click to enable)"}>
+            ⊞ Snap
+          </button>
+        </>
+      ) : null}
       <div className="idea-canvas__toolbar-divider" />
       {!simplified && (
         <>

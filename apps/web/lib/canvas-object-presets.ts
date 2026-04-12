@@ -52,6 +52,18 @@ export const CANVAS_OBJECT_PRESETS: CanvasObjectPreset[] = [
   // Electronics
   { key: "electronics/tv", label: "TV", category: "electronics", svgPath: "/objects/electronics/tv.svg", defaultWidth: 160, defaultHeight: 80 },
   { key: "electronics/computer", label: "Computer", category: "electronics", svgPath: "/objects/electronics/computer.svg", defaultWidth: 140, defaultHeight: 100 },
+
+  // Landscape
+  { key: "landscape/tree-deciduous", label: "Deciduous Tree", category: "landscape", svgPath: "/objects/landscape/tree-deciduous.svg", defaultWidth: 80, defaultHeight: 80 },
+  { key: "landscape/tree-conifer", label: "Conifer Tree", category: "landscape", svgPath: "/objects/landscape/tree-conifer.svg", defaultWidth: 60, defaultHeight: 80 },
+  { key: "landscape/shrub", label: "Shrub", category: "landscape", svgPath: "/objects/landscape/shrub.svg", defaultWidth: 60, defaultHeight: 50 },
+  { key: "landscape/garden-bed", label: "Garden Bed", category: "landscape", svgPath: "/objects/landscape/garden-bed.svg", defaultWidth: 160, defaultHeight: 80 },
+  { key: "landscape/pool", label: "Pool", category: "landscape", svgPath: "/objects/landscape/pool.svg", defaultWidth: 200, defaultHeight: 120 },
+  { key: "landscape/fence-section", label: "Fence Section", category: "landscape", svgPath: "/objects/landscape/fence-section.svg", defaultWidth: 160, defaultHeight: 20 },
+  { key: "landscape/patio", label: "Patio", category: "landscape", svgPath: "/objects/landscape/patio.svg", defaultWidth: 180, defaultHeight: 140 },
+  { key: "landscape/driveway", label: "Driveway", category: "landscape", svgPath: "/objects/landscape/driveway.svg", defaultWidth: 100, defaultHeight: 200 },
+  { key: "landscape/fire-pit", label: "Fire Pit", category: "landscape", svgPath: "/objects/landscape/fire-pit.svg", defaultWidth: 60, defaultHeight: 60 },
+  { key: "landscape/raised-bed", label: "Raised Bed", category: "landscape", svgPath: "/objects/landscape/raised-bed.svg", defaultWidth: 120, defaultHeight: 60 },
 ];
 
 /** Group presets by category for easy rendering in the picker UI */
@@ -64,6 +76,7 @@ export const CANVAS_OBJECT_PRESETS_BY_CATEGORY: Record<CanvasObjectCategory, Can
   tool: [],
   person: [],
   electronics: [],
+  landscape: [],
   custom: [],
 };
 

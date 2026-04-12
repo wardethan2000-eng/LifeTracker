@@ -19,6 +19,9 @@ type UseCanvasKeyboardInput = {
   onEscape: () => void;
   onFinishWallChain: () => void;
   onSelectAll: () => void;
+  onRotate90: () => void;
+  onGroup: () => void;
+  onUngroup: () => void;
   setActiveTool: (tool: ActiveTool) => void;
 };
 
@@ -39,6 +42,9 @@ export function useCanvasKeyboard({
   onEscape,
   onFinishWallChain,
   onSelectAll,
+  onRotate90,
+  onGroup,
+  onUngroup,
   setActiveTool,
 }: UseCanvasKeyboardInput) {
   useEffect(() => {
@@ -66,12 +72,20 @@ export function useCanvasKeyboard({
       } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         onSelectAll();
+      } else if (e.key === "g" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        onUngroup();
+      } else if (e.key === "g" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        onGroup();
       } else if (e.key === "s" && !e.ctrlKey && !e.metaKey) {
         setActiveTool("select");
       } else if (e.key === "p" && !e.ctrlKey && !e.metaKey) {
         setActiveTool("freehand");
       } else if (e.key === "w" && !e.ctrlKey && !e.metaKey) {
         if (physicalUnit) setActiveTool("wall");
+      } else if (e.key === "r" && !e.ctrlKey && !e.metaKey) {
+        onRotate90();
       }
     };
     window.addEventListener("keydown", handler);
@@ -79,7 +93,8 @@ export function useCanvasKeyboard({
   }, [
     editingNodeId, editingEdgeId, editingName, showSettings,
     onDelete, onUndo, onRedo, onCopy, onPaste, onEscape,
-    onFinishWallChain, onSelectAll, setActiveTool,
+    onFinishWallChain, onSelectAll, onRotate90, onGroup, onUngroup,
+    setActiveTool,
     nodes, activeTool, physicalUnit, hasWallChain,
   ]);
 }

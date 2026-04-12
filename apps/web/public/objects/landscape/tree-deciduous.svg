@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- canopy (top-down view) -->
+  <circle cx="40" cy="40" r="34" fill="#6aaa50" stroke="#3d7030"/>
+  <circle cx="28" cy="30" r="14" fill="#7dbd60" stroke="none" opacity="0.5"/>
+  <circle cx="50" cy="34" r="12" fill="#7dbd60" stroke="none" opacity="0.4"/>
+  <!-- trunk -->
+  <circle cx="40" cy="40" r="5" fill="#8a6530" stroke="#6a4520"/>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- patio surface -->
+  <rect x="4" y="4" width="172" height="132" rx="4" fill="#c0b090" stroke="#9a8868"/>
+  <!-- paver lines (horizontal) -->
+  <line x1="4" y1="37" x2="176" y2="37" stroke="#a89870" stroke-width="1"/>
+  <line x1="4" y1="70" x2="176" y2="70" stroke="#a89870" stroke-width="1"/>
+  <line x1="4" y1="103" x2="176" y2="103" stroke="#a89870" stroke-width="1"/>
+  <!-- paver lines (vertical, offset per row) -->
+  <line x1="46" y1="4" x2="46" y2="37" stroke="#a89870" stroke-width="1"/>
+  <line x1="90" y1="4" x2="90" y2="37" stroke="#a89870" stroke-width="1"/>
+  <line x1="134" y1="4" x2="134" y2="37" stroke="#a89870" stroke-width="1"/>
+  <line x1="68" y1="37" x2="68" y2="70" stroke="#a89870" stroke-width="1"/>
+  <line x1="112" y1="37" x2="112" y2="70" stroke="#a89870" stroke-width="1"/>
+  <line x1="156" y1="37" x2="156" y2="70" stroke="#a89870" stroke-width="1"/>
+  <line x1="46" y1="70" x2="46" y2="103" stroke="#a89870" stroke-width="1"/>
+  <line x1="90" y1="70" x2="90" y2="103" stroke="#a89870" stroke-width="1"/>
+  <line x1="134" y1="70" x2="134" y2="103" stroke="#a89870" stroke-width="1"/>
+  <line x1="68" y1="103" x2="68" y2="136" stroke="#a89870" stroke-width="1"/>
+  <line x1="112" y1="103" x2="112" y2="136" stroke="#a89870" stroke-width="1"/>
+  <line x1="156" y1="103" x2="156" y2="136" stroke="#a89870" stroke-width="1"/>
+</svg>

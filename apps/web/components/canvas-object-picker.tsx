@@ -29,6 +29,7 @@ const CATEGORY_LABELS: Record<CanvasObjectCategory, string> = {
   tool: "Tools",
   person: "People",
   electronics: "Electronics",
+  landscape: "Landscape",
   custom: "Custom",
 };
 

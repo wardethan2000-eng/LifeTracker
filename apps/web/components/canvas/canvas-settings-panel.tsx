@@ -119,6 +119,23 @@ export function CanvasSettingsPanel({
             <span className="idea-canvas__settings-value">{Math.round((local.backgroundImageOpacity ?? 0.5) * 100)}%</span>
           </div>
         ) : null}
+        {resolvedBgUrl ? (
+          <div className="idea-canvas__settings-row">
+            <label>Image Scale</label>
+            <input type="range" min={0.05} max={10} step={0.05}
+              value={local.backgroundImageScale ?? 1}
+              onChange={(e) => setLocal((p) => ({ ...p, backgroundImageScale: parseFloat(e.target.value) }))} />
+            <span className="idea-canvas__settings-value">{Math.round((local.backgroundImageScale ?? 1) * 100)}%</span>
+          </div>
+        ) : null}
+        {resolvedBgUrl ? (
+          <div className="idea-canvas__settings-row">
+            <button type="button" className="button button--ghost button--small"
+              onClick={() => setLocal((p) => ({ ...p, backgroundImageX: 0, backgroundImageY: 0, backgroundImageScale: 1 }))}>
+              Reset Position
+            </button>
+          </div>
+        ) : null}
       </div>
       <div className="idea-canvas__settings-footer">
         <button type="button" className="button button--ghost button--small" onClick={onClose}>Cancel</button>

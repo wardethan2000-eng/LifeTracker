@@ -47,6 +47,17 @@ import {
 } from "../lib/api";
 import { exportCanvasToSVG, exportCanvasToPNG } from "../lib/canvas-export";
 import { useCanvasHistory, useCanvasViewport, useCanvasSync, useCanvasKeyboard } from "./canvas/hooks";
+import {
+  getNodeCenter,
+  getEdgeAnchors,
+  bezierPath,
+  getShapeRadius,
+  strokeDasharray,
+  snapToGrid,
+  snapWallAngle,
+  computeAlignmentGuides,
+  type AlignGuide,
+} from "./canvas/canvas-tools/canvas-geometry";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +73,11 @@ type DragState =
   | { type: "measure"; startCX: number; startCY: number; endCX: number; endCY: number }
   | { type: "freehand"; points: { x: number; y: number }[] }
   | { type: "guide"; guideId: string; axis: "horizontal" | "vertical"; startPosition: number }
-  | { type: "group-resize"; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startPositions: Record<string, { x: number; y: number; width: number; height: number }>; startMouseCX: number; startMouseCY: number };
+  | { type: "group-resize"; handle: ResizeHandle; startBounds: { x: number; y: number; width: number; height: number }; startPositions: Record<string, { x: number; y: number; width: number; height: number }>; startMouseCX: number; startMouseCY: number }
+  | { type: "bg-move"; startX: number; startY: number; startImgX: number; startImgY: number }
+  | { type: "bg-resize"; handle: "nw" | "ne" | "se" | "sw"; startMouseCX: number; startMouseCY: number; startScale: number; startImgX: number; startImgY: number; imgW: number; imgH: number }
+  | { type: "calibrate"; startCX: number; startCY: number; endCX: number; endCY: number }
+  | { type: "rotate"; nodeId: string; centerCX: number; centerCY: number; startAngle: number; startRotation: number };
 
 type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "line-start" | "line-end";
 
@@ -93,168 +108,6 @@ const MAX_ZOOM = 5;
 const ZOOM_STEP = 0.1;
 const SYNC_DEBOUNCE_MS = 800;
 const MIN_SIZE = 10;
-
-// ─── Geometry ────────────────────────────────────────────────────────────────
-
-function getNodeCenter(n: IdeaCanvasNode) {
-  return { cx: n.x + n.width / 2, cy: n.y + n.height / 2 };
-}
-
-function getEdgeAnchors(source: IdeaCanvasNode, target: IdeaCanvasNode) {
-  const s = getNodeCenter(source);
-  const t = getNodeCenter(target);
-  const dx = t.cx - s.cx;
-  const dy = t.cy - s.cy;
-  const angle = Math.atan2(dy, dx);
-
-  const clampToEdge = (node: IdeaCanvasNode, a: number) => {
-    const c = getNodeCenter(node);
-    // Diamond: use vertex math
-    if (node.shape === "diamond") {
-      const hw = node.width / 2;
-      const hh = node.height / 2;
-      const cos = Math.cos(a);
-      const sin = Math.sin(a);
-      // Which diamond vertex is closest to angle a?
-      const vertices = [
-        { x: c.cx, y: node.y },        // top
-        { x: node.x + node.width, y: c.cy }, // right
-        { x: c.cx, y: node.y + node.height }, // bottom
-        { x: node.x, y: c.cy },        // left
-      ];
-      let best = vertices[0];
-      let bestDot = -Infinity;
-      for (const v of vertices) {
-        const dot = (v.x - c.cx) * cos + (v.y - c.cy) * sin;
-        if (dot > bestDot) { bestDot = dot; best = v; }
-      }
-      return best;
-    }
-    const hw = node.width / 2;
-    const hh = node.height / 2;
-    const cos = Math.cos(a);
-    const sin = Math.sin(a);
-    const sx = cos !== 0 ? hw / Math.abs(cos) : Infinity;
-    const sy = sin !== 0 ? hh / Math.abs(sin) : Infinity;
-    const scale = Math.min(sx, sy);
-    return { x: c.cx + cos * scale, y: c.cy + sin * scale };
-  };
-
-  const sp = clampToEdge(source, angle);
-  const tp = clampToEdge(target, angle + Math.PI);
-  return { sx: sp.x, sy: sp.y, tx: tp.x, ty: tp.y };
-}
-
-function bezierPath(sx: number, sy: number, tx: number, ty: number): string {
-  const dx = tx - sx;
-  const midX = sx + dx * 0.5;
-  const cpOffset = Math.min(Math.abs(dx) * 0.3, 80);
-  return `M ${sx} ${sy} C ${midX + cpOffset} ${sy}, ${midX - cpOffset} ${ty}, ${tx} ${ty}`;
-}
-
-function getShapeRadius(shape: CanvasNodeShape): number {
-  switch (shape) {
-    case "rounded": return 12;
-    case "pill": return 999;
-    default: return 4;
-  }
-}
-
-function strokeDasharray(style: CanvasEdgeStyle): string | undefined {
-  switch (style) {
-    case "dashed": return "8,4";
-    case "dotted": return "3,3";
-    default: return undefined;
-  }
-}
-
-function snapToGrid(val: number, gridSize: number): number {
-  return Math.round(val / gridSize) * gridSize;
-}
-
-// ─── Alignment snapping ──────────────────────────────────────────────────────
-
-type AlignGuide = { axis: "horizontal" | "vertical"; position: number };
-
-/** Find alignment snap guides for nodes being dragged */
-function computeAlignmentGuides(
-  draggedNodes: { x: number; y: number; width: number; height: number }[],
-  otherNodes: { x: number; y: number; width: number; height: number }[],
-  threshold: number,
-): { guides: AlignGuide[]; snapDx: number; snapDy: number } {
-  if (draggedNodes.length === 0 || otherNodes.length === 0) return { guides: [], snapDx: 0, snapDy: 0 };
-
-  // Bounding box of dragged nodes
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const n of draggedNodes) {
-    minX = Math.min(minX, n.x);
-    minY = Math.min(minY, n.y);
-    maxX = Math.max(maxX, n.x + n.width);
-    maxY = Math.max(maxY, n.y + n.height);
-  }
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-
-  // Collect edges to test: left, center, right  /  top, center, bottom
-  const dragHoriz = [minX, cx, maxX]; // x values
-  const dragVert = [minY, cy, maxY]; // y values
-
-  const guides: AlignGuide[] = [];
-  let bestDx = Infinity, bestDy = Infinity;
-
-  for (const o of otherNodes) {
-    const ox = [o.x, o.x + o.width / 2, o.x + o.width];
-    const oy = [o.y, o.y + o.height / 2, o.y + o.height];
-
-    for (const dx of dragHoriz) {
-      for (const oxx of ox) {
-        const diff = oxx - dx;
-        if (Math.abs(diff) < threshold && Math.abs(diff) <= Math.abs(bestDx)) {
-          if (Math.abs(diff) < Math.abs(bestDx)) {
-            bestDx = diff;
-            // Clear any existing vertical guides with worse distance
-            for (let i = guides.length - 1; i >= 0; i--) {
-              if (guides[i].axis === "vertical") guides.splice(i, 1);
-            }
-          }
-          guides.push({ axis: "vertical", position: oxx });
-        }
-      }
-    }
-
-    for (const dy of dragVert) {
-      for (const oyy of oy) {
-        const diff = oyy - dy;
-        if (Math.abs(diff) < threshold && Math.abs(diff) <= Math.abs(bestDy)) {
-          if (Math.abs(diff) < Math.abs(bestDy)) {
-            bestDy = diff;
-            for (let i = guides.length - 1; i >= 0; i--) {
-              if (guides[i].axis === "horizontal") guides.splice(i, 1);
-            }
-          }
-          guides.push({ axis: "horizontal", position: oyy });
-        }
-      }
-    }
-  }
-
-  return {
-    guides,
-    snapDx: Math.abs(bestDx) < threshold ? bestDx : 0,
-    snapDy: Math.abs(bestDy) < threshold ? bestDy : 0,
-  };
-}
-
-// Snap (dx, dy) to nearest allowed wall angle.
-// Default: 0°/90°. With shiftKey: also 45°.
-function snapWallAngle(dx: number, dy: number, shiftKey: boolean): { dx: number; dy: number } {
-  const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 1) return { dx: 0, dy: 0 };
-  const angle = Math.atan2(dy, dx);
-  const step = shiftKey ? Math.PI / 4 : Math.PI / 2;
-  const snapped = Math.round(angle / step) * step;
-  return { dx: Math.round(Math.cos(snapped) * len), dy: Math.round(Math.sin(snapped) * len) };
-}
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -350,6 +203,9 @@ export function CanvasRenderer({
     physicalUnit: (initialCanvas.physicalUnit as UpdateCanvasSettingsInput["physicalUnit"]) ?? null,
     backgroundImageUrl: initialCanvas.backgroundImageUrl,
     backgroundImageOpacity: initialCanvas.backgroundImageOpacity ?? 0.5,
+    backgroundImageX: initialCanvas.backgroundImageX ?? 0,
+    backgroundImageY: initialCanvas.backgroundImageY ?? 0,
+    backgroundImageScale: initialCanvas.backgroundImageScale ?? 1,
     snapToGrid: initialCanvas.snapToGrid,
     gridSize: initialCanvas.gridSize,
     showDimensions: initialCanvas.showDimensions ?? true,
@@ -359,6 +215,10 @@ export function CanvasRenderer({
   const [bgImageDims, setBgImageDims] = useState<{ w: number; h: number } | null>(null);
   const [bgUploading, setBgUploading] = useState(false);
   const [bgUploadError, setBgUploadError] = useState<string | null>(null);
+  // Calibration dialog state: shown after user draws a calibration line
+  const [calibrationLine, setCalibrationLine] = useState<{ startCX: number; startCY: number; endCX: number; endCY: number } | null>(null);
+  const [calibrationInput, setCalibrationInput] = useState("");
+  const calibrationInputRef = useRef<HTMLInputElement>(null);
   // Map from nodeId -> resolved download URL for image object nodes
   const [nodeImageUrls, setNodeImageUrls] = useState<Map<string, string>>(new Map());
   const [imgObjUploading, setImgObjUploading] = useState(false);
@@ -382,7 +242,7 @@ export function CanvasRenderer({
   const onUndoSync = useCallback((restoredNodes: IdeaCanvasNode[]) => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(async () => {
-      const updates = restoredNodes.map((n) => ({ id: n.id, x: n.x, y: n.y, width: n.width, height: n.height, x2: n.x2, y2: n.y2 }));
+      const updates = restoredNodes.map((n) => ({ id: n.id, x: n.x, y: n.y, width: n.width, height: n.height, x2: n.x2, y2: n.y2, rotation: n.rotation }));
       if (updates.length > 0) {
         await batchUpdateCanvasNodes(householdId, canvasId, { nodes: updates });
       }
@@ -639,6 +499,8 @@ export function CanvasRenderer({
       }
     } else if (activeTool === "measure") {
       setDrag({ type: "measure", startCX: maybeSnap(cp.x), startCY: maybeSnap(cp.y), endCX: maybeSnap(cp.x), endCY: maybeSnap(cp.y) });
+    } else if (activeTool === "calibrate") {
+      setDrag({ type: "calibrate", startCX: cp.x, startCY: cp.y, endCX: cp.x, endCY: cp.y });
     } else if (activeTool === "freehand") {
       setDrag({ type: "freehand", points: [{ x: cp.x, y: cp.y }] });
     } else if (activeTool === "room") {
@@ -882,6 +744,17 @@ export function CanvasRenderer({
     } else if (drag.type === "measure") {
       const cp = screenToCanvas(e.clientX, e.clientY);
       setDrag({ ...drag, endCX: cp.x, endCY: cp.y });
+    } else if (drag.type === "rotate") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const currentAngle = Math.atan2(cp.y - drag.centerCY, cp.x - drag.centerCX);
+      let delta = (currentAngle - drag.startAngle) * (180 / Math.PI);
+      // Snap to 15° increments when shift is held
+      if (e.shiftKey) delta = Math.round(delta / 15) * 15;
+      const newRotation = drag.startRotation + delta;
+      setNodes((prev) => prev.map((n) => n.id === drag.nodeId ? { ...n, rotation: newRotation } : n));
+    } else if (drag.type === "calibrate") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      setDrag({ ...drag, endCX: cp.x, endCY: cp.y });
     } else if (drag.type === "freehand") {
       const cp = screenToCanvas(e.clientX, e.clientY);
       setDrag({ ...drag, points: [...drag.points, { x: cp.x, y: cp.y }] });
@@ -916,6 +789,24 @@ export function CanvasRenderer({
           height: Math.max(MIN_SIZE, sp.height * scaleY),
         };
       }));
+    } else if (drag.type === "bg-move") {
+      const dx = (e.clientX - drag.startX) / zoom;
+      const dy = (e.clientY - drag.startY) / zoom;
+      setSettings(prev => ({ ...prev, backgroundImageX: drag.startImgX + dx, backgroundImageY: drag.startImgY + dy }));
+    } else if (drag.type === "bg-resize") {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      const dx = cp.x - drag.startMouseCX;
+      const dy = cp.y - drag.startMouseCY;
+      // Scale proportionally based on diagonal movement
+      const diag = Math.sqrt(drag.imgW * drag.imgW + drag.imgH * drag.imgH) * drag.startScale;
+      const delta = (dx + dy) * (drag.handle === "nw" || drag.handle === "sw" ? -1 : 1);
+      const newScale = Math.max(0.01, drag.startScale + (diag > 0 ? (delta / diag) * drag.startScale : 0));
+      // Anchor the opposite corner: compute new position so opposite corner stays fixed
+      const anchorX = drag.handle.includes("e") ? drag.startImgX : drag.startImgX + drag.imgW * drag.startScale;
+      const anchorY = drag.handle.includes("s") ? drag.startImgY : drag.startImgY + drag.imgH * drag.startScale;
+      const newX = drag.handle.includes("e") ? anchorX : anchorX - drag.imgW * newScale;
+      const newY = drag.handle.includes("s") ? anchorY : anchorY - drag.imgH * newScale;
+      setSettings(prev => ({ ...prev, backgroundImageScale: newScale, backgroundImageX: newX, backgroundImageY: newY }));
     }
   }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit, activeTool, nodes, guides]);
 
@@ -1011,6 +902,13 @@ export function CanvasRenderer({
         pushHistory(nodes, edges);
         scheduleSyncPositions();
       }
+    } else if (drag.type === "rotate") {
+      const n = nodeMap.get(drag.nodeId);
+      if (n) {
+        pendingNodeUpdates.current.set(drag.nodeId, { rotation: n.rotation ?? 0 });
+        pushHistory(nodes, edges);
+        scheduleSyncPositions();
+      }
     } else if (drag.type === "measure") {
       const { startCX, startCY, endCX, endCY } = drag;
       const dx = endCX - startCX;
@@ -1092,9 +990,28 @@ export function CanvasRenderer({
         if (n) pendingNodeUpdates.current.set(id, { x: n.x, y: n.y, width: n.width, height: n.height });
       }
       scheduleSyncPositions();
+    } else if (drag.type === "bg-move" || drag.type === "bg-resize") {
+      // Persist the updated background image position/scale
+      void updateCanvasSettings(householdId, canvasId, {
+        backgroundImageX: settings.backgroundImageX,
+        backgroundImageY: settings.backgroundImageY,
+        backgroundImageScale: settings.backgroundImageScale,
+      });
+    } else if (drag.type === "calibrate") {
+      const { startCX, startCY, endCX, endCY } = drag;
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      const pixelLen = Math.sqrt(dx * dx + dy * dy);
+      if (pixelLen >= 4) {
+        setCalibrationLine({ startCX, startCY, endCX, endCY });
+        setCalibrationInput("");
+        setTimeout(() => calibrationInputRef.current?.focus(), 50);
+        // Don't reset drag to keep the line visible; will reset after dialog
+        return;
+      }
     }
     setDrag({ type: "none" });
-  }, [drag, zoom, panX, panY, scheduleViewportSync, nodes, edges, nodeMap, guides, maybeSnap, pushHistory, householdId, canvasId, scheduleSyncPositions]);
+  }, [drag, zoom, panX, panY, scheduleViewportSync, nodes, edges, nodeMap, guides, maybeSnap, pushHistory, householdId, canvasId, scheduleSyncPositions, settings]);
 
   // ─── Node interactions ───────────────────────────────────────────────────
 
@@ -1118,7 +1035,13 @@ export function CanvasRenderer({
       setSelectedIds(newSelectedIds);
     } else {
       if (!selectedIds.has(nodeId)) {
-        newSelectedIds = new Set([nodeId]);
+        // Auto-select all nodes in the same group
+        const gId = node.groupId;
+        if (gId) {
+          newSelectedIds = new Set(nodes.filter((n) => n.groupId === gId).map((n) => n.id));
+        } else {
+          newSelectedIds = new Set([nodeId]);
+        }
         setSelectedIds(newSelectedIds);
       } else {
         newSelectedIds = new Set(selectedIds);
@@ -1139,7 +1062,7 @@ export function CanvasRenderer({
       startY: e.clientY,
       startPositions,
     });
-  }, [nodeMap, drag.type, activeTool, selectedIds]);
+  }, [nodeMap, drag.type, activeTool, selectedIds, nodes]);
 
   const handleNodeMouseUp = useCallback(async (nodeId: string) => {
     if (drag.type === "edge" && drag.sourceNodeId !== nodeId) {
@@ -1190,6 +1113,26 @@ export function CanvasRenderer({
       startY2: node.y2,
       startMouseCX: cp.x,
       startMouseCY: cp.y,
+    });
+  }, [nodeMap, screenToCanvas]);
+
+  // ─── Rotation handle interactions ──────────────────────────────────────
+
+  const handleRotateMouseDown = useCallback((e: React.MouseEvent, nodeId: string) => {
+    e.stopPropagation();
+    const node = nodeMap.get(nodeId);
+    if (!node) return;
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    const cp = screenToCanvas(e.clientX, e.clientY);
+    const startAngle = Math.atan2(cp.y - cy, cp.x - cx);
+    setDrag({
+      type: "rotate",
+      nodeId,
+      centerCX: cx,
+      centerCY: cy,
+      startAngle,
+      startRotation: node.rotation ?? 0,
     });
   }, [nodeMap, screenToCanvas]);
 
@@ -1282,40 +1225,130 @@ export function CanvasRenderer({
     setDrag({ type: "edge", sourceNodeId: firstId, mouseX: 0, mouseY: 0 });
   }, [selectedIds, nodeMap]);
 
+  const handleAlignNodes = useCallback(async (
+    axis: "left" | "center-h" | "right" | "top" | "center-v" | "bottom" | "distribute-h" | "distribute-v"
+  ) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length < 2) return;
+    const selected = nodes.filter((n) => ids.includes(n.id));
+
+    let updated = [...nodes];
+    if (axis === "left") {
+      const minX = Math.min(...selected.map((n) => n.x));
+      updated = nodes.map((n) => ids.includes(n.id) ? { ...n, x: minX } : n);
+    } else if (axis === "right") {
+      const maxX = Math.max(...selected.map((n) => n.x + n.width));
+      updated = nodes.map((n) => ids.includes(n.id) ? { ...n, x: maxX - n.width } : n);
+    } else if (axis === "center-h") {
+      const minX = Math.min(...selected.map((n) => n.x));
+      const maxX = Math.max(...selected.map((n) => n.x + n.width));
+      const midX = (minX + maxX) / 2;
+      updated = nodes.map((n) => ids.includes(n.id) ? { ...n, x: midX - n.width / 2 } : n);
+    } else if (axis === "top") {
+      const minY = Math.min(...selected.map((n) => n.y));
+      updated = nodes.map((n) => ids.includes(n.id) ? { ...n, y: minY } : n);
+    } else if (axis === "bottom") {
+      const maxY = Math.max(...selected.map((n) => n.y + n.height));
+      updated = nodes.map((n) => ids.includes(n.id) ? { ...n, y: maxY - n.height } : n);
+    } else if (axis === "center-v") {
+      const minY = Math.min(...selected.map((n) => n.y));
+      const maxY = Math.max(...selected.map((n) => n.y + n.height));
+      const midY = (minY + maxY) / 2;
+      updated = nodes.map((n) => ids.includes(n.id) ? { ...n, y: midY - n.height / 2 } : n);
+    } else if (axis === "distribute-h") {
+      const sorted = [...selected].sort((a, b) => a.x - b.x);
+      if (sorted.length < 3) return;
+      const totalSpan = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width - sorted[0].x;
+      const totalNodeWidth = sorted.reduce((s, n) => s + n.width, 0);
+      const gap = (totalSpan - totalNodeWidth) / (sorted.length - 1);
+      let cursor = sorted[0].x + sorted[0].width;
+      const posMap = new Map<string, number>();
+      for (let i = 1; i < sorted.length - 1; i++) {
+        posMap.set(sorted[i].id, cursor + gap);
+        cursor += gap + sorted[i].width;
+      }
+      updated = nodes.map((n) => posMap.has(n.id) ? { ...n, x: posMap.get(n.id)! } : n);
+    } else if (axis === "distribute-v") {
+      const sorted = [...selected].sort((a, b) => a.y - b.y);
+      if (sorted.length < 3) return;
+      const totalSpan = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height - sorted[0].y;
+      const totalNodeHeight = sorted.reduce((s, n) => s + n.height, 0);
+      const gap = (totalSpan - totalNodeHeight) / (sorted.length - 1);
+      let cursor = sorted[0].y + sorted[0].height;
+      const posMap = new Map<string, number>();
+      for (let i = 1; i < sorted.length - 1; i++) {
+        posMap.set(sorted[i].id, cursor + gap);
+        cursor += gap + sorted[i].height;
+      }
+      updated = nodes.map((n) => posMap.has(n.id) ? { ...n, y: posMap.get(n.id)! } : n);
+    }
+
+    const nodeUpdates = updated
+      .filter((n) => ids.includes(n.id))
+      .map((n) => ({ id: n.id, x: n.x, y: n.y }));
+    if (nodeUpdates.length === 0) return;
+    setNodes(updated);
+    pushHistory(updated, edges);
+    await batchUpdateCanvasNodes(householdId, canvasId, { nodes: nodeUpdates });
+  }, [selectedIds, nodes, edges, householdId, canvasId, pushHistory]);
+
+  const handleToggleSnap = useCallback(() => {
+    setSettings((prev) => ({ ...prev, snapToGrid: !prev.snapToGrid }));
+  }, []);
+
   const handleChangeColor = useCallback(async (color: string | null) => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { color })));
-    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, color } : n));
-  }, [selectedIds, householdId, canvasId]);
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, color } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleChangeFillColor = useCallback(async (fillColor: string | null) => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { fillColor })));
-    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, fillColor } : n));
-  }, [selectedIds, householdId, canvasId]);
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, fillColor } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleChangeStrokeColor = useCallback(async (strokeColor: string) => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { strokeColor })));
-    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, strokeColor } : n));
-  }, [selectedIds, householdId, canvasId]);
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, strokeColor } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleChangeStrokeWidth = useCallback(async (strokeWidth: number) => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { strokeWidth })));
-    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, strokeWidth } : n));
-  }, [selectedIds, householdId, canvasId]);
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, strokeWidth } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
+
+  const handleChangeFontSize = useCallback(async (fontSize: number) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { fontSize })));
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, fontSize } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleChangeWallHeight = useCallback(async (wallHeight: number | null) => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { wallHeight })));
-    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, wallHeight } : n));
-  }, [selectedIds, householdId, canvasId]);
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, wallHeight } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   /** Commit inline wall dimension edit: resize wall to specified physical length, keeping angle */
   const commitWallDimEdit = useCallback(async (confirm: boolean) => {
@@ -1347,34 +1380,63 @@ export function CanvasRenderer({
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { shape })));
-    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, shape } : n));
-  }, [selectedIds, householdId, canvasId]);
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, shape } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleChangeEdgeStyle = useCallback(async (style: CanvasEdgeStyle) => {
     if (!selectedEdgeId) return;
     await updateCanvasEdge(householdId, canvasId, selectedEdgeId, { style });
-    setEdges((prev) => prev.map((e) => e.id === selectedEdgeId ? { ...e, style } : e));
-  }, [selectedEdgeId, householdId, canvasId]);
+    const newEdges = edges.map((e) => e.id === selectedEdgeId ? { ...e, style } : e);
+    setEdges(newEdges);
+    pushHistory(nodes, newEdges);
+  }, [selectedEdgeId, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleLabelCommit = useCallback(async (nodeId: string, label: string) => {
     await updateCanvasNode(householdId, canvasId, nodeId, { label });
-    setNodes((prev) => prev.map((n) => n.id === nodeId ? { ...n, label } : n));
+    const newNodes = nodes.map((n) => n.id === nodeId ? { ...n, label } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
     setEditingNodeId(null);
-  }, [householdId, canvasId]);
+  }, [householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleEdgeLabelCommit = useCallback(async (edgeId: string, label: string) => {
     const value = label.trim() || null;
     await updateCanvasEdge(householdId, canvasId, edgeId, { label: value });
-    setEdges((prev) => prev.map((e) => e.id === edgeId ? { ...e, label: value } : e));
+    const newEdges = edges.map((e) => e.id === edgeId ? { ...e, label: value } : e);
+    setEdges(newEdges);
+    pushHistory(nodes, newEdges);
     setEditingEdgeId(null);
-  }, [householdId, canvasId]);
+  }, [householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleLinkNote = useCallback(async (nodeId: string, entryId: string | null) => {
     await updateCanvasNode(householdId, canvasId, nodeId, { entryId });
-    setNodes((prev) => prev.map((n) => n.id === nodeId ? { ...n, entryId } : n));
+    const newNodes = nodes.map((n) => n.id === nodeId ? { ...n, entryId } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
     setShowNotePicker(null);
     setContextMenu(null);
-  }, [householdId, canvasId]);
+  }, [householdId, canvasId, nodes, edges, pushHistory]);
+
+  // ─── Object grouping ────────────────────────────────────────────────────
+
+  const handleGroupSelected = useCallback(async () => {
+    if (selectedIds.size < 2) return;
+    const groupId = crypto.randomUUID();
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { groupId })));
+    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, groupId } : n));
+    pushHistory(nodes.map((n) => ids.includes(n.id) ? { ...n, groupId } : n), edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
+
+  const handleUngroupSelected = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { groupId: null })));
+    setNodes((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, groupId: null } : n));
+    pushHistory(nodes.map((n) => ids.includes(n.id) ? { ...n, groupId: null } : n), edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
   const handleNameCommit = useCallback(async () => {
     const trimmed = canvasName.trim();
@@ -1397,18 +1459,23 @@ export function CanvasRenderer({
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const padding = 48;
+    const imgScale = settings.backgroundImageScale ?? 1;
+    const imgX = settings.backgroundImageX ?? 0;
+    const imgY = settings.backgroundImageY ?? 0;
+    const scaledW = imgW * imgScale;
+    const scaledH = imgH * imgScale;
     const newZoom = Math.min(
-      (rect.width - padding * 2) / imgW,
-      (rect.height - padding * 2) / imgH,
+      (rect.width - padding * 2) / scaledW,
+      (rect.height - padding * 2) / scaledH,
       2,
     );
-    const newPanX = (rect.width / newZoom - imgW) / 2;
-    const newPanY = (rect.height / newZoom - imgH) / 2;
+    const newPanX = (rect.width / newZoom - scaledW) / 2 - imgX;
+    const newPanY = (rect.height / newZoom - scaledH) / 2 - imgY;
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
     scheduleViewportSync(newZoom, newPanX, newPanY);
-  }, [scheduleViewportSync]);
+  }, [scheduleViewportSync, settings.backgroundImageScale, settings.backgroundImageX, settings.backgroundImageY]);
 
   // Load image dimensions from a URL into state
   const loadImageDims = useCallback((url: string) => {
@@ -1455,6 +1522,16 @@ export function CanvasRenderer({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Periodically refresh background image presigned URL (expires after 1hr)
+  useEffect(() => {
+    const raw = settings.backgroundImageUrl;
+    if (!raw || !raw.startsWith("attachment:")) return;
+    const interval = setInterval(() => {
+      void resolveBackgroundUrl(raw);
+    }, 45 * 60 * 1000); // refresh every 45 minutes
+    return () => clearInterval(interval);
+  }, [settings.backgroundImageUrl, resolveBackgroundUrl]);
 
   const handleBgImageUpload = useCallback(async (file: File) => {
     setBgUploading(true);
@@ -1506,12 +1583,78 @@ export function CanvasRenderer({
   }, [householdId, canvasId, settings, fitViewportToImage]);
 
   const handleRemoveBgImage = useCallback(async () => {
-    const newSettings: UpdateCanvasSettingsInput = { ...settings, backgroundImageUrl: null };
+    const newSettings: UpdateCanvasSettingsInput = { ...settings, backgroundImageUrl: null, backgroundImageX: 0, backgroundImageY: 0, backgroundImageScale: 1 };
     await updateCanvasSettings(householdId, canvasId, newSettings);
     setSettings(newSettings);
     setResolvedBgUrl(null);
     setBgImageDims(null);
   }, [householdId, canvasId, settings]);
+
+  // Start dragging/resizing the background image
+  const handleBgImageMouseDown = useCallback((e: React.MouseEvent, handle?: "nw" | "ne" | "se" | "sw") => {
+    e.stopPropagation();
+    if (!bgImageDims) return;
+    const imgX = settings.backgroundImageX ?? 0;
+    const imgY = settings.backgroundImageY ?? 0;
+    const imgScale = settings.backgroundImageScale ?? 1;
+    if (handle) {
+      const cp = screenToCanvas(e.clientX, e.clientY);
+      setDrag({
+        type: "bg-resize",
+        handle,
+        startMouseCX: cp.x,
+        startMouseCY: cp.y,
+        startScale: imgScale,
+        startImgX: imgX,
+        startImgY: imgY,
+        imgW: bgImageDims.w,
+        imgH: bgImageDims.h,
+      });
+    } else {
+      setDrag({
+        type: "bg-move",
+        startX: e.clientX,
+        startY: e.clientY,
+        startImgX: imgX,
+        startImgY: imgY,
+      });
+    }
+  }, [bgImageDims, settings, screenToCanvas]);
+
+  // Apply calibration: user drew a line and entered a real-world distance
+  const handleCalibrationConfirm = useCallback(async () => {
+    if (!calibrationLine) return;
+    const realDist = parseFloat(calibrationInput);
+    if (!realDist || realDist <= 0) return;
+    const { startCX, startCY, endCX, endCY } = calibrationLine;
+    const dx = endCX - startCX;
+    const dy = endCY - startCY;
+    const pixelDist = Math.sqrt(dx * dx + dy * dy);
+    if (pixelDist < 1) return;
+    // pixelsPerUnit = pixelDist / realDist, and gridSize = pixelsPerUnit
+    const newGridSize = Math.round(Math.max(8, Math.min(200, pixelDist / realDist)));
+    // Auto-set a unit if none is set
+    const unit = settings.physicalUnit ?? "ft";
+    const newSettings: UpdateCanvasSettingsInput = {
+      ...settings,
+      gridSize: newGridSize,
+      physicalUnit: unit as UpdateCanvasSettingsInput["physicalUnit"],
+      showDimensions: true,
+    };
+    await updateCanvasSettings(householdId, canvasId, newSettings);
+    setSettings(newSettings);
+    setCalibrationLine(null);
+    setCalibrationInput("");
+    setDrag({ type: "none" });
+    setActiveTool("select");
+  }, [calibrationLine, calibrationInput, settings, householdId, canvasId]);
+
+  const handleCalibrationCancel = useCallback(() => {
+    setCalibrationLine(null);
+    setCalibrationInput("");
+    setDrag({ type: "none" });
+    setActiveTool("select");
+  }, []);
 
   // ─── Layer handlers ───────────────────────────────────────────────────────
 
@@ -1664,6 +1807,11 @@ export function CanvasRenderer({
   const handlePaste = useCallback(async () => {
     const clip = clipboardRef.current;
     if (clip.length === 0) return;
+    // Map old groupIds to new ones so pasted groups stay grouped but separate from originals
+    const groupIdMap = new Map<string, string>();
+    for (const n of clip) {
+      if (n.groupId && !groupIdMap.has(n.groupId)) groupIdMap.set(n.groupId, crypto.randomUUID());
+    }
     const created = await Promise.all(
       clip.map((n) => createNodeOnActiveLayer({
         label: n.label,
@@ -1676,6 +1824,7 @@ export function CanvasRenderer({
         strokeWidth: n.strokeWidth,
         shape: n.shape,
         objectType: n.objectType,
+        groupId: n.groupId ? groupIdMap.get(n.groupId) : undefined,
       }))
     );
     const newNodes = [...nodes, ...created];
@@ -1745,6 +1894,25 @@ export function CanvasRenderer({
     setSelectedIds(new Set(nodes.map((n) => n.id)));
   }, [nodes]);
 
+  const handleRotate90 = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    const nonRotatable = new Set(["wall", "dimension", "freehand", "room"]);
+    const toRotate = nodes.filter((n) => selectedIds.has(n.id) && !nonRotatable.has(n.objectType));
+    if (toRotate.length === 0) return;
+    setNodes((prev) => prev.map((n) => {
+      if (!selectedIds.has(n.id) || nonRotatable.has(n.objectType)) return n;
+      return { ...n, rotation: ((n.rotation ?? 0) + 90) % 360 };
+    }));
+    for (const n of toRotate) {
+      pendingNodeUpdates.current.set(n.id, { rotation: ((n.rotation ?? 0) + 90) % 360 });
+    }
+    pushHistory(nodes.map((n) => {
+      if (!selectedIds.has(n.id) || nonRotatable.has(n.objectType)) return n;
+      return { ...n, rotation: ((n.rotation ?? 0) + 90) % 360 };
+    }), edges);
+    scheduleSyncPositions();
+  }, [selectedIds, nodes, edges, pushHistory, scheduleSyncPositions, pendingNodeUpdates]);
+
   useCanvasKeyboard({
     editingNodeId,
     editingEdgeId,
@@ -1762,6 +1930,9 @@ export function CanvasRenderer({
     onEscape: handleEscape,
     onFinishWallChain: handleFinishWallChain,
     onSelectAll: handleSelectAll,
+    onRotate90: handleRotate90,
+    onGroup: handleGroupSelected,
+    onUngroup: handleUngroupSelected,
     setActiveTool,
   });
 
@@ -1840,8 +2011,22 @@ export function CanvasRenderer({
       { handle: "sw", cx: x, cy: y + h },
       { handle: "w", cx: x, cy: y + h / 2 },
     ];
+    // Rotation handle: above top-center, visible for rotatable object types
+    const canRotate = !["wall", "dimension", "freehand", "room"].includes(node.objectType);
+    const rotHandleY = y - 24 / zoom;
+    const rotHandleCx = x + w / 2;
     return (
       <>
+        {canRotate && (
+          <>
+            <line x1={rotHandleCx} y1={y} x2={rotHandleCx} y2={rotHandleY}
+              stroke="var(--accent)" strokeWidth={1 / zoom} pointerEvents="none" />
+            <circle cx={rotHandleCx} cy={rotHandleY} r={5 / zoom}
+              fill="var(--surface)" stroke="var(--accent)" strokeWidth={1.5 / zoom}
+              style={{ cursor: "grab" }}
+              onMouseDown={(e) => handleRotateMouseDown(e, node.id)} />
+          </>
+        )}
         {handles.map(({ handle, cx, cy }) => (
           <rect
             key={handle}
@@ -1872,6 +2057,10 @@ export function CanvasRenderer({
     const sw = isSelected ? 2.5 : (node.strokeWidth ?? 1.5);
     const cursor = drag.type === "edge" ? "crosshair" : "grab";
 
+    // Rotation transform for rotatable nodes
+    const rot = node.rotation ?? 0;
+    const rotTransform = rot !== 0 ? `rotate(${rot} ${node.x + node.width / 2} ${node.y + node.height / 2})` : undefined;
+
     const nodeEvents = {
       onMouseDown: (e: React.MouseEvent) => handleNodeMouseDown(e, node.id),
       onMouseUp: () => handleNodeMouseUp(node.id),
@@ -1882,7 +2071,7 @@ export function CanvasRenderer({
     if (node.objectType === "image") {
       const imgUrl = nodeImageUrls.get(node.id);
       return (
-        <g key={node.id}>
+        <g key={node.id} transform={rotTransform}>
           {imgUrl ? (
             <image href={imgUrl}
               x={node.x} y={node.y} width={node.width} height={node.height}
@@ -1944,7 +2133,7 @@ export function CanvasRenderer({
         }
       }
       return (
-        <g key={node.id}>
+        <g key={node.id} transform={rotTransform}>
           {clipPathEl}
           {imgUrl ? (
             <image href={imgUrl}
@@ -2347,7 +2536,7 @@ export function CanvasRenderer({
       const rx = node.width / 2;
       const ry = node.height / 2;
       return (
-        <g key={node.id}>
+        <g key={node.id} transform={rotTransform}>
           <ellipse cx={cx} cy={cy} rx={rx} ry={ry}
             fill={node.fillColor ?? node.color ?? "transparent"}
             stroke={stroke} strokeWidth={sw}
@@ -2355,7 +2544,7 @@ export function CanvasRenderer({
             {...nodeEvents} />
           {node.label ? (
             <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
-              fontSize={14} fill="var(--ink)" style={{ pointerEvents: "none", userSelect: "none" }}>
+              fontSize={node.fontSize ?? 14} fill="var(--ink)" style={{ pointerEvents: "none", userSelect: "none" }}>
               {node.label}
             </text>
           ) : null}
@@ -2366,7 +2555,7 @@ export function CanvasRenderer({
 
     if (node.objectType === "text") {
       return (
-        <g key={node.id}>
+        <g key={node.id} transform={rotTransform}>
           <rect x={node.x} y={node.y} width={node.width} height={node.height}
             fill={isSelected ? "rgba(var(--accent-rgb, 99,102,241),0.05)" : "transparent"}
             stroke={isSelected ? selStroke : "none"} strokeWidth={sw}
@@ -2384,10 +2573,10 @@ export function CanvasRenderer({
                 onKeyDown={(e) => {
                   if (e.key === "Escape") { handleLabelCommit(node.id, (e.target as HTMLTextAreaElement).value); }
                 }}
-                style={{ width: "100%", height: "100%", resize: "none" }}
+                style={{ width: "100%", height: "100%", resize: "none", fontSize: `${node.fontSize ?? 14}px` }}
               />
             ) : (
-              <div className="idea-canvas__text-content">{node.label}</div>
+              <div className="idea-canvas__text-content" style={{ fontSize: `${node.fontSize ?? 14}px` }}>{node.label}</div>
             )}
           </foreignObject>
           {isSelected && renderResizeHandles(node)}
@@ -2397,7 +2586,7 @@ export function CanvasRenderer({
 
     if (node.objectType === "rect") {
       return (
-        <g key={node.id}>
+        <g key={node.id} transform={rotTransform}>
           <rect x={node.x} y={node.y} width={node.width} height={node.height} rx={4} ry={4}
             fill={node.fillColor ?? node.color ?? "transparent"}
             stroke={stroke} strokeWidth={sw}
@@ -2406,7 +2595,7 @@ export function CanvasRenderer({
           {node.label ? (
             <foreignObject x={node.x + 4} y={node.y + 4} width={node.width - 8} height={node.height - 8}
               pointerEvents="none">
-              <div className="idea-canvas__node-content">{node.label}</div>
+              <div className="idea-canvas__node-content" style={{ fontSize: `${node.fontSize ?? 14}px` }}>{node.label}</div>
             </foreignObject>
           ) : null}
           {isSelected && renderResizeHandles(node)}
@@ -2419,7 +2608,7 @@ export function CanvasRenderer({
     const fillColor = node.fillColor ?? node.color ?? "#f8fafc";
 
     return (
-      <g key={node.id}>
+      <g key={node.id} transform={rotTransform}>
         {node.shape === "diamond" ? (
           <path
             d={`M ${node.x + node.width / 2} ${node.y} L ${node.x + node.width} ${node.y + node.height / 2} L ${node.x + node.width / 2} ${node.y + node.height} L ${node.x} ${node.y + node.height / 2} Z`}
@@ -2440,6 +2629,7 @@ export function CanvasRenderer({
               className="idea-canvas__node-label-input"
               defaultValue={node.label}
               autoFocus
+              style={{ fontSize: `${node.fontSize ?? 14}px` }}
               onBlur={(e) => handleLabelCommit(node.id, e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLabelCommit(node.id, (e.target as HTMLInputElement).value);
@@ -2447,7 +2637,7 @@ export function CanvasRenderer({
               }}
             />
           ) : (
-            <div className="idea-canvas__node-content">
+            <div className="idea-canvas__node-content" style={{ fontSize: `${node.fontSize ?? 14}px` }}>
               {linkedEntry ? (
                 <span className="idea-canvas__node-linked-icon" title={`Linked: ${linkedEntry.title ?? "Note"}`}>📄</span>
               ) : null}
@@ -2526,6 +2716,41 @@ export function CanvasRenderer({
             </text>
           ) : null}
           <circle cx={startCX} cy={startCY} r={3 / zoom} fill="#6366f1" pointerEvents="none" />
+        </g>
+      );
+    }
+    // Calibration tool preview line
+    if (drag.type === "calibrate") {
+      const { startCX, startCY, endCX, endCY } = drag;
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      return (
+        <g>
+          <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
+            stroke="#f59e0b" strokeWidth={2.5 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`}
+            pointerEvents="none" />
+          {len > 4 ? (
+            <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - 10 / zoom}
+              textAnchor="middle" fontSize={12 / zoom} fill="#f59e0b" fontWeight="600" pointerEvents="none">
+              {Math.round(len)} px — enter distance
+            </text>
+          ) : null}
+          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#f59e0b" pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#f59e0b" pointerEvents="none" />
+        </g>
+      );
+    }
+    // Calibration line persisted while dialog is open
+    if (calibrationLine) {
+      const { startCX, startCY, endCX, endCY } = calibrationLine;
+      return (
+        <g>
+          <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
+            stroke="#f59e0b" strokeWidth={2.5 / zoom}
+            pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#f59e0b" pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#f59e0b" pointerEvents="none" />
         </g>
       );
     }
@@ -2895,9 +3120,12 @@ export function CanvasRenderer({
       imageUrlMap: nodeImageUrls,
       backgroundImageUrl: resolvedBgUrl ?? undefined,
       backgroundImageOpacity: settings.backgroundImageOpacity,
+      backgroundImageX: settings.backgroundImageX,
+      backgroundImageY: settings.backgroundImageY,
+      backgroundImageScale: settings.backgroundImageScale,
       bgImageDims: bgImageDims ?? undefined,
     });
-  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, bgImageDims]);
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, bgImageDims]);
 
   const handleExportPNG = useCallback(() => {
     exportCanvasToPNG(nodes, edges, canvasName, {
@@ -2908,9 +3136,12 @@ export function CanvasRenderer({
       imageUrlMap: nodeImageUrls,
       backgroundImageUrl: resolvedBgUrl ?? undefined,
       backgroundImageOpacity: settings.backgroundImageOpacity,
+      backgroundImageX: settings.backgroundImageX,
+      backgroundImageY: settings.backgroundImageY,
+      backgroundImageScale: settings.backgroundImageScale,
       bgImageDims: bgImageDims ?? undefined,
     });
-  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, bgImageDims]);
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, bgImageDims]);
 
   const handleExportPDF = useCallback(() => {
     const url = `/api/v1/households/${householdId}/canvases/${canvasId}/export/pdf`;
@@ -2923,7 +3154,12 @@ export function CanvasRenderer({
   }, [householdId, canvasId, canvasName]);
 
   const svgCursor = drag.type === "pan" ? "grabbing"
+    : drag.type === "bg-move" ? "grabbing"
+    : drag.type === "bg-resize" ? (drag.handle === "nw" || drag.handle === "se" ? "nwse-resize" : "nesw-resize")
+    : drag.type === "rotate" ? "grabbing"
+    : drag.type === "calibrate" ? "crosshair"
     : activeTool === "pan" ? "grab"
+    : activeTool === "calibrate" ? "crosshair"
     : drag.type === "freehand" || drag.type === "edge" || drag.type === "wall" || drag.type === "measure"
       || ["rect", "circle", "line", "text", "node", "wall", "wall-arc", "room", "door", "window", "stairs", "measure", "freehand"].includes(activeTool) ? "crosshair"
     : "default";
@@ -2970,6 +3206,7 @@ export function CanvasRenderer({
         onChangeFillColor={handleChangeFillColor}
         onChangeStrokeColor={handleChangeStrokeColor}
         onChangeStrokeWidth={handleChangeStrokeWidth}
+        onChangeFontSize={handleChangeFontSize}
         onChangeEdgeStyle={handleChangeEdgeStyle}
         onChangeWallHeight={handleChangeWallHeight}
         physicalUnit={settings.physicalUnit}
@@ -3005,6 +3242,9 @@ export function CanvasRenderer({
         onExportPDF={handleExportPDF}
         onBringForward={handleBringForward}
         onSendBackward={handleSendBackward}
+        onAlignNodes={handleAlignNodes}
+        onToggleSnap={handleToggleSnap}
+        snapEnabled={settings.snapToGrid ?? false}
         simplified={simplified}
       />
 
@@ -3044,13 +3284,48 @@ export function CanvasRenderer({
               className="canvas-grid-line" pointerEvents="none" />
           ))}
 
-          {/* Background image — rendered at canvas origin with natural pixel dimensions */}
-          {resolvedBgUrl ? (
-            <image href={resolvedBgUrl}
-              x={0} y={0}
-              width={bgImageDims?.w ?? 1920} height={bgImageDims?.h ?? 1080}
-              opacity={settings.backgroundImageOpacity ?? 0.5} pointerEvents="none" preserveAspectRatio="none" />
-          ) : null}
+          {/* Background image — positioned and scaled via settings */}
+          {resolvedBgUrl ? (() => {
+            const imgX = settings.backgroundImageX ?? 0;
+            const imgY = settings.backgroundImageY ?? 0;
+            const imgScale = settings.backgroundImageScale ?? 1;
+            const imgW = (bgImageDims?.w ?? 1920) * imgScale;
+            const imgH = (bgImageDims?.h ?? 1080) * imgScale;
+            const handleSize = 10 / zoom;
+            const isActive = activeTool === "select" && drag.type === "none";
+            return (
+              <g>
+                <image href={resolvedBgUrl}
+                  x={imgX} y={imgY}
+                  width={imgW} height={imgH}
+                  opacity={settings.backgroundImageOpacity ?? 0.5}
+                  preserveAspectRatio="none"
+                  style={{ cursor: isActive ? "move" : undefined }}
+                  pointerEvents={isActive ? "visiblePainted" : "none"}
+                  onMouseDown={isActive ? (e) => handleBgImageMouseDown(e) : undefined} />
+                {/* Border and resize handles — visible when select tool is active */}
+                {isActive ? (
+                  <>
+                    <rect x={imgX} y={imgY} width={imgW} height={imgH}
+                      fill="none" stroke="var(--accent, #3b82f6)" strokeWidth={1.5 / zoom}
+                      strokeDasharray={`${4 / zoom} ${4 / zoom}`}
+                      pointerEvents="none" />
+                    {(["nw", "ne", "se", "sw"] as const).map((h) => {
+                      const hx = h.includes("e") ? imgX + imgW - handleSize / 2 : imgX - handleSize / 2;
+                      const hy = h.includes("s") ? imgY + imgH - handleSize / 2 : imgY - handleSize / 2;
+                      const cursor = h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize";
+                      return (
+                        <rect key={h} x={hx} y={hy} width={handleSize} height={handleSize}
+                          fill="white" stroke="var(--accent, #3b82f6)" strokeWidth={1 / zoom}
+                          style={{ cursor }} rx={2 / zoom}
+                          onMouseDown={(e) => handleBgImageMouseDown(e, h)} />
+                      );
+                    })}
+                  </>
+                ) : null}
+              </g>
+            );
+          })() : null}
 
           {/* Scale labels */}
           {renderScaleLabels()}
@@ -3163,6 +3438,38 @@ export function CanvasRenderer({
             />
           ))}
 
+          {/* Group boundary indicators */}
+          {(() => {
+            const groups = new Map<string, { minX: number; minY: number; maxX: number; maxY: number }>();
+            for (const n of nodes) {
+              if (!n.groupId) continue;
+              const g = groups.get(n.groupId);
+              if (g) {
+                g.minX = Math.min(g.minX, n.x);
+                g.minY = Math.min(g.minY, n.y);
+                g.maxX = Math.max(g.maxX, n.objectType === "line" ? Math.max(n.x, n.x2) : n.x + n.width);
+                g.maxY = Math.max(g.maxY, n.objectType === "line" ? Math.max(n.y, n.y2) : n.y + n.height);
+              } else {
+                groups.set(n.groupId, {
+                  minX: n.x,
+                  minY: n.y,
+                  maxX: n.objectType === "line" ? Math.max(n.x, n.x2) : n.x + n.width,
+                  maxY: n.objectType === "line" ? Math.max(n.y, n.y2) : n.y + n.height,
+                });
+              }
+            }
+            const pad = 4 / zoom;
+            return Array.from(groups.entries()).map(([gId, b]) => (
+              <rect key={`grp-${gId}`}
+                x={b.minX - pad} y={b.minY - pad}
+                width={b.maxX - b.minX + pad * 2} height={b.maxY - b.minY + pad * 2}
+                fill="none" stroke="var(--accent)" strokeWidth={1 / zoom}
+                strokeDasharray={`${3 / zoom},${3 / zoom}`}
+                opacity={0.45} rx={3 / zoom}
+                pointerEvents="none" />
+            ));
+          })()}
+
           {/* Group selection bounding box with resize handles */}
           {selectedIds.size > 1 && drag.type !== "group-resize" ? (() => {
             let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
@@ -3260,6 +3567,54 @@ export function CanvasRenderer({
         );
       })() : null}
 
+      {/* Calibration distance input dialog */}
+      {calibrationLine && svgRef.current ? (() => {
+        const svgRect = svgRef.current.getBoundingClientRect();
+        const midCX = (calibrationLine.startCX + calibrationLine.endCX) / 2;
+        const midCY = (calibrationLine.startCY + calibrationLine.endCY) / 2;
+        const screenX = (midCX + panX) * zoom;
+        const screenY = (midCY + panY) * zoom;
+        const dx = calibrationLine.endCX - calibrationLine.startCX;
+        const dy = calibrationLine.endCY - calibrationLine.startCY;
+        const pixelLen = Math.sqrt(dx * dx + dy * dy);
+        return (
+          <div className="idea-canvas__calibrate-overlay"
+            style={{ left: screenX, top: screenY - 50 }}>
+            <p className="idea-canvas__calibrate-label">How long is this line?</p>
+            <div className="idea-canvas__calibrate-row">
+              <input
+                ref={calibrationInputRef}
+                type="number"
+                className="idea-canvas__calibrate-input"
+                value={calibrationInput}
+                onChange={(e) => setCalibrationInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { void handleCalibrationConfirm(); e.preventDefault(); }
+                  if (e.key === "Escape") { handleCalibrationCancel(); e.preventDefault(); }
+                  e.stopPropagation();
+                }}
+                placeholder="e.g. 50"
+                min={0}
+                step="any"
+              />
+              <select
+                className="idea-canvas__calibrate-unit"
+                value={settings.physicalUnit ?? "ft"}
+                onChange={(e) => setSettings(prev => ({ ...prev, physicalUnit: (e.target.value || null) as UpdateCanvasSettingsInput["physicalUnit"] }))}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                {PHYSICAL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="idea-canvas__calibrate-actions">
+              <button type="button" className="button button--ghost button--xs" onClick={handleCalibrationCancel}>Cancel</button>
+              <button type="button" className="button button--primary button--xs" onClick={() => void handleCalibrationConfirm()}>Set Scale</button>
+            </div>
+            <p className="idea-canvas__calibrate-hint">{Math.round(pixelLen)} px drawn</p>
+          </div>
+        );
+      })() : null}
+
       {/* Settings panel */}
       {showSettings ? (
         <CanvasSettingsPanel
@@ -3331,6 +3686,16 @@ export function CanvasRenderer({
               handleCopy();
               setContextMenu(null);
             }}>Copy</button>
+            {selectedIds.size >= 2 ? (
+              <button type="button" onClick={() => { handleGroupSelected(); setContextMenu(null); }}>
+                Group <span style={{ opacity: 0.5, fontSize: "0.85em" }}>Ctrl+G</span>
+              </button>
+            ) : null}
+            {nodeMap.get(contextMenu.nodeId)?.groupId ? (
+              <button type="button" onClick={() => { handleUngroupSelected(); setContextMenu(null); }}>
+                Ungroup <span style={{ opacity: 0.5, fontSize: "0.85em" }}>Ctrl+Shift+G</span>
+              </button>
+            ) : null}
             <button type="button" className="idea-canvas__context-danger" onClick={() => {
               setSelectedIds(new Set([contextMenu.nodeId]));
               handleDeleteSelected();

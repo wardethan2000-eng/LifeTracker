@@ -20,7 +20,8 @@ export type ActiveTool =
   | "stairs"
   | "room"
   | "measure"
-  | "freehand";
+  | "freehand"
+  | "calibrate";
 
 // ─── Canvas Settings ─────────────────────────────────────────────────────────
 

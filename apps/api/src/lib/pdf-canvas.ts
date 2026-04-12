@@ -1,5 +1,33 @@
 import PDFDocument from "pdfkit";
 
+/** Read natural image dimensions from a PNG or JPEG buffer. Returns null if unrecognized. */
+export function readImageSize(buf: Buffer): { width: number; height: number } | null {
+  // PNG: first 8 bytes are signature, then IHDR chunk at offset 8, width at 16, height at 20
+  if (buf.length > 24 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    const width = buf.readUInt32BE(16);
+    const height = buf.readUInt32BE(20);
+    return { width, height };
+  }
+  // JPEG: starts with FF D8; scan for SOF0/SOF2 marker
+  if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    let offset = 2;
+    while (offset < buf.length - 8) {
+      if (buf[offset] !== 0xff) break;
+      const marker = buf[offset + 1]!;
+      // SOF0 (0xC0) or SOF2 (0xC2) — contains dimensions
+      if (marker === 0xc0 || marker === 0xc2) {
+        const height = buf.readUInt16BE(offset + 5);
+        const width = buf.readUInt16BE(offset + 7);
+        return { width, height };
+      }
+      // Skip to next marker
+      const segLen = buf.readUInt16BE(offset + 2);
+      offset += 2 + segLen;
+    }
+  }
+  return null;
+}
+
 type PdfNode = {
   id: string;
   x: number;
@@ -15,6 +43,7 @@ type PdfNode = {
   strokeColor: string | null;
   fillColor: string | null;
   strokeWidth: number;
+  fontSize: number;
   rotation: number;
   sortOrder: number;
   maskJson: string | null;
@@ -41,6 +70,20 @@ export type CanvasPdfInput = {
   physicalUnit: string | null;
   pixelsPerUnit: number | null;
   showDimensions: boolean;
+  /** Background image buffer (JPEG/PNG) for satellite overlay */
+  backgroundImage?: {
+    buffer: Buffer;
+    x: number;
+    y: number;
+    scale: number;
+    opacity: number;
+    /** Natural image width in pixels (before canvas scale) */
+    naturalWidth: number;
+    /** Natural image height in pixels (before canvas scale) */
+    naturalHeight: number;
+  };
+  /** Map of nodeId → image buffer for image/object nodes */
+  nodeImages?: Map<string, Buffer>;
 };
 
 function computeBounds(nodes: PdfNode[], padding = 20) {
@@ -262,27 +305,42 @@ function drawNode(doc: PDFKit.PDFDocument, node: PdfNode, s: number, ox: number,
       doc.ellipse(cx, cy, rx, ry).lineWidth(sw).fillColor(fill).strokeColor(stroke).fillAndStroke();
       doc.restore();
       if (node.label) {
-        doc.fontSize(10 * s).fillColor("#333333").text(node.label, cx - rx, cy - 5, { width: rx * 2, align: "center" });
+        doc.fontSize((node.fontSize ?? 10) * s).fillColor("#333333").text(node.label, cx - rx, cy - 5, { width: rx * 2, align: "center" });
       }
       break;
     }
     case "text": {
       if (node.label) {
-        doc.fontSize(Math.max(10 * s, 6)).fillColor("#333333")
+        doc.fontSize(Math.max((node.fontSize ?? 10) * s, 6)).fillColor("#333333")
           .text(node.label, tx(node.x) + 2, ty(node.y) + 2, { width: Math.max(ts(node.width) - 4, 20) });
       }
       break;
     }
     case "image":
     case "object": {
-      // Draw a placeholder box (actual image embedding would require fetching URLs)
+      const imgBuf = opts.nodeImages?.get(node.id);
+      const nx = tx(node.x), ny = ty(node.y), nw = ts(node.width), nh = ts(node.height);
+      const rot = node.rotation ?? 0;
       doc.save();
-      doc.rect(tx(node.x), ty(node.y), ts(node.width), ts(node.height))
-        .fillColor("#f0f4f8").strokeColor("#475569").lineWidth(0.75).fillAndStroke();
+      if (rot !== 0) {
+        doc.translate(nx + nw / 2, ny + nh / 2).rotate(rot).translate(-(nx + nw / 2), -(ny + nh / 2));
+      }
+      if (imgBuf) {
+        try {
+          doc.image(imgBuf, nx, ny, { width: nw, height: nh });
+        } catch {
+          // Fallback to placeholder if image is invalid
+          doc.rect(nx, ny, nw, nh)
+            .fillColor("#f0f4f8").strokeColor("#475569").lineWidth(0.75).fillAndStroke();
+        }
+      } else {
+        doc.rect(nx, ny, nw, nh)
+          .fillColor("#f0f4f8").strokeColor("#475569").lineWidth(0.75).fillAndStroke();
+      }
       doc.restore();
       if (node.label) {
         doc.fontSize(Math.max(8 * s, 5)).fillColor("#666666")
-          .text(node.label, tx(node.x), ty(node.y) + ts(node.height) / 2 - 5, { width: ts(node.width), align: "center" });
+          .text(node.label, nx, ny + nh / 2 - 5, { width: nw, align: "center" });
       }
       break;
     }
@@ -303,7 +361,7 @@ function drawNode(doc: PDFKit.PDFDocument, node: PdfNode, s: number, ox: number,
         doc.lineWidth(sw).fillColor(fill).strokeColor(stroke).fillAndStroke();
         doc.restore();
         if (node.label) {
-          doc.fontSize(Math.max(10 * s, 6)).fillColor("#333333").text(node.label, cx - hw, cy - 5, { width: hw * 2, align: "center" });
+          doc.fontSize(Math.max((node.fontSize ?? 10) * s, 6)).fillColor("#333333").text(node.label, cx - hw, cy - 5, { width: hw * 2, align: "center" });
         }
       } else {
         doc.save();
@@ -311,7 +369,7 @@ function drawNode(doc: PDFKit.PDFDocument, node: PdfNode, s: number, ox: number,
         doc.lineWidth(sw).fillColor(fill).strokeColor(stroke).fillAndStroke();
         doc.restore();
         if (node.label) {
-          doc.fontSize(Math.max(10 * s, 6)).fillColor("#333333")
+          doc.fontSize(Math.max((node.fontSize ?? 10) * s, 6)).fillColor("#333333")
             .text(node.label, tx(node.x) + 4, ty(node.y) + ts(node.height) / 2 - 5, { width: Math.max(ts(node.width) - 8, 20), align: "center" });
         }
       }
@@ -380,6 +438,16 @@ export function generateCanvasPdf(input: CanvasPdfInput): PDFKit.PDFDocument {
   return doc;
 }
 
+/** Pick a round scale bar length in physical units that fits well on the page. */
+function pickScaleBarLength(ppu: number, scale: number, maxBarPx: number): number {
+  const maxPhysical = maxBarPx / (ppu * scale);
+  const candidates = [0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000];
+  for (const c of candidates) {
+    if (c <= maxPhysical && c * ppu * scale >= 30) return c;
+  }
+  return candidates[0]!;
+}
+
 /**
  * Render a canvas as a new page in an existing PDFDocument.
  * Adds a page, draws title + all nodes/edges scaled to fit.
@@ -393,10 +461,24 @@ export function renderCanvasPage(doc: PDFKit.PDFDocument, input: CanvasPdfInput)
   doc.addPage();
 
   const pageW = doc.page.width - 80; // margins
-  const pageH = doc.page.height - 120; // margins + title space
+  const footerH = 50; // space for scale bar + metadata
+  const pageH = doc.page.height - 120 - footerH; // margins + title + footer
 
   // Title
   doc.fontSize(16).fillColor("#1e293b").text(name, 40, 40, { width: pageW, align: "center" });
+
+  // Subtitle: mode + physical size
+  const subtitle: string[] = [];
+  if (input.canvasMode === "floorplan") subtitle.push("Floor Plan");
+  else if (input.canvasMode === "freehand") subtitle.push("Freehand");
+  if (input.pixelsPerUnit && input.physicalUnit) {
+    const physW = canvasW / input.pixelsPerUnit;
+    const physH = canvasH / input.pixelsPerUnit;
+    subtitle.push(`${physW.toFixed(1)} × ${physH.toFixed(1)} ${input.physicalUnit}`);
+  }
+  if (subtitle.length > 0) {
+    doc.fontSize(9).fillColor("#64748b").text(subtitle.join(" · "), 40, doc.y, { width: pageW, align: "center" });
+  }
   doc.moveDown(0.5);
   const startY = doc.y;
 
@@ -411,6 +493,24 @@ export function renderCanvasPage(doc: PDFKit.PDFDocument, input: CanvasPdfInput)
   // Save for coordinate translation
   doc.save();
   doc.translate(40, startY);
+
+  // Draw background image if provided
+  if (input.backgroundImage) {
+    const bg = input.backgroundImage;
+    const tx = (v: number) => (v - offsetX) * scale;
+    const ty = (v: number) => (v - offsetY) * scale;
+    const imgW = bg.naturalWidth * bg.scale * scale;
+    const imgH = bg.naturalHeight * bg.scale * scale;
+    const imgX = tx(bg.x);
+    const imgY = ty(bg.y);
+    doc.save();
+    doc.opacity(bg.opacity);
+    try {
+      doc.image(bg.buffer, imgX, imgY, { width: imgW, height: imgH });
+    } catch { /* skip invalid image */ }
+    doc.opacity(1);
+    doc.restore();
+  }
 
   // Build node map for edges
   const nodeMap = new Map<string, PdfNode>();
@@ -428,4 +528,45 @@ export function renderCanvasPage(doc: PDFKit.PDFDocument, input: CanvasPdfInput)
   }
 
   doc.restore();
+
+  // --- Footer: scale bar + north arrow + date ---
+  const footerY = doc.page.height - 40 - footerH;
+
+  // Scale bar (bottom-left)
+  if (input.pixelsPerUnit && input.physicalUnit) {
+    const barLen = pickScaleBarLength(input.pixelsPerUnit, scale, pageW * 0.3);
+    const barPx = barLen * input.pixelsPerUnit * scale;
+    const barX = 40;
+    const barY = footerY + 20;
+    const barH = 4;
+
+    doc.save();
+    doc.rect(barX, barY, barPx, barH).fillColor("#1e293b").fill();
+    // Tick marks at ends
+    doc.lineWidth(0.75).strokeColor("#1e293b");
+    doc.moveTo(barX, barY - 3).lineTo(barX, barY + barH + 3).stroke();
+    doc.moveTo(barX + barPx, barY - 3).lineTo(barX + barPx, barY + barH + 3).stroke();
+    // Label
+    const barLabel = `${barLen % 1 === 0 ? barLen.toFixed(0) : barLen.toFixed(1)} ${input.physicalUnit}`;
+    doc.fontSize(8).fillColor("#1e293b").text(barLabel, barX, barY + barH + 5, { width: barPx, align: "center" });
+    doc.restore();
+  }
+
+  // North arrow (bottom-right)
+  const arrowX = doc.page.width - 60;
+  const arrowY = footerY + 14;
+  const arrowLen = 20;
+  doc.save();
+  doc.lineWidth(1.2).strokeColor("#1e293b");
+  doc.moveTo(arrowX, arrowY + arrowLen).lineTo(arrowX, arrowY).stroke();
+  // Arrowhead
+  doc.fillColor("#1e293b");
+  doc.polygon([arrowX, arrowY - 2], [arrowX - 4, arrowY + 6], [arrowX + 4, arrowY + 6]).fill();
+  // "N" label
+  doc.fontSize(9).fillColor("#1e293b").text("N", arrowX - 10, arrowY + arrowLen + 3, { width: 20, align: "center" });
+  doc.restore();
+
+  // Date (center-right)
+  const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  doc.fontSize(7).fillColor("#94a3b8").text(dateStr, doc.page.width - 40 - 100, footerY + footerH - 10, { width: 100, align: "right" });
 }

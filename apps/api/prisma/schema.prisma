@@ -2640,6 +2640,9 @@ model IdeaCanvas {
   physicalUnit      String?           @db.VarChar(10)
   backgroundImageUrl    String?          @db.VarChar(1000)
   backgroundImageOpacity Float          @default(0.5)
+  backgroundImageX  Float             @default(0)
+  backgroundImageY  Float             @default(0)
+  backgroundImageScale Float          @default(1)
   snapToGrid        Boolean           @default(false)
   gridSize          Int               @default(24)
   canvasMode        CanvasMode        @default(diagram)
@@ -2676,6 +2679,7 @@ model IdeaCanvasNode {
   strokeColor String?         @db.VarChar(30)
   fillColor   String?         @db.VarChar(30)
   strokeWidth Int             @default(1)
+  fontSize       Int             @default(14)
   shape       CanvasNodeShape @default(rectangle)
   objectType     String          @default("flowchart") @db.VarChar(20)
   imageUrl       String?         @db.VarChar(1000)
@@ -2694,6 +2698,8 @@ model IdeaCanvasNode {
   pointBy        Float?
   // Freehand / polyline data
   pointsJson     String?         @db.Text
+  // Group assignment
+  groupId        String?
   // Layer assignment
   layerId        String?
   createdAt      DateTime        @default(now())

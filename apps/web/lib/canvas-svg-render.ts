@@ -30,6 +30,12 @@ export type CanvasRenderOptions = {
   backgroundImageUrl?: string;
   /** Opacity for the background image (0–1, default 0.5) */
   backgroundImageOpacity?: number;
+  /** Canvas-coord X offset for background image */
+  backgroundImageX?: number;
+  /** Canvas-coord Y offset for background image */
+  backgroundImageY?: number;
+  /** Scale factor for background image (default 1) */
+  backgroundImageScale?: number;
   /** Natural pixel dimensions of the background image */
   bgImageDims?: { w: number; h: number };
 };
@@ -406,14 +412,14 @@ function renderCircleNode(node: IdeaCanvasThumbnailNode): string {
   const sw = node.strokeWidth ?? 1.5;
   let label = "";
   if (node.label) {
-    label = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#333">${esc(node.label)}</text>`;
+    label = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${node.fontSize ?? 14}" fill="#333">${esc(node.label)}</text>`;
   }
   return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>${label}`;
 }
 
 function renderTextNode(node: IdeaCanvasThumbnailNode): string {
   if (!node.label) return `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" fill="transparent"/>`;
-  return `<text x="${node.x + 4}" y="${node.y + 16}" font-size="14" fill="#333">`
+  return `<text x="${node.x + 4}" y="${node.y + (node.fontSize ?? 14) + 2}" font-size="${node.fontSize ?? 14}" fill="#333">`
     + `<tspan>${esc(node.label)}</tspan></text>`;
 }
 
@@ -425,7 +431,7 @@ function renderRectNode(node: IdeaCanvasThumbnailNode): string {
   if (node.label) {
     const cx = node.x + node.width / 2;
     const cy = node.y + node.height / 2;
-    label = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#333">${esc(node.label)}</text>`;
+    label = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${node.fontSize ?? 14}" fill="#333">${esc(node.label)}</text>`;
   }
   return `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="4" ry="4" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>${label}`;
 }
@@ -446,7 +452,7 @@ function renderFlowchartNode(node: IdeaCanvasThumbnailNode): string {
   if (node.label) {
     const cx = node.x + node.width / 2;
     const cy = node.y + node.height / 2;
-    label = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#333">${esc(node.label)}</text>`;
+    label = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${node.fontSize ?? 14}" fill="#333">${esc(node.label)}</text>`;
   }
   return shape + label;
 }
@@ -459,22 +465,31 @@ export function renderNodeSVG(
   opts: CanvasRenderOptions,
 ): string {
   const imgUrl = opts.imageUrlMap?.get(node.id);
+  let svg: string;
   switch (node.objectType) {
-    case "image":     return renderImageNode(node, imgUrl);
-    case "object":    return renderObjectNode(node, imgUrl);
-    case "wall":      return renderWallNode(node, wallMiterPolygons, opts);
-    case "line":      return renderLineNode(node);
-    case "dimension": return renderDimensionNode(node, opts);
-    case "room":      return renderRoomNode(node, opts);
-    case "door":      return renderDoorNode(node);
-    case "window":    return renderWindowNode(node);
-    case "stairs":    return renderStairsNode(node, opts.pixelsPerUnit);
-    case "freehand":  return renderFreehandNode(node);
-    case "circle":    return renderCircleNode(node);
-    case "text":      return renderTextNode(node);
-    case "rect":      return renderRectNode(node);
-    default:          return renderFlowchartNode(node);
+    case "image":     svg = renderImageNode(node, imgUrl); break;
+    case "object":    svg = renderObjectNode(node, imgUrl); break;
+    case "wall":      svg = renderWallNode(node, wallMiterPolygons, opts); break;
+    case "line":      svg = renderLineNode(node); break;
+    case "dimension": svg = renderDimensionNode(node, opts); break;
+    case "room":      svg = renderRoomNode(node, opts); break;
+    case "door":      svg = renderDoorNode(node); break;
+    case "window":    svg = renderWindowNode(node); break;
+    case "stairs":    svg = renderStairsNode(node, opts.pixelsPerUnit); break;
+    case "freehand":  svg = renderFreehandNode(node); break;
+    case "circle":    svg = renderCircleNode(node); break;
+    case "text":      svg = renderTextNode(node); break;
+    case "rect":      svg = renderRectNode(node); break;
+    default:          svg = renderFlowchartNode(node); break;
   }
+  // Apply rotation transform for rotatable node types
+  const rot = node.rotation ?? 0;
+  if (rot !== 0 && !["wall", "door", "window", "dimension", "freehand", "room"].includes(node.objectType)) {
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    return `<g transform="rotate(${rot} ${cx} ${cy})">${svg}</g>`;
+  }
+  return svg;
 }
 
 // ─── Edge rendering ──────────────────────────────────────────────────────────
@@ -556,7 +571,12 @@ export function renderCanvasToSVG(
   // Background image (if present)
   if (opts.backgroundImageUrl && opts.bgImageDims) {
     const imgOp = opts.backgroundImageOpacity ?? 0.5;
-    body += `<image href="${esc(opts.backgroundImageUrl)}" x="0" y="0" width="${opts.bgImageDims.w}" height="${opts.bgImageDims.h}" opacity="${imgOp}" preserveAspectRatio="none"/>`;
+    const imgX = opts.backgroundImageX ?? 0;
+    const imgY = opts.backgroundImageY ?? 0;
+    const imgScale = opts.backgroundImageScale ?? 1;
+    const imgW = opts.bgImageDims.w * imgScale;
+    const imgH = opts.bgImageDims.h * imgScale;
+    body += `<image href="${esc(opts.backgroundImageUrl)}" x="${imgX}" y="${imgY}" width="${imgW}" height="${imgH}" opacity="${imgOp}" preserveAspectRatio="none"/>`;
   }
 
   // Grid
@@ -573,6 +593,45 @@ export function renderCanvasToSVG(
   const sorted = [...nodes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   for (const node of sorted) {
     body += renderNodeSVG(node, wallMiterPolygons, opts);
+  }
+
+  // Footer elements: scale bar + north arrow
+  const footerPadding = 12;
+  const footerY = box.maxY - footerPadding;
+
+  // Scale bar (bottom-left)
+  if (opts.pixelsPerUnit && opts.physicalUnit) {
+    const ppu = opts.pixelsPerUnit;
+    const maxBarPx = box.width * 0.25;
+    const candidates = [0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000];
+    let barLen = candidates[0]!;
+    for (const c of candidates) {
+      if (c <= maxBarPx / ppu && c * ppu >= 30) barLen = c;
+    }
+    const barPx = barLen * ppu;
+    const barX = box.minX + footerPadding;
+    const barY = footerY - 6;
+    const barH = 4;
+    const tickH = 6;
+    const label = `${barLen % 1 === 0 ? barLen.toFixed(0) : barLen.toFixed(1)} ${opts.physicalUnit}`;
+    body += `<g class="scale-bar">`;
+    body += `<rect x="${barX}" y="${barY}" width="${barPx}" height="${barH}" fill="#1e293b"/>`;
+    body += `<line x1="${barX}" y1="${barY - tickH / 2}" x2="${barX}" y2="${barY + barH + tickH / 2}" stroke="#1e293b" stroke-width="1"/>`;
+    body += `<line x1="${barX + barPx}" y1="${barY - tickH / 2}" x2="${barX + barPx}" y2="${barY + barH + tickH / 2}" stroke="#1e293b" stroke-width="1"/>`;
+    body += `<text x="${barX + barPx / 2}" y="${barY + barH + tickH + 10}" text-anchor="middle" font-size="10" fill="#1e293b" font-family="system-ui, sans-serif">${esc(label)}</text>`;
+    body += `</g>`;
+  }
+
+  // North arrow (bottom-right)
+  {
+    const arrowX = box.maxX - footerPadding - 8;
+    const arrowTop = footerY - 22;
+    const arrowBot = footerY - 2;
+    body += `<g class="north-arrow">`;
+    body += `<line x1="${arrowX}" y1="${arrowBot}" x2="${arrowX}" y2="${arrowTop}" stroke="#1e293b" stroke-width="1.5"/>`;
+    body += `<polygon points="${arrowX},${arrowTop - 2} ${arrowX - 4},${arrowTop + 6} ${arrowX + 4},${arrowTop + 6}" fill="#1e293b"/>`;
+    body += `<text x="${arrowX}" y="${arrowBot + 12}" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b" font-family="system-ui, sans-serif">N</text>`;
+    body += `</g>`;
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.minX} ${box.minY} ${box.width} ${box.height}" width="${box.width}" height="${box.height}">`

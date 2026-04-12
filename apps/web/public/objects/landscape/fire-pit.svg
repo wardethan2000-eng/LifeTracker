@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- fire pit (top-down view) -->
+  <circle cx="30" cy="30" r="26" fill="#787878" stroke="#505050"/>
+  <circle cx="30" cy="30" r="20" fill="#4a4a4a" stroke="#383838"/>
+  <!-- fire/ember glow -->
+  <circle cx="30" cy="30" r="12" fill="#c05020" stroke="none" opacity="0.6"/>
+  <circle cx="30" cy="30" r="6" fill="#e08030" stroke="none" opacity="0.5"/>
+  <!-- stone ring details -->
+  <path d="M8 18 A26 26 0 0 1 18 8" stroke="#606060" fill="none" stroke-width="1"/>
+  <path d="M42 8 A26 26 0 0 1 52 18" stroke="#606060" fill="none" stroke-width="1"/>
+  <path d="M52 42 A26 26 0 0 1 42 52" stroke="#606060" fill="none" stroke-width="1"/>
+  <path d="M18 52 A26 26 0 0 1 8 42" stroke="#606060" fill="none" stroke-width="1"/>
+</svg>

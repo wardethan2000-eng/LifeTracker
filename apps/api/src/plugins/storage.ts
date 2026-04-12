@@ -16,6 +16,7 @@ export interface StorageService {
   generateDownloadUrl(key: string, filename: string): Promise<string>;
   deleteObject(key: string): Promise<void>;
   headObject(key: string): Promise<{ contentLength: number; contentType: string } | null>;
+  getObjectBuffer(key: string): Promise<Buffer | null>;
 }
 
 declare module "fastify" {
@@ -54,6 +55,7 @@ const makeDisabledStorage = (): StorageService => {
     generateDownloadUrl: fail,
     deleteObject: fail,
     headObject: fail,
+    getObjectBuffer: async () => null,
   };
 };
 
@@ -147,6 +149,23 @@ export const storagePlugin = fp(async (app) => {
           contentLength: result.ContentLength ?? 0,
           contentType: result.ContentType ?? "application/octet-stream",
         };
+      } catch {
+        return null;
+      }
+    },
+
+    async getObjectBuffer(key) {
+      try {
+        const result = await client.send(new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: key,
+        }));
+        if (!result.Body) return null;
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of result.Body as AsyncIterable<Uint8Array>) {
+          chunks.push(chunk);
+        }
+        return Buffer.concat(chunks);
       } catch {
         return null;
       }

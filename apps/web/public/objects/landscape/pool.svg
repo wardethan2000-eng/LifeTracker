@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- pool outline -->
+  <rect x="4" y="4" width="192" height="112" rx="20" fill="#60b0e0" stroke="#3080b0"/>
+  <!-- water shimmer -->
+  <rect x="14" y="14" width="172" height="92" rx="14" fill="#80c8f0" stroke="none" opacity="0.5"/>
+  <!-- lane lines -->
+  <line x1="70" y1="14" x2="70" y2="106" stroke="#3080b0" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>
+  <line x1="130" y1="14" x2="130" y2="106" stroke="#3080b0" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>
+  <!-- pool edge highlight -->
+  <rect x="4" y="4" width="192" height="112" rx="20" fill="none" stroke="#a0d0e8" stroke-width="1" opacity="0.4"/>
+</svg>
