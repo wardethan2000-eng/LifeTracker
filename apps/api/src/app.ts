@@ -73,6 +73,7 @@ import { hobbyLogRoutes } from "./routes/hobbies/logs.js";
 import { noteFolderRoutes } from "./routes/notes/index.js";
 import { noteTemplateRoutes } from "./routes/notes/templates.js";
 import { ideaCanvasRoutes } from "./routes/canvases/index.js";
+import { canvasShareRoutes, publicCanvasShareRoutes } from "./routes/canvases/share.js";
 import { ideaRoutes } from "./routes/ideas/index.js";
 import { ideaBulkRoutes } from "./routes/ideas/bulk.js";
 import { ideaExportRoutes } from "./routes/ideas/export.js";
@@ -105,6 +106,7 @@ const registerRouteGroup = async (scope: FastifyInstance, plugins: FastifyPlugin
 const publicRoutePlugins: FastifyPluginAsync[] = [
   authRoutes,
   publicShareRoutes,
+  publicCanvasShareRoutes,
   healthRoutes,
   scanRoutes
 ];
@@ -155,6 +157,7 @@ const householdRoutePlugins: FastifyPluginAsync[] = [
   noteFolderRoutes,
   noteTemplateRoutes,
   ideaCanvasRoutes,
+  canvasShareRoutes,
   ideaBulkRoutes,
   ideaExportRoutes,
   ideaRoutes,

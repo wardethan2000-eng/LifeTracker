@@ -19,6 +19,7 @@ import CanvasObjectPicker, { type CanvasObjectPlacement } from "./canvas-object-
 import { CanvasToolbar } from "./canvas/canvas-toolbar";
 import { CanvasSettingsPanel } from "./canvas/canvas-settings-panel";
 import { CanvasLayerPanel } from "./canvas/canvas-layer-panel";
+import CanvasSharePanel from "./canvas/canvas-share-panel";
 import type { ActiveTool } from "./canvas/canvas-tools/types";
 import { simplifyPoints, findNearestWallEndpoint, wallPolygonFromLine, fmtPhysical, computeWallPolygonsWithMiters, arcFromThreePoints, svgArcPath, arcLength, arcWallPolygonPath, polygonArea, polygonCentroid, projectPointOnWall } from "./canvas/canvas-tools/types";
 import {
@@ -126,6 +127,7 @@ export function CanvasRenderer({
     () => (initialCanvas.layers ?? []).find((l) => !l.locked)?.id ?? null
   );
   const [showLayerPanel, setShowLayerPanel] = useState(false);
+  const [activeFloor, setActiveFloor] = useState(0);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasId = initialCanvas.id;
@@ -155,6 +157,7 @@ export function CanvasRenderer({
   const [canvasName, setCanvasName] = useState(initialCanvas.name);
   const [editingName, setEditingName] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSharePanel, setShowSharePanel] = useState(false);
   const canvasMode: CanvasMode = (initialCanvas.canvasMode as CanvasMode) ?? "diagram";
   const [showDimensions, setShowDimensions] = useState(initialCanvas.showDimensions ?? true);
   // Guides — persistent lines dragged from rulers
@@ -278,10 +281,39 @@ export function CanvasRenderer({
     [layers]
   );
 
-  const visibleLayerIds = useMemo(
-    () => new Set(layers.filter((l) => l.visible).map((l) => l.id)),
-    [layers]
-  );
+  // Multi-storey: unique sorted floor numbers
+  const floors = useMemo(() => {
+    const set = new Set(layers.map((l) => l.floorNumber));
+    return [...set].sort((a, b) => a - b);
+  }, [layers]);
+
+  // In floorplan mode, only show layers on the active floor (+visible). In other modes, show all visible.
+  const visibleLayerIds = useMemo(() => {
+    const isFloorplan = settings.canvasMode === "floorplan";
+    return new Set(
+      layers
+        .filter((l) => l.visible && (!isFloorplan || l.floorNumber === activeFloor))
+        .map((l) => l.id)
+    );
+  }, [layers, activeFloor, settings.canvasMode]);
+
+  // Ghost nodes: nodes on floor below, rendered at reduced opacity
+  const ghostLayerIds = useMemo(() => {
+    if (settings.canvasMode !== "floorplan") return new Set<string>();
+    return new Set(
+      layers
+        .filter((l) => l.floorNumber === activeFloor - 1)
+        .map((l) => l.id)
+    );
+  }, [layers, activeFloor, settings.canvasMode]);
+
+  const ghostNodes = useMemo(() => {
+    if (ghostLayerIds.size === 0) return [];
+    return nodes.filter((n) => {
+      const lid = n.layerId ?? defaultLayerId;
+      return lid && ghostLayerIds.has(lid);
+    });
+  }, [nodes, ghostLayerIds, defaultLayerId]);
 
   const sortedNodes = useMemo(() => {
     return [...nodes]
@@ -729,13 +761,40 @@ export function CanvasRenderer({
       if (drag.handle === "line-start") {
         const newX = maybeSnap(b.x + dx);
         const newY = maybeSnap(b.y + dy);
-        setNodes((prev) => prev.map((n) => n.id === drag.nodeId ? { ...n, x: newX, y: newY } : n));
+        setNodes((prev) => {
+          // Find current position of the dragged endpoint to detect connected walls
+          const primary = prev.find((n) => n.id === drag.nodeId);
+          const curX = primary?.x ?? b.x;
+          const curY = primary?.y ?? b.y;
+          return prev.map((n) => {
+            if (n.id === drag.nodeId) return { ...n, x: newX, y: newY };
+            if (n.objectType === "wall" || n.objectType === "line" || n.objectType === "dimension") {
+              const eps = 1;
+              if (Math.abs(n.x - curX) < eps && Math.abs(n.y - curY) < eps) return { ...n, x: newX, y: newY };
+              if (Math.abs(n.x2 - curX) < eps && Math.abs(n.y2 - curY) < eps) return { ...n, x2: newX, y2: newY };
+            }
+            return n;
+          });
+        });
         return;
       }
       if (drag.handle === "line-end") {
         const newX2 = maybeSnap(drag.startX2 + dx);
         const newY2 = maybeSnap(drag.startY2 + dy);
-        setNodes((prev) => prev.map((n) => n.id === drag.nodeId ? { ...n, x2: newX2, y2: newY2 } : n));
+        setNodes((prev) => {
+          const primary = prev.find((n) => n.id === drag.nodeId);
+          const curX2 = primary?.x2 ?? drag.startX2;
+          const curY2 = primary?.y2 ?? drag.startY2;
+          return prev.map((n) => {
+            if (n.id === drag.nodeId) return { ...n, x2: newX2, y2: newY2 };
+            if (n.objectType === "wall" || n.objectType === "line" || n.objectType === "dimension") {
+              const eps = 1;
+              if (Math.abs(n.x - curX2) < eps && Math.abs(n.y - curY2) < eps) return { ...n, x: newX2, y: newY2 };
+              if (Math.abs(n.x2 - curX2) < eps && Math.abs(n.y2 - curY2) < eps) return { ...n, x2: newX2, y2: newY2 };
+            }
+            return n;
+          });
+        });
         return;
       }
 
@@ -909,6 +968,25 @@ export function CanvasRenderer({
       if (n) {
         const update: Partial<IdeaCanvasNode> = { x: n.x, y: n.y, width: n.width, height: n.height, x2: n.x2, y2: n.y2 };
         pendingNodeUpdates.current.set(drag.nodeId, update);
+        // Also persist connected wall endpoints that were dragged along
+        if (drag.handle === "line-start" || drag.handle === "line-end") {
+          for (const other of nodes) {
+            if (other.id === drag.nodeId) continue;
+            if (other.objectType !== "wall" && other.objectType !== "line" && other.objectType !== "dimension") continue;
+            const cur = nodeMap.get(other.id);
+            if (!cur) continue;
+            // If its coordinates changed from the initial load, it was moved by the connected drag
+            const initial = drag.handle === "line-start"
+              ? { x: drag.startBounds.x, y: drag.startBounds.y }
+              : { x: drag.startX2, y: drag.startY2 };
+            const now = drag.handle === "line-start"
+              ? { x: n.x, y: n.y }
+              : { x: n.x2, y: n.y2 };
+            if (initial.x !== now.x || initial.y !== now.y) {
+              pendingNodeUpdates.current.set(other.id, { x: cur.x, y: cur.y, x2: cur.x2, y2: cur.y2 });
+            }
+          }
+        }
         pushHistory(nodes, edges);
         scheduleSyncPositions();
       }
@@ -1360,6 +1438,33 @@ export function CanvasRenderer({
     pushHistory(newNodes, edges);
   }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
 
+  const handleChangeSwingDirection = useCallback(async (swingDirection: "left" | "right" | "double") => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { swingDirection })));
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, swingDirection } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
+
+  const handleChangeStairDirection = useCallback(async (stairDirection: "up" | "down" | "left" | "right") => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { stairDirection })));
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, stairDirection } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
+
+  const handleChangeStairFloors = useCallback(async (fromFloor: number | null, toFloor: number | null) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await Promise.all(ids.map((id) => updateCanvasNode(householdId, canvasId, id, { fromFloor, toFloor })));
+    const newNodes = nodes.map((n) => ids.includes(n.id) ? { ...n, fromFloor, toFloor } : n);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+  }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
+
   /** Commit inline wall dimension edit: resize wall to specified physical length, keeping angle */
   const commitWallDimEdit = useCallback(async (confirm: boolean) => {
     if (!wallDimEdit) return;
@@ -1797,10 +1902,25 @@ export function CanvasRenderer({
     const layer = await createCanvasLayer(householdId, canvasId, {
       name: `Layer ${layers.length + 1}`,
       sortOrder: nextOrder,
+      floorNumber: settings.canvasMode === "floorplan" ? activeFloor : 0,
     });
     setLayers((prev) => [...prev, layer]);
     setActiveLayerId(layer.id);
-  }, [householdId, canvasId, layers]);
+  }, [householdId, canvasId, layers, activeFloor, settings.canvasMode]);
+
+  const handleAddFloor = useCallback(async () => {
+    const maxFloor = floors.length > 0 ? Math.max(...floors) : -1;
+    const newFloor = maxFloor + 1;
+    const nextOrder = layers.length > 0 ? Math.max(...layers.map((l) => l.sortOrder)) + 1 : 0;
+    const layer = await createCanvasLayer(householdId, canvasId, {
+      name: newFloor === 0 ? "Ground Floor" : `Floor ${newFloor}`,
+      sortOrder: nextOrder,
+      floorNumber: newFloor,
+    });
+    setLayers((prev) => [...prev, layer]);
+    setActiveFloor(newFloor);
+    setActiveLayerId(layer.id);
+  }, [householdId, canvasId, layers, floors]);
 
   const handleUpdateLayer = useCallback(async (layerId: string, patch: Parameters<typeof updateCanvasLayer>[3]) => {
     const updated = await updateCanvasLayer(householdId, canvasId, layerId, patch);
@@ -2542,6 +2662,8 @@ export function CanvasRenderer({
       const w = node.width;
       const h = node.height || 6;
       const rot = node.rotation ?? 0;
+      const swing = (node as Record<string, unknown>).swingDirection as string | null ?? "left";
+      const strokeCol = isSelected ? selStroke : (node.strokeColor ?? "#374151");
       return (
         <g key={node.id} transform={`translate(${node.x},${node.y}) rotate(${rot})`}>
           {/* Gap clear rectangle (white to mask wall) */}
@@ -2549,15 +2671,27 @@ export function CanvasRenderer({
             fill="#ffffff" stroke="none" style={{ cursor }} {...nodeEvents} />
           {/* Door line (the leaf) */}
           <line x1={-w / 2} y1={0} x2={w / 2} y2={0}
-            stroke={isSelected ? selStroke : (node.strokeColor ?? "#374151")}
-            strokeWidth={1.5 / zoom} pointerEvents="none" />
-          {/* Swing arc (90°) */}
-          <path d={`M ${w / 2},0 A ${w},${w} 0 0,1 ${-w / 2 + w * (1 - Math.cos(Math.PI / 2))},${-w * Math.sin(Math.PI / 2)}`}
-            fill="none" stroke={isSelected ? selStroke : (node.strokeColor ?? "#374151")}
-            strokeWidth={0.75 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`}
-            pointerEvents="none" />
+            stroke={strokeCol} strokeWidth={1.5 / zoom} pointerEvents="none" />
+          {/* Swing arc(s) — left: hinge at left, right: hinge at right, double: both */}
+          {(swing === "left" || swing === "double") && (
+            <path d={`M ${w / 2},0 A ${w},${w} 0 0,1 ${-w / 2},${-w}`}
+              fill="none" stroke={strokeCol}
+              strokeWidth={0.75 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`}
+              pointerEvents="none" />
+          )}
+          {(swing === "right" || swing === "double") && (
+            <path d={`M ${-w / 2},0 A ${w},${w} 0 0,0 ${w / 2},${-w}`}
+              fill="none" stroke={strokeCol}
+              strokeWidth={0.75 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`}
+              pointerEvents="none" />
+          )}
           {/* Hinge markers */}
-          <circle cx={-w / 2} cy={0} r={2 / zoom} fill={node.strokeColor ?? "#374151"} pointerEvents="none" />
+          {(swing === "left" || swing === "double") && (
+            <circle cx={-w / 2} cy={0} r={2 / zoom} fill={node.strokeColor ?? "#374151"} pointerEvents="none" />
+          )}
+          {(swing === "right" || swing === "double") && (
+            <circle cx={w / 2} cy={0} r={2 / zoom} fill={node.strokeColor ?? "#374151"} pointerEvents="none" />
+          )}
           {isSelected && (
             <rect x={-w / 2 - 2} y={-w - 2} width={w + 4} height={w + h / 2 + 4}
               fill="none" stroke="var(--accent)" strokeWidth={1 / zoom}
@@ -2604,8 +2738,34 @@ export function CanvasRenderer({
       // Stairs: rectangle with step lines and direction arrow
       const w = node.width;
       const h = node.height;
-      const stepCount = Math.max(3, Math.round(h / (pixelsPerUnit ? pixelsPerUnit * 0.25 : 12)));
-      const stepH = h / stepCount;
+      const dir = (node as Record<string, unknown>).stairDirection as string | null ?? "up";
+      const isHorizontal = dir === "left" || dir === "right";
+      const stepCount = Math.max(3, Math.round((isHorizontal ? w : h) / (pixelsPerUnit ? pixelsPerUnit * 0.25 : 12)));
+      const stepSize = (isHorizontal ? w : h) / stepCount;
+      // Arrow geometry
+      const cx = node.x + w / 2;
+      const cy = node.y + h / 2;
+      const arrowSize = 5 / zoom;
+      let arrowLine: { x1: number; y1: number; x2: number; y2: number };
+      let arrowHead: string;
+      switch (dir) {
+        case "down":
+          arrowLine = { x1: cx, y1: node.y + h * 0.15, x2: cx, y2: node.y + h * 0.85 };
+          arrowHead = `${cx},${node.y + h * 0.9} ${cx - arrowSize},${node.y + h * 0.8} ${cx + arrowSize},${node.y + h * 0.8}`;
+          break;
+        case "left":
+          arrowLine = { x1: node.x + w * 0.85, y1: cy, x2: node.x + w * 0.15, y2: cy };
+          arrowHead = `${node.x + w * 0.1},${cy} ${node.x + w * 0.2},${cy - arrowSize} ${node.x + w * 0.2},${cy + arrowSize}`;
+          break;
+        case "right":
+          arrowLine = { x1: node.x + w * 0.15, y1: cy, x2: node.x + w * 0.85, y2: cy };
+          arrowHead = `${node.x + w * 0.9},${cy} ${node.x + w * 0.8},${cy - arrowSize} ${node.x + w * 0.8},${cy + arrowSize}`;
+          break;
+        default: // up
+          arrowLine = { x1: cx, y1: node.y + h * 0.85, x2: cx, y2: node.y + h * 0.15 };
+          arrowHead = `${cx},${node.y + h * 0.1} ${cx - arrowSize},${node.y + h * 0.2} ${cx + arrowSize},${node.y + h * 0.2}`;
+          break;
+      }
       return (
         <g key={node.id}>
           {/* Outer rectangle */}
@@ -2616,18 +2776,30 @@ export function CanvasRenderer({
             style={{ cursor }} {...nodeEvents} />
           {/* Step lines */}
           {Array.from({ length: stepCount - 1 }, (_, i) => {
-            const sy = node.y + stepH * (i + 1);
-            return (
-              <line key={i} x1={node.x} y1={sy} x2={node.x + w} y2={sy}
-                stroke={node.strokeColor ?? "#374151"} strokeWidth={0.5 / zoom} pointerEvents="none" />
-            );
+            if (isHorizontal) {
+              const sx = node.x + stepSize * (i + 1);
+              return <line key={i} x1={sx} y1={node.y} x2={sx} y2={node.y + h}
+                stroke={node.strokeColor ?? "#374151"} strokeWidth={0.5 / zoom} pointerEvents="none" />;
+            }
+            const sy = node.y + stepSize * (i + 1);
+            return <line key={i} x1={node.x} y1={sy} x2={node.x + w} y2={sy}
+              stroke={node.strokeColor ?? "#374151"} strokeWidth={0.5 / zoom} pointerEvents="none" />;
           })}
-          {/* Direction arrow (up) */}
-          <line x1={node.x + w / 2} y1={node.y + h * 0.85}
-            x2={node.x + w / 2} y2={node.y + h * 0.15}
+          {/* Direction arrow */}
+          <line x1={arrowLine.x1} y1={arrowLine.y1} x2={arrowLine.x2} y2={arrowLine.y2}
             stroke={node.strokeColor ?? "#374151"} strokeWidth={1.5 / zoom} pointerEvents="none" />
-          <polygon points={`${node.x + w / 2},${node.y + h * 0.1} ${node.x + w / 2 - 5 / zoom},${node.y + h * 0.2} ${node.x + w / 2 + 5 / zoom},${node.y + h * 0.2}`}
+          <polygon points={arrowHead}
             fill={node.strokeColor ?? "#374151"} pointerEvents="none" />
+          {/* Floor label */}
+          {node.fromFloor != null && node.toFloor != null && (() => {
+            const fmt = (f: number) => f === 0 ? "G" : f > 0 ? `${f}` : `B${Math.abs(f)}`;
+            return (
+              <text x={cx} y={node.y + h - 4 / zoom} textAnchor="middle"
+                fontSize={9 / zoom} fill={node.strokeColor ?? "#374151"} fontWeight="600" pointerEvents="none">
+                {`${fmt(node.fromFloor)}→${fmt(node.toFloor)}`}
+              </text>
+            );
+          })()}
           {isSelected && renderResizeHandles(node)}
         </g>
       );
@@ -3351,6 +3523,9 @@ export function CanvasRenderer({
         onChangeFontSize={handleChangeFontSize}
         onChangeEdgeStyle={handleChangeEdgeStyle}
         onChangeWallHeight={handleChangeWallHeight}
+        onChangeSwingDirection={handleChangeSwingDirection}
+        onChangeStairDirection={handleChangeStairDirection}
+        onChangeStairFloors={handleChangeStairFloors}
         physicalUnit={settings.physicalUnit}
         pixelsPerUnit={pixelsPerUnit}
         onDeleteSelected={handleDeleteSelected}
@@ -3379,9 +3554,14 @@ export function CanvasRenderer({
         showSettings={showSettings}
         onToggleLayerPanel={() => setShowLayerPanel((v) => !v)}
         showLayerPanel={showLayerPanel}
+        floors={floors}
+        activeFloor={activeFloor}
+        onFloorChange={setActiveFloor}
+        onAddFloor={handleAddFloor}
         onExportSVG={handleExportSVG}
         onExportPNG={handleExportPNG}
         onExportPDF={handleExportPDF}
+        onShare={simplified ? undefined : () => setShowSharePanel(v => !v)}
         onBringForward={handleBringForward}
         onSendBackward={handleSendBackward}
         onAlignNodes={handleAlignNodes}
@@ -3552,6 +3732,13 @@ export function CanvasRenderer({
             );
           })() : null}
 
+          {/* Ghost overlay: floor below rendered at reduced opacity */}
+          {ghostNodes.length > 0 && (
+            <g opacity={0.15} pointerEvents="none" style={{ filter: "grayscale(1)" }}>
+              {ghostNodes.map((n) => renderNode(n))}
+            </g>
+          )}
+
           {/* Nodes grouped by layer (visible layers in sortOrder, with per-layer opacity + lock) */}
           {(() => {
             const grouped = new Map<string, IdeaCanvasNode[]>();
@@ -3562,7 +3749,7 @@ export function CanvasRenderer({
               grouped.set(lid, grp);
             }
             return [...layers]
-              .filter((l) => l.visible)
+              .filter((l) => visibleLayerIds.has(l.id))
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((layer) => (
                 <g key={layer.id} opacity={layer.opacity} pointerEvents={layer.locked ? "none" : "all"}>
@@ -3802,6 +3989,15 @@ export function CanvasRenderer({
         />
       ) : null}
 
+      {/* Share panel */}
+      {showSharePanel ? (
+        <CanvasSharePanel
+          householdId={householdId}
+          canvasId={initialCanvas.id}
+          onClose={() => setShowSharePanel(false)}
+        />
+      ) : null}
+
       {/* Background image crop mode overlay */}
       {bgCropMode && resolvedBgUrl && bgImageDims ? (() => {
         const imgX = settings.backgroundImageX ?? 0;
@@ -3911,11 +4107,13 @@ export function CanvasRenderer({
           onToggleLock={(id) => handleUpdateLayer(id, { locked: !layers.find((l) => l.id === id)?.locked })}
           onRename={(id, name) => handleUpdateLayer(id, { name })}
           onChangeOpacity={(id, opacity) => handleUpdateLayer(id, { opacity })}
+          onChangeFloorNumber={(id, floorNumber) => handleUpdateLayer(id, { floorNumber })}
           onMoveUp={handleMoveLayerUp}
           onMoveDown={handleMoveLayerDown}
           onAdd={handleAddLayer}
           onDelete={handleDeleteLayer}
           onClose={() => setShowLayerPanel(false)}
+          isFloorplan={settings.canvasMode === "floorplan"}
         />
       ) : null}
 

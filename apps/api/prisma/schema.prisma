@@ -389,6 +389,7 @@ model User {
   createdNoteFolders      NoteFolder[]          @relation("NoteFolderCreator")
   createdNoteTemplates    NoteTemplate[]        @relation("NoteTemplateCreator")
   createdIdeaCanvases     IdeaCanvas[]          @relation("IdeaCanvasCreator")
+  createdCanvasShareLinks CanvasShareLink[]     @relation("CanvasShareLinkCreator")
   createdIdeas            Idea[]                @relation("IdeaCreator")
   performedSpaceItemHistory SpaceItemHistory[]  @relation("SpaceItemHistoryPerformer")
   spaceScanLogs          SpaceScanLog[]
@@ -2662,6 +2663,7 @@ model IdeaCanvas {
   nodes             IdeaCanvasNode[]
   edges             IdeaCanvasEdge[]
   layers            IdeaCanvasLayer[]
+  shareLinks        CanvasShareLink[]
 
   @@index([householdId])
   @@index([householdId, entityType, entityId])
@@ -2697,6 +2699,10 @@ model IdeaCanvasNode {
   wallHeight     Float?
   physicalLength Float?
   parentNodeId   String?
+  swingDirection String?         @db.VarChar(10)
+  stairDirection String?         @db.VarChar(10)
+  fromFloor      Int?
+  toFloor        Int?
   pointAx        Float?
   pointAy        Float?
   pointBx        Float?
@@ -2726,9 +2732,10 @@ model IdeaCanvasLayer {
   name       String           @db.VarChar(100)
   visible    Boolean          @default(true)
   locked     Boolean          @default(false)
-  sortOrder  Int              @default(0)
-  opacity    Float            @default(1)
-  createdAt  DateTime         @default(now())
+  sortOrder    Int              @default(0)
+  opacity      Float            @default(1)
+  floorNumber  Int              @default(0)
+  createdAt    DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
   canvas     IdeaCanvas       @relation(fields: [canvasId], references: [id], onDelete: Cascade)
   nodes      IdeaCanvasNode[]
@@ -2753,6 +2760,24 @@ model IdeaCanvasEdge {
   @@index([canvasId])
   @@index([sourceNodeId])
   @@index([targetNodeId])
+}
+
+// A share link that grants public (unauthenticated) access to a canvas.
+model CanvasShareLink {
+  id          String    @id @default(cuid())
+  canvasId    String
+  token       String    @unique @db.VarChar(64)
+  permission  String    @default("view") @db.VarChar(10) // view | edit
+  label       String?   @db.VarChar(100)
+  expiresAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  canvas      IdeaCanvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  createdBy   User       @relation("CanvasShareLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([canvasId])
+  @@index([token])
 }
 
 model UserLayoutPreference {

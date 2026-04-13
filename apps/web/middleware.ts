@@ -10,6 +10,9 @@ const sessionCookieName = "better-auth.session_token";
 const isAuthPage = (pathname: string): boolean =>
   pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
 
+const isPublicPage = (pathname: string): boolean =>
+  pathname.startsWith("/shared/");
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
@@ -32,7 +35,7 @@ export function middleware(request: NextRequest): NextResponse {
 
   const hasSession = Boolean(request.cookies.get(sessionCookieName)?.value);
 
-  if (!isAuthPage(pathname) && !hasSession) {
+  if (!isAuthPage(pathname) && !isPublicPage(pathname) && !hasSession) {
     const signIn = new URL("/sign-in", request.url);
     signIn.searchParams.set("next", pathname);
     return NextResponse.redirect(signIn);

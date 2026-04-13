@@ -12,11 +12,13 @@ export interface CanvasLayerPanelProps {
   onToggleLock: (layerId: string) => void;
   onRename: (layerId: string, name: string) => void;
   onChangeOpacity: (layerId: string, opacity: number) => void;
+  onChangeFloorNumber?: (layerId: string, floorNumber: number) => void;
   onMoveUp: (layerId: string) => void;
   onMoveDown: (layerId: string) => void;
   onAdd: () => void;
   onDelete: (layerId: string) => void;
   onClose: () => void;
+  isFloorplan?: boolean;
 }
 
 export function CanvasLayerPanel({
@@ -27,11 +29,13 @@ export function CanvasLayerPanel({
   onToggleLock,
   onRename,
   onChangeOpacity,
+  onChangeFloorNumber,
   onMoveUp,
   onMoveDown,
   onAdd,
   onDelete,
   onClose,
+  isFloorplan = false,
 }: CanvasLayerPanelProps): JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -125,6 +129,21 @@ export function CanvasLayerPanel({
                   </span>
                 )}
               </div>
+
+              {/* Floor number (floorplan mode only) */}
+              {isFloorplan && onChangeFloorNumber && (
+                <select
+                  className="idea-canvas__layer-floor-select"
+                  value={layer.floorNumber}
+                  title={`Floor ${layer.floorNumber}`}
+                  onChange={(e) => { e.stopPropagation(); onChangeFloorNumber(layer.id, Number(e.target.value)); }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {Array.from({ length: 11 }, (_, i) => i - 2).map((f) => (
+                    <option key={f} value={f}>{f === 0 ? "G" : f > 0 ? `F${f}` : `B${Math.abs(f)}`}</option>
+                  ))}
+                </select>
+              )}
 
               {/* Opacity */}
               <input

@@ -46,6 +46,10 @@ function serializeNode(n: {
   maskJson?: string | null;
   wallThickness?: number; wallAngle?: number | null; wallHeight?: number | null; physicalLength?: number | null;
   parentNodeId?: string | null;
+  swingDirection?: string | null;
+  stairDirection?: string | null;
+  fromFloor?: number | null;
+  toFloor?: number | null;
   pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
   pointsJson?: string | null;
   groupId?: string | null;
@@ -84,13 +88,15 @@ type CanvasWithRelations = {
     maskJson?: string | null;
     wallThickness?: number; wallAngle?: number | null; physicalLength?: number | null;
     parentNodeId?: string | null;
+    fromFloor?: number | null;
+    toFloor?: number | null;
     pointAx?: number | null; pointAy?: number | null; pointBx?: number | null; pointBy?: number | null;
     groupId?: string | null;
     layerId?: string | null;
     createdAt: Date; updatedAt: Date;
   }>;
   edges: Array<{ id: string; canvasId: string; sourceNodeId: string; targetNodeId: string; label: string | null; style: string; createdAt: Date; updatedAt: Date }>;
-  layers: Array<{ id: string; canvasId: string; name: string; visible: boolean; locked: boolean; sortOrder: number; opacity: number; createdAt: Date; updatedAt: Date }>;
+  layers: Array<{ id: string; canvasId: string; name: string; visible: boolean; locked: boolean; sortOrder: number; opacity: number; floorNumber: number; createdAt: Date; updatedAt: Date }>;
 };
 
 function serializeCanvas(c: CanvasWithRelations) {
@@ -163,6 +169,9 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
               maskJson: true, pointsJson: true,
               pointAx: true, pointAy: true, pointBx: true, pointBy: true,
               wallThickness: true, wallAngle: true,
+              swingDirection: true, stairDirection: true,
+              fromFloor: true, toFloor: true,
+              groupId: true, layerId: true, fontSize: true,
             },
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           },
@@ -313,6 +322,12 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         pointBx: n.pointBx,
         pointBy: n.pointBy,
         wallThickness: n.wallThickness ?? null,
+        swingDirection: n.swingDirection ?? null,
+        stairDirection: n.stairDirection ?? null,
+        fromFloor: n.fromFloor ?? null,
+        toFloor: n.toFloor ?? null,
+        groupId: n.groupId ?? null,
+        layerId: n.layerId ?? null,
         fontSize: n.fontSize ?? 14,
       })),
       edges: (canvas as unknown as CanvasWithRelations).edges.map((e) => ({
@@ -492,6 +507,10 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         wallHeight: input.wallHeight ?? null,
         physicalLength: input.physicalLength ?? null,
         parentNodeId: input.parentNodeId ?? null,
+        swingDirection: input.swingDirection ?? null,
+        stairDirection: input.stairDirection ?? null,
+        fromFloor: input.fromFloor ?? null,
+        toFloor: input.toFloor ?? null,
         pointAx: input.pointAx ?? null,
         pointAy: input.pointAy ?? null,
         pointBx: input.pointBx ?? null,
@@ -539,6 +558,10 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.wallAngle !== undefined) data.wallAngle = input.wallAngle;
     if (input.physicalLength !== undefined) data.physicalLength = input.physicalLength;
     if (input.parentNodeId !== undefined) data.parentNodeId = input.parentNodeId;
+    if (input.swingDirection !== undefined) data.swingDirection = input.swingDirection;
+    if (input.stairDirection !== undefined) data.stairDirection = input.stairDirection;
+    if (input.fromFloor !== undefined) data.fromFloor = input.fromFloor;
+    if (input.toFloor !== undefined) data.toFloor = input.toFloor;
     if (input.pointAx !== undefined) data.pointAx = input.pointAx;
     if (input.pointAy !== undefined) data.pointAy = input.pointAy;
     if (input.pointBx !== undefined) data.pointBx = input.pointBx;
@@ -724,6 +747,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         locked: input.locked ?? false,
         sortOrder: nextOrder,
         opacity: input.opacity ?? 1,
+        floorNumber: input.floorNumber ?? 0,
       },
     });
 
@@ -752,6 +776,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.locked !== undefined) data.locked = input.locked;
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
     if (input.opacity !== undefined) data.opacity = input.opacity;
+    if (input.floorNumber !== undefined) data.floorNumber = input.floorNumber;
 
     const updated = await app.prisma.ideaCanvasLayer.update({ where: { id: layerId }, data });
     return ideaCanvasLayerSchema.parse({

@@ -40,6 +40,12 @@ export interface CanvasToolbarProps {
   snapEnabled?: boolean;
   // Wall-specific actions
   onChangeWallHeight?: (height: number | null) => void;
+  /** Callback to change door swing direction */
+  onChangeSwingDirection?: (dir: "left" | "right" | "double") => void;
+  /** Callback to change stair direction */
+  onChangeStairDirection?: (dir: "up" | "down" | "left" | "right") => void;
+  /** Callback to change stair fromFloor/toFloor */
+  onChangeStairFloors?: (fromFloor: number | null, toFloor: number | null) => void;
   /** Physical unit string (e.g. "ft", "m") for displaying wall length */
   physicalUnit?: string | null;
   /** Pixels per physical unit for converting wall length */
@@ -60,10 +66,17 @@ export interface CanvasToolbarProps {
   // Layers
   onToggleLayerPanel?: () => void;
   showLayerPanel?: boolean;
+  // Floors (multi-storey)
+  floors?: number[];
+  activeFloor?: number;
+  onFloorChange?: (floor: number) => void;
+  onAddFloor?: () => void;
   // Export
   onExportSVG?: () => void;
   onExportPNG?: () => void;
   onExportPDF?: () => void;
+  /** Callback to open the share dialog */
+  onShare?: () => void;
   /** Simplified mode: hides advanced tools for embedded use */
   simplified?: boolean;
 }
@@ -96,7 +109,8 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     onUndo, onRedo, zoom, onZoomIn, onZoomOut, onFitToView,
     objectPickerOpen, onToggleObjectPicker, showSettings,
     onToggleLayerPanel, showLayerPanel,
-    onExportSVG, onExportPNG, onExportPDF,
+    floors, activeFloor, onFloorChange, onAddFloor,
+    onExportSVG, onExportPNG, onExportPDF, onShare,
     onBringForward, onSendBackward,
     onAlignNodes, onToggleSnap, snapEnabled = false,
     simplified = false,
@@ -333,6 +347,68 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
                   min={0} step={0.1} />
               ) : null}
             </>
+          ) : singleSelected.objectType === "door" ? (
+            <>
+              <span className="idea-canvas__toolbar-divider" />
+              <label className="idea-canvas__tool-label" title="Swing direction">
+                🚪
+                <select className="idea-canvas__tool-select"
+                  value={(singleSelected as Record<string, unknown>).swingDirection as string ?? "left"}
+                  onChange={(e) => onChangeSwingDirection?.(e.target.value as "left" | "right" | "double")}
+                  title="Swing direction">
+                  <option value="left">Left hinge</option>
+                  <option value="right">Right hinge</option>
+                  <option value="double">Double</option>
+                </select>
+              </label>
+            </>
+          ) : singleSelected.objectType === "stairs" ? (
+            <>
+              <span className="idea-canvas__toolbar-divider" />
+              <label className="idea-canvas__tool-label" title="Stair direction">
+                🪜
+                <select className="idea-canvas__tool-select"
+                  value={(singleSelected as Record<string, unknown>).stairDirection as string ?? "up"}
+                  onChange={(e) => onChangeStairDirection?.(e.target.value as "up" | "down" | "left" | "right")}
+                  title="Stair direction">
+                  <option value="up">↑ Up</option>
+                  <option value="down">↓ Down</option>
+                  <option value="left">← Left</option>
+                  <option value="right">→ Right</option>
+                </select>
+              </label>
+              {floors && floors.length > 1 && props.onChangeStairFloors && (
+                <>
+                  <label className="idea-canvas__tool-label" title="From floor">
+                    <select className="idea-canvas__tool-select"
+                      value={(singleSelected as Record<string, unknown>).fromFloor as number ?? activeFloor ?? 0}
+                      onChange={(e) => {
+                        const from = Number(e.target.value);
+                        const to = (singleSelected as Record<string, unknown>).toFloor as number ?? from + 1;
+                        props.onChangeStairFloors!(from, to);
+                      }}
+                      title="From floor">
+                      {floors.map((f) => (
+                        <option key={f} value={f}>{f === 0 ? "Ground" : f > 0 ? `F${f}` : `B${Math.abs(f)}`}</option>
+                      ))}
+                    </select>
+                    →
+                    <select className="idea-canvas__tool-select"
+                      value={(singleSelected as Record<string, unknown>).toFloor as number ?? (activeFloor ?? 0) + 1}
+                      onChange={(e) => {
+                        const to = Number(e.target.value);
+                        const from = (singleSelected as Record<string, unknown>).fromFloor as number ?? activeFloor ?? 0;
+                        props.onChangeStairFloors!(from, to);
+                      }}
+                      title="To floor">
+                      {floors.map((f) => (
+                        <option key={f} value={f}>{f === 0 ? "Ground" : f > 0 ? `F${f}` : `B${Math.abs(f)}`}</option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+            </>
           ) : singleSelected.objectType === "flowchart" ? (
             <>
               {NODE_COLORS.filter((c) => c.value !== null).map((c) => (
@@ -442,6 +518,16 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
         </>
       ) : null}
 
+      {/* ── Share ── */}
+      {(!simplified && onShare) ? (
+        <>
+          <button type="button" className="idea-canvas__tool-btn" onClick={onShare} title="Share canvas">
+            🔗 Share
+          </button>
+          <div className="idea-canvas__toolbar-divider" />
+        </>
+      ) : null}
+
       {/* ── Zoom controls ── */}
       <button type="button" className="idea-canvas__tool-btn" onClick={onZoomOut} title="Zoom out">−</button>
       <span className="idea-canvas__zoom-label">{Math.round(zoom * 100)}%</span>
@@ -459,6 +545,24 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
         </>
       ) : null}
       <div className="idea-canvas__toolbar-divider" />
+      {/* ── Floor selector (multi-storey, floorplan mode only) ── */}
+      {!simplified && canvasMode === "floorplan" && floors && floors.length > 0 && onFloorChange && (
+        <div className="idea-canvas__floor-selector">
+          <span className="idea-canvas__floor-label">Floor</span>
+          <select
+            className="idea-canvas__floor-select"
+            value={activeFloor ?? 0}
+            onChange={(e) => onFloorChange(Number(e.target.value))}
+          >
+            {floors.map((f) => (
+              <option key={f} value={f}>{f === 0 ? "Ground" : f > 0 ? `Floor ${f}` : `B${Math.abs(f)}`}</option>
+            ))}
+          </select>
+          {onAddFloor && (
+            <button type="button" className="idea-canvas__tool-btn" onClick={onAddFloor} title="Add floor">+</button>
+          )}
+        </div>
+      )}
       {!simplified && (
         <>
           <button type="button" className={`idea-canvas__tool-btn${showSettings ? " idea-canvas__tool-btn--active" : ""}`}

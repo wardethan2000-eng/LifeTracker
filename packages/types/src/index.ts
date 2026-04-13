@@ -5826,6 +5826,7 @@ export const ideaCanvasLayerSchema = z.object({
   locked: z.boolean(),
   sortOrder: z.number(),
   opacity: z.number(),
+  floorNumber: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -5837,6 +5838,7 @@ export const createCanvasLayerSchema = z.object({
   locked: z.boolean().default(false),
   sortOrder: z.number().int().optional(),
   opacity: z.number().min(0).max(1).default(1),
+  floorNumber: z.number().int().default(0),
 });
 export type CreateCanvasLayerInput = z.input<typeof createCanvasLayerSchema>;
 
@@ -5846,6 +5848,7 @@ export const updateCanvasLayerSchema = z.object({
   locked: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   opacity: z.number().min(0).max(1).optional(),
+  floorNumber: z.number().int().optional(),
 });
 export type UpdateCanvasLayerInput = z.infer<typeof updateCanvasLayerSchema>;
 
@@ -5853,6 +5856,45 @@ export const reorderCanvasLayersSchema = z.object({
   layers: z.array(z.object({ id: z.string(), sortOrder: z.number().int() })).min(1).max(50),
 });
 export type ReorderCanvasLayersInput = z.infer<typeof reorderCanvasLayersSchema>;
+
+// ─── Canvas Share Links ──────────────────────────────────────────────────────
+
+export const canvasSharePermissionSchema = z.enum(["view", "edit"]);
+export type CanvasSharePermission = z.infer<typeof canvasSharePermissionSchema>;
+
+export const canvasShareLinkSchema = z.object({
+  id: z.string(),
+  canvasId: z.string(),
+  token: z.string(),
+  permission: canvasSharePermissionSchema,
+  label: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  createdById: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type CanvasShareLink = z.infer<typeof canvasShareLinkSchema>;
+
+export const createCanvasShareLinkSchema = z.object({
+  permission: canvasSharePermissionSchema.optional().default("view"),
+  label: z.string().max(100).optional(),
+  expiresAt: z.string().datetime().optional(),
+});
+export type CreateCanvasShareLinkInput = z.infer<typeof createCanvasShareLinkSchema>;
+
+export const updateCanvasShareLinkSchema = z.object({
+  permission: canvasSharePermissionSchema.optional(),
+  label: z.string().max(100).nullable().optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
+});
+export type UpdateCanvasShareLinkInput = z.infer<typeof updateCanvasShareLinkSchema>;
+
+export const sharedCanvasSchema = z.object({
+  canvas: z.lazy(() => ideaCanvasSchema),
+  permission: canvasSharePermissionSchema,
+  shareLabel: z.string().nullable(),
+});
+export type SharedCanvas = z.infer<typeof sharedCanvasSchema>;
 
 export const ideaCanvasNodeSchema = z.object({
   id: z.string(),
@@ -5883,6 +5925,10 @@ export const ideaCanvasNodeSchema = z.object({
   wallHeight: z.number().nullable().optional(),
   physicalLength: z.number().nullable().optional(),
   parentNodeId: z.string().nullable().optional(),
+  swingDirection: z.enum(["left", "right", "double"]).nullable().optional(),
+  stairDirection: z.enum(["up", "down", "left", "right"]).nullable().optional(),
+  fromFloor: z.number().nullable().optional(),
+  toFloor: z.number().nullable().optional(),
   pointAx: z.number().nullable().optional(),
   pointAy: z.number().nullable().optional(),
   pointBx: z.number().nullable().optional(),
@@ -5995,7 +6041,12 @@ export const ideaCanvasThumbnailNodeSchema = z.object({
   pointBy: z.number().nullable().optional(),
   wallThickness: z.number().optional(),
   wallAngle: z.number().nullable().optional(),
+  swingDirection: z.enum(["left", "right", "double"]).nullable().optional(),
+  stairDirection: z.enum(["up", "down", "left", "right"]).nullable().optional(),
+  fromFloor: z.number().nullable().optional(),
+  toFloor: z.number().nullable().optional(),
   groupId: z.string().nullable().optional(),
+  layerId: z.string().nullable().optional(),
 });
 export type IdeaCanvasThumbnailNode = z.infer<typeof ideaCanvasThumbnailNodeSchema>;
 
@@ -6085,6 +6136,10 @@ export const createCanvasNodeSchema = z.object({
   wallHeight: z.number().positive().optional().nullable(),
   physicalLength: z.number().optional().nullable(),
   parentNodeId: z.string().optional().nullable(),
+  swingDirection: z.enum(["left", "right", "double"]).optional().nullable(),
+  stairDirection: z.enum(["up", "down", "left", "right"]).optional().nullable(),
+  fromFloor: z.number().int().optional().nullable(),
+  toFloor: z.number().int().optional().nullable(),
   pointAx: z.number().optional().nullable(),
   pointAy: z.number().optional().nullable(),
   pointBx: z.number().optional().nullable(),
@@ -6124,6 +6179,10 @@ export const updateCanvasNodeSchema = z.object({
   wallHeight: z.number().positive().optional().nullable(),
   physicalLength: z.number().optional().nullable(),
   parentNodeId: z.string().optional().nullable(),
+  swingDirection: z.enum(["left", "right", "double"]).optional().nullable(),
+  stairDirection: z.enum(["up", "down", "left", "right"]).optional().nullable(),
+  fromFloor: z.number().int().optional().nullable(),
+  toFloor: z.number().int().optional().nullable(),
   pointAx: z.number().optional().nullable(),
   pointAy: z.number().optional().nullable(),
   pointBx: z.number().optional().nullable(),

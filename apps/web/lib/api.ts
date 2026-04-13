@@ -522,6 +522,12 @@ import {
   type CreateCanvasLayerInput,
   type UpdateCanvasLayerInput,
   type ReorderCanvasLayersInput,
+  canvasShareLinkSchema,
+  type CanvasShareLink,
+  type CreateCanvasShareLinkInput,
+  type UpdateCanvasShareLinkInput,
+  sharedCanvasSchema,
+  type SharedCanvas,
   canvasObjectSchema,
   createCanvasObjectSchema,
   type CanvasObject,
@@ -6351,6 +6357,62 @@ export const reorderCanvasLayers = async (
   body: input,
   schema: ideaCanvasSchema,
 });
+
+// ─── Canvas Share Links ─────────────────────────────────────────────────────
+
+export const getCanvasShareLinks = async (
+  householdId: string,
+  canvasId: string
+): Promise<CanvasShareLink[]> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/share-links`,
+  schema: canvasShareLinkSchema.array(),
+});
+
+export const createCanvasShareLink = async (
+  householdId: string,
+  canvasId: string,
+  input: CreateCanvasShareLinkInput
+): Promise<CanvasShareLink> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/share-links`,
+  method: "POST",
+  body: input,
+  schema: canvasShareLinkSchema,
+});
+
+export const updateCanvasShareLink = async (
+  householdId: string,
+  canvasId: string,
+  shareLinkId: string,
+  input: UpdateCanvasShareLinkInput
+): Promise<CanvasShareLink> => apiRequest({
+  path: `/v1/households/${householdId}/canvases/${canvasId}/share-links/${shareLinkId}`,
+  method: "PATCH",
+  body: input,
+  schema: canvasShareLinkSchema,
+});
+
+export const deleteCanvasShareLink = async (
+  householdId: string,
+  canvasId: string,
+  shareLinkId: string
+): Promise<void> => {
+  await apiRequest({
+    path: `/v1/households/${householdId}/canvases/${canvasId}/share-links/${shareLinkId}`,
+    method: "DELETE",
+  });
+};
+
+export const getSharedCanvas = async (
+  token: string
+): Promise<SharedCanvas> => {
+  const res = await fetch(`/api/public/canvas/${token}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    throw new Error((body.message as string) ?? `Failed to load shared canvas`);
+  }
+  const data = await res.json();
+  return sharedCanvasSchema.parse(data);
+};
 
 // ─── Canvas Object Library ──────────────────────────────────────────────────
 

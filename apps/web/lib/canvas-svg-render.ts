@@ -352,11 +352,20 @@ function renderDoorNode(node: IdeaCanvasThumbnailNode): string {
   const h = node.height || 6;
   const rot = node.rotation ?? 0;
   const stroke = node.strokeColor ?? "#374151";
+  const swing = node.swingDirection ?? "left";
+  let arcs = "";
+  if (swing === "left" || swing === "double") {
+    arcs += `<path d="M ${w / 2},0 A ${w},${w} 0 0,1 ${-w / 2},${-w}" fill="none" stroke="${stroke}" stroke-width="0.75" stroke-dasharray="3,2"/>`;
+    arcs += `<circle cx="${-w / 2}" cy="0" r="2" fill="${stroke}"/>`;
+  }
+  if (swing === "right" || swing === "double") {
+    arcs += `<path d="M ${-w / 2},0 A ${w},${w} 0 0,0 ${w / 2},${-w}" fill="none" stroke="${stroke}" stroke-width="0.75" stroke-dasharray="3,2"/>`;
+    arcs += `<circle cx="${w / 2}" cy="0" r="2" fill="${stroke}"/>`;
+  }
   return `<g transform="translate(${node.x},${node.y}) rotate(${rot})">`
     + `<rect x="${-w / 2}" y="${-h / 2 - 1}" width="${w}" height="${h + 2}" fill="#ffffff" stroke="none"/>`
     + `<line x1="${-w / 2}" y1="0" x2="${w / 2}" y2="0" stroke="${stroke}" stroke-width="1.5"/>`
-    + `<path d="M ${w / 2},0 A ${w},${w} 0 0,1 ${-w / 2 + w * (1 - Math.cos(Math.PI / 2))},${-w * Math.sin(Math.PI / 2)}" fill="none" stroke="${stroke}" stroke-width="0.75" stroke-dasharray="3,2"/>`
-    + `<circle cx="${-w / 2}" cy="0" r="2" fill="${stroke}"/>`
+    + arcs
     + `</g>`;
 }
 
@@ -376,20 +385,54 @@ function renderWindowNode(node: IdeaCanvasThumbnailNode): string {
 function renderStairsNode(node: IdeaCanvasThumbnailNode, pixelsPerUnit?: number | null): string {
   const w = node.width;
   const h = node.height;
-  const stepCount = Math.max(3, Math.round(h / (pixelsPerUnit ? pixelsPerUnit * 0.25 : 12)));
-  const stepH = h / stepCount;
+  const dir = node.stairDirection ?? "up";
+  const isHoriz = dir === "left" || dir === "right";
+  const span = isHoriz ? w : h;
+  const stepCount = Math.max(3, Math.round(span / (pixelsPerUnit ? pixelsPerUnit * 0.25 : 12)));
+  const stepSize = span / stepCount;
   const fill = node.fillColor ?? "rgba(255,255,255,0.9)";
   const stroke = node.strokeColor ?? "#374151";
   let steps = "";
-  for (let i = 0; i < stepCount - 1; i++) {
-    const sy = node.y + stepH * (i + 1);
-    steps += `<line x1="${node.x}" y1="${sy}" x2="${node.x + w}" y2="${sy}" stroke="${stroke}" stroke-width="0.5"/>`;
+  for (let i = 1; i < stepCount; i++) {
+    if (isHoriz) {
+      const sx = node.x + stepSize * i;
+      steps += `<line x1="${sx}" y1="${node.y}" x2="${sx}" y2="${node.y + h}" stroke="${stroke}" stroke-width="0.5"/>`;
+    } else {
+      const sy = node.y + stepSize * i;
+      steps += `<line x1="${node.x}" y1="${sy}" x2="${node.x + w}" y2="${sy}" stroke="${stroke}" stroke-width="0.5"/>`;
+    }
+  }
+  const cx = node.x + w / 2, cy = node.y + h / 2;
+  const aLen = span * 0.35;
+  let arrow = "";
+  switch (dir) {
+    case "up":
+      arrow = `<line x1="${cx}" y1="${cy + aLen}" x2="${cx}" y2="${cy - aLen}" stroke="${stroke}" stroke-width="1.5"/>`
+        + `<polygon points="${cx},${cy - aLen - 2} ${cx - 5},${cy - aLen + 5} ${cx + 5},${cy - aLen + 5}" fill="${stroke}"/>`;
+      break;
+    case "down":
+      arrow = `<line x1="${cx}" y1="${cy - aLen}" x2="${cx}" y2="${cy + aLen}" stroke="${stroke}" stroke-width="1.5"/>`
+        + `<polygon points="${cx},${cy + aLen + 2} ${cx - 5},${cy + aLen - 5} ${cx + 5},${cy + aLen - 5}" fill="${stroke}"/>`;
+      break;
+    case "left":
+      arrow = `<line x1="${cx + aLen}" y1="${cy}" x2="${cx - aLen}" y2="${cy}" stroke="${stroke}" stroke-width="1.5"/>`
+        + `<polygon points="${cx - aLen - 2},${cy} ${cx - aLen + 5},${cy - 5} ${cx - aLen + 5},${cy + 5}" fill="${stroke}"/>`;
+      break;
+    case "right":
+      arrow = `<line x1="${cx - aLen}" y1="${cy}" x2="${cx + aLen}" y2="${cy}" stroke="${stroke}" stroke-width="1.5"/>`
+        + `<polygon points="${cx + aLen + 2},${cy} ${cx + aLen - 5},${cy - 5} ${cx + aLen - 5},${cy + 5}" fill="${stroke}"/>`;
+      break;
+  }
+  // Floor label (e.g. "G→1")
+  let floorLabel = "";
+  if (node.fromFloor != null && node.toFloor != null) {
+    const fmt = (f: number) => f === 0 ? "G" : f > 0 ? `${f}` : `B${Math.abs(f)}`;
+    const text = `${fmt(node.fromFloor)}→${fmt(node.toFloor)}`;
+    floorLabel = `<text x="${cx}" y="${node.y + h - 4}" text-anchor="middle" font-size="9" fill="${stroke}" font-weight="600">${text}</text>`;
   }
   return `<g>`
     + `<rect x="${node.x}" y="${node.y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`
-    + steps
-    + `<line x1="${node.x + w / 2}" y1="${node.y + h * 0.85}" x2="${node.x + w / 2}" y2="${node.y + h * 0.15}" stroke="${stroke}" stroke-width="1.5"/>`
-    + `<polygon points="${node.x + w / 2},${node.y + h * 0.1} ${node.x + w / 2 - 5},${node.y + h * 0.2} ${node.x + w / 2 + 5},${node.y + h * 0.2}" fill="${stroke}"/>`
+    + steps + arrow + floorLabel
     + `</g>`;
 }
 
