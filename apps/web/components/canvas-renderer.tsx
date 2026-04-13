@@ -206,6 +206,11 @@ export function CanvasRenderer({
     backgroundImageX: initialCanvas.backgroundImageX ?? 0,
     backgroundImageY: initialCanvas.backgroundImageY ?? 0,
     backgroundImageScale: initialCanvas.backgroundImageScale ?? 1,
+    backgroundImageLocked: initialCanvas.backgroundImageLocked ?? false,
+    backgroundImageCropX: initialCanvas.backgroundImageCropX ?? null,
+    backgroundImageCropY: initialCanvas.backgroundImageCropY ?? null,
+    backgroundImageCropW: initialCanvas.backgroundImageCropW ?? null,
+    backgroundImageCropH: initialCanvas.backgroundImageCropH ?? null,
     snapToGrid: initialCanvas.snapToGrid,
     gridSize: initialCanvas.gridSize,
     showDimensions: initialCanvas.showDimensions ?? true,
@@ -215,6 +220,11 @@ export function CanvasRenderer({
   const [bgImageDims, setBgImageDims] = useState<{ w: number; h: number } | null>(null);
   const [bgUploading, setBgUploading] = useState(false);
   const [bgUploadError, setBgUploadError] = useState<string | null>(null);
+  // Background image crop mode
+  const [bgCropMode, setBgCropMode] = useState(false);
+  const [bgCropRect, setBgCropRect] = useState<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 1, h: 1 });
+  // Calibration wizard prompt after upload
+  const [showCalibrationPrompt, setShowCalibrationPrompt] = useState(false);
   // Calibration dialog state: shown after user draws a calibration line
   const [calibrationLine, setCalibrationLine] = useState<{ startCX: number; startCY: number; endCX: number; endCY: number } | null>(null);
   const [calibrationInput, setCalibrationInput] = useState("");
@@ -1533,6 +1543,18 @@ export function CanvasRenderer({
     return () => clearInterval(interval);
   }, [settings.backgroundImageUrl, resolveBackgroundUrl]);
 
+  // Auto-dismiss calibration prompt on tool change or timeout
+  useEffect(() => {
+    if (!showCalibrationPrompt) return;
+    const timeout = setTimeout(() => setShowCalibrationPrompt(false), 15000);
+    return () => clearTimeout(timeout);
+  }, [showCalibrationPrompt]);
+  useEffect(() => {
+    if (showCalibrationPrompt && activeTool !== "select") {
+      setShowCalibrationPrompt(false);
+    }
+  }, [activeTool, showCalibrationPrompt]);
+
   const handleBgImageUpload = useCallback(async (file: File) => {
     setBgUploading(true);
     setBgUploadError(null);
@@ -1575,6 +1597,10 @@ export function CanvasRenderer({
       setResolvedBgUrl(downloadUrl);
       setBgImageDims(dims);
       fitViewportToImage(dims.w, dims.h);
+      // Show calibration prompt if no physical units set yet
+      if (!settings.physicalUnit) {
+        setShowCalibrationPrompt(true);
+      }
     } catch (err) {
       setBgUploadError(err instanceof Error ? err.message : "Upload failed. Try again.");
     } finally {
@@ -1583,12 +1609,120 @@ export function CanvasRenderer({
   }, [householdId, canvasId, settings, fitViewportToImage]);
 
   const handleRemoveBgImage = useCallback(async () => {
-    const newSettings: UpdateCanvasSettingsInput = { ...settings, backgroundImageUrl: null, backgroundImageX: 0, backgroundImageY: 0, backgroundImageScale: 1 };
+    const newSettings: UpdateCanvasSettingsInput = { ...settings, backgroundImageUrl: null, backgroundImageX: 0, backgroundImageY: 0, backgroundImageScale: 1, backgroundImageCropX: null, backgroundImageCropY: null, backgroundImageCropW: null, backgroundImageCropH: null, backgroundImageLocked: false };
     await updateCanvasSettings(householdId, canvasId, newSettings);
     setSettings(newSettings);
     setResolvedBgUrl(null);
     setBgImageDims(null);
   }, [householdId, canvasId, settings]);
+
+  // Start background image crop mode
+  const handleStartCrop = useCallback(() => {
+    const cx = settings.backgroundImageCropX;
+    const cy = settings.backgroundImageCropY;
+    const cw = settings.backgroundImageCropW;
+    const ch = settings.backgroundImageCropH;
+    if (cx != null && cy != null && cw != null && ch != null) {
+      setBgCropRect({ x: cx, y: cy, w: cw, h: ch });
+    } else {
+      setBgCropRect({ x: 0, y: 0, w: 1, h: 1 });
+    }
+    setBgCropMode(true);
+  }, [settings]);
+
+  const handleApplyCrop = useCallback(async () => {
+    const patch: UpdateCanvasSettingsInput = {
+      backgroundImageCropX: bgCropRect.x,
+      backgroundImageCropY: bgCropRect.y,
+      backgroundImageCropW: bgCropRect.w,
+      backgroundImageCropH: bgCropRect.h,
+    };
+    await updateCanvasSettings(householdId, canvasId, patch);
+    setSettings((prev) => ({ ...prev, ...patch }));
+    setBgCropMode(false);
+  }, [householdId, canvasId, bgCropRect]);
+
+  const handleCancelCrop = useCallback(() => {
+    setBgCropMode(false);
+  }, []);
+
+  // Add a reference image as an image node on a locked "Reference" layer
+  const handleAddReferenceImage = useCallback(async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        // Read natural dimensions
+        const localUrl = URL.createObjectURL(file);
+        const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => { resolve({ w: img.naturalWidth, h: img.naturalHeight }); URL.revokeObjectURL(localUrl); };
+          img.onerror = () => { resolve({ w: 800, h: 600 }); URL.revokeObjectURL(localUrl); };
+          img.src = localUrl;
+        });
+
+        // Upload via attachment flow
+        const { attachment, uploadUrl } = await requestAttachmentUpload(householdId, {
+          entityType: "canvas",
+          entityId: canvasId,
+          filename: file.name,
+          mimeType: file.type,
+          fileSize: file.size,
+        });
+        const putRes = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+        if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+        await confirmAttachmentUpload(householdId, attachment.id);
+
+        // Find or create a "Reference" layer
+        let refLayer = layers.find((l) => l.name === "Reference");
+        if (!refLayer) {
+          const maxSort = layers.reduce((m, l) => Math.max(m, l.sortOrder), 0);
+          refLayer = await createCanvasLayer(householdId, canvasId, {
+            name: "Reference",
+            locked: true,
+            opacity: 0.3,
+            sortOrder: maxSort + 1,
+          });
+          setLayers((prev) => [...prev, refLayer!]);
+        }
+
+        // Determine node size: fit to ~40% of viewport
+        const svgEl = svgRef.current;
+        const viewW = svgEl ? svgEl.getBoundingClientRect().width / zoom : 800;
+        const viewH = svgEl ? svgEl.getBoundingClientRect().height / zoom : 600;
+        const targetW = viewW * 0.4;
+        const ratio = dims.h / dims.w;
+        const nodeW = targetW;
+        const nodeH = targetW * ratio;
+
+        // Place at viewport center
+        const cx = -panX + viewW / 2 - nodeW / 2;
+        const cy = -panY + viewH / 2 - nodeH / 2;
+
+        const newNode = await createCanvasNode(householdId, canvasId, {
+          objectType: "image" as CanvasObjectType,
+          label: file.name.replace(/\.[^.]+$/, ""),
+          x: cx,
+          y: cy,
+          width: nodeW,
+          height: nodeH,
+          imageUrl: `attachment:${attachment.id}`,
+          layerId: refLayer.id,
+        });
+        setNodes((prev) => [...prev, newNode]);
+
+        // Resolve the image URL for rendering
+        const { url: dlUrl } = await getAttachmentDownloadUrl(householdId, attachment.id);
+        setNodeImageUrls((prev) => new Map(prev).set(newNode.id, dlUrl));
+      } catch {
+        // Silently fail — the user can retry from the settings panel
+      }
+    };
+    input.click();
+  }, [householdId, canvasId, layers, zoom, panX, panY]);
 
   // Start dragging/resizing the background image
   const handleBgImageMouseDown = useCallback((e: React.MouseEvent, handle?: "nw" | "ne" | "se" | "sw") => {
@@ -3123,9 +3257,13 @@ export function CanvasRenderer({
       backgroundImageX: settings.backgroundImageX,
       backgroundImageY: settings.backgroundImageY,
       backgroundImageScale: settings.backgroundImageScale,
+      backgroundImageCropX: settings.backgroundImageCropX ?? undefined,
+      backgroundImageCropY: settings.backgroundImageCropY ?? undefined,
+      backgroundImageCropW: settings.backgroundImageCropW ?? undefined,
+      backgroundImageCropH: settings.backgroundImageCropH ?? undefined,
       bgImageDims: bgImageDims ?? undefined,
     });
-  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, bgImageDims]);
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, settings.backgroundImageCropX, settings.backgroundImageCropY, settings.backgroundImageCropW, settings.backgroundImageCropH, bgImageDims]);
 
   const handleExportPNG = useCallback(() => {
     exportCanvasToPNG(nodes, edges, canvasName, {
@@ -3139,9 +3277,13 @@ export function CanvasRenderer({
       backgroundImageX: settings.backgroundImageX,
       backgroundImageY: settings.backgroundImageY,
       backgroundImageScale: settings.backgroundImageScale,
+      backgroundImageCropX: settings.backgroundImageCropX ?? undefined,
+      backgroundImageCropY: settings.backgroundImageCropY ?? undefined,
+      backgroundImageCropW: settings.backgroundImageCropW ?? undefined,
+      backgroundImageCropH: settings.backgroundImageCropH ?? undefined,
       bgImageDims: bgImageDims ?? undefined,
     });
-  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, bgImageDims]);
+  }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, settings.backgroundImageCropX, settings.backgroundImageCropY, settings.backgroundImageCropW, settings.backgroundImageCropH, bgImageDims]);
 
   const handleExportPDF = useCallback(() => {
     const url = `/api/v1/households/${householdId}/canvases/${canvasId}/export/pdf`;
@@ -3292,18 +3434,35 @@ export function CanvasRenderer({
             const imgW = (bgImageDims?.w ?? 1920) * imgScale;
             const imgH = (bgImageDims?.h ?? 1080) * imgScale;
             const handleSize = 10 / zoom;
-            const isActive = activeTool === "select" && drag.type === "none";
+            const isLocked = !!settings.backgroundImageLocked;
+            const isActive = activeTool === "select" && drag.type === "none" && !isLocked;
+            const hasCrop = settings.backgroundImageCropX != null && settings.backgroundImageCropY != null
+              && settings.backgroundImageCropW != null && settings.backgroundImageCropH != null;
+            const cropClipId = "bg-crop-clip";
             return (
               <g>
+                {/* Crop clip-path definition */}
+                {hasCrop ? (
+                  <defs>
+                    <clipPath id={cropClipId}>
+                      <rect
+                        x={imgX + settings.backgroundImageCropX! * imgW}
+                        y={imgY + settings.backgroundImageCropY! * imgH}
+                        width={settings.backgroundImageCropW! * imgW}
+                        height={settings.backgroundImageCropH! * imgH} />
+                    </clipPath>
+                  </defs>
+                ) : null}
                 <image href={resolvedBgUrl}
                   x={imgX} y={imgY}
                   width={imgW} height={imgH}
                   opacity={settings.backgroundImageOpacity ?? 0.5}
                   preserveAspectRatio="none"
+                  clipPath={hasCrop ? `url(#${cropClipId})` : undefined}
                   style={{ cursor: isActive ? "move" : undefined }}
                   pointerEvents={isActive ? "visiblePainted" : "none"}
                   onMouseDown={isActive ? (e) => handleBgImageMouseDown(e) : undefined} />
-                {/* Border and resize handles — visible when select tool is active */}
+                {/* Border and resize handles — visible when select tool is active and not locked */}
                 {isActive ? (
                   <>
                     <rect x={imgX} y={imgY} width={imgW} height={imgH}
@@ -3322,6 +3481,16 @@ export function CanvasRenderer({
                       );
                     })}
                   </>
+                ) : null}
+                {/* Lock badge — shown when background is locked */}
+                {isLocked && activeTool === "select" ? (
+                  <g pointerEvents="none">
+                    <rect x={imgX + imgW - 24 / zoom} y={imgY + 4 / zoom}
+                      width={20 / zoom} height={20 / zoom}
+                      rx={4 / zoom} fill="rgba(0,0,0,0.55)" />
+                    <text x={imgX + imgW - 14 / zoom} y={imgY + 18 / zoom}
+                      fontSize={13 / zoom} textAnchor="middle" fill="white">🔒</text>
+                  </g>
                 ) : null}
               </g>
             );
@@ -3628,7 +3797,108 @@ export function CanvasRenderer({
           onRemoveBgImage={handleRemoveBgImage}
           onUploadBgImage={handleBgImageUpload}
           onFitViewportToImage={fitViewportToImage}
+          onStartCrop={handleStartCrop}
+          onAddReferenceImage={handleAddReferenceImage}
         />
+      ) : null}
+
+      {/* Background image crop mode overlay */}
+      {bgCropMode && resolvedBgUrl && bgImageDims ? (() => {
+        const imgX = settings.backgroundImageX ?? 0;
+        const imgY = settings.backgroundImageY ?? 0;
+        const imgScale = settings.backgroundImageScale ?? 1;
+        const imgW = bgImageDims.w * imgScale;
+        const imgH = bgImageDims.h * imgScale;
+        const cropX = imgX + bgCropRect.x * imgW;
+        const cropY = imgY + bgCropRect.y * imgH;
+        const cropW = bgCropRect.w * imgW;
+        const cropH = bgCropRect.h * imgH;
+        const hs = 8;
+        return (
+          <div className="idea-canvas__crop-overlay">
+            <svg width="100%" height="100%" style={{ position: "absolute", inset: 0 }}>
+              <g transform={`scale(${zoom}) translate(${panX}, ${panY})`}>
+                {/* Dark overlay mask */}
+                <defs>
+                  <mask id="crop-mask">
+                    <rect x={imgX} y={imgY} width={imgW} height={imgH} fill="white" />
+                    <rect x={cropX} y={cropY} width={cropW} height={cropH} fill="black" />
+                  </mask>
+                </defs>
+                <rect x={imgX} y={imgY} width={imgW} height={imgH}
+                  fill="rgba(0,0,0,0.5)" mask="url(#crop-mask)" pointerEvents="none" />
+                {/* Crop rect border */}
+                <rect x={cropX} y={cropY} width={cropW} height={cropH}
+                  fill="none" stroke="white" strokeWidth={2 / zoom} pointerEvents="none" />
+                {/* Corner handles */}
+                {(["nw", "ne", "se", "sw"] as const).map((h) => {
+                  const hx = h.includes("e") ? cropX + cropW - hs / 2 / zoom : cropX - hs / 2 / zoom;
+                  const hy = h.includes("s") ? cropY + cropH - hs / 2 / zoom : cropY - hs / 2 / zoom;
+                  return (
+                    <rect key={h} x={hx} y={hy} width={hs / zoom} height={hs / zoom}
+                      fill="white" stroke="var(--accent)" strokeWidth={1 / zoom}
+                      style={{ cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize" }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        const startMouse = { x: e.clientX, y: e.clientY };
+                        const startRect = { ...bgCropRect };
+                        const onMove = (me: MouseEvent) => {
+                          const dx = (me.clientX - startMouse.x) / zoom / imgW;
+                          const dy = (me.clientY - startMouse.y) / zoom / imgH;
+                          const r = { ...startRect };
+                          if (h.includes("w")) { r.x = Math.max(0, Math.min(startRect.x + startRect.w - 0.02, startRect.x + dx)); r.w = startRect.w - (r.x - startRect.x); }
+                          if (h.includes("e")) { r.w = Math.max(0.02, Math.min(1 - startRect.x, startRect.w + dx)); }
+                          if (h.includes("n")) { r.y = Math.max(0, Math.min(startRect.y + startRect.h - 0.02, startRect.y + dy)); r.h = startRect.h - (r.y - startRect.y); }
+                          if (h.includes("s")) { r.h = Math.max(0.02, Math.min(1 - startRect.y, startRect.h + dy)); }
+                          setBgCropRect(r);
+                        };
+                        const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+                        window.addEventListener("mousemove", onMove);
+                        window.addEventListener("mouseup", onUp);
+                      }} />
+                  );
+                })}
+                {/* Drag crop body to move */}
+                <rect x={cropX} y={cropY} width={cropW} height={cropH}
+                  fill="transparent" style={{ cursor: "move" }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    const startMouse = { x: e.clientX, y: e.clientY };
+                    const startRect = { ...bgCropRect };
+                    const onMove = (me: MouseEvent) => {
+                      const dx = (me.clientX - startMouse.x) / zoom / imgW;
+                      const dy = (me.clientY - startMouse.y) / zoom / imgH;
+                      const nx = Math.max(0, Math.min(1 - startRect.w, startRect.x + dx));
+                      const ny = Math.max(0, Math.min(1 - startRect.h, startRect.y + dy));
+                      setBgCropRect({ ...startRect, x: nx, y: ny });
+                    };
+                    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
+                  }} />
+              </g>
+            </svg>
+            <div className="idea-canvas__crop-bar">
+              <button type="button" className="button button--primary button--small" onClick={handleApplyCrop}>Apply Crop</button>
+              <button type="button" className="button button--ghost button--small" onClick={handleCancelCrop}>Cancel</button>
+            </div>
+          </div>
+        );
+      })() : null}
+
+      {/* Calibration wizard prompt — shown after background image upload */}
+      {showCalibrationPrompt ? (
+        <div className="idea-canvas__calibration-prompt">
+          <span>📐 Set the scale? Draw a line along a known dimension.</span>
+          <button type="button" className="button button--primary button--small"
+            onClick={() => { setActiveTool("calibrate"); setShowCalibrationPrompt(false); }}>
+            Start Calibration
+          </button>
+          <button type="button" className="button button--ghost button--small"
+            onClick={() => setShowCalibrationPrompt(false)}>
+            Skip
+          </button>
+        </div>
       ) : null}
 
       {/* Layer panel */}

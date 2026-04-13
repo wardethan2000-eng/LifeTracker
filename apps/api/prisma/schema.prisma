@@ -2643,6 +2643,11 @@ model IdeaCanvas {
   backgroundImageX  Float             @default(0)
   backgroundImageY  Float             @default(0)
   backgroundImageScale Float          @default(1)
+  backgroundImageLocked Boolean       @default(false)
+  backgroundImageCropX Float?
+  backgroundImageCropY Float?
+  backgroundImageCropW Float?
+  backgroundImageCropH Float?
   snapToGrid        Boolean           @default(false)
   gridSize          Int               @default(24)
   canvasMode        CanvasMode        @default(diagram)

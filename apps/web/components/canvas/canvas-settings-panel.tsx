@@ -17,13 +17,18 @@ export interface CanvasSettingsPanelProps {
   onRemoveBgImage: () => void;
   onUploadBgImage: (file: File) => void;
   onFitViewportToImage: (w: number, h: number) => void;
+  onStartCrop?: () => void;
+  onAddReferenceImage?: () => void;
 }
 
 export function CanvasSettingsPanel({
   settings, resolvedBgUrl, bgImageDims, bgUploading, bgUploadError,
   onSave, onClose, onRemoveBgImage, onUploadBgImage, onFitViewportToImage,
+  onStartCrop, onAddReferenceImage,
 }: CanvasSettingsPanelProps): JSX.Element {
   const [local, setLocal] = useState<UpdateCanvasSettingsInput>({ ...settings });
+  const hasCrop = local.backgroundImageCropX != null && local.backgroundImageCropY != null
+    && local.backgroundImageCropW != null && local.backgroundImageCropH != null;
 
   return (
     <div className="idea-canvas__settings-panel">
@@ -89,6 +94,20 @@ export function CanvasSettingsPanel({
                   onClick={() => onRemoveBgImage()}>Remove</button>
                 <button type="button" className="button button--ghost button--small"
                   onClick={() => { if (bgImageDims) onFitViewportToImage(bgImageDims.w, bgImageDims.h); }}>Fit View</button>
+                {onStartCrop ? (
+                  <button type="button" className="button button--ghost button--small"
+                    onClick={() => { onStartCrop(); onClose(); }}>Crop</button>
+                ) : null}
+                {hasCrop ? (
+                  <button type="button" className="button button--ghost button--small"
+                    onClick={() => setLocal((p) => ({
+                      ...p,
+                      backgroundImageCropX: null,
+                      backgroundImageCropY: null,
+                      backgroundImageCropW: null,
+                      backgroundImageCropH: null,
+                    }))}>Clear Crop</button>
+                ) : null}
               </>
             ) : (
               <>
@@ -122,18 +141,37 @@ export function CanvasSettingsPanel({
         {resolvedBgUrl ? (
           <div className="idea-canvas__settings-row">
             <label>Image Scale</label>
-            <input type="range" min={0.05} max={10} step={0.05}
+            <input type="range" min={0.01} max={50} step={0.05}
               value={local.backgroundImageScale ?? 1}
               onChange={(e) => setLocal((p) => ({ ...p, backgroundImageScale: parseFloat(e.target.value) }))} />
             <span className="idea-canvas__settings-value">{Math.round((local.backgroundImageScale ?? 1) * 100)}%</span>
           </div>
         ) : null}
         {resolvedBgUrl ? (
-          <div className="idea-canvas__settings-row">
+          <>
+            <div className="idea-canvas__settings-row">
+              <label>Lock Background</label>
+              <input type="checkbox" checked={!!local.backgroundImageLocked}
+                onChange={(e) => setLocal((p) => ({ ...p, backgroundImageLocked: e.target.checked }))} />
+            </div>
+            <div className="idea-canvas__settings-row">
+              <button type="button" className="button button--ghost button--small"
+                onClick={() => setLocal((p) => ({ ...p, backgroundImageX: 0, backgroundImageY: 0, backgroundImageScale: 1 }))}>
+                Reset Position
+              </button>
+            </div>
+          </>
+        ) : null}
+        {onAddReferenceImage ? (
+          <div className="idea-canvas__settings-row idea-canvas__settings-row--full">
+            <label>Reference Images</label>
             <button type="button" className="button button--ghost button--small"
-              onClick={() => setLocal((p) => ({ ...p, backgroundImageX: 0, backgroundImageY: 0, backgroundImageScale: 1 }))}>
-              Reset Position
+              onClick={() => { onAddReferenceImage(); onClose(); }}>
+              + Add Reference Image
             </button>
+            <span className="idea-canvas__bg-image-hint">
+              Added as image nodes on a locked &ldquo;Reference&rdquo; layer
+            </span>
           </div>
         ) : null}
       </div>

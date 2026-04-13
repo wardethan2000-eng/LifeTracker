@@ -254,6 +254,10 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
               opacity: canvas.backgroundImageOpacity,
               naturalWidth: dims.width,
               naturalHeight: dims.height,
+              cropX: canvas.backgroundImageCropX,
+              cropY: canvas.backgroundImageCropY,
+              cropW: canvas.backgroundImageCropW,
+              cropH: canvas.backgroundImageCropH,
             };
           }
         }
@@ -430,6 +434,11 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     if (input.backgroundImageX !== undefined) data.backgroundImageX = input.backgroundImageX;
     if (input.backgroundImageY !== undefined) data.backgroundImageY = input.backgroundImageY;
     if (input.backgroundImageScale !== undefined) data.backgroundImageScale = input.backgroundImageScale;
+    if (input.backgroundImageLocked !== undefined) data.backgroundImageLocked = input.backgroundImageLocked;
+    if (input.backgroundImageCropX !== undefined) data.backgroundImageCropX = input.backgroundImageCropX;
+    if (input.backgroundImageCropY !== undefined) data.backgroundImageCropY = input.backgroundImageCropY;
+    if (input.backgroundImageCropW !== undefined) data.backgroundImageCropW = input.backgroundImageCropW;
+    if (input.backgroundImageCropH !== undefined) data.backgroundImageCropH = input.backgroundImageCropH;
     if (input.snapToGrid !== undefined) data.snapToGrid = input.snapToGrid;
     if (input.gridSize !== undefined) data.gridSize = input.gridSize;
     if (input.showDimensions !== undefined) data.showDimensions = input.showDimensions;

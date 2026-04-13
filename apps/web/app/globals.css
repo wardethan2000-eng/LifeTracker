@@ -16177,6 +16177,53 @@ html[data-ui-density="compact"] .resource-layout__aside {
   cursor: wait;
 }
 
+/* Calibration prompt */
+.idea-canvas__calibration-prompt {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.idea-canvas__calibration-prompt span {
+  color: var(--ink-muted, #64748b);
+}
+
+/* Background image crop overlay */
+.idea-canvas__crop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+
+.idea-canvas__crop-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
 /* Layer panel */
 .idea-canvas__layer-panel {
   position: absolute;

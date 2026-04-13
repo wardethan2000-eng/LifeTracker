@@ -81,6 +81,11 @@ export type CanvasPdfInput = {
     naturalWidth: number;
     /** Natural image height in pixels (before canvas scale) */
     naturalHeight: number;
+    /** Crop region (normalised 0-1 fractions of the drawn image rect) */
+    cropX?: number | null;
+    cropY?: number | null;
+    cropW?: number | null;
+    cropH?: number | null;
   };
   /** Map of nodeId → image buffer for image/object nodes */
   nodeImages?: Map<string, Buffer>;
@@ -505,6 +510,14 @@ export function renderCanvasPage(doc: PDFKit.PDFDocument, input: CanvasPdfInput)
     const imgY = ty(bg.y);
     doc.save();
     doc.opacity(bg.opacity);
+    const hasCrop = bg.cropX != null && bg.cropY != null && bg.cropW != null && bg.cropH != null && !(bg.cropX === 0 && bg.cropY === 0 && bg.cropW === 1 && bg.cropH === 1);
+    if (hasCrop) {
+      const clipX = imgX + bg.cropX! * imgW;
+      const clipY = imgY + bg.cropY! * imgH;
+      const clipW = bg.cropW! * imgW;
+      const clipH = bg.cropH! * imgH;
+      doc.rect(clipX, clipY, clipW, clipH).clip();
+    }
     try {
       doc.image(bg.buffer, imgX, imgY, { width: imgW, height: imgH });
     } catch { /* skip invalid image */ }

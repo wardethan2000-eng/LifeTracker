@@ -38,6 +38,11 @@ export type CanvasRenderOptions = {
   backgroundImageScale?: number;
   /** Natural pixel dimensions of the background image */
   bgImageDims?: { w: number; h: number };
+  /** Background image crop (normalised 0-1 fractions of the drawn image rect) */
+  backgroundImageCropX?: number | null;
+  backgroundImageCropY?: number | null;
+  backgroundImageCropW?: number | null;
+  backgroundImageCropH?: number | null;
 };
 
 export type BoundingBox = {
@@ -576,7 +581,21 @@ export function renderCanvasToSVG(
     const imgScale = opts.backgroundImageScale ?? 1;
     const imgW = opts.bgImageDims.w * imgScale;
     const imgH = opts.bgImageDims.h * imgScale;
-    body += `<image href="${esc(opts.backgroundImageUrl)}" x="${imgX}" y="${imgY}" width="${imgW}" height="${imgH}" opacity="${imgOp}" preserveAspectRatio="none"/>`;
+    const cx = opts.backgroundImageCropX;
+    const cy = opts.backgroundImageCropY;
+    const cw = opts.backgroundImageCropW;
+    const ch = opts.backgroundImageCropH;
+    const hasCrop = cx != null && cy != null && cw != null && ch != null && !(cx === 0 && cy === 0 && cw === 1 && ch === 1);
+    if (hasCrop) {
+      const clipX = imgX + cx! * imgW;
+      const clipY = imgY + cy! * imgH;
+      const clipW = cw! * imgW;
+      const clipH = ch! * imgH;
+      body += `<defs><clipPath id="bg-crop"><rect x="${clipX}" y="${clipY}" width="${clipW}" height="${clipH}"/></clipPath></defs>`;
+      body += `<image href="${esc(opts.backgroundImageUrl)}" x="${imgX}" y="${imgY}" width="${imgW}" height="${imgH}" opacity="${imgOp}" preserveAspectRatio="none" clip-path="url(#bg-crop)"/>`;
+    } else {
+      body += `<image href="${esc(opts.backgroundImageUrl)}" x="${imgX}" y="${imgY}" width="${imgW}" height="${imgH}" opacity="${imgOp}" preserveAspectRatio="none"/>`;
+    }
   }
 
   // Grid
