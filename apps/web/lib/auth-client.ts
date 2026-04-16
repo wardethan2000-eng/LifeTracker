@@ -1,11 +1,12 @@
 import { createAuthClient } from "better-auth/client";
 
-// The BetterAuth handler lives on the Fastify API server.
-// Reuses the same API base URL env var as the rest of the web app.
+// Use the current page origin in the browser so auth works from any domain
+// (lifetracker.home, Tailscale hostname, etc.) — nginx proxies /api/auth/
+// to the API on all server names. Fall back to the env var for SSR contexts.
 const apiBaseUrl =
-  process.env.NEXT_PUBLIC_LIFEKEEPER_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000";
+  typeof window !== "undefined"
+    ? window.location.origin
+    : (process.env.NEXT_PUBLIC_LIFEKEEPER_API_BASE_URL ?? "http://localhost:4000");
 
 export const authClient = createAuthClient({
   baseURL: apiBaseUrl,
