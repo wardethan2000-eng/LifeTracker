@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import {
   activityLogSchema,
@@ -840,7 +841,7 @@ const getFetchTarget = (path: string): string => {
   return `${apiBaseUrl}${path}`;
 };
 
-const getRequestHeaders = (contentType: string | null = "application/json"): HeadersInit => {
+const getRequestHeaders = async (contentType: string | null = "application/json"): Promise<HeadersInit> => {
   const headers = new Headers();
 
   if (contentType) {
@@ -848,7 +849,12 @@ const getRequestHeaders = (contentType: string | null = "application/json"): Hea
   }
 
   if (typeof window === "undefined") {
-    headers.set("x-dev-user-id", devUserId);
+    // Forward the session cookie so server-side API calls are authenticated.
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("better-auth.session_token");
+    if (sessionCookie) {
+      headers.set("cookie", `better-auth.session_token=${sessionCookie.value}`);
+    }
   }
 
   return headers;
@@ -920,7 +926,7 @@ export const apiRequest = async <T>({
     response = await fetch(getFetchTarget(path), {
       method,
       ...resolvedCacheOptions,
-      headers: getRequestHeaders(body === undefined ? null : "application/json"),
+      headers: await getRequestHeaders(body === undefined ? null : "application/json"),
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     });
   } catch (error) {
@@ -2585,7 +2591,7 @@ export const exportHouseholdInventory = async (householdId: string): Promise<str
     response = await fetch(getFetchTarget(path), {
       method: "GET",
       cache: "no-store",
-      headers: getRequestHeaders(null)
+      headers: await getRequestHeaders(null)
     });
   } catch (error) {
     const detail = error instanceof Error && error.message
@@ -2621,7 +2627,7 @@ export const importHouseholdInventory = async (
     response = await fetch(getFetchTarget(path), {
       method: "POST",
       cache: "no-store",
-      headers: getRequestHeaders(),
+      headers: await getRequestHeaders(),
       body: JSON.stringify({ items })
     });
   } catch (error) {
@@ -2656,7 +2662,7 @@ export const exportHouseholdSpaces = async (householdId: string): Promise<string
     response = await fetch(getFetchTarget(path), {
       method: "GET",
       cache: "no-store",
-      headers: getRequestHeaders(null)
+      headers: await getRequestHeaders(null)
     });
   } catch (error) {
     const detail = error instanceof Error && error.message
@@ -2692,7 +2698,7 @@ export const importHouseholdSpaces = async (
     response = await fetch(getFetchTarget(path), {
       method: "POST",
       cache: "no-store",
-      headers: getRequestHeaders(),
+      headers: await getRequestHeaders(),
       body: JSON.stringify({ spaces })
     });
   } catch (error) {
@@ -4189,7 +4195,7 @@ export const exportHouseholdAssets = async (householdId: string): Promise<string
     response = await fetch(getFetchTarget(path), {
       method: "GET",
       cache: "no-store",
-      headers: getRequestHeaders(null)
+      headers: await getRequestHeaders(null)
     });
   } catch (error) {
     const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
@@ -5941,7 +5947,7 @@ const fetchCsvExport = async (path: string): Promise<string> => {
     response = await fetch(getFetchTarget(path), {
       method: "GET",
       cache: "no-store",
-      headers: getRequestHeaders(null)
+      headers: await getRequestHeaders(null)
     });
   } catch (error) {
     const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
@@ -5964,7 +5970,7 @@ const postCsvImport = async (path: string, items: Array<Record<string, unknown>>
     response = await fetch(getFetchTarget(path), {
       method: "POST",
       cache: "no-store",
-      headers: getRequestHeaders(),
+      headers: await getRequestHeaders(),
       body: JSON.stringify({ items })
     });
   } catch (error) {
