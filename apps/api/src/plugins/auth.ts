@@ -131,7 +131,17 @@ export const authPlugin = fp(async (app) => {
   app.decorateRequest("auth", undefined as unknown as AuthContext);
 
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (request.url === "/health") {
+    // Skip auth for public routes. authPlugin uses fastify-plugin (fp) which
+    // breaks encapsulation and adds this hook at the root level, so it runs
+    // for all routes including those registered in the public scope.
+    const url = request.url.split("?")[0];
+    if (
+      url === "/health" ||
+      url.startsWith("/api/auth/") ||
+      url.startsWith("/v1/public/") ||
+      url === "/v1/scan/resolve" ||
+      url.startsWith("/v1/scan/spaces/")
+    ) {
       return;
     }
 
