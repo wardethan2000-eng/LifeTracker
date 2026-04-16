@@ -26,7 +26,14 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     url: "/api/auth/*",
     method: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     handler: async (request, reply) => {
-      const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+      // Prefer X-Forwarded-Proto set by a reverse proxy (e.g. nginx) so that
+      // BetterAuth constructs cookies with the correct Secure flag.  Falling
+      // back to the APP_BASE_URL scheme keeps local dev working without a proxy.
+      const xForwardedProto = request.headers["x-forwarded-proto"];
+      const protocol =
+        typeof xForwardedProto === "string"
+          ? xForwardedProto.split(",")[0].trim()
+          : (process.env.APP_BASE_URL?.startsWith("https") ? "https" : "http");
       const host = request.headers.host ?? "localhost:4000";
       const url = `${protocol}://${host}${request.url}`;
 
