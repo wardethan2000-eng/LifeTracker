@@ -848,17 +848,22 @@ const getRequestHeaders = async (contentType: string | null = "application/json"
   }
 
   if (typeof window === "undefined") {
-    // Forward the session cookie so server-side API calls are authenticated.
-    // Dynamic import avoids bundling next/headers into client-side chunks.
-    try {
-      const { cookies } = await import("next/headers");
-      const cookieStore = await cookies();
-      const sessionCookie = cookieStore.get("better-auth.session_token");
-      if (sessionCookie) {
-        headers.set("cookie", `better-auth.session_token=${sessionCookie.value}`);
+    if (process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true") {
+      // Dev bypass: send the dev user ID header so the API authenticates without a session cookie.
+      headers.set("x-dev-user-id", devUserId);
+    } else {
+      // Forward the session cookie so server-side API calls are authenticated.
+      // Dynamic import avoids bundling next/headers into client-side chunks.
+      try {
+        const { cookies } = await import("next/headers");
+        const cookieStore = await cookies();
+        const sessionCookie = cookieStore.get("better-auth.session_token");
+        if (sessionCookie) {
+          headers.set("cookie", `better-auth.session_token=${sessionCookie.value}`);
+        }
+      } catch {
+        // Not in a Next.js server context (e.g. during static generation).
       }
-    } catch {
-      // Not in a Next.js server context (e.g. during static generation).
     }
   }
 
