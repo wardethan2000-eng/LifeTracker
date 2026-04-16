@@ -865,7 +865,7 @@ export const updateDisplayPreferencesSchema = displayPreferencesSchema.partial()
 export type UpdateDisplayPreferencesInput = z.infer<typeof updateDisplayPreferencesSchema>;
 
 export const userProfileSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   clerkUserId: z.string().nullable(),
   email: z.string().email().nullable(),
   displayName: z.string().nullable(),
@@ -887,10 +887,10 @@ export const updateHouseholdSchema = z.object({
 });
 
 export const householdSummarySchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   name: z.string(),
   timezone: z.string().default("America/New_York"),
-  createdById: z.string().cuid(),
+  createdById: z.string(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   memberCount: z.number().int().min(0),
