@@ -1,5 +1,4 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { z } from "zod";
 import {
   activityLogSchema,
@@ -850,10 +849,16 @@ const getRequestHeaders = async (contentType: string | null = "application/json"
 
   if (typeof window === "undefined") {
     // Forward the session cookie so server-side API calls are authenticated.
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("better-auth.session_token");
-    if (sessionCookie) {
-      headers.set("cookie", `better-auth.session_token=${sessionCookie.value}`);
+    // Dynamic import avoids bundling next/headers into client-side chunks.
+    try {
+      const { cookies } = await import("next/headers");
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get("better-auth.session_token");
+      if (sessionCookie) {
+        headers.set("cookie", `better-auth.session_token=${sessionCookie.value}`);
+      }
+    } catch {
+      // Not in a Next.js server context (e.g. during static generation).
     }
   }
 
