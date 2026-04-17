@@ -15,6 +15,23 @@ vi.mock("./barcode-lookup-field", () => ({
   BarcodeLookupField: () => <div>Barcode Lookup Stub</div>,
 }));
 
+vi.mock("./image-upload-field", () => ({
+  ImageUploadField: ({
+    label,
+    value,
+    onChange,
+  }: {
+    label: string;
+    value?: string;
+    onChange?: (value: string) => void;
+  }) => (
+    <label>
+      <span>{label}</span>
+      <input value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
+    </label>
+  ),
+}));
+
 import { InventoryItemEditForm } from "./inventory-item-edit-form";
 
 const sampleItem: InventoryItemSummary = {
@@ -37,6 +54,8 @@ const sampleItem: InventoryItemSummary = {
   unitCost: 12.5,
   storageLocation: "Garage shelf",
   notes: "Fits mower",
+  imageUrl: null,
+  expiresAt: null,
   deletedAt: null,
   createdAt: "2026-03-01T00:00:00.000Z",
   updatedAt: "2026-03-01T00:00:00.000Z",
@@ -79,5 +98,26 @@ describe("InventoryItemEditForm", () => {
 
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("accepts an app-hosted attachment image path", async () => {
+    actionMocks.updateInventoryItemAction.mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+
+    render(
+      <InventoryItemEditForm
+        householdId="household-1"
+        item={sampleItem}
+        onSaved={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByLabelText("Image"), "/api/v1/households/household-1/attachments/attachment-1/download");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(actionMocks.updateInventoryItemAction).toHaveBeenCalledTimes(1);
+    const formData = actionMocks.updateInventoryItemAction.mock.calls[0]![0] as FormData;
+    expect(formData.get("imageUrl")).toBe("/api/v1/households/household-1/attachments/attachment-1/download");
   });
 });

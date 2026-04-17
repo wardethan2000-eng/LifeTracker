@@ -328,8 +328,6 @@ async function ItemDetailContent({ householdId, inventoryItemId }: { householdId
             householdId={householdId}
             entityType="inventory_item"
             entityId={item.id}
-            title="Notes"
-            subtitle="Capture sourcing notes, restock reminders, warnings, and reference notes directly on this inventory item."
             backToHref={`/inventory/${item.id}?householdId=${householdId}`}
             compact
           />

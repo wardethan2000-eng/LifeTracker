@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+const isRelativeOrHttpUrl = (value: string): boolean => {
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const storedUrlSchema = (maxLength: number) => z.string().max(maxLength).refine(isRelativeOrHttpUrl, {
+  message: "Invalid URL."
+});
+
 export * from "./analytics/comparative.js";
 export * from "./analytics/compliance.js";
 export * from "./analytics/hobbies.js";
@@ -1482,7 +1499,7 @@ export const createInventoryItemSchema = z.object({
   unitCost: z.number().min(0).optional(),
   storageLocation: z.string().max(200).optional(),
   notes: z.string().max(4000).optional(),
-  imageUrl: z.string().url().max(1000).nullable().optional(),
+  imageUrl: storedUrlSchema(1000).nullable().optional(),
   expiresAt: z.string().datetime().nullable().optional()
 });
 
@@ -2577,7 +2594,7 @@ export const createProjectPhaseSupplySchema = z.object({
   isStaged: z.boolean().default(false),
   inventoryItemId: z.string().cuid().optional(),
   notes: z.string().max(2000).optional(),
-  imageUrl: z.string().url().max(1000).nullable().optional(),
+  imageUrl: storedUrlSchema(1000).nullable().optional(),
   sortOrder: z.number().int().optional()
 });
 
@@ -2591,7 +2608,7 @@ export const updateProjectPhaseSupplySchema = createProjectPhaseSupplySchema.par
   supplierUrl: z.string().url().max(2000).nullable().optional(),
   inventoryItemId: z.string().cuid().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
-  imageUrl: z.string().url().max(1000).nullable().optional(),
+  imageUrl: storedUrlSchema(1000).nullable().optional(),
   sortOrder: z.number().int().nullable().optional(),
   procuredAt: z.string().datetime().nullable().optional(),
   stagedAt: z.string().datetime().nullable().optional()
@@ -4085,6 +4102,7 @@ export type BarcodeLabelsQuery = z.infer<typeof barcodeLabelsQuerySchema>;
 // ── Attachment Schemas ───────────────────────────────────────────────
 
 export const attachmentEntityTypeValues = [
+  "household",
   "maintenance_log",
   "asset",
   "project",
@@ -5296,7 +5314,7 @@ export const hobbySeriesSchema = z.object({
   bestBatchSessionId: z.string().cuid().nullable(),
   tags: z.array(hobbySeriesTagSchema),
   notes: z.string().nullable(),
-  coverImageUrl: z.string().url().nullable(),
+  coverImageUrl: storedUrlSchema(2000).nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -5315,7 +5333,7 @@ export const createHobbySeriesInputSchema = z.object({
   sessionIds: z.array(z.string().cuid()).max(200).optional(),
   tags: z.array(hobbySeriesTagSchema).max(50).optional(),
   notes: z.string().max(10000).optional(),
-  coverImageUrl: z.string().url().max(2000).optional(),
+  coverImageUrl: storedUrlSchema(2000).optional(),
 });
 export type CreateHobbySeriesInput = z.infer<typeof createHobbySeriesInputSchema>;
 
@@ -5325,7 +5343,7 @@ export const updateHobbySeriesInputSchema = z.object({
   status: seriesStatusSchema.optional(),
   tags: z.array(hobbySeriesTagSchema).max(50).optional(),
   notes: z.string().max(10000).nullable().optional(),
-  coverImageUrl: z.string().url().max(2000).nullable().optional(),
+  coverImageUrl: storedUrlSchema(2000).nullable().optional(),
   bestBatchSessionId: z.string().cuid().nullable().optional(),
 });
 export type UpdateHobbySeriesInput = z.infer<typeof updateHobbySeriesInputSchema>;

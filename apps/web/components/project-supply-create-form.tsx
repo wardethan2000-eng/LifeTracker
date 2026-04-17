@@ -6,6 +6,7 @@ import type { InventoryItemSummary } from "@aegis/types";
 import { createProjectPhaseSupplyAction } from "../app/actions";
 import { formatQuantity } from "../lib/formatters";
 import { LinkPreviewDialog } from "./link-preview-dialog";
+import { ImageUploadField } from "./image-upload-field";
 
 type Props = {
   householdId: string;
@@ -115,10 +116,13 @@ export function ProjectSupplyCreateForm({ householdId, projectId, phaseId, inven
             <span>Supplier URL</span>
             <input name="supplierUrl" type="url" defaultValue={prefill.supplierUrl ?? ""} />
           </label>
-          <label className="field field--full">
-            <span>Image URL</span>
-            <input name="imageUrl" type="url" defaultValue={prefill.imageUrl ?? ""} placeholder="https://example.com/product-image.jpg" />
-          </label>
+          <ImageUploadField
+            householdId={householdId}
+            fieldName="imageUrl"
+            label="Image"
+            defaultValue={prefill.imageUrl ?? ""}
+            placeholder="Paste an image URL or upload one"
+          />
           <label className="field">
             <span>Linked Inventory Item</span>
             <select name="inventoryItemId" defaultValue="">

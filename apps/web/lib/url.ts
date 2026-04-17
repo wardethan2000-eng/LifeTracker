@@ -245,3 +245,25 @@ export function normalizeExternalUrl(value: string): string | null {
     return null;
   }
 }
+
+export function isAppRelativeUrl(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//");
+}
+
+export function normalizeStoredUrl(value: string): string | null {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (isAppRelativeUrl(trimmed)) {
+    return trimmed;
+  }
+
+  return normalizeExternalUrl(trimmed);
+}
+
+export function buildAttachmentDownloadPath(householdId: string, attachmentId: string): string {
+  return `/api/v1/households/${householdId}/attachments/${attachmentId}/download`;
+}

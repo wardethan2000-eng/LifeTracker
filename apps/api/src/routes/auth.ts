@@ -18,6 +18,59 @@ const toWebHeaders = (raw: Record<string, string | string[] | undefined>): Heade
   return headers;
 };
 
+const firstHeaderValue = (value: string | string[] | undefined): string | undefined => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return Array.isArray(value) ? value[0] : undefined;
+};
+
+const stripHeaderArtifacts = (value: string): string => value
+  .trim()
+  .replace(/^\\+/, "")
+  .replace(/^"+|"+$/g, "");
+
+const resolveProtocol = (forwardedProto: string | string[] | undefined): "http" | "https" => {
+  const fallback = process.env.APP_BASE_URL?.startsWith("https") ? "https" : "http";
+  const candidate = firstHeaderValue(forwardedProto)
+    ?.split(",")[0]
+    .trim();
+
+  if (!candidate) {
+    return fallback;
+  }
+
+  const normalized = stripHeaderArtifacts(candidate)
+    .replace(/:.*$/, "")
+    .toLowerCase();
+
+  return normalized === "https" ? "https" : normalized === "http" ? "http" : fallback;
+};
+
+const resolveHost = (
+  forwardedHost: string | string[] | undefined,
+  hostHeader: string | string[] | undefined
+): string => {
+  const candidate = firstHeaderValue(forwardedHost ?? hostHeader)
+    ?.split(",")[0]
+    .trim();
+
+  if (!candidate) {
+    return "localhost:4000";
+  }
+
+  const normalized = stripHeaderArtifacts(candidate);
+
+  try {
+    return new URL(normalized).host || "localhost:4000";
+  } catch {
+    return normalized
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "") || "localhost:4000";
+  }
+};
+
 // Delegates all /api/auth/* requests to the BetterAuth handler.
 // This route is registered in the PUBLIC scope (before the auth preHandler) so
 // sign-in / sign-up / session endpoints are accessible without a session.
@@ -29,13 +82,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       // Prefer X-Forwarded-Proto set by a reverse proxy (e.g. nginx) so that
       // BetterAuth constructs cookies with the correct Secure flag.  Falling
       // back to the APP_BASE_URL scheme keeps local dev working without a proxy.
-      const xForwardedProto = request.headers["x-forwarded-proto"];
-      const protocol =
-        typeof xForwardedProto === "string"
-          ? xForwardedProto.split(",")[0].trim()
-          : (process.env.APP_BASE_URL?.startsWith("https") ? "https" : "http");
-      const host = request.headers.host ?? "localhost:4000";
-      const url = `${protocol}://${host}${request.url}`;
+      const protocol = resolveProtocol(request.headers["x-forwarded-proto"]);
+      const host = resolveHost(request.headers["x-forwarded-host"], request.headers.host);
+      const url = new URL(request.url, `${protocol}://${host}`).toString();
 
       const hasBody =
         request.method !== "GET" &&

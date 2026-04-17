@@ -6,5 +6,5 @@ type HobbyCommentsPageProps = {
 
 export default async function HobbyCommentsPage({ params }: HobbyCommentsPageProps): Promise<never> {
   const { hobbyId } = await params;
-  redirect(`/hobbies/${hobbyId}/entries`);
+  redirect(`/hobbies/${hobbyId}/notes`);
 }

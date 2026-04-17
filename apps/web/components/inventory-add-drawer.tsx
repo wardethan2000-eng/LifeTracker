@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createInventoryItemAction } from "../app/actions";
 import { BarcodeLookupField } from "./barcode-lookup-field";
+import { ImageUploadField } from "./image-upload-field";
 import { LinkPreviewDialog } from "./link-preview-dialog";
 import { normalizeExternalUrl } from "../lib/url";
 
@@ -308,11 +309,15 @@ export function InventoryAddDrawer({ householdId, categoryOptions, open, onClose
                 </div>
                 <small>Paste a product URL here, then import the product details.</small>
               </label>
-              <label className="field field--full">
-                <span>Image URL</span>
-                <input type="url" name="imageUrl" placeholder="https://example.com/product-image.jpg" defaultValue={prefill.imageUrl ?? ""} />
-                <small>Optional product or packaging photo URL.</small>
-              </label>
+              <ImageUploadField
+                householdId={householdId}
+                fieldName="imageUrl"
+                label="Image"
+                defaultValue={prefill.imageUrl ?? ""}
+                placeholder="Paste an image URL or upload one"
+                hint="Optional product or packaging photo."
+                helperClassName=""
+              />
               <label className="field field--full">
                 <span>Storage Location</span>
                 <input type="text" name="storageLocation" placeholder="Garage shelf 2" />

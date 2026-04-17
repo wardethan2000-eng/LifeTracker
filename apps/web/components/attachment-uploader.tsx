@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import type { Attachment, AttachmentEntityType } from "@aegis/types";
+import type { ReactNode } from "react";
 import { requestAttachmentUpload, confirmAttachmentUpload } from "../lib/api";
 import { InlineError } from "./inline-error";
 
@@ -15,7 +16,9 @@ type AttachmentUploaderProps = {
   maxFileSizeMb?: number;
   multiple?: boolean;
   compact?: boolean;
-  label?: string;
+  label?: ReactNode;
+  allowedMimeTypes?: readonly string[];
+  allowedFileTypeLabel?: string;
 };
 
 const DEFAULT_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf";
@@ -45,6 +48,8 @@ export function AttachmentUploader({
   multiple = true,
   compact = false,
   label,
+  allowedMimeTypes = Array.from(ALLOWED_MIME_SET),
+  allowedFileTypeLabel = ALLOWED_FILE_TYPE_LABEL,
 }: AttachmentUploaderProps) {
   const [dragover, setDragover] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -55,8 +60,8 @@ export function AttachmentUploader({
   const maxBytes = maxFileSizeMb * 1_048_576;
 
   const uploadFile = useCallback(async (file: File) => {
-    if (!ALLOWED_MIME_SET.has(file.type)) {
-      const msg = `"${file.name}" has an unsupported file type. Accepted types: ${ALLOWED_FILE_TYPE_LABEL}.`;
+    if (!allowedMimeTypes.includes(file.type)) {
+      const msg = `"${file.name}" has an unsupported file type. Accepted types: ${allowedFileTypeLabel}.`;
       setError(msg);
       onError?.(msg);
       return;
@@ -113,7 +118,7 @@ export function AttachmentUploader({
     } finally {
       setProgress(null);
     }
-  }, [householdId, entityType, entityId, maxBytes, maxFileSizeMb, onUploadComplete, onError]);
+  }, [allowedFileTypeLabel, allowedMimeTypes, householdId, entityType, entityId, maxBytes, maxFileSizeMb, onUploadComplete, onError]);
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -165,7 +170,7 @@ export function AttachmentUploader({
             {label ?? <><strong>Click to upload</strong> or drag and drop</>}
           </div>
           <div className="attachment-upload__hint">
-            {ALLOWED_FILE_TYPE_LABEL} up to {maxFileSizeMb} MB
+            {allowedFileTypeLabel} up to {maxFileSizeMb} MB
           </div>
         </>
       )}

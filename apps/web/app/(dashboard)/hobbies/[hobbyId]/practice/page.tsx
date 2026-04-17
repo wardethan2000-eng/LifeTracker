@@ -1,10 +1,13 @@
 import type { JSX } from "react";
+import type { HobbyMetricReading } from "@aegis/types";
 import { Suspense } from "react";
+import { HobbyMetricsManager } from "../../../../../components/hobby-metrics-manager";
 import { HobbyPracticeTab } from "../../../../../components/hobby-practice-tab";
 import {
   ApiError,
   getHobbyDetail,
   getHobbyMetrics,
+  getHobbyMetricReadings,
   getMe,
   listHobbyPracticeGoals,
   listHobbyPracticeRoutines,
@@ -35,16 +38,43 @@ async function PracticeContent({ householdId, hobbyId }: { householdId: string; 
       listHobbyPracticeRoutines(householdId, hobbyId, { limit: 100 }),
       getHobbyMetrics(householdId, hobbyId),
     ]);
+    const metricReadingsMap: Record<string, HobbyMetricReading[]> = {};
+    await Promise.all(
+      metrics.map(async (metric) => {
+        metricReadingsMap[metric.id] = await getHobbyMetricReadings(householdId, hobbyId, metric.id);
+      }),
+    );
 
     return (
-      <HobbyPracticeTab
-        householdId={householdId}
-        hobbyId={hobbyId}
-        activityMode={hobby.activityMode}
-        goals={practiceGoals.items}
-        routines={practiceRoutines.items}
-        metrics={metrics}
-      />
+      <div style={{ display: "grid", gap: 24 }}>
+        <section className="panel">
+          <div className="panel__body--padded" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <a href="#practice-goals" className="button button--ghost button--sm">Goals</a>
+            <a href="#practice-routines" className="button button--ghost button--sm">Routines</a>
+            <a href="#practice-metrics" className="button button--ghost button--sm">Metrics</a>
+          </div>
+        </section>
+
+        <section>
+          <HobbyPracticeTab
+            householdId={householdId}
+            hobbyId={hobbyId}
+            activityMode={hobby.activityMode}
+            goals={practiceGoals.items}
+            routines={practiceRoutines.items}
+            metrics={metrics}
+          />
+        </section>
+
+        <section id="practice-metrics">
+          <HobbyMetricsManager
+            householdId={householdId}
+            hobbyId={hobbyId}
+            initialMetrics={metrics}
+            initialReadingsMap={metricReadingsMap}
+          />
+        </section>
+      </div>
     );
   } catch (error) {
     if (error instanceof ApiError) {

@@ -1,15 +1,13 @@
 import type { JSX } from "react";
 import { Suspense } from "react";
-import { ApiError, getCanvasesWithGeometry, getMe, getNoteFolders, getEntries, getNoteTemplates } from "../../../lib/api";
+import { ApiError, getCanvasesWithGeometry, getMe, getNoteTemplates } from "../../../lib/api";
 import { NotesHub } from "../../../components/notes-hub";
 import { PageHeader } from "../../../components/page-header";
 
 // ── Deferred notes content ─────────────────────────────────
 async function NotesContent({ householdId, initialTab }: { householdId: string; initialTab: "notes" | "canvases" }): Promise<JSX.Element> {
   try {
-    const [folders, entries, templates, canvases] = await Promise.all([
-      getNoteFolders(householdId),
-      getEntries(householdId, { entityType: "notebook", entityId: householdId }),
+    const [templates, canvases] = await Promise.all([
       getNoteTemplates(householdId),
       getCanvasesWithGeometry(householdId),
     ]);
@@ -17,8 +15,6 @@ async function NotesContent({ householdId, initialTab }: { householdId: string; 
     return (
       <NotesHub
         householdId={householdId}
-        initialFolders={folders}
-        initialEntries={entries.items}
         templates={templates}
         canvases={canvases}
         initialTab={initialTab}
@@ -55,7 +51,6 @@ export default async function NotesPage({ searchParams }: { searchParams?: Promi
     <>
       <PageHeader
         title="Notes"
-        subtitle="Capture, organize, and develop your thoughts across all areas of Aegis."
       />
 
       <div className="page-body">

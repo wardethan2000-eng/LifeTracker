@@ -17,14 +17,12 @@ export default async function AssetNotesPage({ params, searchParams }: AssetNote
     if (!household) return <p>No household found.</p>;
 
     return (
-      <EntityNotesWorkspace
-        householdId={household.id}
-        entityType="asset"
-        entityId={assetId}
-        title="Asset notes"
-        subtitle="Keep maintenance context, decisions, warnings, reminders, and reference notes tied directly to this asset."
-        backToHref={`/assets/${assetId}/notes`}
-      />
+        <EntityNotesWorkspace
+          householdId={household.id}
+          entityType="asset"
+          entityId={assetId}
+          backToHref={`/assets/${assetId}/notes?householdId=${household.id}`}
+        />
     );
   } catch (error) {
     if (error instanceof ApiError) {

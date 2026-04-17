@@ -38,6 +38,8 @@ const validateEntityOwnership = async (
   householdId: string
 ): Promise<boolean> => {
   switch (entityType) {
+    case "household":
+      return entityId === householdId;
     case "asset": {
       const asset = await prisma.asset.findFirst({
         where: { id: entityId, householdId },
@@ -110,14 +112,14 @@ const validateEntityOwnership = async (
     }
     case "hobby": {
       const hobby = await prisma.hobby.findFirst({
-        where: { id: entityId, householdId, deletedAt: null },
+        where: { id: entityId, householdId },
         select: { id: true },
       });
       return hobby !== null;
     }
     case "idea": {
       const idea = await prisma.idea.findFirst({
-        where: { id: entityId, householdId, deletedAt: null },
+        where: { id: entityId, householdId },
         select: { id: true },
       });
       return idea !== null;

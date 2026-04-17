@@ -12,6 +12,7 @@ import {
   type InventoryItemResolvedValues
 } from "../lib/validation/forms";
 import { BarcodeLookupField } from "./barcode-lookup-field";
+import { ImageUploadField } from "./image-upload-field";
 import { InlineError } from "./inline-error";
 
 type InventoryItemEditFormProps = {
@@ -56,6 +57,8 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
     }
   });
   const itemType = watch("itemType") === "equipment" ? "equipment" : "consumable";
+  const watchedImageUrl = watch("imageUrl");
+  const imageUrlValue = typeof watchedImageUrl === "string" ? watchedImageUrl : "";
 
   const handleBarcodeResult = useCallback((result: BarcodeLookupResult) => {
     const setIfEmpty = (name: string, value: string | null) => {
@@ -228,11 +231,16 @@ export function InventoryItemEditForm({ householdId, item, onSaved, onCancel }: 
         <input type="text" {...register("supplierUrl")} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
         <InlineError message={errors.supplierUrl?.message} size="sm" />
       </label>
-      <label className="field field--full">
-        <span>Image URL</span>
-        <input type="url" {...register("imageUrl")} placeholder="https://example.com/product-image.jpg" />
-        <InlineError message={errors.imageUrl?.message} size="sm" />
-      </label>
+      <ImageUploadField
+        householdId={householdId}
+        entityType="inventory_item"
+        entityId={item.id}
+        label="Image"
+        value={imageUrlValue}
+        onChange={(value) => setValue("imageUrl", value, { shouldValidate: true, shouldDirty: true })}
+        placeholder="Paste an image URL or upload one"
+        errorMessage={errors.imageUrl?.message}
+      />
       <label className="field field--full">
         <span>Storage Location</span>
         <input type="text" {...register("storageLocation")} />

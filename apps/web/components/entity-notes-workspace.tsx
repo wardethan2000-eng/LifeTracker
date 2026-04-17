@@ -1,21 +1,39 @@
 "use client";
 
-import type { Entry, EntryEntityType, EntryFlag, EntryType, NoteFolder } from "@aegis/types";
+import type { Entry, EntryEntityType, EntryFlag, EntryType, NoteFolder, NoteTemplate } from "@aegis/types";
 import Link from "next/link";
 import type { JSX } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { createEntry, deleteEntry, getEntries, getNoteFolders, updateEntry } from "../lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  createEntry,
+  createNoteFolder,
+  deleteEntry,
+  deleteNoteFolder,
+  getEntries,
+  getNoteFolders,
+  updateEntry,
+  updateNoteFolder,
+} from "../lib/api";
+import { NoteFolderTree } from "./note-folder-tree";
+import { QuickCapture } from "./quick-capture";
 import { RichEditor } from "./rich-editor";
 import { RichEditorDisplay } from "./rich-editor-display";
+import { TemplatePicker } from "./template-picker";
+
+type FolderWithCounts = NoteFolder & { entryCount: number; childCount: number };
+
+type NotebookWorkspaceOptions = {
+  templates: NoteTemplate[];
+  manageTemplatesHref: string;
+};
 
 type EntityNotesWorkspaceProps = {
   householdId: string;
   entityType: EntryEntityType;
   entityId: string;
-  title: string;
-  subtitle: string;
   backToHref: string;
   compact?: boolean;
+  notebookOptions?: NotebookWorkspaceOptions;
 };
 
 type NoteDraft = {
@@ -83,7 +101,7 @@ const parseTagString = (value: string): string[] => Array.from(new Set(
     .filter(Boolean)
 ));
 
-const buildDraft = (entry: Entry | null): NoteDraft => {
+const buildDraft = (entry: Entry | null, defaultFolderId?: string | null): NoteDraft => {
   const tags = entry?.tags.filter((tag) => tag !== DISCUSSION_TAG) ?? [];
 
   return {
@@ -92,7 +110,7 @@ const buildDraft = (entry: Entry | null): NoteDraft => {
     entryType: entry?.entryType ?? "note",
     flags: entry?.flags ?? [],
     tags: tags.join(", "),
-    folderId: entry?.folderId ?? "",
+    folderId: entry?.folderId ?? defaultFolderId ?? "",
     reminderAt: toLocalDateTimeInput(entry?.reminderAt),
     reminderRepeatDays: entry?.reminderRepeatDays ? String(entry.reminderRepeatDays) : "",
     reminderUntil: toLocalDateInput(entry?.reminderUntil),
@@ -103,13 +121,13 @@ export function EntityNotesWorkspace({
   householdId,
   entityType,
   entityId,
-  title,
-  subtitle,
   backToHref,
   compact = false,
+  notebookOptions,
 }: EntityNotesWorkspaceProps): JSX.Element {
+  const isNotebookWorkspace = Boolean(notebookOptions);
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [folders, setFolders] = useState<NoteFolder[]>([]);
+  const [folders, setFolders] = useState<FolderWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
@@ -121,6 +139,49 @@ export function EntityNotesWorkspace({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  const fetchWorkspace = useCallback(async (folderIdOverride: string | null = activeFolderId) => {
+    const [entryResponse, folderResponse] = await Promise.all([
+      getEntries(householdId, {
+        entityType,
+        entityId,
+        includeArchived: true,
+        limit: 100,
+        ...(isNotebookWorkspace && folderIdOverride !== null ? { folderId: folderIdOverride } : {}),
+      }),
+      getNoteFolders(householdId),
+    ]);
+
+    return {
+      entries: entryResponse.items,
+      folders: folderResponse,
+    };
+  }, [activeFolderId, entityId, entityType, householdId, isNotebookWorkspace]);
+
+  const refreshWorkspace = useCallback(async (options?: {
+    folderId?: string | null;
+    selectedEntryId?: string | null;
+  }): Promise<void> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const nextFolderId = options?.folderId ?? activeFolderId;
+      const workspace = await fetchWorkspace(nextFolderId);
+      setEntries(workspace.entries);
+      setFolders(workspace.folders);
+
+      if (options && "selectedEntryId" in options) {
+        setSelectedEntryId(options.selectedEntryId ?? null);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load notes.");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeFolderId, fetchWorkspace]);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,19 +191,11 @@ export function EntityNotesWorkspace({
       setError(null);
 
       try {
-        const [entryResponse, folderResponse] = await Promise.all([
-          getEntries(householdId, {
-            entityType,
-            entityId,
-            includeArchived: true,
-            limit: 100,
-          }),
-          getNoteFolders(householdId),
-        ]);
+        const workspace = await fetchWorkspace();
 
         if (!cancelled) {
-          setEntries(entryResponse.items);
-          setFolders(folderResponse);
+          setEntries(workspace.entries);
+          setFolders(workspace.folders);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -160,7 +213,7 @@ export function EntityNotesWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [entityId, entityType, householdId]);
+  }, [fetchWorkspace]);
 
   const visibleEntries = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -197,14 +250,18 @@ export function EntityNotesWorkspace({
     ?? entries.find((entry) => entry.id === selectedEntryId)
     ?? null;
 
+  const activeFolder = activeFolderId
+    ? folders.find((folder) => folder.id === activeFolderId) ?? null
+    : null;
+
   useEffect(() => {
     if (selectedEntry) {
-      setDraft(buildDraft(selectedEntry));
+      setDraft(buildDraft(selectedEntry, activeFolderId));
       return;
     }
 
-    setDraft(buildDraft(null));
-  }, [selectedEntry]);
+    setDraft(buildDraft(null, activeFolderId));
+  }, [activeFolderId, selectedEntry]);
 
   useEffect(() => {
     if (selectedEntryId && visibleEntries.some((entry) => entry.id === selectedEntryId)) {
@@ -220,13 +277,6 @@ export function EntityNotesWorkspace({
     }
   }, [selectedEntryId, visibleEntries]);
 
-  const stats = useMemo(() => ({
-    total: entries.length,
-    reminders: entries.filter((entry) => entry.reminderAt).length,
-    actionable: entries.filter((entry) => entry.flags.includes("actionable")).length,
-    pinned: entries.filter((entry) => entry.flags.includes("pinned")).length,
-  }), [entries]);
-
   const handleSelectEntry = (entry: Entry): void => {
     setSelectedEntryId(entry.id);
     setSaveMessage(null);
@@ -234,13 +284,13 @@ export function EntityNotesWorkspace({
 
   const handleCreateNew = (): void => {
     setSelectedEntryId(null);
-    setDraft(buildDraft(null));
+    setDraft(buildDraft(null, activeFolderId));
     setDetailsOpen(false);
     setSaveMessage(null);
   };
 
   const handleSave = async (): Promise<void> => {
-    if (saving || !draft.body.trim()) {
+    if (saving || !stripHtml(draft.body).trim()) {
       return;
     }
 
@@ -275,13 +325,18 @@ export function EntityNotesWorkspace({
           entityId,
         });
 
-      setEntries((current) => {
-        const exists = current.some((entry) => entry.id === saved.id);
-        return exists
-          ? current.map((entry) => entry.id === saved.id ? saved : entry)
-          : [saved, ...current];
-      });
-      setSelectedEntryId(saved.id);
+      if (isNotebookWorkspace) {
+        await refreshWorkspace({ selectedEntryId: saved.id });
+      } else {
+        setEntries((current) => {
+          const exists = current.some((entry) => entry.id === saved.id);
+          return exists
+            ? current.map((entry) => entry.id === saved.id ? saved : entry)
+            : [saved, ...current];
+        });
+        setSelectedEntryId(saved.id);
+      }
+
       setSaveMessage(selectedEntry ? "Saved." : "Note created.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to save note.");
@@ -301,9 +356,15 @@ export function EntityNotesWorkspace({
 
     try {
       await deleteEntry(householdId, selectedEntry.id);
-      setEntries((current) => current.filter((entry) => entry.id !== selectedEntry.id));
-      setSelectedEntryId(null);
-      setDraft(buildDraft(null));
+
+      if (isNotebookWorkspace) {
+        await refreshWorkspace({ selectedEntryId: null });
+      } else {
+        setEntries((current) => current.filter((entry) => entry.id !== selectedEntry.id));
+        setSelectedEntryId(null);
+      }
+
+      setDraft(buildDraft(null, activeFolderId));
       setSaveMessage("Note deleted.");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete note.");
@@ -312,36 +373,119 @@ export function EntityNotesWorkspace({
     }
   };
 
+  const handleFolderSelect = useCallback((folderId: string | null): void => {
+    setActiveFolderId(folderId);
+    setSaveMessage(null);
+  }, []);
+
+  const handleCreateFolder = useCallback(async (name: string, parentFolderId?: string | null): Promise<void> => {
+    await createNoteFolder(householdId, { name, parentFolderId: parentFolderId ?? null });
+    await refreshWorkspace();
+  }, [householdId, refreshWorkspace]);
+
+  const handleRenameFolder = useCallback(async (folderId: string, name: string): Promise<void> => {
+    await updateNoteFolder(householdId, folderId, { name });
+    await refreshWorkspace();
+  }, [householdId, refreshWorkspace]);
+
+  const handleDeleteFolder = useCallback(async (folderId: string): Promise<void> => {
+    await deleteNoteFolder(householdId, folderId);
+    const nextFolderId = activeFolderId === folderId ? null : activeFolderId;
+
+    if (activeFolderId === folderId) {
+      setActiveFolderId(null);
+    }
+
+    await refreshWorkspace({
+      folderId: nextFolderId,
+      selectedEntryId: activeFolderId === folderId ? null : selectedEntryId,
+    });
+  }, [activeFolderId, householdId, refreshWorkspace, selectedEntryId]);
+
+  const handleQuickCapture = useCallback(async (body: string): Promise<void> => {
+    const created = await createEntry(householdId, {
+      body: `<p>${body}</p>`,
+      bodyFormat: "rich_text",
+      entryDate: new Date().toISOString(),
+      entityType,
+      entityId,
+      entryType: "note",
+      flags: [],
+      tags: [],
+      measurements: [],
+      folderId: activeFolderId,
+    });
+
+    await refreshWorkspace({ selectedEntryId: created.id });
+  }, [activeFolderId, entityId, entityType, householdId, refreshWorkspace]);
+
+  const handleTemplateSelect = useCallback(async (template: NoteTemplate): Promise<void> => {
+    const created = await createEntry(householdId, {
+      title: template.name,
+      body: template.bodyTemplate,
+      bodyFormat: "rich_text",
+      entryDate: new Date().toISOString(),
+      entityType,
+      entityId,
+      entryType: template.entryType as EntryType,
+      flags: template.defaultFlags as EntryFlag[],
+      tags: template.defaultTags,
+      measurements: [],
+      folderId: activeFolderId,
+    });
+
+    setShowTemplatePicker(false);
+    await refreshWorkspace({ selectedEntryId: created.id });
+  }, [activeFolderId, entityId, entityType, householdId, refreshWorkspace]);
+
   const currentTypeLabel = entryTypeOptions.find((option) => option.value === draft.entryType)?.label ?? draft.entryType;
   const currentTagCount = parseTagString(draft.tags).length;
+  const hasActiveSearchFilters = Boolean(
+    searchText.trim()
+    || remindersOnly
+    || actionableOnly
+    || pinnedOnly
+  );
+
+  const clearFilters = (): void => {
+    setSearchText("");
+    setRemindersOnly(false);
+    setActionableOnly(false);
+    setPinnedOnly(false);
+  };
 
   return (
     <section className={`entity-notes-workspace${compact ? " entity-notes-workspace--compact" : ""}`}>
-      <div className="entity-notes-workspace__hero">
-        <div>
-          <h2>{title}</h2>
-          <p>{subtitle}</p>
-        </div>
-      </div>
+      {isNotebookWorkspace && notebookOptions ? (
+        <>
+          <div className="entity-notes-workspace__notebook-tools">
+            <div className="entity-notes-workspace__quick-capture">
+              <QuickCapture onCapture={handleQuickCapture} />
+            </div>
+            <button
+              type="button"
+              className="button button--small"
+              onClick={() => setShowTemplatePicker((current) => !current)}
+            >
+              {showTemplatePicker ? "Hide templates" : "Start from template"}
+            </button>
+            <Link href={notebookOptions.manageTemplatesHref} className="button button--ghost button--small">
+              Manage Templates
+            </Link>
+          </div>
 
-      <div className="entity-notes-workspace__stats">
-        <div className="entity-notes-workspace__stat">
-          <span>{stats.total}</span>
-          <label>Notes</label>
-        </div>
-        <div className="entity-notes-workspace__stat">
-          <span>{stats.reminders}</span>
-          <label>Reminders</label>
-        </div>
-        <div className="entity-notes-workspace__stat">
-          <span>{stats.actionable}</span>
-          <label>Actionable</label>
-        </div>
-        <div className="entity-notes-workspace__stat">
-          <span>{stats.pinned}</span>
-          <label>Pinned</label>
-        </div>
-      </div>
+          {showTemplatePicker ? (
+            <TemplatePicker
+              templates={notebookOptions.templates}
+              onSelect={(template) => { void handleTemplateSelect(template); }}
+              onSkip={() => {
+                setShowTemplatePicker(false);
+                handleCreateNew();
+              }}
+            />
+          ) : null}
+        </>
+      ) : null}
 
       <div className="entity-notes-workspace__toolbar">
         <input
@@ -362,13 +506,40 @@ export function EntityNotesWorkspace({
           <input type="checkbox" checked={pinnedOnly} onChange={(event) => setPinnedOnly(event.target.checked)} />
           <span>Pinned</span>
         </label>
+        {activeFolder ? (
+          <button
+            type="button"
+            className="button button--ghost button--sm"
+            onClick={() => handleFolderSelect(null)}
+          >
+            All folders
+          </button>
+        ) : null}
+        {hasActiveSearchFilters ? (
+          <button type="button" className="button button--ghost button--sm" onClick={clearFilters}>
+            Clear filters
+          </button>
+        ) : null}
         <button type="button" className="button button--primary button--sm" onClick={handleCreateNew}>New note</button>
       </div>
 
       {error ? <p className="workbench-error">{error}</p> : null}
       {saveMessage ? <p className="note">{saveMessage}</p> : null}
 
-      <div className="entity-notes-workspace__layout">
+      <div className={`entity-notes-workspace__layout${isNotebookWorkspace ? " entity-notes-workspace__layout--notebook" : ""}`}>
+        {isNotebookWorkspace ? (
+          <aside className="entity-notes-workspace__folders">
+            <NoteFolderTree
+              folders={folders}
+              activeFolderId={activeFolderId}
+              onSelect={handleFolderSelect}
+              onCreate={handleCreateFolder}
+              onRename={handleRenameFolder}
+              onDelete={handleDeleteFolder}
+            />
+          </aside>
+        ) : null}
+
         <aside className="entity-notes-workspace__list">
           {loading ? (
             <div aria-hidden="true" style={{ display: "grid", gap: 8 }}>
@@ -378,9 +549,35 @@ export function EntityNotesWorkspace({
             </div>
           ) : visibleEntries.length === 0 ? (
             <div className="entity-notes-workspace__empty">
-              <p>
-                No notes yet. Save quick thoughts, reminders, checklists, and reference notes here.
-              </p>
+              <p>{hasActiveSearchFilters || activeFolder ? "No notes match the current filters." : "No notes yet."}</p>
+              <div className="entity-notes-workspace__empty-actions">
+                <button type="button" className="button button--primary button--sm" onClick={handleCreateNew}>
+                  New note
+                </button>
+                {isNotebookWorkspace && notebookOptions ? (
+                  <button
+                    type="button"
+                    className="button button--ghost button--sm"
+                    onClick={() => setShowTemplatePicker(true)}
+                  >
+                    Start from template
+                  </button>
+                ) : null}
+                {hasActiveSearchFilters ? (
+                  <button type="button" className="button button--ghost button--sm" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                ) : null}
+                {activeFolder ? (
+                  <button
+                    type="button"
+                    className="button button--ghost button--sm"
+                    onClick={() => handleFolderSelect(null)}
+                  >
+                    All folders
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : (
             <div className="entity-notes-workspace__items">

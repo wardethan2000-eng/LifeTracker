@@ -10,6 +10,7 @@ import {
   updateProjectPhaseSupplyAction
 } from "../app/actions";
 import { formatCurrency, formatQuantity } from "../lib/formatters";
+import { ImageUploadField } from "./image-upload-field";
 import { type DragHandleProps } from "./ui/sortable-list";
 
 type ProjectSupplyCardProps = {
@@ -263,10 +264,13 @@ export function ProjectSupplyCard({
                 <span>Notes</span>
                 <textarea name="notes" rows={2} defaultValue={supply.notes ?? ""} />
               </label>
-              <label className="field field--full">
-                <span>Image URL</span>
-                <input name="imageUrl" type="url" defaultValue={supply.imageUrl ?? ""} placeholder="https://example.com/product-image.jpg" />
-              </label>
+              <ImageUploadField
+                householdId={householdId}
+                fieldName="imageUrl"
+                label="Image"
+                defaultValue={supply.imageUrl ?? ""}
+                placeholder="Paste an image URL or upload one"
+              />
             </div>
             <div className="inline-actions" style={{ marginTop: 12 }}>
               <button type="submit" className="button button--sm">Save</button>

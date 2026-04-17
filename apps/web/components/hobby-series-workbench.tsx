@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type JSX } from "react";
+import { ImageUploadField } from "./image-upload-field";
 
 type HobbySeriesWorkbenchProps = {
   action: (formData: FormData) => Promise<void>;
@@ -93,16 +94,16 @@ export function HobbySeriesWorkbench({ action, householdId, hobbyId }: HobbySeri
             />
           </label>
 
-          <label className="workbench-field workbench-field--wide">
-            <span className="workbench-field__label">Cover Image URL</span>
-            <input
-              type="url"
-              className="workbench-field__input"
-              value={coverImageUrl}
-              onChange={(event) => setCoverImageUrl(event.target.value)}
-              placeholder="https://example.com/series-cover.jpg"
-            />
-          </label>
+          <ImageUploadField
+            householdId={householdId}
+            label="Cover image"
+            value={coverImageUrl}
+            onChange={setCoverImageUrl}
+            placeholder="Paste an image URL or upload one"
+            containerClassName="workbench-field workbench-field--wide"
+            labelTextClassName="workbench-field__label"
+            inputClassName="workbench-field__input"
+          />
 
           <label className="workbench-field workbench-field--wide">
             <span className="workbench-field__label">Notes</span>

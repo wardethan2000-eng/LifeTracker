@@ -130,7 +130,7 @@ export function HobbyPracticeTab({ householdId, hobbyId, activityMode, goals, ro
 
   return (
     <div className="mode-workspace mode-workspace--split">
-      <section className="panel panel--studio">
+      <section className="panel panel--studio" id="practice-goals">
         <div className="panel__header mode-workspace__header">
           <div>
             <h2>Goals</h2>
@@ -221,7 +221,7 @@ export function HobbyPracticeTab({ householdId, hobbyId, activityMode, goals, ro
         </div>
       </section>
 
-      <section className="panel panel--studio">
+      <section className="panel panel--studio" id="practice-routines">
         <div className="panel__header mode-workspace__header">
           <div>
             <h2>Routines</h2>

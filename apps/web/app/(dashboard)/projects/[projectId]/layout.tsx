@@ -48,10 +48,10 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
   const tabs: WorkspaceTab[] = [
     { id: "overview", label: "Overview", href: `${base}${qs}` },
     { id: "phases", label: "Plan", href: `${base}/phases${qs}` },
-    { id: "budget", label: "Budget", href: `${base}/budget${qs}` },
     { id: "supplies", label: "Materials", href: `${base}/supplies${qs}` },
+    { id: "budget", label: "Budget", href: `${base}/budget${qs}` },
+    { id: "notepad", label: "Notepad", href: `${base}/notepad${qs}` },
     { id: "canvas", label: "Canvas", href: `${base}/canvas${qs}` },
-    { id: "notepad", label: "Notes", href: `${base}/notepad${qs}` },
     { id: "notes", label: "Activity", href: `${base}/notes${qs}` },
     { id: "settings", label: "Settings", href: `${base}/settings${qs}` },
   ];

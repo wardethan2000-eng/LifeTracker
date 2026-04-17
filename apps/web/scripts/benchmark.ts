@@ -368,7 +368,7 @@ async function main(): Promise<void> {
     const hobbiesIndex = pages.findIndex((page) => page.label === "Hobbies list");
     const hobbyDetailPages: PageDefinition[] = [
       { label: "Hobby detail (overview)", path: `/hobbies/${hobbyId}` },
-      { label: "Hobby detail (entries)", path: `/hobbies/${hobbyId}/entries` }
+      { label: "Hobby detail (notes)", path: `/hobbies/${hobbyId}/notes` }
     ];
 
     if (hobbiesIndex >= 0) {

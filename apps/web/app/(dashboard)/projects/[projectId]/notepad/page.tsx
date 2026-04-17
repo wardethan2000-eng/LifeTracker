@@ -26,8 +26,6 @@ export default async function ProjectNotepadPage({ params, searchParams }: Proje
           householdId={household.id}
           entityType="project"
           entityId={projectId}
-          title="Project notes"
-          subtitle="Save planning notes, reminders, checklists, and reference material for this project."
           backToHref={`/projects/${projectId}/notepad?householdId=${household.id}`}
         />
       </section>

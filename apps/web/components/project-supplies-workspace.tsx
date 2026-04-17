@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { createProjectPhaseSupplyAction } from "../app/actions";
 import { formatCurrency, formatQuantity } from "../lib/formatters";
 import { Card } from "./card";
+import { ImageUploadField } from "./image-upload-field";
 import { LinkPreviewDialog } from "./link-preview-dialog";
 import { ProjectSupplyCard } from "./project-supply-card";
 
@@ -337,10 +338,14 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
                   <span>Supplier URL</span>
                   <input name="supplierUrl" type="url" defaultValue={createPrefill.supplierUrl ?? ""} />
                 </label>
-                <label className="field">
-                  <span>Image URL</span>
-                  <input name="imageUrl" type="url" placeholder="https://..." defaultValue={createPrefill.imageUrl ?? ""} />
-                </label>
+                <ImageUploadField
+                  householdId={householdId}
+                  fieldName="imageUrl"
+                  label="Image"
+                  defaultValue={createPrefill.imageUrl ?? ""}
+                  placeholder="Paste an image URL or upload one"
+                  containerClassName="field"
+                />
                 <label className="field">
                   <span>Linked Inventory</span>
                   <select name="inventoryItemId" defaultValue="">

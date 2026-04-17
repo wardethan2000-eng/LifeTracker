@@ -661,9 +661,8 @@ p { margin: 0; color: var(--ink-light); }
   gap: 18px;
 }
 
-.entity-notes-workspace__hero,
-.entity-notes-workspace__stats,
 .entity-notes-workspace__toolbar,
+.entity-notes-workspace__notebook-tools,
 .entity-notes-workspace__layout {
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -671,19 +670,11 @@ p { margin: 0; color: var(--ink-light); }
   box-shadow: var(--shadow-sm);
 }
 
-.entity-notes-workspace__hero,
-.entity-notes-workspace__toolbar {
+.entity-notes-workspace__toolbar,
+.entity-notes-workspace__notebook-tools {
   padding: 16px 18px;
 }
 
-.entity-notes-workspace__hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.entity-notes-workspace__hero p,
 .entity-notes-workspace__editor-bar p {
   margin-top: 6px;
   max-width: 70ch;
@@ -712,38 +703,24 @@ p { margin: 0; color: var(--ink-light); }
   color: #fff;
 }
 
-.entity-notes-workspace__stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-}
-
-.entity-notes-workspace__stat {
-  padding: 14px 16px;
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent-bg));
-  display: grid;
-  gap: 4px;
-}
-
-.entity-notes-workspace__stat span {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  color: var(--ink);
-}
-
-.entity-notes-workspace__stat label {
-  color: var(--ink-muted);
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 .entity-notes-workspace__toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+.entity-notes-workspace__notebook-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.entity-notes-workspace__quick-capture {
+  flex: 1 1 320px;
+  min-width: 260px;
 }
 
 .entity-notes-workspace__toolbar input[type="search"] {
@@ -766,10 +743,22 @@ p { margin: 0; color: var(--ink-light); }
   overflow: hidden;
 }
 
+.entity-notes-workspace__layout--notebook {
+  grid-template-columns: minmax(240px, 300px) minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.entity-notes-workspace__folders,
 .entity-notes-workspace__list {
-  border-right: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 92%, var(--surface-alt));
   padding: 14px;
+}
+
+.entity-notes-workspace__folders {
+  border-right: 1px solid var(--border);
+}
+
+.entity-notes-workspace__list {
+  border-right: 1px solid var(--border);
 }
 
 .entity-notes-workspace__items {
@@ -882,11 +871,20 @@ p { margin: 0; color: var(--ink-light); }
   border-radius: 14px;
   padding: 16px;
   background: color-mix(in srgb, var(--surface) 92%, var(--surface-alt));
+  display: grid;
+  gap: 12px;
 }
 
-.entity-notes-workspace--compact .entity-notes-workspace__hero,
+.entity-notes-workspace__empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.entity-notes-workspace--compact .entity-notes-workspace__notebook-tools,
 .entity-notes-workspace--compact .entity-notes-workspace__toolbar,
 .entity-notes-workspace--compact .entity-notes-workspace__editor,
+.entity-notes-workspace--compact .entity-notes-workspace__folders,
 .entity-notes-workspace--compact .entity-notes-workspace__list {
   padding: 14px;
 }
@@ -896,6 +894,7 @@ p { margin: 0; color: var(--ink-light); }
     grid-template-columns: 1fr;
   }
 
+  .entity-notes-workspace__folders,
   .entity-notes-workspace__list {
     border-right: 0;
     border-bottom: 1px solid var(--border);
@@ -903,11 +902,6 @@ p { margin: 0; color: var(--ink-light); }
 }
 
 @media (max-width: 760px) {
-  .entity-notes-workspace__hero {
-    flex-direction: column;
-  }
-
-  .entity-notes-workspace__stats,
   .entity-notes-workspace__form-grid {
     grid-template-columns: 1fr;
   }

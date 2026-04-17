@@ -17,14 +17,12 @@ export default async function IdeaNotesPage({ params, searchParams }: IdeaNotesP
     if (!household) return <p>No household found.</p>;
 
     return (
-      <EntityNotesWorkspace
-        householdId={household.id}
-        entityType="idea"
-        entityId={ideaId}
-        title="Idea notes"
-        subtitle="Capture research, references, next steps, reminders, and planning notes as the idea evolves."
-        backToHref={`/ideas/${ideaId}/notes`}
-      />
+        <EntityNotesWorkspace
+          householdId={household.id}
+          entityType="idea"
+          entityId={ideaId}
+          backToHref={`/ideas/${ideaId}/notes?householdId=${household.id}`}
+        />
     );
   } catch (error) {
     if (error instanceof ApiError) {

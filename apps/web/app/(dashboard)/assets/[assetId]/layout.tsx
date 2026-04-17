@@ -20,17 +20,13 @@ type AssetDetailLayoutProps = {
 
 const assetTabs = (assetId: string) => [
   { id: "overview", label: "Overview", href: `/assets/${assetId}` },
-  { id: "maintenance", label: "Maintenance", href: `/assets/${assetId}/maintenance` },
   { id: "details", label: "Details", href: `/assets/${assetId}/details` },
-  { id: "relationships", label: "Relationships", href: `/assets/${assetId}/relationships` },
-  { id: "metrics", label: "Metrics", href: `/assets/${assetId}/metrics` },
-  { id: "costs", label: "Costs", href: `/assets/${assetId}/costs` },
-  { id: "tco", label: "TCO", href: `/assets/${assetId}/tco` },
+  { id: "maintenance", label: "Maintenance", href: `/assets/${assetId}/maintenance` },
+  { id: "costs", label: "Financials", href: `/assets/${assetId}/costs` },
   { id: "inventory", label: "Inventory", href: `/assets/${assetId}/inventory` },
   { id: "notes", label: "Notes", href: `/assets/${assetId}/notes` },
   { id: "canvas", label: "Canvas", href: `/assets/${assetId}/canvas` },
-  { id: "history", label: "History", href: `/assets/${assetId}/history` },
-  { id: "settings", label: "Advanced", href: `/assets/${assetId}/settings` },
+  { id: "settings", label: "Settings", href: `/assets/${assetId}/settings` },
 ];
 
 export default async function AssetDetailLayout({ params, children }: AssetDetailLayoutProps): Promise<JSX.Element> {

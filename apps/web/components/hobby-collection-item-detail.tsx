@@ -10,6 +10,7 @@ import { useMemo, useState, type FormEvent, type JSX } from "react";
 import { createHobbyMetricReading, updateHobbyCollectionItem } from "../lib/api";
 import { LkLineChart } from "./charts";
 import { EntryTimeline } from "./entry-system";
+import { ImageUploadField } from "./image-upload-field";
 import { useFormattedDate } from "../lib/formatted-date";
 import { toHouseholdDateInputValue, fromHouseholdDateInput } from "../lib/date-input-utils";
 import { useTimezone } from "../lib/timezone-context";
@@ -182,10 +183,16 @@ export function HobbyCollectionItemDetailSurface({ householdId, hobbyId, item, m
                 <span className="workbench-field__label">Quantity</span>
                 <input className="workbench-field__input" value={headerDraft.quantity} onChange={(event) => setHeaderDraft((current) => ({ ...current, quantity: event.target.value }))} />
               </label>
-              <label className="workbench-field workbench-field--wide">
-                <span className="workbench-field__label">Cover image URL</span>
-                <input className="workbench-field__input" value={headerDraft.coverImageUrl} onChange={(event) => setHeaderDraft((current) => ({ ...current, coverImageUrl: event.target.value }))} />
-              </label>
+               <ImageUploadField
+                 householdId={householdId}
+                 label="Cover image"
+                 value={headerDraft.coverImageUrl}
+                 onChange={(value) => setHeaderDraft((current) => ({ ...current, coverImageUrl: value }))}
+                 placeholder="Paste an image URL or upload one"
+                 containerClassName="workbench-field workbench-field--wide"
+                 labelTextClassName="workbench-field__label"
+                 inputClassName="workbench-field__input"
+               />
             </div>
 
             <section className="mode-section-card">

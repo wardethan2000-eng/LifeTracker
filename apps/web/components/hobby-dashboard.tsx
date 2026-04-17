@@ -208,7 +208,7 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
       ) : (
         <p className="dashboard-card__empty">No journal entries yet</p>
       ),
-      footerLink: { label: "View journal →", href: `${base}/entries` },
+      footerLink: { label: "View journal →", href: `${base}/notes` },
     },
     {
       key: "notepad",
@@ -220,7 +220,7 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
           entityId={hobbyId}
         />
       ),
-      footerLink: { label: "Open journal →", href: `${base}/entries` },
+      footerLink: { label: "Open journal →", href: `${base}/notes` },
     },
     {
       key: "quicklog",
@@ -323,7 +323,7 @@ export function HobbyDashboard(props: HobbyDashboardProps) {
           entityId={hobbyId}
           recentNote={recentNote}
           canvases={canvases}
-          allNotesHref={`/hobbies/${hobbyId}/entries`}
+          allNotesHref={`/hobbies/${hobbyId}/notes`}
         />
       </div>
     </>

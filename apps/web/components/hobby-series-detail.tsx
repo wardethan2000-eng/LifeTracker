@@ -14,6 +14,7 @@ import {
 } from "../lib/api";
 import { Card } from "./card";
 import { EntryTimeline } from "./entry-system";
+import { ImageUploadField } from "./image-upload-field";
 import { InlineError } from "./inline-error";
 import { useFormattedDate } from "../lib/formatted-date";
 
@@ -305,10 +306,13 @@ export function HobbySeriesDetail({
                 <span>Description</span>
                 <textarea rows={4} value={formState.description} onChange={(event) => setFormState((previous) => ({ ...previous, description: event.target.value }))} />
               </label>
-              <label className="field field--full">
-                <span>Cover Image URL</span>
-                <input value={formState.coverImageUrl} onChange={(event) => setFormState((previous) => ({ ...previous, coverImageUrl: event.target.value }))} />
-              </label>
+              <ImageUploadField
+                householdId={householdId}
+                label="Cover image"
+                value={formState.coverImageUrl}
+                onChange={(value) => setFormState((previous) => ({ ...previous, coverImageUrl: value }))}
+                placeholder="Paste an image URL or upload one"
+              />
               <label className="field field--full">
                 <span>Notes</span>
                 <textarea rows={6} value={formState.notes} onChange={(event) => setFormState((previous) => ({ ...previous, notes: event.target.value }))} />

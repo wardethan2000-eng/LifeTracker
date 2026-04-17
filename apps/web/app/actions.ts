@@ -103,6 +103,7 @@ import {
   isSeededProjectBlueprint,
   type SeededProjectBlueprint
 } from "../lib/project-blueprints";
+import { normalizeStoredUrl } from "../lib/url";
 import {
   broadcastRealtimeEvent,
   createRealtimeEvent,
@@ -259,7 +260,6 @@ import {
   updatePlaybook,
   deletePlaybook,
 } from "../lib/api";
-import { normalizeExternalUrl } from "../lib/url";
 import { buildAssetEntryPayload as buildAssetEntryDetails, buildProjectEntryPayload as buildProjectEntryDetails } from "@aegis/utils";
 
 const emitRealtimeEvent = async (
@@ -348,7 +348,7 @@ const getOptionalNormalizedUrl = (formData: FormData, key: string): string | und
     return undefined;
   }
 
-  const normalized = normalizeExternalUrl(value);
+  const normalized = normalizeStoredUrl(value);
 
   if (!normalized) {
     throw new Error(`${key} must be a valid URL.`);
@@ -3701,7 +3701,7 @@ export async function createHobbySeriesAction(formData: FormData): Promise<void>
   const description = getOptionalString(formData, "description");
   const status = getOptionalString(formData, "status");
   const notes = getOptionalString(formData, "notes");
-  const coverImageUrl = getOptionalString(formData, "coverImageUrl");
+  const coverImageUrl = getOptionalNormalizedUrl(formData, "coverImageUrl");
 
   if (description) input.description = description;
   if (status === "active" || status === "completed" || status === "archived") input.status = status;

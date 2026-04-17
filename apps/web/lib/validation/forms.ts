@@ -12,7 +12,7 @@ import {
 } from "@aegis/types";
 import { z } from "zod";
 
-import { normalizeExternalUrl } from "../url";
+import { normalizeStoredUrl } from "../url";
 
 const dateInputPattern = /^\d{4}-\d{2}-\d{2}$/;
 const dateTimeLocalPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
@@ -99,9 +99,9 @@ const normalizedUrlInput = z.preprocess((value) => {
     return undefined;
   }
 
-  const normalized = normalizeExternalUrl(trimmed);
+  const normalized = normalizeStoredUrl(trimmed);
   return normalized ?? trimmed;
-}, z.string().url("Supplier Link must be a valid URL.").max(1000).optional());
+}, z.string().max(1000).refine((candidate) => normalizeStoredUrl(candidate) !== null, "Supplier Link must be a valid URL.").optional());
 
 const hobbySessionIdField = z.string().cuid().or(z.literal(""));
 

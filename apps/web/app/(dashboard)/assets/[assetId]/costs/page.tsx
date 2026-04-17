@@ -1,10 +1,12 @@
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { AssetCostsTab } from "../../../../../components/asset-costs-tab";
+import { AssetTcoPanel } from "../../../../../components/asset-tco-panel";
 import {
   getAssetCostForecast,
   getAssetCostPerUnit,
-  getAssetCostSummary
+  getAssetCostSummary,
+  getAssetTco,
 } from "../../../../../lib/api";
 
 type AssetCostsPageProps = {
@@ -22,17 +24,37 @@ export default async function AssetCostsPage({ params }: AssetCostsPageProps): P
 }
 
 async function CostsContent({ assetId }: { assetId: string }): Promise<JSX.Element> {
-  const [costSummary, costPerUnit, costForecast] = await Promise.all([
+  const [costSummary, costPerUnit, costForecast, tco] = await Promise.all([
     getAssetCostSummary(assetId).catch(() => null),
     getAssetCostPerUnit(assetId).catch(() => null),
-    getAssetCostForecast(assetId).catch(() => null)
+    getAssetCostForecast(assetId).catch(() => null),
+    getAssetTco(assetId).catch(() => null),
   ]);
 
   return (
-    <AssetCostsTab
-      costSummary={costSummary}
-      costPerUnit={costPerUnit}
-      costForecast={costForecast}
-    />
+    <div style={{ display: "grid", gap: 24 }}>
+      <section className="panel">
+        <div className="panel__body--padded" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a href="#asset-costs" className="button button--ghost button--sm">Maintenance costs</a>
+          {tco ? <a href="#asset-tco" className="button button--ghost button--sm">TCO</a> : null}
+        </div>
+      </section>
+
+      <section id="asset-costs">
+        <AssetCostsTab
+          costSummary={costSummary}
+          costPerUnit={costPerUnit}
+          costForecast={costForecast}
+        />
+      </section>
+
+      {tco ? (
+        <AssetTcoPanel
+          breakdown={tco.breakdown}
+          timeline={tco.timeline}
+          failureSummary={tco.failureSummary}
+        />
+      ) : null}
+    </div>
   );
 }

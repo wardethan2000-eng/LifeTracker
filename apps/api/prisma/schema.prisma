@@ -192,6 +192,7 @@ enum ProjectAssetRelationship {
 
 // Polymorphic target type for uploaded file attachments.
 enum AttachmentEntityType {
+  household
   maintenance_log
   asset
   project
@@ -200,6 +201,7 @@ enum AttachmentEntityType {
   project_phase
   project_task
   inventory_item
+  hobby
   idea
   canvas
   canvas_object
