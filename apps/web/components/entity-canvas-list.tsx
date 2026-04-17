@@ -15,16 +15,16 @@ type EntityCanvasListProps = {
   initialCanvases: IdeaCanvasThumbnail[];
 };
 
-type CanvasTemplate = "blank" | "floorplan" | "flowchart";
+type CanvasTemplate = "blank" | "freehand" | "flowchart";
 
 const TEMPLATES: { value: CanvasTemplate; label: string }[] = [
   { value: "blank", label: "Blank Canvas" },
-  { value: "floorplan", label: "Floor Plan" },
+  { value: "freehand", label: "Sketch Canvas" },
   { value: "flowchart", label: "Flowchart" },
 ];
 
-function templateToMode(t: CanvasTemplate): "diagram" | "floorplan" {
-  return t === "floorplan" ? "floorplan" : "diagram";
+function templateToMode(t: CanvasTemplate): "diagram" | "freehand" {
+  return t === "freehand" ? "freehand" : "diagram";
 }
 
 export function EntityCanvasList({

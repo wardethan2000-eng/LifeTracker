@@ -84,8 +84,6 @@ export interface CanvasToolbarProps {
   onExportPNG?: () => void;
   onExportPDF?: () => void;
   onShare?: () => void;
-  showFloorplanStarter?: boolean;
-  onStartFloorplanWalls?: () => void;
   onAddStarterRoom?: () => void;
   onTraceFloorplanImage?: () => void;
   toolWorkflowContext?: CanvasWorkflowContext | null;
@@ -185,8 +183,6 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     onExportPNG,
     onExportPDF,
     onShare,
-    showFloorplanStarter = false,
-    onStartFloorplanWalls,
     onAddStarterRoom,
     onTraceFloorplanImage,
     toolWorkflowContext,
@@ -196,8 +192,8 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     simplified = false,
   } = props;
 
-  const [drawExpanded, setDrawExpanded] = useState(canvasMode !== "floorplan");
-  const [buildExpanded, setBuildExpanded] = useState(canvasMode === "floorplan");
+  const [drawExpanded, setDrawExpanded] = useState(true);
+  const [buildExpanded, setBuildExpanded] = useState(true);
   const [annotateExpanded, setAnnotateExpanded] = useState(true);
   const [wallGeometry, setWallGeometry] = useState({
     length: "",
@@ -207,11 +203,7 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
     endY: "",
   });
 
-  const modeLabel: Record<CanvasMode, string> = {
-    diagram: "Diagram",
-    floorplan: "Floorplan",
-    freehand: "Freehand",
-  };
+  const modeBadge = canvasMode === "freehand" ? "Freehand" : null;
 
   const toolButtonClass = (tool: ActiveTool) => {
     let className = `idea-canvas__tool-btn${activeTool === tool ? " idea-canvas__tool-btn--active" : ""}`;
@@ -280,36 +272,12 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
       <aside className="idea-canvas__tool-rail">
         {!simplified ? (
           <div className="idea-canvas__surface-header">
-            <span className="idea-canvas__mode-badge" title="Canvas mode">
-              {modeLabel[canvasMode]}
-            </span>
+            {modeBadge ? (
+              <span className="idea-canvas__mode-badge" title="Canvas mode">
+                {modeBadge}
+              </span>
+            ) : null}
           </div>
-        ) : null}
-
-        {showFloorplanStarter && !simplified ? (
-          <ToolbarSection title="Start here" compact>
-            <div className="idea-canvas__surface-callout idea-canvas__surface-callout--primary">
-              <strong>Start your floor plan</strong>
-              <span>Use the default 1 ft grid, then either draw walls immediately or drop in a starter room to edit.</span>
-              <div className="idea-canvas__tool-stack">
-                {onStartFloorplanWalls ? (
-                  <button type="button" className="idea-canvas__tool-btn idea-canvas__tool-btn--active" onClick={onStartFloorplanWalls}>
-                    ⊟ Draw walls
-                  </button>
-                ) : null}
-                {onAddStarterRoom ? (
-                  <button type="button" className="idea-canvas__tool-btn" onClick={onAddStarterRoom}>
-                    ▭ Use starter room
-                  </button>
-                ) : null}
-                {onTraceFloorplanImage ? (
-                  <button type="button" className="idea-canvas__tool-btn" onClick={onTraceFloorplanImage}>
-                    🖼 Trace reference image
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </ToolbarSection>
         ) : null}
 
         {toolWorkflowContext && !simplified ? (
@@ -427,6 +395,18 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
                 {renderToolButton("door", "Door", "Place a door on a wall", "🚪")}
                 {renderToolButton("window", "Window", "Place a window on a wall", "▣")}
                 {renderToolButton("stairs", "Stairs", "Place a stair object", "⊞")}
+                {onAddStarterRoom ? (
+                  <button type="button" className="idea-canvas__tool-btn" onClick={onAddStarterRoom} title="Drop in a starter room footprint">
+                    <span aria-hidden="true">▭</span>
+                    <span>Starter room</span>
+                  </button>
+                ) : null}
+                {onTraceFloorplanImage ? (
+                  <button type="button" className="idea-canvas__tool-btn" onClick={onTraceFloorplanImage} title="Upload or calibrate a reference image">
+                    <span aria-hidden="true">🖼</span>
+                    <span>Reference</span>
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </ToolbarSection>
@@ -500,7 +480,7 @@ export function CanvasToolbar(props: CanvasToolbarProps): JSX.Element {
           </div>
         ) : null}
 
-        {!simplified && canvasMode === "floorplan" && floors && floors.length > 0 && onFloorChange ? (
+        {!simplified && floors && floors.some((floor) => floor !== 0) && onFloorChange ? (
           <div className="idea-canvas__topbar-group idea-canvas__floor-selector">
             <span className="idea-canvas__floor-label">Floor</span>
             <select

@@ -138,7 +138,7 @@ export function CanvasDashboardCard({ householdId, canvas }: CanvasDashboardCard
         </div>
         <div className="canvas-dash-card__meta">
           <span className="canvas-dash-card__name">{canvas.name}</span>
-          {canvas.canvasMode !== "diagram" && (
+          {canvas.canvasMode === "freehand" && (
             <span className="canvas-dash-card__mode">{canvas.canvasMode}</span>
           )}
           <span className="canvas-dash-card__counts">

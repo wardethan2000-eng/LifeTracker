@@ -13,16 +13,16 @@ type CanvasListProps = {
   initialCanvases: IdeaCanvasThumbnail[];
 };
 
-type CanvasTemplate = "blank" | "floorplan" | "flowchart";
+type CanvasTemplate = "blank" | "freehand" | "flowchart";
 
 const TEMPLATES: { value: CanvasTemplate; label: string; description: string }[] = [
   { value: "blank", label: "Blank Canvas", description: "Start with a clean slate" },
-  { value: "floorplan", label: "Floor Plan", description: "Physical units, grid, and walls" },
+  { value: "freehand", label: "Sketch Canvas", description: "Loose ideation and markups" },
   { value: "flowchart", label: "Flowchart", description: "Nodes and connectors" },
 ];
 
-function templateToMode(t: CanvasTemplate): "diagram" | "floorplan" {
-  return t === "floorplan" ? "floorplan" : "diagram";
+function templateToMode(t: CanvasTemplate): "diagram" | "freehand" {
+  return t === "freehand" ? "freehand" : "diagram";
 }
 
 export function CanvasList({ householdId, initialCanvases }: CanvasListProps): JSX.Element {
@@ -145,7 +145,7 @@ export function CanvasList({ householdId, initialCanvases }: CanvasListProps): J
                 <div className="canvas-list__card-info">
                   <strong className="canvas-list__card-name">{canvas.name}</strong>
                   <span className="canvas-list__card-meta">
-                    {canvas.canvasMode && canvas.canvasMode !== "diagram" ? (
+                    {canvas.canvasMode === "freehand" ? (
                       <span className="canvas-list__card-mode-badge">{canvas.canvasMode}</span>
                     ) : null}
                     {canvas.nodes.length} node{canvas.nodes.length !== 1 ? "s" : ""} · {canvas.edges.length} edge{canvas.edges.length !== 1 ? "s" : ""}

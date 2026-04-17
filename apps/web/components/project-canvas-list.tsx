@@ -14,16 +14,16 @@ type ProjectCanvasListProps = {
   initialCanvases: IdeaCanvasThumbnail[];
 };
 
-type CanvasTemplate = "blank" | "floorplan" | "flowchart";
+type CanvasTemplate = "blank" | "freehand" | "flowchart";
 
 const TEMPLATES: { value: CanvasTemplate; label: string }[] = [
   { value: "blank", label: "Blank Canvas" },
-  { value: "floorplan", label: "Floor Plan" },
+  { value: "freehand", label: "Sketch Canvas" },
   { value: "flowchart", label: "Flowchart" },
 ];
 
-function templateToMode(t: CanvasTemplate): "diagram" | "floorplan" {
-  return t === "floorplan" ? "floorplan" : "diagram";
+function templateToMode(t: CanvasTemplate): "diagram" | "freehand" {
+  return t === "freehand" ? "freehand" : "diagram";
 }
 
 export function ProjectCanvasList({
@@ -130,7 +130,7 @@ export function ProjectCanvasList({
                 <div className="canvas-list__card-info">
                   <strong className="canvas-list__card-name">{canvas.name}</strong>
                   <span className="canvas-list__card-meta">
-                    {canvas.canvasMode && canvas.canvasMode !== "diagram" ? (
+                    {canvas.canvasMode === "freehand" ? (
                       <span className="canvas-list__card-mode-badge">{canvas.canvasMode}</span>
                     ) : null}
                     {canvas.nodes.length} node{canvas.nodes.length !== 1 ? "s" : ""} · {canvas.edges.length} edge{canvas.edges.length !== 1 ? "s" : ""}

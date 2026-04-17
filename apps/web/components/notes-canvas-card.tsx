@@ -49,7 +49,7 @@ function formatCanvasMode(mode: string): string {
   switch (mode) {
     case "freehand": return "Freehand";
     case "diagram": return "Diagram";
-    case "floorplan": return "Floor Plan";
+    case "floorplan": return "Canvas";
     default: return mode;
   }
 }

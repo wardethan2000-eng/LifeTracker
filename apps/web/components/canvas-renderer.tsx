@@ -144,6 +144,7 @@ export function CanvasRenderer({
   );
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [activeFloor, setActiveFloor] = useState(0);
+  const [spacePanActive, setSpacePanActive] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasId = initialCanvas.id;
@@ -307,24 +308,25 @@ export function CanvasRenderer({
   }, [layers]);
 
   // In floorplan mode, only show layers on the active floor (+visible). In other modes, show all visible.
+  const hasMultipleFloors = useMemo(() => floors.length > 1 || floors.some((floor) => floor !== 0), [floors]);
+
   const visibleLayerIds = useMemo(() => {
-    const isFloorplan = canvasMode === "floorplan";
     return new Set(
       layers
-        .filter((l) => l.visible && (!isFloorplan || l.floorNumber === activeFloor))
+        .filter((l) => l.visible && (!hasMultipleFloors || l.floorNumber === activeFloor))
         .map((l) => l.id)
     );
-  }, [layers, activeFloor, canvasMode]);
+  }, [layers, activeFloor, hasMultipleFloors]);
 
   // Ghost nodes: nodes on floor below, rendered at reduced opacity
   const ghostLayerIds = useMemo(() => {
-    if (canvasMode !== "floorplan") return new Set<string>();
+    if (!hasMultipleFloors) return new Set<string>();
     return new Set(
       layers
         .filter((l) => l.floorNumber === activeFloor - 1)
         .map((l) => l.id)
     );
-  }, [layers, activeFloor, canvasMode]);
+  }, [layers, activeFloor, hasMultipleFloors]);
 
   const ghostNodes = useMemo(() => {
     if (ghostLayerIds.size === 0) return [];
@@ -434,6 +436,39 @@ export function CanvasRenderer({
     setRoomPreviewCursor(null);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.code !== "Space") {
+        return;
+      }
+      const active = document.activeElement;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || (active as HTMLElement).isContentEditable)) {
+        return;
+      }
+      event.preventDefault();
+      setSpacePanActive(true);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent): void => {
+      if (event.code === "Space") {
+        setSpacePanActive(false);
+      }
+    };
+
+    const handleBlur = (): void => {
+      setSpacePanActive(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
   // ─── Mouse handlers ─────────────────────────────────────────────────────
 
   const placeObjectAtCanvasPoint = useCallback(async (placement: CanvasObjectPlacement, canvasX: number, canvasY: number) => {
@@ -527,7 +562,8 @@ export function CanvasRenderer({
   }, [clearRoomDraftSession, createNodeOnActiveLayer, edges, nodes, pushHistory]);
 
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
+    const isPanPointer = e.button === 1 || (e.button === 0 && spacePanActive);
+    if (e.button !== 0 && e.button !== 1) return;
     const target = e.target as SVGElement;
     const isBlank = target === svgRef.current || target.classList.contains("canvas-bg") || target.classList.contains("canvas-grid-line");
     if (!isBlank) return;
@@ -535,7 +571,8 @@ export function CanvasRenderer({
     setContextMenu(null);
     const cp = screenToCanvas(e.clientX, e.clientY);
 
-    if (activeTool === "pan") {
+    if (isPanPointer || activeTool === "pan") {
+      e.preventDefault();
       setDrag({ type: "pan", startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
     } else if (activeTool === "object") {
       if (!pendingObjectPlacement) return;
@@ -701,7 +738,7 @@ export function CanvasRenderer({
         setActiveTool("select");
       });
     }
-  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, arcPreview, zoom, computeWallDraftPreview, handleFinishRoomPolygon]);
+  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, arcPreview, zoom, computeWallDraftPreview, handleFinishRoomPolygon, spacePanActive]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Update physical cursor readout
@@ -1094,7 +1131,7 @@ export function CanvasRenderer({
           x2: endCX, y2: endCY,
           width: 1, height: 1,
           objectType: "dimension",
-          strokeColor: "#6366f1",
+          strokeColor: "#111827",
           strokeWidth: 1,
           pointAx: startCX, pointAy: startCY,
           pointBx: endCX, pointBy: endCY,
@@ -1194,6 +1231,12 @@ export function CanvasRenderer({
     const node = nodeMap.get(nodeId);
     if (!node) return;
 
+    if (e.button === 1 || spacePanActive) {
+      e.preventDefault();
+      setDrag({ type: "pan", startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
+      return;
+    }
+
     setContextMenu(null);
     if (drag.type === "edge") return;
 
@@ -1234,7 +1277,7 @@ export function CanvasRenderer({
       startY: e.clientY,
       startPositions,
     });
-  }, [nodeMap, drag.type, activeTool, selectedIds, nodes]);
+  }, [nodeMap, drag.type, selectedIds, nodes, spacePanActive, panX, panY]);
 
   const handleNodeMouseUp = useCallback(async (nodeId: string) => {
     if (drag.type === "edge" && drag.sourceNodeId !== nodeId) {
@@ -2141,11 +2184,11 @@ export function CanvasRenderer({
     const layer = await createCanvasLayer(householdId, canvasId, {
       name: `Layer ${layers.length + 1}`,
       sortOrder: nextOrder,
-      floorNumber: canvasMode === "floorplan" ? activeFloor : 0,
+      floorNumber: hasMultipleFloors ? activeFloor : 0,
     });
     setLayers((prev) => [...prev, layer]);
     setActiveLayerId(layer.id);
-  }, [householdId, canvasId, layers, activeFloor, canvasMode]);
+  }, [householdId, canvasId, layers, activeFloor, hasMultipleFloors]);
 
   const handleAddFloor = useCallback(async () => {
     const maxFloor = floors.length > 0 ? Math.max(...floors) : -1;
@@ -2512,8 +2555,26 @@ export function CanvasRenderer({
   const singleSelected = selectedIds.size === 1 && singleSelectedId ? nodeMap.get(singleSelectedId) : undefined;
   const selectedEdge = selectedEdgeId ? edges.find((e) => e.id === selectedEdgeId) : undefined;
   const allFlowchartSelected = singleSelected?.objectType === "flowchart";
-  const isEmptyCanvas = nodes.length === 0 && edges.length === 0;
-  const showFloorplanStarter = canvasMode === "floorplan" && isEmptyCanvas && activeTool === "select";
+  const visibleWalls = useMemo(
+    () => nodes.filter((node) => node.objectType === "wall" && !!node.layerId && visibleLayerIds.has(node.layerId)),
+    [nodes, visibleLayerIds]
+  );
+  const selectedWallIds = useMemo(
+    () => new Set(Array.from(selectedIds).filter((id) => nodeMap.get(id)?.objectType === "wall")),
+    [selectedIds, nodeMap]
+  );
+  const wallMeasurementIds = useMemo(() => {
+    if (!showDimensions || !pixelsPerUnit || !settings.physicalUnit) {
+      return new Set<string>();
+    }
+    if (selectedWallIds.size > 0) {
+      return new Set(selectedWallIds);
+    }
+    if (visibleWalls.length <= 12 || zoom >= 1.2) {
+      return new Set(visibleWalls.map((wall) => wall.id));
+    }
+    return new Set<string>();
+  }, [showDimensions, pixelsPerUnit, settings.physicalUnit, selectedWallIds, visibleWalls, zoom]);
   const wallPreviewMetrics = useMemo(() => {
     const chain = wallChainStartRef.current;
     if (activeTool !== "wall" || !chain || !wallPreviewEnd) {
@@ -2534,8 +2595,8 @@ export function CanvasRenderer({
     };
   }, [activeTool, wallPreviewEnd, pixelsPerUnit, settings.physicalUnit]);
 
-  const ensureFloorplanStarterReady = useCallback(async () => {
-    if (canvasMode !== "floorplan" || settings.physicalUnit) {
+  const ensureDraftingScaleReady = useCallback(async () => {
+    if (settings.physicalUnit) {
       return;
     }
 
@@ -2548,20 +2609,15 @@ export function CanvasRenderer({
 
     await updateCanvasSettings(householdId, canvasId, nextSettings);
     setSettings(nextSettings);
-  }, [canvasMode, settings, householdId, canvasId]);
-
-  const handleStartFloorplanWalls = useCallback(async () => {
-    await ensureFloorplanStarterReady();
-    handleToolChange("wall");
-  }, [ensureFloorplanStarterReady, handleToolChange]);
+  }, [settings, householdId, canvasId]);
 
   const handleTraceFloorplanImage = useCallback(async () => {
-    await ensureFloorplanStarterReady();
+    await ensureDraftingScaleReady();
     setShowSettings(true);
-  }, [ensureFloorplanStarterReady]);
+  }, [ensureDraftingScaleReady]);
 
   const handleAddStarterRoom = useCallback(async () => {
-    await ensureFloorplanStarterReady();
+    await ensureDraftingScaleReady();
 
     const grid = settings.gridSize || 24;
     const starterWidth = grid * 18;
@@ -2603,7 +2659,7 @@ export function CanvasRenderer({
     setNodes(newNodes);
     pushHistory(newNodes, edges);
     setSelectedIds(new Set(createdWalls.map((wall) => wall.id)));
-  }, [ensureFloorplanStarterReady, settings.gridSize, zoom, panX, panY, maybeSnap, createNodeOnActiveLayer, nodes, pushHistory, edges]);
+  }, [ensureDraftingScaleReady, settings.gridSize, zoom, panX, panY, maybeSnap, createNodeOnActiveLayer, nodes, pushHistory, edges]);
 
   const handleApplyExactWallLength = useCallback(() => {
     const chain = wallChainStartRef.current;
@@ -2931,9 +2987,9 @@ export function CanvasRenderer({
     }
 
     if (node.objectType === "wall") {
-      const thickness = (node.strokeWidth ?? 6) * (isSelected ? 1.15 : 1);
-      const wallFill = isSelected ? "var(--accent-soft, rgba(99,102,241,0.15))" : (node.fillColor ?? "#d1d5db");
-      const wallStroke = isSelected ? selStroke : (node.strokeColor ?? "#374151");
+      const thickness = Math.max(node.strokeWidth ?? 8, 8) * (isSelected ? 1.05 : 1);
+      const wallFill = "#111111";
+      const wallStroke = "#111111";
       const isCurved = node.pointAx != null && node.pointAy != null;
 
       if (isCurved) {
@@ -2952,7 +3008,7 @@ export function CanvasRenderer({
           const len = arcLength(arc);
           const mx = (node.x + node.x2) / 2;
           const my = (node.y + node.y2) / 2;
-          const lenLabel = (pixelsPerUnit && settings.physicalUnit)
+          const lenLabel = (showDimensions && wallMeasurementIds.has(node.id) && pixelsPerUnit && settings.physicalUnit)
             ? fmtPhysical(len, pixelsPerUnit, settings.physicalUnit!)
             : null;
           return (
@@ -2970,7 +3026,7 @@ export function CanvasRenderer({
                 strokeWidth={1} pointerEvents="none" />
               {lenLabel ? (
                 <text x={mx} y={my - thickness / 2 - 6}
-                  textAnchor="middle" fontSize={11 / zoom} fill="var(--ink)"
+                  textAnchor="middle" fontSize={11 / zoom} fill="#111111"
                   pointerEvents="none" style={{ userSelect: "none" }}>
                   {lenLabel}
                 </text>
@@ -2996,7 +3052,7 @@ export function CanvasRenderer({
       const hitPoly = wallPolygonFromLine(node.x, node.y, node.x2, node.y2, Math.max(thickness * 2, 14));
       const hitPts = hitPoly.map(p => `${p.x},${p.y}`).join(" ");
       // Physical length label
-      const wallLenLabel = (pixelsPerUnit && settings.physicalUnit) ? (() => {
+      const wallLenLabel = (showDimensions && wallMeasurementIds.has(node.id) && pixelsPerUnit && settings.physicalUnit) ? (() => {
         const dx = node.x2 - node.x;
         const dy = node.y2 - node.y;
         const len = Math.sqrt(dx * dx + dy * dy);
@@ -3007,7 +3063,7 @@ export function CanvasRenderer({
         return (
           <text
             x={mx} y={my - thickness / 2 - 4}
-            textAnchor="middle" fontSize={11 / zoom} fill="var(--ink)"
+            textAnchor="middle" fontSize={11 / zoom} fill="#111111"
             transform={`rotate(${Math.abs(angle) > 90 ? angle + 180 : angle}, ${mx}, ${my})`}
             pointerEvents="none" style={{ userSelect: "none" }}>
             {label}
@@ -3076,23 +3132,39 @@ export function CanvasRenderer({
       // Arrow tick marks
       const tickLen = 6 / zoom;
       const nx = -dy / len, ny = dx / len;
+      const labelX = mx + perpX / zoom;
+      const labelY = my + perpY / zoom;
+      const labelWidth = Math.max((label.length + 1) * (6.5 / zoom), 28 / zoom);
+      const labelHeight = 16 / zoom;
+      const dimensionColor = isSelected ? selStroke : "#111827";
       return (
         <g key={node.id}>
           {/* Main dim line */}
           <line x1={ax} y1={ay} x2={bx} y2={by}
-            stroke={isSelected ? selStroke : "#6366f1"} strokeWidth={1.5 / zoom}
+            stroke={dimensionColor} strokeWidth={1.5 / zoom}
             strokeDasharray={`${4 / zoom},${2 / zoom}`}
             style={{ cursor: "pointer" }} {...nodeEvents} />
           {/* End ticks */}
           <line x1={ax + nx * tickLen} y1={ay + ny * tickLen} x2={ax - nx * tickLen} y2={ay - ny * tickLen}
-            stroke={isSelected ? selStroke : "#6366f1"} strokeWidth={1.5 / zoom} pointerEvents="none" />
+            stroke={dimensionColor} strokeWidth={1.5 / zoom} pointerEvents="none" />
           <line x1={bx + nx * tickLen} y1={by + ny * tickLen} x2={bx - nx * tickLen} y2={by - ny * tickLen}
-            stroke={isSelected ? selStroke : "#6366f1"} strokeWidth={1.5 / zoom} pointerEvents="none" />
+            stroke={dimensionColor} strokeWidth={1.5 / zoom} pointerEvents="none" />
           {/* Label */}
-          <text x={mx + perpX / zoom} y={my + perpY / zoom}
+          <rect
+            x={labelX - labelWidth / 2}
+            y={labelY - labelHeight / 2}
+            width={labelWidth}
+            height={labelHeight}
+            rx={4 / zoom}
+            fill="rgba(255,255,255,0.94)"
+            stroke={dimensionColor}
+            strokeWidth={0.8 / zoom}
+            pointerEvents="none"
+          />
+          <text x={labelX} y={labelY}
             textAnchor="middle" dominantBaseline="middle"
-            fontSize={11 / zoom} fill="#6366f1"
-            transform={`rotate(${displayAngle}, ${mx + perpX / zoom}, ${my + perpY / zoom})`}
+            fontSize={11 / zoom} fill={dimensionColor}
+            transform={`rotate(${displayAngle}, ${labelX}, ${labelY})`}
             pointerEvents="none" style={{ userSelect: "none" }}>
             {label}
           </text>
@@ -3500,34 +3572,34 @@ export function CanvasRenderer({
       const dy = endCY - startCY;
       const len = Math.sqrt(dx * dx + dy * dy);
       const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
-      const previewThickness = 6;
+      const previewThickness = 10;
       const poly = wallPolygonFromLine(startCX, startCY, endCX, endCY, previewThickness);
       const polyPts = poly.map(p => `${p.x},${p.y}`).join(" ");
       return (
         <g>
           <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
-            stroke="#6366f1" strokeWidth={1 / zoom} strokeDasharray={`${6 / zoom},${4 / zoom}`} opacity={0.7}
+            stroke="rgba(17,17,17,0.35)" strokeWidth={1 / zoom} strokeDasharray={`${6 / zoom},${4 / zoom}`} opacity={0.9}
             pointerEvents="none" />
           {/* Polygon preview outline */}
-          <polygon points={polyPts} fill="rgba(99,102,241,0.18)" stroke="#4338ca"
-            strokeWidth={1.25 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
+          <polygon points={polyPts} fill="rgba(17,17,17,0.18)" stroke="#111111"
+            strokeWidth={1.4 / zoom} pointerEvents="none" />
           {/* Endpoint caps */}
-          <circle cx={startCX} cy={startCY} r={previewThickness / 2} fill="rgba(99,102,241,0.18)"
-            stroke="#4338ca" strokeWidth={1.25 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
-          <circle cx={endCX} cy={endCY} r={previewThickness / 2} fill="rgba(99,102,241,0.18)"
-            stroke="#4338ca" strokeWidth={1.25 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={previewThickness / 2} fill="rgba(17,17,17,0.18)"
+            stroke="#111111" strokeWidth={1.4 / zoom} pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={previewThickness / 2} fill="rgba(17,17,17,0.18)"
+            stroke="#111111" strokeWidth={1.4 / zoom} pointerEvents="none" />
           {len > 4 ? (
             <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - previewThickness / 2 - 4}
-              textAnchor="middle" fontSize={11 / zoom} fill="#312e81" pointerEvents="none">
+              textAnchor="middle" fontSize={11 / zoom} fill="#111111" pointerEvents="none">
               {pixelsPerUnit && settings.physicalUnit ? fmtPhysical(len, pixelsPerUnit, settings.physicalUnit) : `${Math.round(len)} px`} · {Math.round(angleDeg)}°
             </text>
           ) : null}
           {/* Start point marker */}
-          <circle cx={startCX} cy={startCY} r={9 / zoom} fill="rgba(99,102,241,0.16)" pointerEvents="none" />
-          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#4338ca" pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={9 / zoom} fill="rgba(17,17,17,0.12)" pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#111111" pointerEvents="none" />
           {/* Snap indicator at endpoint */}
-          <circle cx={endCX} cy={endCY} r={7 / zoom} fill="rgba(67,56,202,0.12)" pointerEvents="none" />
-          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#4338ca" opacity={0.88} pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={7 / zoom} fill="rgba(17,17,17,0.12)" pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#111111" opacity={0.88} pointerEvents="none" />
         </g>
       );
     }
@@ -3539,15 +3611,15 @@ export function CanvasRenderer({
       return (
         <g>
           <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
-            stroke="#6366f1" strokeWidth={1.5 / zoom} strokeDasharray={`${4 / zoom},${2 / zoom}`}
+            stroke="#111827" strokeWidth={1.5 / zoom} strokeDasharray={`${4 / zoom},${2 / zoom}`}
             pointerEvents="none" />
           {len > 4 && pixelsPerUnit && settings.physicalUnit ? (
             <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - 8 / zoom}
-              textAnchor="middle" fontSize={11 / zoom} fill="#6366f1" pointerEvents="none">
+              textAnchor="middle" fontSize={11 / zoom} fill="#111827" pointerEvents="none">
               {fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)}
             </text>
           ) : null}
-          <circle cx={startCX} cy={startCY} r={3 / zoom} fill="#6366f1" pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={3 / zoom} fill="#111827" pointerEvents="none" />
         </g>
       );
     }
@@ -3749,106 +3821,296 @@ export function CanvasRenderer({
 
   const renderParallelWallDimensions = () => {
     if (!showDimensions || !pixelsPerUnit || !settings.physicalUnit) return null;
-    const walls = nodes.filter((n) => n.objectType === "wall");
-    if (walls.length < 2) return null;
-    const els: JSX.Element[] = [];
-    const ANGLE_THRESH = 8; // degrees
-    const OFFSET = 14 / zoom;
-    const ARROWLEN = 5 / zoom;
-    const FONTSIZE = 10 / zoom;
-    const dimensionKeys = new Set<string>();
 
-    const projectOntoAxis = (point: { x: number; y: number }, origin: { x: number; y: number }, axis: { x: number; y: number }) => (
-      (point.x - origin.x) * axis.x + (point.y - origin.y) * axis.y
-    );
+    const sourceWalls = selectedWallIds.size > 0
+      ? visibleWalls.filter((wall) => selectedWallIds.has(wall.id))
+      : visibleWalls.length <= 6
+        ? visibleWalls
+        : [];
+    if (sourceWalls.length === 0) return null;
 
-    for (let i = 0; i < walls.length; i++) {
-      for (let j = i + 1; j < walls.length; j++) {
-        const a = walls[i];
-        const b = walls[j];
-        if (!a || !b) continue;
-        const angA = (a.wallAngle ?? Math.atan2(a.y2 - a.y, a.x2 - a.x) * (180 / Math.PI));
-        const angB = (b.wallAngle ?? Math.atan2(b.y2 - b.y, b.x2 - b.x) * (180 / Math.PI));
-        let diff = Math.abs(angA - angB) % 180;
-        if (diff > 90) diff = 180 - diff;
-        if (diff > ANGLE_THRESH) continue; // not parallel
+    const angleThreshold = 8;
+    const offset = 16 / zoom;
+    const arrowLength = 5 / zoom;
+    const labelInset = 9 / zoom;
+    const renderedPairs = new Set<string>();
+    const relationshipEls: JSX.Element[] = [];
 
-        const wallAngleRad = angA * (Math.PI / 180);
-        const wallDirX = Math.cos(wallAngleRad);
-        const wallDirY = Math.sin(wallAngleRad);
-        const perpNx = -wallDirY;
-        const perpNy = wallDirX;
+    const projectOntoAxis = (
+      point: { x: number; y: number },
+      origin: { x: number; y: number },
+      axis: { x: number; y: number }
+    ) => (point.x - origin.x) * axis.x + (point.y - origin.y) * axis.y;
 
-        const aLength = Math.hypot(a.x2 - a.x, a.y2 - a.y);
-        const bLength = Math.hypot(b.x2 - b.x, b.y2 - b.y);
-        if (aLength < 4 || bLength < 4) continue;
+    for (const sourceWall of sourceWalls) {
+      const candidates = visibleWalls
+        .filter((wall) => wall.id !== sourceWall.id)
+        .map((wall) => {
+          const angleA = sourceWall.wallAngle ?? Math.atan2(sourceWall.y2 - sourceWall.y, sourceWall.x2 - sourceWall.x) * (180 / Math.PI);
+          const angleB = wall.wallAngle ?? Math.atan2(wall.y2 - wall.y, wall.x2 - wall.x) * (180 / Math.PI);
+          let diff = Math.abs(angleA - angleB) % 180;
+          if (diff > 90) diff = 180 - diff;
+          if (diff > angleThreshold) return null;
 
-        const aStartProjection = projectOntoAxis({ x: a.x, y: a.y }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
-        const aEndProjection = projectOntoAxis({ x: a.x2, y: a.y2 }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
-        const bStartProjection = projectOntoAxis({ x: b.x, y: b.y }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
-        const bEndProjection = projectOntoAxis({ x: b.x2, y: b.y2 }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
+          const wallAngleRad = angleA * (Math.PI / 180);
+          const wallDirX = Math.cos(wallAngleRad);
+          const wallDirY = Math.sin(wallAngleRad);
+          const perpNx = -wallDirY;
+          const perpNy = wallDirX;
 
-        const overlapStart = Math.max(Math.min(aStartProjection, aEndProjection), Math.min(bStartProjection, bEndProjection));
-        const overlapEnd = Math.min(Math.max(aStartProjection, aEndProjection), Math.max(bStartProjection, bEndProjection));
-        if (overlapEnd - overlapStart < Math.min(aLength, bLength) * 0.18) continue;
+          const sourceLength = Math.hypot(sourceWall.x2 - sourceWall.x, sourceWall.y2 - sourceWall.y);
+          const otherLength = Math.hypot(wall.x2 - wall.x, wall.y2 - wall.y);
+          if (sourceLength < 4 || otherLength < 4) return null;
 
-        const overlapMid = (overlapStart + overlapEnd) / 2;
-        const anchorAx = a.x + wallDirX * overlapMid;
-        const anchorAy = a.y + wallDirY * overlapMid;
-        const anchorBx = b.x + wallDirX * overlapMid;
-        const anchorBy = b.y + wallDirY * overlapMid;
+          const sourceStartProjection = projectOntoAxis({ x: sourceWall.x, y: sourceWall.y }, { x: sourceWall.x, y: sourceWall.y }, { x: wallDirX, y: wallDirY });
+          const sourceEndProjection = projectOntoAxis({ x: sourceWall.x2, y: sourceWall.y2 }, { x: sourceWall.x, y: sourceWall.y }, { x: wallDirX, y: wallDirY });
+          const otherStartProjection = projectOntoAxis({ x: wall.x, y: wall.y }, { x: sourceWall.x, y: sourceWall.y }, { x: wallDirX, y: wallDirY });
+          const otherEndProjection = projectOntoAxis({ x: wall.x2, y: wall.y2 }, { x: sourceWall.x, y: sourceWall.y }, { x: wallDirX, y: wallDirY });
 
-        const perpDist = Math.abs((anchorBx - anchorAx) * perpNx + (anchorBy - anchorAy) * perpNy);
-        if (perpDist < 4) continue; // overlapping
+          const overlapStart = Math.max(Math.min(sourceStartProjection, sourceEndProjection), Math.min(otherStartProjection, otherEndProjection));
+          const overlapEnd = Math.min(Math.max(sourceStartProjection, sourceEndProjection), Math.max(otherStartProjection, otherEndProjection));
+          if (overlapEnd - overlapStart < Math.min(sourceLength, otherLength) * 0.15) return null;
 
-        const sign = (anchorBx - anchorAx) * perpNx + (anchorBy - anchorAy) * perpNy >= 0 ? 1 : -1;
-        const startOffsetX = anchorAx + sign * perpNx * OFFSET;
-        const startOffsetY = anchorAy + sign * perpNy * OFFSET;
-        const endOffsetX = anchorBx - sign * perpNx * OFFSET;
-        const endOffsetY = anchorBy - sign * perpNy * OFFSET;
-        const dimensionKey = [
-          Math.round(startOffsetX / 12),
-          Math.round(startOffsetY / 12),
-          Math.round(endOffsetX / 12),
-          Math.round(endOffsetY / 12),
-          Math.round(perpDist / 4),
-        ].join(":");
-        if (dimensionKeys.has(dimensionKey)) continue;
-        dimensionKeys.add(dimensionKey);
+          const overlapMid = (overlapStart + overlapEnd) / 2;
+          const anchorAx = sourceWall.x + wallDirX * overlapMid;
+          const anchorAy = sourceWall.y + wallDirY * overlapMid;
+          const anchorBx = wall.x + wallDirX * overlapMid;
+          const anchorBy = wall.y + wallDirY * overlapMid;
+          const signedDistance = (anchorBx - anchorAx) * perpNx + (anchorBy - anchorAy) * perpNy;
+          const perpDistance = Math.abs(signedDistance);
+          if (perpDistance < 4) return null;
 
-        const mlx = (startOffsetX + endOffsetX) / 2;
-        const mly = (startOffsetY + endOffsetY) / 2;
-        const guideOffset = 8 / zoom;
-        const label = fmtPhysical(perpDist, pixelsPerUnit, settings.physicalUnit!);
+          return {
+            wall,
+            sourceWall,
+            wallDirX,
+            wallDirY,
+            perpNx,
+            perpNy,
+            anchorAx,
+            anchorAy,
+            anchorBx,
+            anchorBy,
+            signedDistance,
+            perpDistance,
+          };
+        })
+        .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+        .sort((a, b) => a.perpDistance - b.perpDistance)
+        .slice(0, 2);
+
+      for (const candidate of candidates) {
+        const pairKey = [candidate.sourceWall.id, candidate.wall.id].sort().join(":");
+        if (renderedPairs.has(pairKey)) continue;
+        renderedPairs.add(pairKey);
+
+        const sign = candidate.signedDistance >= 0 ? 1 : -1;
+        const startOffsetX = candidate.anchorAx + sign * candidate.perpNx * offset;
+        const startOffsetY = candidate.anchorAy + sign * candidate.perpNy * offset;
+        const endOffsetX = candidate.anchorBx - sign * candidate.perpNx * offset;
+        const endOffsetY = candidate.anchorBy - sign * candidate.perpNy * offset;
+        const midX = (startOffsetX + endOffsetX) / 2;
+        const midY = (startOffsetY + endOffsetY) / 2;
         const displayAngle = Math.atan2(endOffsetY - startOffsetY, endOffsetX - startOffsetX) * (180 / Math.PI);
-        const labelX = mlx + perpNx * guideOffset;
-        const labelY = mly + perpNy * guideOffset;
+        const labelX = midX + candidate.perpNx * labelInset;
+        const labelY = midY + candidate.perpNy * labelInset;
+        const label = fmtPhysical(candidate.perpDistance, pixelsPerUnit, settings.physicalUnit!);
+        const labelWidth = Math.max((label.length + 1) * (6.5 / zoom), 34 / zoom);
+        const labelHeight = 16 / zoom;
+        const highlight = selectedWallIds.size > 0 && (selectedWallIds.has(candidate.sourceWall.id) || selectedWallIds.has(candidate.wall.id));
+        const strokeColor = highlight ? "var(--accent, #4f46e5)" : "#1f2937";
+        const guideColor = highlight ? "rgba(79,70,229,0.35)" : "rgba(17,24,39,0.26)";
 
-        els.push(
-          <g key={`pdim-${i}-${j}`} pointerEvents="none">
-            <line x1={anchorAx} y1={anchorAy} x2={startOffsetX} y2={startOffsetY}
-              stroke="#7dd3fc" strokeWidth={0.9 / zoom} strokeDasharray={`${2 / zoom},${2 / zoom}`} />
-            <line x1={anchorBx} y1={anchorBy} x2={endOffsetX} y2={endOffsetY}
-              stroke="#7dd3fc" strokeWidth={0.9 / zoom} strokeDasharray={`${2 / zoom},${2 / zoom}`} />
-            <line x1={startOffsetX} y1={startOffsetY} x2={endOffsetX} y2={endOffsetY}
-              stroke="#0ea5e9" strokeWidth={1 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`} />
-            <line x1={startOffsetX + wallDirX * ARROWLEN} y1={startOffsetY + wallDirY * ARROWLEN}
-              x2={startOffsetX - wallDirX * ARROWLEN} y2={startOffsetY - wallDirY * ARROWLEN}
-              stroke="#0ea5e9" strokeWidth={1 / zoom} />
-            <line x1={endOffsetX + wallDirX * ARROWLEN} y1={endOffsetY + wallDirY * ARROWLEN}
-              x2={endOffsetX - wallDirX * ARROWLEN} y2={endOffsetY - wallDirY * ARROWLEN}
-              stroke="#0ea5e9" strokeWidth={1 / zoom} />
-            <text x={labelX} y={labelY}
-              textAnchor="middle" fontSize={FONTSIZE} fill="#0ea5e9"
+        relationshipEls.push(
+          <g key={`wall-gap-${pairKey}`} pointerEvents="none">
+            <line
+              x1={candidate.anchorAx}
+              y1={candidate.anchorAy}
+              x2={startOffsetX}
+              y2={startOffsetY}
+              stroke={guideColor}
+              strokeWidth={1 / zoom}
+              strokeDasharray={`${2 / zoom},${2 / zoom}`}
+            />
+            <line
+              x1={candidate.anchorBx}
+              y1={candidate.anchorBy}
+              x2={endOffsetX}
+              y2={endOffsetY}
+              stroke={guideColor}
+              strokeWidth={1 / zoom}
+              strokeDasharray={`${2 / zoom},${2 / zoom}`}
+            />
+            <line
+              x1={startOffsetX}
+              y1={startOffsetY}
+              x2={endOffsetX}
+              y2={endOffsetY}
+              stroke={strokeColor}
+              strokeWidth={1.25 / zoom}
+              strokeDasharray={`${4 / zoom},${2 / zoom}`}
+            />
+            <line
+              x1={startOffsetX + candidate.wallDirX * arrowLength}
+              y1={startOffsetY + candidate.wallDirY * arrowLength}
+              x2={startOffsetX - candidate.wallDirX * arrowLength}
+              y2={startOffsetY - candidate.wallDirY * arrowLength}
+              stroke={strokeColor}
+              strokeWidth={1.1 / zoom}
+            />
+            <line
+              x1={endOffsetX + candidate.wallDirX * arrowLength}
+              y1={endOffsetY + candidate.wallDirY * arrowLength}
+              x2={endOffsetX - candidate.wallDirX * arrowLength}
+              y2={endOffsetY - candidate.wallDirY * arrowLength}
+              stroke={strokeColor}
+              strokeWidth={1.1 / zoom}
+            />
+            <rect
+              x={labelX - labelWidth / 2}
+              y={labelY - labelHeight / 2}
+              width={labelWidth}
+              height={labelHeight}
+              rx={4 / zoom}
+              fill="rgba(255,255,255,0.96)"
+              stroke={strokeColor}
+              strokeWidth={0.8 / zoom}
+            />
+            <text
+              x={labelX}
+              y={labelY}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={10.5 / zoom}
+              fill={strokeColor}
               transform={`rotate(${displayAngle}, ${labelX}, ${labelY})`}
-              style={{ userSelect: "none" }}>
+              style={{ userSelect: "none" }}
+            >
               {label}
             </text>
           </g>
         );
       }
     }
-    return <>{els}</>;
+
+    if (selectedWallIds.size > 0) {
+      const anglePairKeys = new Set<string>();
+      const endpointTolerance = 6 / zoom;
+
+      const getSharedEndpoint = (
+        a: { x: number; y: number; x2: number; y2: number },
+        b: { x: number; y: number; x2: number; y2: number }
+      ) => {
+        const pointsA = [
+          { x: a.x, y: a.y, ox: a.x2, oy: a.y2 },
+          { x: a.x2, y: a.y2, ox: a.x, oy: a.y },
+        ];
+        const pointsB = [
+          { x: b.x, y: b.y, ox: b.x2, oy: b.y2 },
+          { x: b.x2, y: b.y2, ox: b.x, oy: b.y },
+        ];
+
+        for (const pointA of pointsA) {
+          for (const pointB of pointsB) {
+            if (Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y) <= endpointTolerance) {
+              return {
+                jointX: (pointA.x + pointB.x) / 2,
+                jointY: (pointA.y + pointB.y) / 2,
+                aOtherX: pointA.ox,
+                aOtherY: pointA.oy,
+                bOtherX: pointB.ox,
+                bOtherY: pointB.oy,
+              };
+            }
+          }
+        }
+        return null;
+      };
+
+      for (const sourceWall of visibleWalls.filter((wall) => selectedWallIds.has(wall.id))) {
+        for (const otherWall of visibleWalls) {
+          if (otherWall.id === sourceWall.id) continue;
+
+          const joint = getSharedEndpoint(sourceWall, otherWall);
+          if (!joint) continue;
+
+          const pairKey = [
+            sourceWall.id,
+            otherWall.id,
+            Math.round(joint.jointX / 4),
+            Math.round(joint.jointY / 4),
+          ].sort().join(":");
+          if (anglePairKeys.has(pairKey)) continue;
+          anglePairKeys.add(pairKey);
+
+          const v1x = joint.aOtherX - joint.jointX;
+          const v1y = joint.aOtherY - joint.jointY;
+          const v2x = joint.bOtherX - joint.jointX;
+          const v2y = joint.bOtherY - joint.jointY;
+          const mag1 = Math.hypot(v1x, v1y);
+          const mag2 = Math.hypot(v2x, v2y);
+          if (mag1 < 1 || mag2 < 1) continue;
+
+          const u1x = v1x / mag1;
+          const u1y = v1y / mag1;
+          const u2x = v2x / mag2;
+          const u2y = v2y / mag2;
+          const dot = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
+          const angleDeg = Math.acos(dot) * (180 / Math.PI);
+          if (angleDeg < 12 || angleDeg > 168) continue;
+
+          let bisectorX = u1x + u2x;
+          let bisectorY = u1y + u2y;
+          const bisectorMag = Math.hypot(bisectorX, bisectorY);
+          if (bisectorMag < 0.001) continue;
+          bisectorX /= bisectorMag;
+          bisectorY /= bisectorMag;
+
+          const label = `${Math.round(angleDeg)}°`;
+          const labelWidth = Math.max((label.length + 1) * (6.5 / zoom), 28 / zoom);
+          const labelHeight = 16 / zoom;
+          const labelX = joint.jointX + bisectorX * (20 / zoom);
+          const labelY = joint.jointY + bisectorY * (20 / zoom);
+
+          relationshipEls.push(
+            <g key={`wall-angle-${pairKey}`} pointerEvents="none">
+              <line
+                x1={joint.jointX}
+                y1={joint.jointY}
+                x2={labelX}
+                y2={labelY}
+                stroke="rgba(17,24,39,0.22)"
+                strokeWidth={1 / zoom}
+                strokeDasharray={`${2 / zoom},${2 / zoom}`}
+              />
+              <rect
+                x={labelX - labelWidth / 2}
+                y={labelY - labelHeight / 2}
+                width={labelWidth}
+                height={labelHeight}
+                rx={4 / zoom}
+                fill="rgba(255,255,255,0.96)"
+                stroke="#111827"
+                strokeWidth={0.8 / zoom}
+              />
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={10.5 / zoom}
+                fill="#111827"
+                style={{ userSelect: "none" }}
+              >
+                {label}
+              </text>
+            </g>
+          );
+        }
+      }
+    }
+
+    return relationshipEls.length > 0 ? <>{relationshipEls}</> : null;
   };
 
   // ─── Ruler overlay (viewport-fixed, outside transform group) ─────────────
@@ -4034,7 +4296,7 @@ export function CanvasRenderer({
     : drag.type === "bg-resize" ? (drag.handle === "nw" || drag.handle === "se" ? "nwse-resize" : "nesw-resize")
     : drag.type === "rotate" ? "grabbing"
     : drag.type === "calibrate" ? "crosshair"
-    : activeTool === "pan" ? "grab"
+    : activeTool === "pan" || spacePanActive ? "grab"
     : activeTool === "calibrate" ? "crosshair"
     : drag.type === "freehand" || drag.type === "edge" || drag.type === "wall" || drag.type === "measure"
       || ["rect", "circle", "line", "text", "node", "wall", "wall-arc", "room", "door", "window", "stairs", "measure", "freehand"].includes(activeTool) ? "crosshair"
@@ -4183,14 +4445,10 @@ export function CanvasRenderer({
               onAdd={handleAddLayer}
               onDelete={handleDeleteLayer}
               onClose={() => setShowLayerPanel(false)}
-              isFloorplan={canvasMode === "floorplan"}
+              isFloorplan
             />
           ) : null
         }
-        showFloorplanStarter={showFloorplanStarter}
-        onStartFloorplanWalls={() => {
-          void handleStartFloorplanWalls();
-        }}
         onAddStarterRoom={() => {
           void handleAddStarterRoom();
         }}
