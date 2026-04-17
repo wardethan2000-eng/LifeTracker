@@ -77,9 +77,9 @@ export async function AssetOverviewTab({ detail, assetId, transferHistory, overv
         householdId={householdId}
         recentNote={recentNote}
         canvases={canvases}
-        serverLayout={assetLayout?.layoutJson}
-        pinnedEntries={pinnedEntries}
-        overviewPins={overviewPins}
+        {...(assetLayout?.layoutJson ? { serverLayout: assetLayout.layoutJson } : {})}
+        {...(pinnedEntries ? { pinnedEntries } : {})}
+        {...(overviewPins ? { overviewPins } : {})}
       />
     </div>
   );

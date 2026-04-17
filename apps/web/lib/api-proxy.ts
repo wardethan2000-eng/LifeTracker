@@ -4,6 +4,18 @@ type StreamingRequestInit = RequestInit & {
   duplex: "half";
 };
 
+const hopByHopResponseHeaders = new Set([
+  "connection",
+  "content-length",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade"
+]);
+
 const buildForwardedHeaders = (request: Request): Headers => {
   const headers = new Headers();
 
@@ -24,7 +36,10 @@ const buildForwardedHeaders = (request: Request): Headers => {
 
 const buildTargetUrl = (request: Request, pathSuffix: string): URL => {
   const requestUrl = new URL(request.url);
-  const apiUrl = new URL(`${getApiBaseUrl()}/v1/${pathSuffix}`);
+  const targetPath = pathSuffix.startsWith("auth/")
+    ? `/api/${pathSuffix}`
+    : `/v1/${pathSuffix}`;
+  const apiUrl = new URL(targetPath, getApiBaseUrl());
   apiUrl.search = requestUrl.search;
   return apiUrl;
 };
@@ -41,10 +56,25 @@ const createUnavailableResponse = (): Response => new Response(
 
 const forwardResponse = (response: Response): Response => {
   const headers = new Headers();
-  const contentType = response.headers.get("content-type");
 
-  if (contentType) {
-    headers.set("content-type", contentType);
+  for (const [key, value] of response.headers.entries()) {
+    if (!hopByHopResponseHeaders.has(key.toLowerCase()) && key.toLowerCase() !== "set-cookie") {
+      headers.append(key, value);
+    }
+  }
+
+  const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+
+  if (typeof getSetCookie === "function") {
+    for (const cookie of getSetCookie.call(response.headers)) {
+      headers.append("set-cookie", cookie);
+    }
+  } else {
+    const setCookie = response.headers.get("set-cookie");
+
+    if (setCookie) {
+      headers.append("set-cookie", setCookie);
+    }
   }
 
   return new Response(response.body, {

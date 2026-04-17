@@ -89,6 +89,7 @@ const categoryLabels: Record<AssetCategory, string> = {
   appliance: "Appliance",
   hvac: "HVAC",
   technology: "Technology",
+  utility: "Utility",
   other: "Other"
 };
 

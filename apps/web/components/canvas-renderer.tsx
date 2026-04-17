@@ -47,7 +47,7 @@ import {
   updateCanvasSettings,
 } from "../lib/api";
 import { exportCanvasToSVG, exportCanvasToPNG } from "../lib/canvas-export";
-import { useCanvasHistory, useCanvasViewport, useCanvasSync, useCanvasKeyboard } from "./canvas/hooks";
+import { useCanvasHistory, useCanvasViewport, useCanvasSync, useCanvasKeyboard, useCanvasWorkflowContext } from "./canvas/hooks";
 import {
   getNodeCenter,
   getEdgeAnchors,
@@ -103,6 +103,22 @@ const NODE_COLORS = [
 const SHAPES: CanvasNodeShape[] = ["rectangle", "rounded", "pill", "diamond"];
 const EDGE_STYLES: CanvasEdgeStyle[] = ["solid", "dashed", "dotted"];
 const PHYSICAL_UNITS = ["ft", "m", "in", "cm"] as const;
+const TOOL_LABELS: Partial<Record<ActiveTool, string>> = {
+  node: "Node",
+  rect: "Rectangle",
+  circle: "Circle",
+  line: "Line",
+  text: "Text",
+  wall: "Wall",
+  "wall-arc": "Curved wall",
+  door: "Door",
+  window: "Window",
+  stairs: "Stairs",
+  room: "Room",
+  measure: "Dimension",
+  freehand: "Freehand",
+  calibrate: "Calibration",
+};
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 5;
@@ -166,8 +182,11 @@ export function CanvasRenderer({
   const [alignGuides, setAlignGuides] = useState<AlignGuide[]>([]);
   // Wall chain: last completed wall endpoint (for chain drawing)
   const wallChainStartRef = useRef<{ cx: number; cy: number } | null>(null);
+  const wallChainNodeIdsRef = useRef<string[]>([]);
+  const wallPointerRef = useRef<{ cx: number; cy: number; shiftKey: boolean } | null>(null);
   // Wall preview endpoint (tracks mouse while wall tool is active and chain is started)
   const [wallPreviewEnd, setWallPreviewEnd] = useState<{ cx: number; cy: number } | null>(null);
+  const [wallDraftLengthInput, setWallDraftLengthInput] = useState("");
   // Inline wall dimension input: shown after placing a wall segment (only when physical units set)
   const [wallDimEdit, setWallDimEdit] = useState<{
     nodeId: string;
@@ -289,23 +308,23 @@ export function CanvasRenderer({
 
   // In floorplan mode, only show layers on the active floor (+visible). In other modes, show all visible.
   const visibleLayerIds = useMemo(() => {
-    const isFloorplan = settings.canvasMode === "floorplan";
+    const isFloorplan = canvasMode === "floorplan";
     return new Set(
       layers
         .filter((l) => l.visible && (!isFloorplan || l.floorNumber === activeFloor))
         .map((l) => l.id)
     );
-  }, [layers, activeFloor, settings.canvasMode]);
+  }, [layers, activeFloor, canvasMode]);
 
   // Ghost nodes: nodes on floor below, rendered at reduced opacity
   const ghostLayerIds = useMemo(() => {
-    if (settings.canvasMode !== "floorplan") return new Set<string>();
+    if (canvasMode !== "floorplan") return new Set<string>();
     return new Set(
       layers
         .filter((l) => l.floorNumber === activeFloor - 1)
         .map((l) => l.id)
     );
-  }, [layers, activeFloor, settings.canvasMode]);
+  }, [layers, activeFloor, canvasMode]);
 
   const ghostNodes = useMemo(() => {
     if (ghostLayerIds.size === 0) return [];
@@ -347,6 +366,73 @@ export function CanvasRenderer({
     if (settings.snapToGrid && settings.gridSize) return snapToGrid(val, settings.gridSize);
     return val;
   }, [settings.snapToGrid, settings.gridSize]);
+
+  const createNodeOnActiveLayer = useCallback(
+    (input: Parameters<typeof createCanvasNode>[2]) =>
+      createCanvasNode(householdId, canvasId, { ...input, layerId: activeLayerId ?? undefined }),
+    [householdId, canvasId, activeLayerId]
+  );
+
+  const computeWallDraftPreview = useCallback((startCX: number, startCY: number, targetCX: number, targetCY: number, shiftKey: boolean) => {
+    const rawDx = targetCX - startCX;
+    const rawDy = targetCY - startCY;
+    const snapped = snapWallAngle(rawDx, rawDy, shiftKey);
+    const snappedLength = Math.hypot(snapped.dx, snapped.dy);
+    if (snappedLength < 0.001) {
+      return {
+        endCX: startCX,
+        endCY: startCY,
+        lengthPx: 0,
+        angleDeg: 0,
+      };
+    }
+
+    const exactLength = pixelsPerUnit ? Number.parseFloat(wallDraftLengthInput) : Number.NaN;
+    if (pixelsPerUnit && Number.isFinite(exactLength) && exactLength > 0) {
+      const scale = (exactLength * pixelsPerUnit) / snappedLength;
+      const endCX = maybeSnap(startCX + snapped.dx * scale);
+      const endCY = maybeSnap(startCY + snapped.dy * scale);
+      const dx = endCX - startCX;
+      const dy = endCY - startCY;
+      return {
+        endCX,
+        endCY,
+        lengthPx: Math.hypot(dx, dy),
+        angleDeg: Math.atan2(dy, dx) * (180 / Math.PI),
+      };
+    }
+
+    const snap = findNearestWallEndpoint(startCX + snapped.dx, startCY + snapped.dy, nodes, 15 / zoom);
+    const endCX = snap.snapped ? snap.x : maybeSnap(startCX + snapped.dx);
+    const endCY = snap.snapped ? snap.y : maybeSnap(startCY + snapped.dy);
+    const dx = endCX - startCX;
+    const dy = endCY - startCY;
+    return {
+      endCX,
+      endCY,
+      lengthPx: Math.hypot(dx, dy),
+      angleDeg: Math.atan2(dy, dx) * (180 / Math.PI),
+    };
+  }, [maybeSnap, nodes, pixelsPerUnit, wallDraftLengthInput, zoom]);
+
+  const clearWallDraftSession = useCallback(() => {
+    wallChainStartRef.current = null;
+    wallChainNodeIdsRef.current = [];
+    wallPointerRef.current = null;
+    setWallPreviewEnd(null);
+    setWallDraftLengthInput("");
+  }, []);
+
+  const clearArcWallDraftSession = useCallback(() => {
+    arcWallRef.current = null;
+    setArcPreview(null);
+  }, []);
+
+  const clearRoomDraftSession = useCallback(() => {
+    roomPointsRef.current = [];
+    setRoomPreviewPoints([]);
+    setRoomPreviewCursor(null);
+  }, []);
 
   // ─── Mouse handlers ─────────────────────────────────────────────────────
 
@@ -395,6 +481,51 @@ export function CanvasRenderer({
     setActiveTool("select");
   }, [householdId, canvasId, maybeSnap, nodes, edges, pushHistory]);
 
+  const handleUndoRoomPoint = useCallback(() => {
+    if (roomPointsRef.current.length === 0) {
+      return;
+    }
+    roomPointsRef.current = roomPointsRef.current.slice(0, -1);
+    setRoomPreviewPoints([...roomPointsRef.current]);
+    if (roomPointsRef.current.length === 0) {
+      setRoomPreviewCursor(null);
+    }
+  }, []);
+
+  const handleFinishRoomPolygon = useCallback(() => {
+    const pts = roomPointsRef.current;
+    if (pts.length < 3) {
+      return;
+    }
+    const xs = pts.map((point) => point.x);
+    const ys = pts.map((point) => point.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const width = maxX - minX || 1;
+    const height = maxY - minY || 1;
+    void createNodeOnActiveLayer({
+      label: "",
+      x: minX,
+      y: minY,
+      width,
+      height,
+      objectType: "room",
+      fillColor: "rgba(59,130,246,0.08)",
+      strokeColor: "#3b82f6",
+      strokeWidth: 1,
+      maskJson: JSON.stringify({ type: "polygon", points: pts.map((point) => ({ x: point.x - minX, y: point.y - minY })) }),
+    }).then((node) => {
+      const newNodes = [...nodes, node];
+      setNodes(newNodes);
+      pushHistory(newNodes, edges);
+      setSelectedIds(new Set([node.id]));
+      setEditingNodeId(node.id);
+      clearRoomDraftSession();
+    });
+  }, [clearRoomDraftSession, createNodeOnActiveLayer, edges, nodes, pushHistory]);
+
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     const target = e.target as SVGElement;
@@ -439,59 +570,20 @@ export function CanvasRenderer({
     } else if (activeTool === "rect" || activeTool === "circle" || activeTool === "line" || activeTool === "text") {
       setDrag({ type: "draw", tool: activeTool, startCX: cp.x, startCY: cp.y, currentCX: cp.x, currentCY: cp.y });
     } else if (activeTool === "wall") {
-      // Click-to-place wall: first click starts chain, subsequent clicks place segments
       const chain = wallChainStartRef.current;
       if (!chain) {
-        // Start chain: snap to existing wall endpoint or grid
         const snap = findNearestWallEndpoint(cp.x, cp.y, nodes, 15 / zoom);
         const sx = snap.snapped ? snap.x : maybeSnap(cp.x);
         const sy = snap.snapped ? snap.y : maybeSnap(cp.y);
         wallChainStartRef.current = { cx: sx, cy: sy };
+        wallChainNodeIdsRef.current = [];
+        wallPointerRef.current = { cx: sx, cy: sy, shiftKey: e.shiftKey };
+        setWallDraftLengthInput("");
         setWallPreviewEnd({ cx: sx, cy: sy });
       } else {
-        // Place wall segment
-        const rawDx = cp.x - chain.cx;
-        const rawDy = cp.y - chain.cy;
-        const snapped = snapWallAngle(rawDx, rawDy, e.shiftKey);
-        const snap = findNearestWallEndpoint(chain.cx + snapped.dx, chain.cy + snapped.dy, nodes, 15 / zoom);
-        const ex = snap.snapped ? snap.x : maybeSnap(chain.cx + snapped.dx);
-        const ey = snap.snapped ? snap.y : maybeSnap(chain.cy + snapped.dy);
-        const dx = ex - chain.cx;
-        const dy = ey - chain.cy;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        if (len >= 4) {
-          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          const wallStartCx = chain.cx;
-          const wallStartCy = chain.cy;
-          createNodeOnActiveLayer({
-            label: "",
-            x: chain.cx, y: chain.cy,
-            x2: ex, y2: ey,
-            width: 1, height: 1,
-            objectType: "wall",
-            strokeWidth: 6,
-            strokeColor: "#374151",
-            wallAngle: angle,
-          }).then((node) => {
-            const newNodes = [...nodes, node];
-            setNodes(newNodes);
-            pushHistory(newNodes, edges);
-            setSelectedIds(new Set([node.id]));
-            // Show inline dimension input if physical units are set
-            if (pixelsPerUnit && settings.physicalUnit) {
-              const physLen = len / pixelsPerUnit;
-              setWallDimEdit({
-                nodeId: node.id,
-                sx: wallStartCx, sy: wallStartCy,
-                ex, ey,
-                value: physLen % 1 === 0 ? physLen.toFixed(0) : physLen.toFixed(1),
-              });
-            }
-          });
-          // Continue chain
-          wallChainStartRef.current = { cx: ex, cy: ey };
-          setWallPreviewEnd({ cx: ex, cy: ey });
-        }
+        wallPointerRef.current = { cx: cp.x, cy: cp.y, shiftKey: e.shiftKey };
+        const preview = computeWallDraftPreview(chain.cx, chain.cy, cp.x, cp.y, e.shiftKey);
+        void commitWallSegment(chain.cx, chain.cy, preview.endCX, preview.endCY);
       }
     } else if (activeTool === "wall-arc") {
       // Curved wall 3-click flow: 1=start, 2=end, 3=finalize arc midpoint
@@ -553,32 +645,13 @@ export function CanvasRenderer({
       const pts = roomPointsRef.current;
       // Close polygon: if clicking near start point and we have ≥3 points
       if (pts.length >= 3) {
-        const d = Math.hypot(px - pts[0].x, py - pts[0].y);
+        const startPoint = pts[0];
+        if (!startPoint) {
+          return;
+        }
+        const d = Math.hypot(px - startPoint.x, py - startPoint.y);
         if (d < 15 / zoom) {
-          // Compute bounding box
-          const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-          const minX = Math.min(...xs), minY = Math.min(...ys);
-          const maxX = Math.max(...xs), maxY = Math.max(...ys);
-          const w = maxX - minX || 1, h = maxY - minY || 1;
-          createNodeOnActiveLayer({
-            label: "",
-            x: minX, y: minY,
-            width: w, height: h,
-            objectType: "room",
-            fillColor: "rgba(59,130,246,0.08)",
-            strokeColor: "#3b82f6",
-            strokeWidth: 1,
-            maskJson: JSON.stringify({ type: "polygon", points: pts.map(p => ({ x: p.x - minX, y: p.y - minY })) }),
-          }).then((node) => {
-            const newNodes = [...nodes, node];
-            setNodes(newNodes);
-            pushHistory(newNodes, edges);
-            setSelectedIds(new Set([node.id]));
-            setEditingNodeId(node.id);
-          });
-          roomPointsRef.current = [];
-          setRoomPreviewPoints([]);
-          setRoomPreviewCursor(null);
+          handleFinishRoomPolygon();
           return;
         }
       }
@@ -628,7 +701,7 @@ export function CanvasRenderer({
         setActiveTool("select");
       });
     }
-  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, wallChainStartRef, arcPreview, pixelsPerUnit, settings.physicalUnit, zoom]);
+  }, [activeTool, panX, panY, screenToCanvas, pendingObjectPlacement, placeObjectAtCanvasPoint, maybeSnap, householdId, canvasId, nodes, edges, pushHistory, arcPreview, zoom, computeWallDraftPreview, handleFinishRoomPolygon]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Update physical cursor readout
@@ -640,13 +713,9 @@ export function CanvasRenderer({
     if (activeTool === "wall" && wallChainStartRef.current && drag.type === "none") {
       const cp = screenToCanvas(e.clientX, e.clientY);
       const chain = wallChainStartRef.current;
-      const rawDx = cp.x - chain.cx;
-      const rawDy = cp.y - chain.cy;
-      const snapped = snapWallAngle(rawDx, rawDy, e.shiftKey);
-      const snap = findNearestWallEndpoint(chain.cx + snapped.dx, chain.cy + snapped.dy, nodes, 15 / zoom);
-      const ex = snap.snapped ? snap.x : maybeSnap(chain.cx + snapped.dx);
-      const ey = snap.snapped ? snap.y : maybeSnap(chain.cy + snapped.dy);
-      setWallPreviewEnd({ cx: ex, cy: ey });
+      wallPointerRef.current = { cx: cp.x, cy: cp.y, shiftKey: e.shiftKey };
+      const preview = computeWallDraftPreview(chain.cx, chain.cy, cp.x, cp.y, e.shiftKey);
+      setWallPreviewEnd({ cx: preview.endCX, cy: preview.endCY });
     }
     // Arc wall tool preview
     if (activeTool === "wall-arc" && arcWallRef.current && drag.type === "none") {
@@ -713,7 +782,10 @@ export function CanvasRenderer({
               if (Math.abs(diff) < alignThreshold && (guideDy === 0 || Math.abs(diff) < Math.abs(guideDy))) {
                 guideDy = diff;
                 // Remove existing horizontal guide lines and add this one
-                for (let i = guideLines.length - 1; i >= 0; i--) { if (guideLines[i].axis === "horizontal") guideLines.splice(i, 1); }
+                for (let i = guideLines.length - 1; i >= 0; i--) {
+                  const guideLine = guideLines[i];
+                  if (guideLine?.axis === "horizontal") guideLines.splice(i, 1);
+                }
                 guideLines.push({ axis: "horizontal", position: g.position });
               }
             }
@@ -722,7 +794,10 @@ export function CanvasRenderer({
               const diff = g.position - edge;
               if (Math.abs(diff) < alignThreshold && (guideDx === 0 || Math.abs(diff) < Math.abs(guideDx))) {
                 guideDx = diff;
-                for (let i = guideLines.length - 1; i >= 0; i--) { if (guideLines[i].axis === "vertical") guideLines.splice(i, 1); }
+                for (let i = guideLines.length - 1; i >= 0; i--) {
+                  const guideLine = guideLines[i];
+                  if (guideLine?.axis === "vertical") guideLines.splice(i, 1);
+                }
                 guideLines.push({ axis: "vertical", position: g.position });
               }
             }
@@ -877,7 +952,18 @@ export function CanvasRenderer({
       const newY = drag.handle.includes("s") ? anchorY : anchorY - drag.imgH * newScale;
       setSettings(prev => ({ ...prev, backgroundImageScale: newScale, backgroundImageX: newX, backgroundImageY: newY }));
     }
-  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit, activeTool, nodes, guides]);
+  }, [drag, zoom, screenToCanvas, maybeSnap, pixelsPerUnit, activeTool, nodes, guides, computeWallDraftPreview]);
+
+  useEffect(() => {
+    if (activeTool !== "wall" || drag.type !== "none" || !wallChainStartRef.current || !wallPointerRef.current) {
+      return;
+    }
+
+    const chain = wallChainStartRef.current;
+    const pointer = wallPointerRef.current;
+    const preview = computeWallDraftPreview(chain.cx, chain.cy, pointer.cx, pointer.cy, pointer.shiftKey);
+    setWallPreviewEnd({ cx: preview.endCX, cy: preview.endCY });
+  }, [activeTool, drag.type, wallDraftLengthInput, computeWallDraftPreview]);
 
   const handleMouseUp = useCallback(async () => {
     if (drag.type === "pan") {
@@ -1113,8 +1199,6 @@ export function CanvasRenderer({
 
     setSelectedEdgeId(null);
 
-    if (activeTool === "edge" || drag.type === "edge") return;
-
     let newSelectedIds: Set<string>;
     if (e.shiftKey) {
       newSelectedIds = new Set(selectedIds);
@@ -1263,10 +1347,11 @@ export function CanvasRenderer({
     const newNodes = [...sorted];
     // Walk from top down so swaps don't cascade
     for (let i = newNodes.length - 2; i >= 0; i--) {
-      if (selectedIds.has(newNodes[i].id) && !selectedIds.has(newNodes[i + 1].id)) {
-        const tmp = newNodes[i];
-        newNodes[i] = newNodes[i + 1];
-        newNodes[i + 1] = tmp;
+      const currentNode = newNodes[i];
+      const nextNode = newNodes[i + 1];
+      if (currentNode && nextNode && selectedIds.has(currentNode.id) && !selectedIds.has(nextNode.id)) {
+        newNodes[i] = nextNode;
+        newNodes[i + 1] = currentNode;
       }
     }
     // Reassign sortOrder based on new positions
@@ -1287,10 +1372,11 @@ export function CanvasRenderer({
     const newNodes = [...sorted];
     // Walk from bottom up so swaps don't cascade
     for (let i = 1; i < newNodes.length; i++) {
-      if (selectedIds.has(newNodes[i].id) && !selectedIds.has(newNodes[i - 1].id)) {
-        const tmp = newNodes[i];
-        newNodes[i] = newNodes[i - 1];
-        newNodes[i - 1] = tmp;
+      const currentNode = newNodes[i];
+      const previousNode = newNodes[i - 1];
+      if (currentNode && previousNode && selectedIds.has(currentNode.id) && !selectedIds.has(previousNode.id)) {
+        newNodes[i] = previousNode;
+        newNodes[i - 1] = currentNode;
       }
     }
     const updates: { id: string; sortOrder: number }[] = [];
@@ -1346,27 +1432,37 @@ export function CanvasRenderer({
     } else if (axis === "distribute-h") {
       const sorted = [...selected].sort((a, b) => a.x - b.x);
       if (sorted.length < 3) return;
-      const totalSpan = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width - sorted[0].x;
+      const firstNode = sorted[0];
+      const lastNode = sorted[sorted.length - 1];
+      if (!firstNode || !lastNode) return;
+      const totalSpan = lastNode.x + lastNode.width - firstNode.x;
       const totalNodeWidth = sorted.reduce((s, n) => s + n.width, 0);
       const gap = (totalSpan - totalNodeWidth) / (sorted.length - 1);
-      let cursor = sorted[0].x + sorted[0].width;
+      let cursor = firstNode.x + firstNode.width;
       const posMap = new Map<string, number>();
       for (let i = 1; i < sorted.length - 1; i++) {
-        posMap.set(sorted[i].id, cursor + gap);
-        cursor += gap + sorted[i].width;
+        const node = sorted[i];
+        if (!node) continue;
+        posMap.set(node.id, cursor + gap);
+        cursor += gap + node.width;
       }
       updated = nodes.map((n) => posMap.has(n.id) ? { ...n, x: posMap.get(n.id)! } : n);
     } else if (axis === "distribute-v") {
       const sorted = [...selected].sort((a, b) => a.y - b.y);
       if (sorted.length < 3) return;
-      const totalSpan = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height - sorted[0].y;
+      const firstNode = sorted[0];
+      const lastNode = sorted[sorted.length - 1];
+      if (!firstNode || !lastNode) return;
+      const totalSpan = lastNode.y + lastNode.height - firstNode.y;
       const totalNodeHeight = sorted.reduce((s, n) => s + n.height, 0);
       const gap = (totalSpan - totalNodeHeight) / (sorted.length - 1);
-      let cursor = sorted[0].y + sorted[0].height;
+      let cursor = firstNode.y + firstNode.height;
       const posMap = new Map<string, number>();
       for (let i = 1; i < sorted.length - 1; i++) {
-        posMap.set(sorted[i].id, cursor + gap);
-        cursor += gap + sorted[i].height;
+        const node = sorted[i];
+        if (!node) continue;
+        posMap.set(node.id, cursor + gap);
+        cursor += gap + node.height;
       }
       updated = nodes.map((n) => posMap.has(n.id) ? { ...n, y: posMap.get(n.id)! } : n);
     }
@@ -1464,6 +1560,149 @@ export function CanvasRenderer({
     setNodes(newNodes);
     pushHistory(newNodes, edges);
   }, [selectedIds, householdId, canvasId, nodes, edges, pushHistory]);
+
+  const applyConnectedWallGeometryUpdate = useCallback(async (
+    nodeId: string,
+    nextStart: { x: number; y: number },
+    nextEnd: { x: number; y: number }
+  ) => {
+    const primary = nodeMap.get(nodeId);
+    if (!primary) {
+      return;
+    }
+
+    const snappedStart = {
+      x: maybeSnap(nextStart.x),
+      y: maybeSnap(nextStart.y),
+    };
+    const snappedEnd = {
+      x: maybeSnap(nextEnd.x),
+      y: maybeSnap(nextEnd.y),
+    };
+
+    const oldStart = { x: primary.x, y: primary.y };
+    const oldEnd = { x: primary.x2, y: primary.y2 };
+    const epsilon = 1;
+
+    const updatedNodes = nodes.map((node) => {
+      if (node.id === nodeId) {
+        return {
+          ...node,
+          x: snappedStart.x,
+          y: snappedStart.y,
+          x2: snappedEnd.x,
+          y2: snappedEnd.y,
+          wallAngle: Math.atan2(snappedEnd.y - snappedStart.y, snappedEnd.x - snappedStart.x) * (180 / Math.PI),
+        };
+      }
+
+      if (node.objectType !== "wall" && node.objectType !== "line" && node.objectType !== "dimension") {
+        return node;
+      }
+
+      let nextNode = node;
+      if (Math.abs(node.x - oldStart.x) < epsilon && Math.abs(node.y - oldStart.y) < epsilon) {
+        nextNode = { ...nextNode, x: snappedStart.x, y: snappedStart.y };
+      } else if (Math.abs(node.x2 - oldStart.x) < epsilon && Math.abs(node.y2 - oldStart.y) < epsilon) {
+        nextNode = { ...nextNode, x2: snappedStart.x, y2: snappedStart.y };
+      }
+
+      if (Math.abs(nextNode.x - oldEnd.x) < epsilon && Math.abs(nextNode.y - oldEnd.y) < epsilon) {
+        nextNode = { ...nextNode, x: snappedEnd.x, y: snappedEnd.y };
+      } else if (Math.abs(nextNode.x2 - oldEnd.x) < epsilon && Math.abs(nextNode.y2 - oldEnd.y) < epsilon) {
+        nextNode = { ...nextNode, x2: snappedEnd.x, y2: snappedEnd.y };
+      }
+
+      if (nextNode !== node && nextNode.objectType === "wall") {
+        return {
+          ...nextNode,
+          wallAngle: Math.atan2(nextNode.y2 - nextNode.y, nextNode.x2 - nextNode.x) * (180 / Math.PI),
+        };
+      }
+
+      return nextNode;
+    });
+
+    const updates = updatedNodes
+      .filter((node, index) => {
+        const previous = nodes[index];
+        return previous
+          && (previous.x !== node.x
+            || previous.y !== node.y
+            || previous.x2 !== node.x2
+            || previous.y2 !== node.y2
+            || previous.wallAngle !== node.wallAngle);
+      })
+      .map((node) => ({
+        id: node.id,
+        x: node.x,
+        y: node.y,
+        x2: node.x2,
+        y2: node.y2,
+        ...(node.objectType === "wall" ? { wallAngle: node.wallAngle } : {}),
+      }));
+
+    if (updates.length === 0) {
+      return;
+    }
+
+    setNodes(updatedNodes);
+    pushHistory(updatedNodes, edges);
+    await batchUpdateCanvasNodes(householdId, canvasId, { nodes: updates });
+  }, [canvasId, edges, householdId, maybeSnap, nodeMap, nodes, pushHistory]);
+
+  const handleChangeSelectedWallLength = useCallback(async (length: number) => {
+    const [selectedId] = selectedIds;
+    const selectedNode = selectedIds.size === 1 && selectedId ? nodeMap.get(selectedId) : null;
+    const selectedWall = selectedNode?.objectType === "wall" ? selectedNode : null;
+    if (!selectedWall || !pixelsPerUnit || length <= 0) {
+      return;
+    }
+
+    const dx = selectedWall.x2 - selectedWall.x;
+    const dy = selectedWall.y2 - selectedWall.y;
+    const currentLength = Math.hypot(dx, dy);
+    if (currentLength < 0.5) {
+      return;
+    }
+
+    const scale = (length * pixelsPerUnit) / currentLength;
+    await applyConnectedWallGeometryUpdate(
+      selectedWall.id,
+      { x: selectedWall.x, y: selectedWall.y },
+      { x: selectedWall.x + dx * scale, y: selectedWall.y + dy * scale }
+    );
+  }, [applyConnectedWallGeometryUpdate, nodeMap, pixelsPerUnit, selectedIds]);
+
+  const handleChangeSelectedWallStart = useCallback(async (x: number, y: number) => {
+    const [selectedId] = selectedIds;
+    const selectedNode = selectedIds.size === 1 && selectedId ? nodeMap.get(selectedId) : null;
+    const selectedWall = selectedNode?.objectType === "wall" ? selectedNode : null;
+    if (!selectedWall) {
+      return;
+    }
+    const scale = pixelsPerUnit ?? 1;
+    await applyConnectedWallGeometryUpdate(
+      selectedWall.id,
+      { x: x * scale, y: y * scale },
+      { x: selectedWall.x2, y: selectedWall.y2 }
+    );
+  }, [applyConnectedWallGeometryUpdate, nodeMap, pixelsPerUnit, selectedIds]);
+
+  const handleChangeSelectedWallEnd = useCallback(async (x: number, y: number) => {
+    const [selectedId] = selectedIds;
+    const selectedNode = selectedIds.size === 1 && selectedId ? nodeMap.get(selectedId) : null;
+    const selectedWall = selectedNode?.objectType === "wall" ? selectedNode : null;
+    if (!selectedWall) {
+      return;
+    }
+    const scale = pixelsPerUnit ?? 1;
+    await applyConnectedWallGeometryUpdate(
+      selectedWall.id,
+      { x: selectedWall.x, y: selectedWall.y },
+      { x: x * scale, y: y * scale }
+    );
+  }, [applyConnectedWallGeometryUpdate, nodeMap, pixelsPerUnit, selectedIds]);
 
   /** Commit inline wall dimension edit: resize wall to specified physical length, keeping angle */
   const commitWallDimEdit = useCallback(async (confirm: boolean) => {
@@ -1902,11 +2141,11 @@ export function CanvasRenderer({
     const layer = await createCanvasLayer(householdId, canvasId, {
       name: `Layer ${layers.length + 1}`,
       sortOrder: nextOrder,
-      floorNumber: settings.canvasMode === "floorplan" ? activeFloor : 0,
+      floorNumber: canvasMode === "floorplan" ? activeFloor : 0,
     });
     setLayers((prev) => [...prev, layer]);
     setActiveLayerId(layer.id);
-  }, [householdId, canvasId, layers, activeFloor, settings.canvasMode]);
+  }, [householdId, canvasId, layers, activeFloor, canvasMode]);
 
   const handleAddFloor = useCallback(async () => {
     const maxFloor = floors.length > 0 ? Math.max(...floors) : -1;
@@ -1975,12 +2214,39 @@ export function CanvasRenderer({
     await updateCanvasLayer(householdId, canvasId, prev.id, { sortOrder: cur.sortOrder });
   }, [householdId, canvasId, layers]);
 
-  // Helper: create a node on the active layer
-  const createNodeOnActiveLayer = useCallback(
-    (input: Parameters<typeof createCanvasNode>[2]) =>
-      createCanvasNode(householdId, canvasId, { ...input, layerId: activeLayerId ?? undefined }),
-    [householdId, canvasId, activeLayerId]
-  );
+  const commitWallSegment = useCallback(async (startCX: number, startCY: number, endCX: number, endCY: number) => {
+    const dx = endCX - startCX;
+    const dy = endCY - startCY;
+    const len = Math.hypot(dx, dy);
+    if (len < 4) {
+      return false;
+    }
+
+    const node = await createNodeOnActiveLayer({
+      label: "",
+      x: startCX,
+      y: startCY,
+      x2: endCX,
+      y2: endCY,
+      width: 1,
+      height: 1,
+      objectType: "wall",
+      strokeWidth: 6,
+      strokeColor: "#374151",
+      wallAngle: Math.atan2(dy, dx) * (180 / Math.PI),
+    });
+
+    const newNodes = [...nodes, node];
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+    setSelectedIds(new Set([node.id]));
+    wallChainNodeIdsRef.current = [...wallChainNodeIdsRef.current, node.id];
+    wallChainStartRef.current = { cx: endCX, cy: endCY };
+    setWallPreviewEnd({ cx: endCX, cy: endCY });
+    setWallDimEdit(null);
+    setWallDraftLengthInput("");
+    return true;
+  }, [createNodeOnActiveLayer, edges, nodes, pushHistory]);
 
   const handleImageObjectUpload = useCallback(async (file: File) => {
     setImgObjUploading(true);
@@ -2129,20 +2395,69 @@ export function CanvasRenderer({
     setEditingNodeId(null);
     setEditingEdgeId(null);
     setPendingObjectPlacement(null);
-    wallChainStartRef.current = null;
-    setWallPreviewEnd(null);
+    setObjectPickerOpen(false);
+    setOpeningPreview(null);
+    clearWallDraftSession();
     setWallDimEdit(null);
-    arcWallRef.current = null;
-    setArcPreview(null);
-    roomPointsRef.current = [];
-    setRoomPreviewPoints([]);
-    setRoomPreviewCursor(null);
-  }, []);
+    clearArcWallDraftSession();
+    clearRoomDraftSession();
+  }, [clearArcWallDraftSession, clearRoomDraftSession, clearWallDraftSession]);
 
   const handleFinishWallChain = useCallback(() => {
-    wallChainStartRef.current = null;
-    setWallPreviewEnd(null);
-  }, []);
+    clearWallDraftSession();
+  }, [clearWallDraftSession]);
+
+  const handleUndoLastWallSegment = useCallback(async () => {
+    const lastWallId = wallChainNodeIdsRef.current.at(-1);
+    if (!lastWallId) {
+      return;
+    }
+
+    const lastWall = nodeMap.get(lastWallId);
+    if (!lastWall) {
+      return;
+    }
+
+    await deleteCanvasNode(householdId, canvasId, lastWallId);
+    const newNodes = nodes.filter((node) => node.id !== lastWallId);
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+    wallChainNodeIdsRef.current = wallChainNodeIdsRef.current.slice(0, -1);
+
+    const previousWallId = wallChainNodeIdsRef.current.at(-1);
+    if (previousWallId) {
+      const previousWall = nodeMap.get(previousWallId);
+      if (previousWall) {
+        wallChainStartRef.current = { cx: previousWall.x2, cy: previousWall.y2 };
+        setWallPreviewEnd({ cx: previousWall.x2, cy: previousWall.y2 });
+      }
+    } else {
+      wallChainStartRef.current = { cx: lastWall.x, cy: lastWall.y };
+      setWallPreviewEnd({ cx: lastWall.x, cy: lastWall.y });
+    }
+
+    setSelectedIds(new Set());
+  }, [canvasId, edges, householdId, nodeMap, nodes, pushHistory]);
+
+  const handleToolChange = useCallback((tool: ActiveTool) => {
+    if (tool !== "wall") {
+      clearWallDraftSession();
+    }
+    if (tool !== "wall-arc") {
+      clearArcWallDraftSession();
+    }
+    if (tool !== "room") {
+      clearRoomDraftSession();
+    }
+    if (tool !== "door" && tool !== "window") {
+      setOpeningPreview(null);
+    }
+    if (tool !== "object") {
+      setObjectPickerOpen(false);
+      setPendingObjectPlacement(null);
+    }
+    setActiveTool(tool);
+  }, [clearArcWallDraftSession, clearRoomDraftSession, clearWallDraftSession]);
 
   const handleSelectAll = useCallback(() => {
     setSelectedIds(new Set(nodes.map((n) => n.id)));
@@ -2172,6 +2487,7 @@ export function CanvasRenderer({
     editingEdgeId,
     editingName,
     showSettings,
+    showLayerPanel,
     activeTool,
     physicalUnit: settings.physicalUnit,
     nodes,
@@ -2192,9 +2508,213 @@ export function CanvasRenderer({
 
   // ─── Derived ─────────────────────────────────────────────────────────────
 
-  const singleSelected = selectedIds.size === 1 ? nodeMap.get(Array.from(selectedIds)[0]) : undefined;
+  const [singleSelectedId] = selectedIds;
+  const singleSelected = selectedIds.size === 1 && singleSelectedId ? nodeMap.get(singleSelectedId) : undefined;
   const selectedEdge = selectedEdgeId ? edges.find((e) => e.id === selectedEdgeId) : undefined;
   const allFlowchartSelected = singleSelected?.objectType === "flowchart";
+  const isEmptyCanvas = nodes.length === 0 && edges.length === 0;
+  const showFloorplanStarter = canvasMode === "floorplan" && isEmptyCanvas && activeTool === "select";
+  const wallPreviewMetrics = useMemo(() => {
+    const chain = wallChainStartRef.current;
+    if (activeTool !== "wall" || !chain || !wallPreviewEnd) {
+      return null;
+    }
+
+    const dx = wallPreviewEnd.cx - chain.cx;
+    const dy = wallPreviewEnd.cy - chain.cy;
+    const lengthPx = Math.hypot(dx, dy);
+    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+    return {
+      lengthPx,
+      angleDeg,
+      lengthLabel: pixelsPerUnit && settings.physicalUnit
+        ? fmtPhysical(lengthPx, pixelsPerUnit, settings.physicalUnit)
+        : `${Math.round(lengthPx)} px`,
+      angleLabel: `${Math.round(angleDeg)}°`,
+    };
+  }, [activeTool, wallPreviewEnd, pixelsPerUnit, settings.physicalUnit]);
+
+  const ensureFloorplanStarterReady = useCallback(async () => {
+    if (canvasMode !== "floorplan" || settings.physicalUnit) {
+      return;
+    }
+
+    const nextSettings: UpdateCanvasSettingsInput = {
+      ...settings,
+      physicalUnit: "ft",
+      snapToGrid: true,
+      showDimensions: true,
+    };
+
+    await updateCanvasSettings(householdId, canvasId, nextSettings);
+    setSettings(nextSettings);
+  }, [canvasMode, settings, householdId, canvasId]);
+
+  const handleStartFloorplanWalls = useCallback(async () => {
+    await ensureFloorplanStarterReady();
+    handleToolChange("wall");
+  }, [ensureFloorplanStarterReady, handleToolChange]);
+
+  const handleTraceFloorplanImage = useCallback(async () => {
+    await ensureFloorplanStarterReady();
+    setShowSettings(true);
+  }, [ensureFloorplanStarterReady]);
+
+  const handleAddStarterRoom = useCallback(async () => {
+    await ensureFloorplanStarterReady();
+
+    const grid = settings.gridSize || 24;
+    const starterWidth = grid * 18;
+    const starterHeight = grid * 12;
+    const svg = svgRef.current;
+    const rect = svg?.getBoundingClientRect();
+    const centerX = rect ? rect.width / 2 / zoom - panX : 420;
+    const centerY = rect ? rect.height / 2 / zoom - panY : 320;
+    const left = maybeSnap(centerX - starterWidth / 2);
+    const top = maybeSnap(centerY - starterHeight / 2);
+    const right = left + starterWidth;
+    const bottom = top + starterHeight;
+    const segments = [
+      { sx: left, sy: top, ex: right, ey: top },
+      { sx: right, sy: top, ex: right, ey: bottom },
+      { sx: right, sy: bottom, ex: left, ey: bottom },
+      { sx: left, sy: bottom, ex: left, ey: top },
+    ];
+
+    const createdWalls = await Promise.all(
+      segments.map(({ sx, sy, ex, ey }) =>
+        createNodeOnActiveLayer({
+          label: "",
+          x: sx,
+          y: sy,
+          x2: ex,
+          y2: ey,
+          width: 1,
+          height: 1,
+          objectType: "wall",
+          strokeWidth: 6,
+          strokeColor: "#374151",
+          wallAngle: Math.atan2(ey - sy, ex - sx) * (180 / Math.PI),
+        })
+      )
+    );
+
+    const newNodes = [...nodes, ...createdWalls];
+    setNodes(newNodes);
+    pushHistory(newNodes, edges);
+    setSelectedIds(new Set(createdWalls.map((wall) => wall.id)));
+  }, [ensureFloorplanStarterReady, settings.gridSize, zoom, panX, panY, maybeSnap, createNodeOnActiveLayer, nodes, pushHistory, edges]);
+
+  const handleApplyExactWallLength = useCallback(() => {
+    const chain = wallChainStartRef.current;
+    if (!chain || !wallPreviewEnd) {
+      return;
+    }
+    void commitWallSegment(chain.cx, chain.cy, wallPreviewEnd.cx, wallPreviewEnd.cy);
+  }, [commitWallSegment, wallPreviewEnd]);
+  const handleUndoLastWallSegmentAction = useCallback(() => {
+    void handleUndoLastWallSegment();
+  }, [handleUndoLastWallSegment]);
+
+  const openObjectLibrary = useCallback(() => {
+    setActiveTool("object");
+    setObjectPickerOpen(true);
+  }, []);
+
+  const closeObjectLibrary = useCallback(() => {
+    setObjectPickerOpen(false);
+  }, []);
+
+  const toolWorkflowContext = useCanvasWorkflowContext({
+    activeTool,
+    wallChainActive: wallChainStartRef.current !== null,
+    wallSegmentCount: wallChainNodeIdsRef.current.length,
+    wallPreviewLengthLabel: wallPreviewMetrics?.lengthLabel ?? null,
+    wallPreviewAngleLabel: wallPreviewMetrics && wallPreviewMetrics.lengthPx > 0 ? wallPreviewMetrics.angleLabel : null,
+    exactLengthValue: wallDraftLengthInput,
+    physicalUnit: settings.physicalUnit ?? null,
+    canApplyExactLength: Boolean(
+      wallChainStartRef.current
+      && wallPreviewEnd
+      && pixelsPerUnit
+      && Number.isFinite(Number.parseFloat(wallDraftLengthInput))
+      && Number.parseFloat(wallDraftLengthInput) > 0
+    ),
+    onExactLengthChange: setWallDraftLengthInput,
+    onApplyExactLength: handleApplyExactWallLength,
+    onUndoLastWallSegment: handleUndoLastWallSegmentAction,
+    onFinishWallChain: handleFinishWallChain,
+    onCancel: handleEscape,
+    arcPhase: arcWallRef.current?.phase ?? 0,
+    roomPointCount: roomPointsRef.current.length,
+    onUndoRoomPoint: handleUndoRoomPoint,
+    onFinishRoomPolygon: handleFinishRoomPolygon,
+    calibrationPixelLength: calibrationLine
+      ? Math.hypot(calibrationLine.endCX - calibrationLine.startCX, calibrationLine.endCY - calibrationLine.startCY)
+      : null,
+    onCancelCalibration: handleCalibrationCancel,
+    pendingObjectPlacement,
+    objectPickerOpen,
+    onOpenObjectLibrary: openObjectLibrary,
+    onCloseObjectLibrary: closeObjectLibrary,
+    openingPreviewReady: Boolean(openingPreview),
+  });
+
+  const activeToolGuide = (() => {
+    if (drag.type === "edge") {
+      return {
+        title: "Connecting nodes",
+        description: "Click a target node to create the connection.",
+        meta: "Esc cancels the connection.",
+      };
+    }
+
+    if (activeTool === "select" || activeTool === "pan") {
+      return null;
+    }
+
+    if (activeTool === "wall" || activeTool === "wall-arc" || activeTool === "calibrate" || activeTool === "room" || activeTool === "door" || activeTool === "window" || activeTool === "object") {
+      return null;
+    }
+
+    if (activeTool === "measure") {
+      return {
+        title: "Dimension tool",
+        description: "Click and drag to create a measured span.",
+        meta: "Dimensions use the current calibrated scale.",
+      };
+    }
+
+    if (activeTool === "stairs") {
+      return {
+        title: "Stairs",
+        description: "Click to place a stair object, then adjust direction and floors in the inspector.",
+        meta: "Esc returns to select mode.",
+      };
+    }
+
+    if (activeTool === "freehand") {
+      return {
+        title: "Freehand",
+        description: "Click and drag to sketch a stroke.",
+        meta: "Release to finish the stroke.",
+      };
+    }
+
+    if (activeTool === "node") {
+      return {
+        title: "Flowchart node",
+        description: "Click anywhere on the canvas to place a new node.",
+        meta: "Double-click a node later to rename it.",
+      };
+    }
+
+    return {
+      title: TOOL_LABELS[activeTool] ?? "Tool",
+      description: `Click and drag to create a ${TOOL_LABELS[activeTool]?.toLowerCase() ?? activeTool}.`,
+      meta: "Esc returns to select mode.",
+    };
+  })();
 
   // Grid lines — always visible, adaptive to zoom so screen spacing stays ~60px
   const gridLines = useMemo(() => {
@@ -2979,29 +3499,35 @@ export function CanvasRenderer({
       const dx = endCX - startCX;
       const dy = endCY - startCY;
       const len = Math.sqrt(dx * dx + dy * dy);
+      const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
       const previewThickness = 6;
       const poly = wallPolygonFromLine(startCX, startCY, endCX, endCY, previewThickness);
       const polyPts = poly.map(p => `${p.x},${p.y}`).join(" ");
       return (
         <g>
+          <line x1={startCX} y1={startCY} x2={endCX} y2={endCY}
+            stroke="#6366f1" strokeWidth={1 / zoom} strokeDasharray={`${6 / zoom},${4 / zoom}`} opacity={0.7}
+            pointerEvents="none" />
           {/* Polygon preview outline */}
-          <polygon points={polyPts} fill="rgba(209,213,219,0.35)" stroke="#374151"
-            strokeWidth={1} strokeDasharray="6,3" pointerEvents="none" />
+          <polygon points={polyPts} fill="rgba(99,102,241,0.18)" stroke="#4338ca"
+            strokeWidth={1.25 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
           {/* Endpoint caps */}
-          <circle cx={startCX} cy={startCY} r={previewThickness / 2} fill="rgba(209,213,219,0.35)"
-            stroke="#374151" strokeWidth={1} strokeDasharray="6,3" pointerEvents="none" />
-          <circle cx={endCX} cy={endCY} r={previewThickness / 2} fill="rgba(209,213,219,0.35)"
-            stroke="#374151" strokeWidth={1} strokeDasharray="6,3" pointerEvents="none" />
-          {len > 4 && pixelsPerUnit && settings.physicalUnit ? (
+          <circle cx={startCX} cy={startCY} r={previewThickness / 2} fill="rgba(99,102,241,0.18)"
+            stroke="#4338ca" strokeWidth={1.25 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={previewThickness / 2} fill="rgba(99,102,241,0.18)"
+            stroke="#4338ca" strokeWidth={1.25 / zoom} strokeDasharray={`${6 / zoom},${3 / zoom}`} pointerEvents="none" />
+          {len > 4 ? (
             <text x={(startCX + endCX) / 2} y={(startCY + endCY) / 2 - previewThickness / 2 - 4}
-              textAnchor="middle" fontSize={11 / zoom} fill="#374151" pointerEvents="none">
-              {fmtPhysical(len, pixelsPerUnit, settings.physicalUnit)}
+              textAnchor="middle" fontSize={11 / zoom} fill="#312e81" pointerEvents="none">
+              {pixelsPerUnit && settings.physicalUnit ? fmtPhysical(len, pixelsPerUnit, settings.physicalUnit) : `${Math.round(len)} px`} · {Math.round(angleDeg)}°
             </text>
           ) : null}
           {/* Start point marker */}
-          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#374151" pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={9 / zoom} fill="rgba(99,102,241,0.16)" pointerEvents="none" />
+          <circle cx={startCX} cy={startCY} r={4 / zoom} fill="#4338ca" pointerEvents="none" />
           {/* Snap indicator at endpoint */}
-          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#374151" opacity={0.5} pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={7 / zoom} fill="rgba(67,56,202,0.12)" pointerEvents="none" />
+          <circle cx={endCX} cy={endCY} r={4 / zoom} fill="#4338ca" opacity={0.88} pointerEvents="none" />
         </g>
       );
     }
@@ -3154,7 +3680,8 @@ export function CanvasRenderer({
       const allPts = cursor ? [...pts, cursor] : pts;
       const polyPts = allPts.map(p => `${p.x},${p.y}`).join(" ");
       // Check if cursor is near start point (close indicator)
-      const nearStart = cursor && pts.length >= 3 && Math.hypot(cursor.x - pts[0].x, cursor.y - pts[0].y) < 15 / zoom;
+      const startPoint = pts[0];
+      const nearStart = cursor && startPoint && pts.length >= 3 && Math.hypot(cursor.x - startPoint.x, cursor.y - startPoint.y) < 15 / zoom;
       return (
         <g>
           {/* Filled preview */}
@@ -3166,8 +3693,8 @@ export function CanvasRenderer({
               fill={i === 0 && nearStart ? "#22c55e" : "#3b82f6"} pointerEvents="none" />
           ))}
           {/* Close indicator ring around first point */}
-          {nearStart && (
-            <circle cx={pts[0].x} cy={pts[0].y} r={8 / zoom} fill="none"
+          {nearStart && startPoint && (
+            <circle cx={startPoint.x} cy={startPoint.y} r={8 / zoom} fill="none"
               stroke="#22c55e" strokeWidth={2 / zoom} pointerEvents="none" />
           )}
           {/* Area label in preview */}
@@ -3226,59 +3753,94 @@ export function CanvasRenderer({
     if (walls.length < 2) return null;
     const els: JSX.Element[] = [];
     const ANGLE_THRESH = 8; // degrees
-    const OFFSET = 20 / zoom;
+    const OFFSET = 14 / zoom;
     const ARROWLEN = 5 / zoom;
     const FONTSIZE = 10 / zoom;
+    const dimensionKeys = new Set<string>();
+
+    const projectOntoAxis = (point: { x: number; y: number }, origin: { x: number; y: number }, axis: { x: number; y: number }) => (
+      (point.x - origin.x) * axis.x + (point.y - origin.y) * axis.y
+    );
 
     for (let i = 0; i < walls.length; i++) {
       for (let j = i + 1; j < walls.length; j++) {
         const a = walls[i];
         const b = walls[j];
+        if (!a || !b) continue;
         const angA = (a.wallAngle ?? Math.atan2(a.y2 - a.y, a.x2 - a.x) * (180 / Math.PI));
         const angB = (b.wallAngle ?? Math.atan2(b.y2 - b.y, b.x2 - b.x) * (180 / Math.PI));
         let diff = Math.abs(angA - angB) % 180;
         if (diff > 90) diff = 180 - diff;
         if (diff > ANGLE_THRESH) continue; // not parallel
 
-        // Compute perpendicular distance between parallel wall midpoints
-        const midAx = (a.x + a.x2) / 2;
-        const midAy = (a.y + a.y2) / 2;
-        const midBx = (b.x + b.x2) / 2;
-        const midBy = (b.y + b.y2) / 2;
         const wallAngleRad = angA * (Math.PI / 180);
         const wallDirX = Math.cos(wallAngleRad);
         const wallDirY = Math.sin(wallAngleRad);
-        // perpendicular component of (midB - midA)
-        const perpDist = Math.abs((midBx - midAx) * (-wallDirY) + (midBy - midAy) * wallDirX);
-        if (perpDist < 4) continue; // overlapping
-
         const perpNx = -wallDirY;
         const perpNy = wallDirX;
-        // sign so dimension line goes from A toward B
-        const sign = (midBx - midAx) * perpNx + (midBy - midAy) * perpNy >= 0 ? 1 : -1;
-        const lx1 = midAx + sign * perpNx * OFFSET;
-        const ly1 = midAy + sign * perpNy * OFFSET;
-        const lx2 = midAx + sign * perpNx * (OFFSET + perpDist);
-        const ly2 = midAy + sign * perpNy * (OFFSET + perpDist);
-        const mlx = (lx1 + lx2) / 2;
-        const mly = (ly1 + ly2) / 2;
+
+        const aLength = Math.hypot(a.x2 - a.x, a.y2 - a.y);
+        const bLength = Math.hypot(b.x2 - b.x, b.y2 - b.y);
+        if (aLength < 4 || bLength < 4) continue;
+
+        const aStartProjection = projectOntoAxis({ x: a.x, y: a.y }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
+        const aEndProjection = projectOntoAxis({ x: a.x2, y: a.y2 }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
+        const bStartProjection = projectOntoAxis({ x: b.x, y: b.y }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
+        const bEndProjection = projectOntoAxis({ x: b.x2, y: b.y2 }, { x: a.x, y: a.y }, { x: wallDirX, y: wallDirY });
+
+        const overlapStart = Math.max(Math.min(aStartProjection, aEndProjection), Math.min(bStartProjection, bEndProjection));
+        const overlapEnd = Math.min(Math.max(aStartProjection, aEndProjection), Math.max(bStartProjection, bEndProjection));
+        if (overlapEnd - overlapStart < Math.min(aLength, bLength) * 0.18) continue;
+
+        const overlapMid = (overlapStart + overlapEnd) / 2;
+        const anchorAx = a.x + wallDirX * overlapMid;
+        const anchorAy = a.y + wallDirY * overlapMid;
+        const anchorBx = b.x + wallDirX * overlapMid;
+        const anchorBy = b.y + wallDirY * overlapMid;
+
+        const perpDist = Math.abs((anchorBx - anchorAx) * perpNx + (anchorBy - anchorAy) * perpNy);
+        if (perpDist < 4) continue; // overlapping
+
+        const sign = (anchorBx - anchorAx) * perpNx + (anchorBy - anchorAy) * perpNy >= 0 ? 1 : -1;
+        const startOffsetX = anchorAx + sign * perpNx * OFFSET;
+        const startOffsetY = anchorAy + sign * perpNy * OFFSET;
+        const endOffsetX = anchorBx - sign * perpNx * OFFSET;
+        const endOffsetY = anchorBy - sign * perpNy * OFFSET;
+        const dimensionKey = [
+          Math.round(startOffsetX / 12),
+          Math.round(startOffsetY / 12),
+          Math.round(endOffsetX / 12),
+          Math.round(endOffsetY / 12),
+          Math.round(perpDist / 4),
+        ].join(":");
+        if (dimensionKeys.has(dimensionKey)) continue;
+        dimensionKeys.add(dimensionKey);
+
+        const mlx = (startOffsetX + endOffsetX) / 2;
+        const mly = (startOffsetY + endOffsetY) / 2;
+        const guideOffset = 8 / zoom;
         const label = fmtPhysical(perpDist, pixelsPerUnit, settings.physicalUnit!);
-        const displayAngle = angA === 0 ? 90 : (Math.abs(angA) < 45 ? 90 : 0);
+        const displayAngle = Math.atan2(endOffsetY - startOffsetY, endOffsetX - startOffsetX) * (180 / Math.PI);
+        const labelX = mlx + perpNx * guideOffset;
+        const labelY = mly + perpNy * guideOffset;
 
         els.push(
           <g key={`pdim-${i}-${j}`} pointerEvents="none">
-            <line x1={lx1} y1={ly1} x2={lx2} y2={ly2}
+            <line x1={anchorAx} y1={anchorAy} x2={startOffsetX} y2={startOffsetY}
+              stroke="#7dd3fc" strokeWidth={0.9 / zoom} strokeDasharray={`${2 / zoom},${2 / zoom}`} />
+            <line x1={anchorBx} y1={anchorBy} x2={endOffsetX} y2={endOffsetY}
+              stroke="#7dd3fc" strokeWidth={0.9 / zoom} strokeDasharray={`${2 / zoom},${2 / zoom}`} />
+            <line x1={startOffsetX} y1={startOffsetY} x2={endOffsetX} y2={endOffsetY}
               stroke="#0ea5e9" strokeWidth={1 / zoom} strokeDasharray={`${3 / zoom},${2 / zoom}`} />
-            {/* arrowheads */}
-            <line x1={lx1 + wallDirX * ARROWLEN} y1={ly1 + wallDirY * ARROWLEN}
-              x2={lx1 - wallDirX * ARROWLEN} y2={ly1 - wallDirY * ARROWLEN}
+            <line x1={startOffsetX + wallDirX * ARROWLEN} y1={startOffsetY + wallDirY * ARROWLEN}
+              x2={startOffsetX - wallDirX * ARROWLEN} y2={startOffsetY - wallDirY * ARROWLEN}
               stroke="#0ea5e9" strokeWidth={1 / zoom} />
-            <line x1={lx2 + wallDirX * ARROWLEN} y1={ly2 + wallDirY * ARROWLEN}
-              x2={lx2 - wallDirX * ARROWLEN} y2={ly2 - wallDirY * ARROWLEN}
+            <line x1={endOffsetX + wallDirX * ARROWLEN} y1={endOffsetY + wallDirY * ARROWLEN}
+              x2={endOffsetX - wallDirX * ARROWLEN} y2={endOffsetY - wallDirY * ARROWLEN}
               stroke="#0ea5e9" strokeWidth={1 / zoom} />
-            <text x={mlx} y={mly - FONTSIZE * 0.7}
+            <text x={labelX} y={labelY}
               textAnchor="middle" fontSize={FONTSIZE} fill="#0ea5e9"
-              transform={`rotate(${displayAngle}, ${mlx}, ${mly})`}
+              transform={`rotate(${displayAngle}, ${labelX}, ${labelY})`}
               style={{ userSelect: "none" }}>
               {label}
             </text>
@@ -3421,19 +3983,19 @@ export function CanvasRenderer({
     exportCanvasToSVG(nodes, edges, canvasName, {
       showGrid: false,
       showDimensions: !!settings.showDimensions,
-      physicalUnit: settings.physicalUnit,
-      pixelsPerUnit,
+      physicalUnit: settings.physicalUnit ?? null,
+      ...(pixelsPerUnit !== undefined ? { pixelsPerUnit } : {}),
       imageUrlMap: nodeImageUrls,
-      backgroundImageUrl: resolvedBgUrl ?? undefined,
-      backgroundImageOpacity: settings.backgroundImageOpacity,
-      backgroundImageX: settings.backgroundImageX,
-      backgroundImageY: settings.backgroundImageY,
-      backgroundImageScale: settings.backgroundImageScale,
-      backgroundImageCropX: settings.backgroundImageCropX ?? undefined,
-      backgroundImageCropY: settings.backgroundImageCropY ?? undefined,
-      backgroundImageCropW: settings.backgroundImageCropW ?? undefined,
-      backgroundImageCropH: settings.backgroundImageCropH ?? undefined,
-      bgImageDims: bgImageDims ?? undefined,
+      ...(resolvedBgUrl ? { backgroundImageUrl: resolvedBgUrl } : {}),
+      ...(settings.backgroundImageOpacity !== undefined ? { backgroundImageOpacity: settings.backgroundImageOpacity } : {}),
+      ...(settings.backgroundImageX !== undefined ? { backgroundImageX: settings.backgroundImageX } : {}),
+      ...(settings.backgroundImageY !== undefined ? { backgroundImageY: settings.backgroundImageY } : {}),
+      ...(settings.backgroundImageScale !== undefined ? { backgroundImageScale: settings.backgroundImageScale } : {}),
+      ...(settings.backgroundImageCropX !== undefined ? { backgroundImageCropX: settings.backgroundImageCropX } : {}),
+      ...(settings.backgroundImageCropY !== undefined ? { backgroundImageCropY: settings.backgroundImageCropY } : {}),
+      ...(settings.backgroundImageCropW !== undefined ? { backgroundImageCropW: settings.backgroundImageCropW } : {}),
+      ...(settings.backgroundImageCropH !== undefined ? { backgroundImageCropH: settings.backgroundImageCropH } : {}),
+      ...(bgImageDims ? { bgImageDims } : {}),
     });
   }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, settings.backgroundImageCropX, settings.backgroundImageCropY, settings.backgroundImageCropW, settings.backgroundImageCropH, bgImageDims]);
 
@@ -3441,19 +4003,19 @@ export function CanvasRenderer({
     exportCanvasToPNG(nodes, edges, canvasName, {
       showGrid: false,
       showDimensions: !!settings.showDimensions,
-      physicalUnit: settings.physicalUnit,
-      pixelsPerUnit,
+      physicalUnit: settings.physicalUnit ?? null,
+      ...(pixelsPerUnit !== undefined ? { pixelsPerUnit } : {}),
       imageUrlMap: nodeImageUrls,
-      backgroundImageUrl: resolvedBgUrl ?? undefined,
-      backgroundImageOpacity: settings.backgroundImageOpacity,
-      backgroundImageX: settings.backgroundImageX,
-      backgroundImageY: settings.backgroundImageY,
-      backgroundImageScale: settings.backgroundImageScale,
-      backgroundImageCropX: settings.backgroundImageCropX ?? undefined,
-      backgroundImageCropY: settings.backgroundImageCropY ?? undefined,
-      backgroundImageCropW: settings.backgroundImageCropW ?? undefined,
-      backgroundImageCropH: settings.backgroundImageCropH ?? undefined,
-      bgImageDims: bgImageDims ?? undefined,
+      ...(resolvedBgUrl ? { backgroundImageUrl: resolvedBgUrl } : {}),
+      ...(settings.backgroundImageOpacity !== undefined ? { backgroundImageOpacity: settings.backgroundImageOpacity } : {}),
+      ...(settings.backgroundImageX !== undefined ? { backgroundImageX: settings.backgroundImageX } : {}),
+      ...(settings.backgroundImageY !== undefined ? { backgroundImageY: settings.backgroundImageY } : {}),
+      ...(settings.backgroundImageScale !== undefined ? { backgroundImageScale: settings.backgroundImageScale } : {}),
+      ...(settings.backgroundImageCropX !== undefined ? { backgroundImageCropX: settings.backgroundImageCropX } : {}),
+      ...(settings.backgroundImageCropY !== undefined ? { backgroundImageCropY: settings.backgroundImageCropY } : {}),
+      ...(settings.backgroundImageCropW !== undefined ? { backgroundImageCropW: settings.backgroundImageCropW } : {}),
+      ...(settings.backgroundImageCropH !== undefined ? { backgroundImageCropH: settings.backgroundImageCropH } : {}),
+      ...(bgImageDims ? { bgImageDims } : {}),
     });
   }, [nodes, edges, canvasName, settings.showDimensions, settings.physicalUnit, pixelsPerUnit, nodeImageUrls, resolvedBgUrl, settings.backgroundImageOpacity, settings.backgroundImageX, settings.backgroundImageY, settings.backgroundImageScale, settings.backgroundImageCropX, settings.backgroundImageCropY, settings.backgroundImageCropW, settings.backgroundImageCropH, bgImageDims]);
 
@@ -3502,13 +4064,23 @@ export function CanvasRenderer({
         )}
       </div>
 
+      <div className="idea-canvas__workspace">
+
       {/* Toolbar */}
       <CanvasToolbar
         activeTool={activeTool}
-        onToolChange={setActiveTool}
+        onToolChange={handleToolChange}
         hasPhysicalUnits={!!settings.physicalUnit}
         canvasMode={canvasMode}
-        onOpenSettings={() => setShowSettings((v) => !v)}
+        onOpenSettings={() => {
+          setShowSettings((value) => {
+            const next = !value;
+            if (next) {
+              setShowLayerPanel(false);
+            }
+            return next;
+          });
+        }}
         selectedCount={selectedIds.size}
         selectedEdgeId={selectedEdgeId}
         singleSelected={singleSelected ?? null}
@@ -3526,8 +4098,11 @@ export function CanvasRenderer({
         onChangeSwingDirection={handleChangeSwingDirection}
         onChangeStairDirection={handleChangeStairDirection}
         onChangeStairFloors={handleChangeStairFloors}
-        physicalUnit={settings.physicalUnit}
-        pixelsPerUnit={pixelsPerUnit}
+        onChangeWallLength={handleChangeSelectedWallLength}
+        onChangeWallStart={handleChangeSelectedWallStart}
+        onChangeWallEnd={handleChangeSelectedWallEnd}
+        physicalUnit={settings.physicalUnit ?? null}
+        pixelsPerUnit={pixelsPerUnit ?? null}
         onDeleteSelected={handleDeleteSelected}
         onUndo={undo}
         onRedo={redo}
@@ -3545,14 +4120,22 @@ export function CanvasRenderer({
         onToggleObjectPicker={() => {
           if (objectPickerOpen) {
             setObjectPickerOpen(false);
-            if (!pendingObjectPlacement) setActiveTool("select");
+            if (!pendingObjectPlacement) handleToolChange("select");
             return;
           }
-          setActiveTool("object");
+          handleToolChange("object");
           setObjectPickerOpen(true);
         }}
         showSettings={showSettings}
-        onToggleLayerPanel={() => setShowLayerPanel((v) => !v)}
+        onToggleLayerPanel={() => {
+          setShowLayerPanel((value) => {
+            const next = !value;
+            if (next) {
+              setShowSettings(false);
+            }
+            return next;
+          });
+        }}
         showLayerPanel={showLayerPanel}
         floors={floors}
         activeFloor={activeFloor}
@@ -3561,7 +4144,60 @@ export function CanvasRenderer({
         onExportSVG={handleExportSVG}
         onExportPNG={handleExportPNG}
         onExportPDF={handleExportPDF}
-        onShare={simplified ? undefined : () => setShowSharePanel(v => !v)}
+        toolWorkflowContext={toolWorkflowContext}
+        inspectorTab={showSettings ? "settings" : showLayerPanel ? "layers" : "selection"}
+        onShowInspectorSelection={() => {
+          setShowSettings(false);
+          setShowLayerPanel(false);
+        }}
+        inspectorUtilityContent={
+          showSettings ? (
+            <CanvasSettingsPanel
+              embedded
+              settings={settings}
+              resolvedBgUrl={resolvedBgUrl}
+              bgImageDims={bgImageDims}
+              bgUploading={bgUploading}
+              bgUploadError={bgUploadError}
+              onSave={handleSaveSettings}
+              onClose={() => setShowSettings(false)}
+              onRemoveBgImage={handleRemoveBgImage}
+              onUploadBgImage={handleBgImageUpload}
+              onFitViewportToImage={fitViewportToImage}
+              onStartCrop={handleStartCrop}
+              onAddReferenceImage={handleAddReferenceImage}
+            />
+          ) : showLayerPanel ? (
+            <CanvasLayerPanel
+              embedded
+              layers={layers}
+              activeLayerId={activeLayerId}
+              onSetActiveLayer={setActiveLayerId}
+              onToggleVisibility={(id) => handleUpdateLayer(id, { visible: !layers.find((layer) => layer.id === id)?.visible })}
+              onToggleLock={(id) => handleUpdateLayer(id, { locked: !layers.find((layer) => layer.id === id)?.locked })}
+              onRename={(id, name) => handleUpdateLayer(id, { name })}
+              onChangeOpacity={(id, opacity) => handleUpdateLayer(id, { opacity })}
+              onChangeFloorNumber={(id, floorNumber) => handleUpdateLayer(id, { floorNumber })}
+              onMoveUp={handleMoveLayerUp}
+              onMoveDown={handleMoveLayerDown}
+              onAdd={handleAddLayer}
+              onDelete={handleDeleteLayer}
+              onClose={() => setShowLayerPanel(false)}
+              isFloorplan={canvasMode === "floorplan"}
+            />
+          ) : null
+        }
+        showFloorplanStarter={showFloorplanStarter}
+        onStartFloorplanWalls={() => {
+          void handleStartFloorplanWalls();
+        }}
+        onAddStarterRoom={() => {
+          void handleAddStarterRoom();
+        }}
+        onTraceFloorplanImage={() => {
+          void handleTraceFloorplanImage();
+        }}
+        {...(!simplified ? { onShare: () => setShowSharePanel(v => !v) } : {})}
         onBringForward={handleBringForward}
         onSendBackward={handleSendBackward}
         onAlignNodes={handleAlignNodes}
@@ -3569,6 +4205,8 @@ export function CanvasRenderer({
         snapEnabled={settings.snapToGrid ?? false}
         simplified={simplified}
       />
+
+      <div className="idea-canvas__canvas-stage">
 
       {/* SVG Canvas */}
       <svg
@@ -3895,7 +4533,6 @@ export function CanvasRenderer({
 
       {/* Inline wall dimension input (floating over canvas) */}
       {wallDimEdit && svgRef.current ? (() => {
-        const svgRect = svgRef.current.getBoundingClientRect();
         // Midpoint in canvas coords → screen coords
         const midCX = (wallDimEdit.sx + wallDimEdit.ex) / 2;
         const midCY = (wallDimEdit.sy + wallDimEdit.ey) / 2;
@@ -3925,17 +4562,11 @@ export function CanvasRenderer({
 
       {/* Calibration distance input dialog */}
       {calibrationLine && svgRef.current ? (() => {
-        const svgRect = svgRef.current.getBoundingClientRect();
-        const midCX = (calibrationLine.startCX + calibrationLine.endCX) / 2;
-        const midCY = (calibrationLine.startCY + calibrationLine.endCY) / 2;
-        const screenX = (midCX + panX) * zoom;
-        const screenY = (midCY + panY) * zoom;
         const dx = calibrationLine.endCX - calibrationLine.startCX;
         const dy = calibrationLine.endCY - calibrationLine.startCY;
         const pixelLen = Math.sqrt(dx * dx + dy * dy);
         return (
-          <div className="idea-canvas__calibrate-overlay"
-            style={{ left: screenX, top: screenY - 50 }}>
+          <div className="idea-canvas__calibrate-overlay idea-canvas__calibrate-overlay--docked">
             <p className="idea-canvas__calibrate-label">How long is this line?</p>
             <div className="idea-canvas__calibrate-row">
               <input
@@ -3971,23 +4602,7 @@ export function CanvasRenderer({
         );
       })() : null}
 
-      {/* Settings panel */}
-      {showSettings ? (
-        <CanvasSettingsPanel
-          settings={settings}
-          resolvedBgUrl={resolvedBgUrl}
-          bgImageDims={bgImageDims}
-          bgUploading={bgUploading}
-          bgUploadError={bgUploadError}
-          onSave={handleSaveSettings}
-          onClose={() => setShowSettings(false)}
-          onRemoveBgImage={handleRemoveBgImage}
-          onUploadBgImage={handleBgImageUpload}
-          onFitViewportToImage={fitViewportToImage}
-          onStartCrop={handleStartCrop}
-          onAddReferenceImage={handleAddReferenceImage}
-        />
-      ) : null}
+      </div>
 
       {/* Share panel */}
       {showSharePanel ? (
@@ -4097,26 +4712,6 @@ export function CanvasRenderer({
         </div>
       ) : null}
 
-      {/* Layer panel */}
-      {showLayerPanel ? (
-        <CanvasLayerPanel
-          layers={layers}
-          activeLayerId={activeLayerId}
-          onSetActiveLayer={setActiveLayerId}
-          onToggleVisibility={(id) => handleUpdateLayer(id, { visible: !layers.find((l) => l.id === id)?.visible })}
-          onToggleLock={(id) => handleUpdateLayer(id, { locked: !layers.find((l) => l.id === id)?.locked })}
-          onRename={(id, name) => handleUpdateLayer(id, { name })}
-          onChangeOpacity={(id, opacity) => handleUpdateLayer(id, { opacity })}
-          onChangeFloorNumber={(id, floorNumber) => handleUpdateLayer(id, { floorNumber })}
-          onMoveUp={handleMoveLayerUp}
-          onMoveDown={handleMoveLayerDown}
-          onAdd={handleAddLayer}
-          onDelete={handleDeleteLayer}
-          onClose={() => setShowLayerPanel(false)}
-          isFloorplan={settings.canvasMode === "floorplan"}
-        />
-      ) : null}
-
       {/* Context menu */}
       {contextMenu ? (
         <>
@@ -4200,31 +4795,12 @@ export function CanvasRenderer({
       ) : null}
 
       {/* Hints */}
-      {drag.type === "edge" ? (
-        <div className="idea-canvas__hint">Click a target node to connect, or press Esc to cancel.</div>
-      ) : activeTool === "object" ? (
-        <div className="idea-canvas__hint">
-          {objectPickerOpen
-            ? "Choose an object from the library."
-            : pendingObjectPlacement
-              ? `Click the canvas to place ${pendingObjectPlacement.source === "preset" ? pendingObjectPlacement.preset.label : pendingObjectPlacement.object.name}. Press Esc to cancel.`
-              : "Open the object library, then choose an object to place."}
-        </div>
-      ) : activeTool !== "select" && activeTool !== "pan" ? (
-        <div className="idea-canvas__hint">
-          {activeTool === "wall"
-            ? (wallChainStartRef.current
-                ? "Click to continue wall chain. Enter to finish chain. Esc to cancel. Hold Shift for 45° angles."
-                : "Click where the wall starts.")
-            : activeTool === "measure"
-              ? "Click and drag to add a dimension annotation."
-              : activeTool === "freehand"
-                ? "Click and drag to draw freehand. Release to finish stroke."
-              : activeTool === "node" ? "Click to place a flowchart node."
-              : activeTool === "line" ? "Click and drag to draw a line."
-              : activeTool === "text" ? "Click to place a text box."
-              : `Click and drag to draw a ${activeTool}.`}
-          {activeTool !== "wall" ? " Press Esc to cancel." : ""}
+      {activeToolGuide ? (
+        <div className="idea-canvas__tool-guide">
+          <div className="idea-canvas__tool-guide-label">Active tool</div>
+          <h3 className="idea-canvas__tool-guide-title">{activeToolGuide.title}</h3>
+          <p className="idea-canvas__tool-guide-body">{activeToolGuide.description}</p>
+          <p className="idea-canvas__tool-guide-meta">{activeToolGuide.meta}</p>
         </div>
       ) : null}
 
@@ -4249,6 +4825,7 @@ export function CanvasRenderer({
         />,
         document.body
       ) : null}
+      </div>
     </div>
   );
 }

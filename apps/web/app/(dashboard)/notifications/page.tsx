@@ -212,8 +212,8 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
         channel={channel}
         type={type}
         limit={limit}
-        cursor={cursor}
         history={history}
+        {...(cursor ? { cursor } : {})}
       />
     </Suspense>
   );
@@ -225,7 +225,7 @@ async function NotificationsContent({ householdId, status, channel, type, limit,
   channel: (typeof channelOptions)[number];
   type: (typeof typeOptions)[number];
   limit: number;
-  cursor: string | undefined;
+  cursor?: string;
   history: string[];
 }): Promise<JSX.Element> {
   const t = await getTranslations("notifications");
@@ -395,7 +395,14 @@ async function NotificationsContent({ householdId, status, channel, type, limit,
             resultCount={filteredNotifications.length}
             entityLabel="notifications"
             buildHref={({ cursor: c, history: h, limit: l }) =>
-              buildNotificationsHref({ status, channel, type, limit: l, cursor: c, history: h })
+              buildNotificationsHref({
+                status,
+                channel,
+                type,
+                limit: l,
+                ...(c ? { cursor: c } : {}),
+                ...(h && h.length > 0 ? { history: h } : {}),
+              })
             }
           />
         </div>

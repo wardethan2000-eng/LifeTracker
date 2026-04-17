@@ -2,6 +2,7 @@
 
 import type {
   HobbyDetail,
+  PresetCustomFieldTemplate,
   HobbySeriesDetail,
   HobbySession,
   HobbySessionDetail,
@@ -778,7 +779,7 @@ export function HobbySessionDetail({
             actions={<span className={`session-saved-indicator${customFieldSaved ? " is-visible" : ""}`}>Saved</span>}
           >
             <div className="session-custom-fields-grid">
-              {[...hobby.fieldDefinitions].sort((a, b) => a.order - b.order).map((field) => {
+              {[...(hobby.fieldDefinitions as PresetCustomFieldTemplate[])].sort((a, b) => a.order - b.order).map((field) => {
                 const value = customFieldDraft[field.key];
                 const strVal = value == null ? "" : String(value);
 

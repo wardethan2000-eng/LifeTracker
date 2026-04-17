@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { JSX, ReactNode } from "react";
 import { WorkspaceLayout, type WorkspaceTab } from "../../../../components/workspace-layout";
 import { getMe, getProjectDetail } from "../../../../lib/api";
+import { formatCurrency, formatDate } from "../../../../lib/formatters";
 
 type ProjectLayoutProps = {
   params: Promise<{ projectId: string }>;
@@ -47,13 +48,11 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
   const tabs: WorkspaceTab[] = [
     { id: "overview", label: "Overview", href: `${base}${qs}` },
     { id: "phases", label: "Plan", href: `${base}/phases${qs}` },
-    { id: "canvas", label: "Canvas", href: `${base}/canvas${qs}` },
-    { id: "notepad", label: "Notes", href: `${base}/notepad${qs}` },
-    { id: "timeline", label: "Timeline", href: `${base}/timeline${qs}` },
     { id: "budget", label: "Budget", href: `${base}/budget${qs}` },
     { id: "supplies", label: "Materials", href: `${base}/supplies${qs}` },
-    { id: "notes", label: "Log", href: `${base}/notes${qs}` },
-    { id: "comments", label: "Comments", href: `${base}/comments${qs}` },
+    { id: "canvas", label: "Canvas", href: `${base}/canvas${qs}` },
+    { id: "notepad", label: "Notes", href: `${base}/notepad${qs}` },
+    { id: "notes", label: "Activity", href: `${base}/notes${qs}` },
     { id: "settings", label: "Settings", href: `${base}/settings${qs}` },
   ];
 
@@ -66,6 +65,36 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
     : undefined;
 
   const variant = projectStatusVariant[project.status];
+  const openTaskCount = project.tasks.filter((task) => task.status !== "completed" && task.status !== "skipped").length;
+  const headerMeta = (
+    <>
+      {project.description ? (
+        <p className="workspace-description">{project.description}</p>
+      ) : null}
+      <dl className="project-header-meta">
+        <div className="project-header-meta__item">
+          <dt>Start</dt>
+          <dd>{formatDate(project.startDate, "Not set")}</dd>
+        </div>
+        <div className="project-header-meta__item">
+          <dt>Target</dt>
+          <dd>{formatDate(project.targetEndDate, "No target")}</dd>
+        </div>
+        <div className="project-header-meta__item">
+          <dt>Plan</dt>
+          <dd>{project.phases.length} phases · {openTaskCount} open tasks</dd>
+        </div>
+        <div className="project-header-meta__item">
+          <dt>Budget</dt>
+          <dd>{formatCurrency(project.budgetAmount, "Not set")}</dd>
+        </div>
+        <div className="project-header-meta__item">
+          <dt>Linked assets</dt>
+          <dd>{project.assets.length}</dd>
+        </div>
+      </dl>
+    </>
+  );
 
   return (
     <WorkspaceLayout
@@ -76,9 +105,12 @@ export default async function ProjectLayout({ params, children }: ProjectLayoutP
       {...(breadcrumbs ? { breadcrumbs } : {})}
       backHref={`/projects${qs}`}
       backLabel="All Projects"
+      headerMeta={headerMeta}
       headerActions={
         <>
+          <Link href={`${base}/phases${qs}`} className="button button--primary button--sm">Open Plan</Link>
           <Link href={`/projects/new?householdId=${household.id}&parentProjectId=${project.id}`} className="button button--ghost button--sm">+ Sub-project</Link>
+          <Link href={`${base}/settings${qs}`} className="button button--ghost button--sm">Edit Project</Link>
         </>
       }
       tabs={tabs}

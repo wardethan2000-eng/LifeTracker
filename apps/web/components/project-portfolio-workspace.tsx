@@ -75,6 +75,18 @@ export function ProjectPortfolioWorkspace({
     () => portfolioProjects.filter((p) => isSelected(p.id)),
     [portfolioProjects, isSelected]
   );
+  const focusProjects = useMemo(() => {
+    const highestRisk = portfolioProjects.find((project) => project.isAtRisk) ?? portfolioProjects[0];
+    const nearestTarget = portfolioProjects.find((project) => project.status !== "completed" && project.daysToTarget !== null);
+    const biggestCommitment = [...portfolioProjects]
+      .sort((left, right) => right.committedCost - left.committedCost)
+      .find((project) => project.committedCost > 0);
+
+    return [highestRisk, nearestTarget, biggestCommitment]
+      .filter((project): project is PortfolioProject => Boolean(project))
+      .filter((project, index, items) => items.findIndex((item) => item.id === project.id) === index)
+      .slice(0, 3);
+  }, [portfolioProjects]);
 
   const allSelected = portfolioProjects.length > 0 && selectedCount === portfolioProjects.length;
 
@@ -117,7 +129,7 @@ export function ProjectPortfolioWorkspace({
     <>
       <section className="panel">
         <div className="panel__header">
-          <h2>Project Portfolio ({portfolioProjects.length})</h2>
+          <h2>Projects in View ({portfolioProjects.length})</h2>
           {total !== portfolioProjects.length && (
             <span className="pill">{total} total</span>
           )}
@@ -143,201 +155,179 @@ export function ProjectPortfolioWorkspace({
               />
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 44 }}>
-                    <input
-                      type="checkbox"
-                      aria-label="Select all projects"
-                      checked={allSelected}
-                      onChange={(e) =>
-                        toggleGroup(portfolioProjects.map((p) => p.id), e.target.checked)
-                      }
-                    />
-                  </th>
-                  <th>Project</th>
-                  <th>Status</th>
-                  <th>Progress</th>
-                  <th>Target</th>
-                  <th>Budget</th>
-                  <th>Material Plan</th>
-                  <th>Updated</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {portfolioProjects.map((project: PortfolioProject) => {
-                  const tone = getRiskTone(project);
-                  const subtitle =
-                    project.description && project.description.length > 50
-                      ? `${project.description.slice(0, 50)}...`
-                      : project.description;
-                  const ov = optimistic[project.id] ?? {};
-                  const name = ov.name ?? project.name;
-                  const status = (ov.status ?? project.status) as ProjectStatus;
+            <div className="project-portfolio-stack">
+              {focusProjects.length > 0 ? (
+                <div className="project-portfolio-grid">
+                  {focusProjects.map((project) => {
+                    const tone = getRiskTone(project);
 
-                  return (
-                    <tr
-                      key={project.id}
-                      className={`row--${tone === "neutral" ? "default" : tone}`}
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${project.name}`}
-                          checked={isSelected(project.id)}
-                          onChange={() => toggleItem(project.id)}
-                        />
-                      </td>
-                      <td>
-                        <Link
-                          href={`/projects/${project.id}?householdId=${householdId}`}
-                          className="data-table__link"
-                        >
-                          {name}
-                        </Link>
-                        <div className="data-table__secondary">
-                          {project.depth > 0 && (
-                            <span style={{ marginRight: 6, opacity: 0.7 }}>Sub-project ·</span>
-                          )}
-                          {tone !== "neutral" && tone !== "accent" ? (
-                            <strong
-                              style={{
-                                color: `var(--${tone}-text, var(--${tone}))`,
-                              }}
-                            >
+                    return (
+                      <article key={`focus-${project.id}`} className={`project-portfolio-card project-portfolio-card--${tone}`}>
+                        <div className="project-portfolio-card__header">
+                          <div>
+                            <div className={`project-risk-badge project-risk-badge--${tone}`}>
                               {getRiskLabel(project)}
-                            </strong>
-                          ) : (
-                            subtitle ?? getRiskLabel(project)
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <ClickToEditSelect
-                          value={status}
-                          options={STATUS_OPTIONS}
-                          disabled={saving.has(`${project.id}:status`)}
-                          aria-label={`Edit status of ${project.name}`}
-                          renderValue={(v) => (
-                            <span className={`pill ${STATUS_CHIP_CLASS[v as ProjectStatus] ?? ""}`}>
-                              {STATUS_LABELS[v as ProjectStatus] ?? v}
-                            </span>
-                          )}
-                          onSave={(v) => { void handleSave(project.id, "status", v); }}
-                        />
-                      </td>
-                      <td>
-                        <ProjectProgressBar
-                          phases={project.phaseProgress ?? []}
-                          totalTaskCount={project.taskCount}
-                          completedTaskCount={project.completedTaskCount}
-                          showLabel={true}
-                        />
-                      </td>
-                      <td>
-                        <strong>
-                          {project.status === "completed"
-                            ? formatDate(project.actualEndDate, "Completed")
-                            : getTargetLabel(project)}
-                        </strong>
-                        <div className="data-table__secondary">
-                          {project.completedPhaseCount} of {project.phaseCount} phases
-                        </div>
-                      </td>
-                      <td>
-                        <strong>{formatCurrency(project.committedCost, "$0.00")}</strong>
-                        {project.totalBudgeted && project.totalBudgeted > 0 ? (
-                          <div className="data-table__secondary">
-                            {Math.round((project.committedCost / project.totalBudgeted) * 100)}% of{" "}
-                            {formatCurrency(project.totalBudgeted, "$0")}
+                            </div>
+                            <h3>{project.name}</h3>
+                            <p>{project.description?.trim() || "No scope summary yet."}</p>
                           </div>
-                        ) : (
-                          <div className="data-table__secondary">Unbudgeted</div>
-                        )}
-                      </td>
-                      <td>
-                        <strong>{getCoverageLabel(project)}</strong>
-                        <div className="data-table__secondary">
-                          {project.inventoryLineCount} lines
-                        </div>
-                      </td>
-                      <td>{formatDate(project.updatedAt, "Recently")}</td>
-                      <td>
-                        <div className="data-table__row-actions">
-                          <Link
-                            href={`/projects/${project.id}/tasks?householdId=${householdId}`}
-                            className="button button--sm button--ghost"
-                          >
-                            Tasks
+                          <Link href={`/projects/${project.id}?householdId=${householdId}`} className="button button--ghost button--sm">
+                            Open
                           </Link>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
+                        <div className="project-portfolio-card__metrics">
+                          <div className="project-metric">
+                            <span>Target</span>
+                            <strong>{project.status === "completed" ? formatDate(project.actualEndDate, "Completed") : getTargetLabel(project)}</strong>
+                          </div>
+                          <div className="project-metric">
+                            <span>Budget</span>
+                            <strong>{formatCurrency(project.committedCost, "$0.00")}</strong>
+                          </div>
+                          <div className="project-metric">
+                            <span>Progress</span>
+                            <strong>{project.percentComplete}% complete</strong>
+                          </div>
+                          <div className="project-metric">
+                            <span>Materials</span>
+                            <strong>{getCoverageLabel(project)}</strong>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : null}
 
-      {/* Material Rollups — no checkboxes */}
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Material Rollups</h2>
-        </div>
-        <div className="panel__body">
-          {portfolioProjects.filter((p) => p.inventoryLineCount > 0).length === 0 ? (
-            <div style={{ padding: "20px 24px" }}>
-              <EmptyState
-                icon="box"
-                title="No material requirements yet"
-                message="Link inventory items to project tasks to track material plans here."
-              />
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Inventory Lines</th>
-                  <th>Allocated</th>
-                  <th>Gap</th>
-                  <th>Planned Cost</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {portfolioProjects
-                  .filter((p) => p.inventoryLineCount > 0)
-                  .map((project) => (
-                    <tr key={project.id}>
-                      <td>
-                        <div className="data-table__primary">{project.name}</div>
-                        <div className="data-table__secondary">{getCoverageLabel(project)}</div>
-                      </td>
-                      <td>{project.inventoryLineCount}</td>
-                      <td>
-                        {project.totalInventoryAllocated} / {project.totalInventoryNeeded}
-                      </td>
-                      <td>{project.totalInventoryRemaining}</td>
-                      <td>{formatCurrency(project.plannedInventoryCost, "$0.00")}</td>
-                      <td>
-                        <div className="data-table__row-actions">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 44 }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Select all projects"
+                        checked={allSelected}
+                        onChange={(e) =>
+                          toggleGroup(portfolioProjects.map((p) => p.id), e.target.checked)
+                        }
+                      />
+                    </th>
+                    <th>Project</th>
+                    <th>Health</th>
+                    <th>Plan</th>
+                    <th>Budget</th>
+                    <th>Materials</th>
+                    <th>Updated</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {portfolioProjects.map((project: PortfolioProject) => {
+                    const tone = getRiskTone(project);
+                    const subtitle =
+                      project.description && project.description.length > 70
+                        ? `${project.description.slice(0, 70)}...`
+                        : project.description;
+                    const ov = optimistic[project.id] ?? {};
+                    const name = ov.name ?? project.name;
+                    const status = (ov.status ?? project.status) as ProjectStatus;
+
+                    return (
+                      <tr
+                        key={project.id}
+                        className={`row--${tone === "neutral" ? "default" : tone}`}
+                      >
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${project.name}`}
+                            checked={isSelected(project.id)}
+                            onChange={() => toggleItem(project.id)}
+                          />
+                        </td>
+                        <td>
                           <Link
                             href={`/projects/${project.id}?householdId=${householdId}`}
-                            className="button button--sm button--ghost"
+                            className="data-table__link"
                           >
-                            Review
+                            {name}
                           </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+                          <div className="data-table__secondary">
+                            {project.depth > 0 ? "Sub-project · " : ""}
+                            {subtitle ?? "No scope summary yet."}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="project-portfolio-health">
+                            <ClickToEditSelect
+                              value={status}
+                              options={STATUS_OPTIONS}
+                              disabled={saving.has(`${project.id}:status`)}
+                              aria-label={`Edit status of ${project.name}`}
+                              renderValue={(v) => (
+                                <span className={`pill ${STATUS_CHIP_CLASS[v as ProjectStatus] ?? ""}`}>
+                                  {STATUS_LABELS[v as ProjectStatus] ?? v}
+                                </span>
+                              )}
+                              onSave={(v) => { void handleSave(project.id, "status", v); }}
+                            />
+                            <div className="data-table__secondary">{getRiskLabel(project)}</div>
+                          </div>
+                        </td>
+                        <td>
+                          <strong>{project.status === "completed" ? formatDate(project.actualEndDate, "Completed") : getTargetLabel(project)}</strong>
+                          <div className="data-table__secondary">
+                            {project.completedPhaseCount} of {project.phaseCount} phases · {project.taskCount} tasks
+                          </div>
+                          <div style={{ marginTop: 8 }}>
+                            <ProjectProgressBar
+                              phases={project.phaseProgress ?? []}
+                              totalTaskCount={project.taskCount}
+                              completedTaskCount={project.completedTaskCount}
+                              showLabel={true}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <strong>{formatCurrency(project.committedCost, "$0.00")}</strong>
+                          {project.totalBudgeted && project.totalBudgeted > 0 ? (
+                            <div className="data-table__secondary">
+                              {Math.round((project.committedCost / project.totalBudgeted) * 100)}% of{" "}
+                              {formatCurrency(project.totalBudgeted, "$0")}
+                            </div>
+                          ) : (
+                            <div className="data-table__secondary">No budget set</div>
+                          )}
+                        </td>
+                        <td>
+                          <strong>{getCoverageLabel(project)}</strong>
+                          <div className="data-table__secondary">
+                            {project.inventoryLineCount > 0 ? `${project.totalInventoryAllocated} of ${project.totalInventoryNeeded} allocated` : "No materials tracked yet"}
+                          </div>
+                        </td>
+                        <td>{formatDate(project.updatedAt, "Recently")}</td>
+                        <td>
+                          <div className="data-table__row-actions">
+                            <Link
+                              href={`/projects/${project.id}?householdId=${householdId}`}
+                              className="button button--sm button--ghost"
+                            >
+                              Overview
+                            </Link>
+                            <Link
+                              href={`/projects/${project.id}/phases?householdId=${householdId}`}
+                              className="button button--sm button--ghost"
+                            >
+                              Plan
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </section>

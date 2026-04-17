@@ -7,7 +7,15 @@ type NoteDetailPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-async function NoteDetailContent({ householdId, entryId }: { householdId: string; entryId: string }): Promise<JSX.Element> {
+async function NoteDetailContent({
+  householdId,
+  entryId,
+  backHref,
+}: {
+  householdId: string;
+  entryId: string;
+  backHref?: string;
+}): Promise<JSX.Element> {
   try {
     const [entry, folders] = await Promise.all([
       getEntry(householdId, entryId),
@@ -20,6 +28,7 @@ async function NoteDetailContent({ householdId, entryId }: { householdId: string
           householdId={householdId}
           entry={entry}
           folderOptions={folders}
+          {...(backHref ? { backHref, backLabel: "← Back" } : {})}
         />
       </div>
     );
@@ -52,6 +61,7 @@ export default async function NoteDetailPage({
   const query = searchParams ? await searchParams : {};
   const householdIdParam =
     typeof query.householdId === "string" ? query.householdId : undefined;
+  const backTo = typeof query.backTo === "string" && query.backTo.startsWith("/") ? query.backTo : undefined;
 
   const me = await getMe();
   const household = householdIdParam
@@ -69,7 +79,7 @@ export default async function NoteDetailPage({
 
   return (
     <Suspense fallback={<div className="page-body"><section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1, 2, 3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section></div>}>
-      <NoteDetailContent householdId={household.id} entryId={entryId} />
+      <NoteDetailContent householdId={household.id} entryId={entryId} {...(backTo ? { backHref: backTo } : {})} />
     </Suspense>
   );
 }

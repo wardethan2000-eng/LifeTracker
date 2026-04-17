@@ -5,7 +5,7 @@ import { NotesHub } from "../../../components/notes-hub";
 import { PageHeader } from "../../../components/page-header";
 
 // ── Deferred notes content ─────────────────────────────────
-async function NotesContent({ householdId, initialTab }: { householdId: string; initialTab: string }): Promise<JSX.Element> {
+async function NotesContent({ householdId, initialTab }: { householdId: string; initialTab: "notes" | "canvases" }): Promise<JSX.Element> {
   try {
     const [folders, entries, templates, canvases] = await Promise.all([
       getNoteFolders(householdId),

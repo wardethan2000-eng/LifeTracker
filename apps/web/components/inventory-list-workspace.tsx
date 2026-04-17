@@ -229,7 +229,7 @@ export function InventoryListWorkspace({
                           <QuantityStepper
                             value={quantityOnHand}
                             min={0}
-                            suffix={item.unit !== "each" ? item.unit : undefined}
+                            {...(item.unit !== "each" ? { suffix: item.unit } : {})}
                             disabled={saving.has(`${item.id}:quantityOnHand`)}
                             aria-label={`Edit quantity of ${item.name}`}
                             onSave={(v) => { void handleSave(item.id, "quantityOnHand", v); }}

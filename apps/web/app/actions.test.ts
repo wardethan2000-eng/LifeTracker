@@ -254,6 +254,7 @@ describe("server actions", () => {
       usageValue: 9500,
       cost: 99.99,
       applyLinkedParts: true,
+      isRepeatFailure: false,
       metadata: {}
     });
     expect(nextMocks.revalidatePath).toHaveBeenCalledWith("/assets/clkeeperasset0000000000001");
@@ -296,7 +297,7 @@ describe("server actions", () => {
       })
     );
     expect(nextMocks.redirect).toHaveBeenCalledWith(
-      "/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-vision-budget-headcount#phase-phase-vision-budget-headcount"
+      "/projects/clproject000000000000000001/phases?householdId=clkeeperhouse000000000001&focusPhaseId=phase-vision-budget-headcount#phase-phase-vision-budget-headcount"
     );
   });
 
@@ -316,7 +317,7 @@ describe("server actions", () => {
     expect(apiMocks.createProjectTask).not.toHaveBeenCalled();
     expect(apiMocks.createProjectPhaseSupply).not.toHaveBeenCalled();
     expect(nextMocks.redirect).toHaveBeenCalledWith(
-      "/projects/clproject000000000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-planning-permitting#phase-phase-planning-permitting"
+      "/projects/clproject000000000000000001/phases?householdId=clkeeperhouse000000000001&focusPhaseId=phase-planning-permitting#phase-phase-planning-permitting"
     );
   });
 
@@ -333,7 +334,7 @@ describe("server actions", () => {
     });
     expect(apiMocks.getProjectDetail).toHaveBeenCalledWith("clkeeperhouse000000000001", "clprojecttemplate000000001");
     expect(nextMocks.redirect).toHaveBeenCalledWith(
-      "/projects/clprojecttemplate000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
+      "/projects/clprojecttemplate000000001/phases?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
     );
   });
 
@@ -350,7 +351,7 @@ describe("server actions", () => {
     });
     expect(apiMocks.getProjectDetail).toHaveBeenCalledWith("clkeeperhouse000000000001", "clprojectclone000000000001");
     expect(nextMocks.redirect).toHaveBeenCalledWith(
-      "/projects/clprojectclone000000000001?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
+      "/projects/clprojectclone000000000001/phases?householdId=clkeeperhouse000000000001&focusPhaseId=phase-loaded-from-project#phase-phase-loaded-from-project"
     );
   });
 });

@@ -55,7 +55,7 @@ async function HobbyAnalyticsContent({ householdId, households, selectedHousehol
       </header>
 
       <div className="page-body">
-        <HobbyAnalyticsWorkspace householdId={householdId} hobbies={hobbies} />
+        <HobbyAnalyticsWorkspace householdId={householdId} hobbies={hobbies.items} />
       </div>
     </>
   );

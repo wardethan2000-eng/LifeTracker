@@ -63,7 +63,7 @@ export function HobbyPracticeTab({ householdId, hobbyId, activityMode, goals, ro
 
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalName, setGoalName] = useState("");
-  const [goalType, setGoalType] = useState<HobbyPracticeGoalType>("cumulative");
+  const [goalType, setGoalType] = useState<HobbyPracticeGoalType>("duration_total");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalUnit, setGoalUnit] = useState("");
   const [goalSaving, setGoalSaving] = useState(false);
@@ -155,7 +155,7 @@ export function HobbyPracticeTab({ householdId, hobbyId, activityMode, goals, ro
               <label className="field">
                 <span>Type</span>
                 <select value={goalType} onChange={(e) => setGoalType(e.target.value as HobbyPracticeGoalType)}>
-                  <option value="cumulative">Cumulative</option>
+                  <option value="duration_total">Duration Total</option>
                   <option value="threshold">Threshold</option>
                   <option value="streak">Streak</option>
                   <option value="completion">Completion</option>

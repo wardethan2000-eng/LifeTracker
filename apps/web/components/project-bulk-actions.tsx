@@ -269,7 +269,7 @@ export function ProjectBulkActions({
                 {statusResult.failed.length > 0 && (
                   <ul>
                     {statusResult.failed.map((f) => (
-                      <li key={f.projectId}>{f.name ?? f.projectId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-project-status"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -496,7 +496,7 @@ export function TaskBulkActions({
                 {completeResult.failed.length > 0 && (
                   <ul>
                     {completeResult.failed.map((f) => (
-                      <li key={f.taskId}>{f.title ?? f.taskId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-task-complete"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -572,7 +572,7 @@ export function TaskBulkActions({
                 {reassignResult.failed.length > 0 && (
                   <ul>
                     {reassignResult.failed.map((f) => (
-                      <li key={f.taskId}>{f.title ?? f.taskId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-task-assign"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}

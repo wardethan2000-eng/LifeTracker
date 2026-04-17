@@ -59,9 +59,9 @@ export function StorageModeProvider({
   const [mode, setModeState] = useState<StorageMode>(initialMode);
   const setMode = useCallback((next: StorageMode) => setModeState(next), []);
   return (
-    <StorageModeContext value={{ mode, setMode }}>
+    <StorageModeContext.Provider value={{ mode, setMode }}>
       {children}
-    </StorageModeContext>
+    </StorageModeContext.Provider>
   );
 }
 

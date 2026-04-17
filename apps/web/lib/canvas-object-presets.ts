@@ -66,6 +66,10 @@ export const CANVAS_OBJECT_PRESETS: CanvasObjectPreset[] = [
   { key: "landscape/raised-bed", label: "Raised Bed", category: "landscape", svgPath: "/objects/landscape/raised-bed.svg", defaultWidth: 120, defaultHeight: 60 },
 ];
 
+const CANVAS_OBJECT_PRESET_MAP = new Map(
+  CANVAS_OBJECT_PRESETS.map((preset) => [preset.key, preset] as const)
+);
+
 /** Group presets by category for easy rendering in the picker UI */
 export const CANVAS_OBJECT_PRESETS_BY_CATEGORY: Record<CanvasObjectCategory, CanvasObjectPreset[]> = {
   vehicle: [],
@@ -82,4 +86,15 @@ export const CANVAS_OBJECT_PRESETS_BY_CATEGORY: Record<CanvasObjectCategory, Can
 
 for (const preset of CANVAS_OBJECT_PRESETS) {
   CANVAS_OBJECT_PRESETS_BY_CATEGORY[preset.category].push(preset);
+}
+
+export function getCanvasObjectPresetByKey(key: string | null | undefined): CanvasObjectPreset | null {
+  if (!key) {
+    return null;
+  }
+  return CANVAS_OBJECT_PRESET_MAP.get(key) ?? null;
+}
+
+export function getCanvasObjectPresetSvgPath(key: string | null | undefined): string | null {
+  return getCanvasObjectPresetByKey(key)?.svgPath ?? null;
 }

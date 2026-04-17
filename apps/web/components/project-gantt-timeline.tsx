@@ -328,7 +328,7 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
     setEditing({
       entityType,
       entityId,
-      phaseId,
+      ...(phaseId ? { phaseId } : {}),
       startDate: entityType === "phase"
         ? toInputDate(phase?.startDate)
         : toInputDate(task?.dueDate),
@@ -417,7 +417,7 @@ export function ProjectGanttTimeline({ data, householdId, projectId }: Props): J
       {!hasAnyPhases && (
         <div className="gantt-empty">
           <p>No phases or tasks have been planned yet.</p>
-          <p>Add phases and tasks with dates in the <a href={`/projects/${projectId}/plan?householdId=${householdId}`}>Plan tab</a> to see the timeline.</p>
+          <p>Add phases and tasks in the <a href={`/projects/${projectId}/phases?householdId=${householdId}`}>plan board</a> to build a schedule here.</p>
         </div>
       )}
 

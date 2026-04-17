@@ -359,7 +359,7 @@ export function MaintenanceBulkActions({
                 {completeResult.failed.length > 0 && (
                   <ul>
                     {completeResult.failed.map((f) => (
-                      <li key={f.scheduleId}>{f.name ?? f.scheduleId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-complete"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -431,7 +431,7 @@ export function MaintenanceBulkActions({
                 {snoozeResult.failed.length > 0 && (
                   <ul>
                     {snoozeResult.failed.map((f) => (
-                      <li key={f.scheduleId}>{f.name ?? f.scheduleId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-snooze"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -500,7 +500,7 @@ export function MaintenanceBulkActions({
                 {pauseResult.failed.length > 0 && (
                   <ul>
                     {pauseResult.failed.map((f) => (
-                      <li key={f.scheduleId}>{f.name ?? f.scheduleId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-pause"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}

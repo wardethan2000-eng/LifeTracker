@@ -12,7 +12,7 @@ type NewAssetPageProps = {
 export default async function NewAssetPage({ searchParams }: NewAssetPageProps): Promise<JSX.Element> {
   const [t, resolvedParams, me] = await Promise.all([
     getTranslations("assets"),
-    searchParams ?? Promise.resolve({}),
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
     getMe(),
   ]);
   const parentAssetId = typeof resolvedParams.parentAssetId === "string" ? resolvedParams.parentAssetId : undefined;
@@ -46,7 +46,7 @@ export default async function NewAssetPage({ searchParams }: NewAssetPageProps):
           </div>
         )}
         <Suspense fallback={<section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1, 2, 3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section>}>
-          <NewAssetContent householdId={household.id} parentAssetId={parentAssetId} />
+          <NewAssetContent householdId={household.id} {...(parentAssetId ? { parentAssetId } : {})} />
         </Suspense>
       </div>
     </>

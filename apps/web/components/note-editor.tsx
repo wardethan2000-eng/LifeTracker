@@ -15,6 +15,8 @@ type NoteEditorProps = {
   householdId: string;
   entry: Entry;
   folderOptions: FolderOption[];
+  backHref?: string;
+  backLabel?: string;
 };
 
 const flagOptions: Array<{ value: EntryFlag; label: string; tone: string }> = [
@@ -34,7 +36,7 @@ const repeatOptions: Array<{ label: string; value: number | null }> = [
   { label: "Monthly", value: 30 },
 ];
 
-export function NoteEditor({ householdId, entry, folderOptions }: NoteEditorProps): JSX.Element {
+export function NoteEditor({ householdId, entry, folderOptions, backHref, backLabel = "← Notes" }: NoteEditorProps): JSX.Element {
   const router = useRouter();
   const [title, setTitle] = useState(entry.title ?? "");
   const [body, setBody] = useState(entry.body);
@@ -73,8 +75,8 @@ export function NoteEditor({ householdId, entry, folderOptions }: NoteEditorProp
   const handleDelete = useCallback(async () => {
     if (!confirm("Permanently delete this note?")) return;
     await deleteEntry(householdId, entry.id);
-    router.push(`/notes?householdId=${householdId}`);
-  }, [householdId, entry.id, router]);
+    router.push(backHref ?? `/notes?householdId=${householdId}`);
+  }, [backHref, householdId, entry.id, router]);
 
   const handleFolderChange = useCallback(
     async (newFolderId: string | null) => {
@@ -143,10 +145,10 @@ export function NoteEditor({ householdId, entry, folderOptions }: NoteEditorProp
     <div className="note-editor">
       <div className="note-editor__bar">
         <Link
-          href={`/notes?householdId=${householdId}`}
+          href={backHref ?? `/notes?householdId=${householdId}`}
           className="button button--ghost button--small"
         >
-          ← Notes
+          {backLabel}
         </Link>
         <div className="note-editor__bar-actions">
           {reminderAt && <span className="note-reminder-badge" title="Reminder set">🔔</span>}

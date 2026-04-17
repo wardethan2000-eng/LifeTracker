@@ -71,7 +71,7 @@ type HobbiesListContentProps = {
   householdId: string;
   selectedStatus: HobbyStatus | undefined;
   selectedMode: HobbyActivityMode | undefined;
-  cursor: string | undefined;
+  cursor?: string;
   history: string[];
   limit: number;
 };
@@ -316,9 +316,9 @@ export default async function HobbiesPage({ searchParams }: HobbiesPageProps): P
             householdId={household.id}
             selectedStatus={selectedStatus}
             selectedMode={selectedMode}
-            cursor={cursor}
             history={history}
             limit={limit}
+            {...(cursor ? { cursor } : {})}
           />
         </Suspense>
       </div>

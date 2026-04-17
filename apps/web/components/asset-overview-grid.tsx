@@ -676,7 +676,7 @@ export function AssetOverviewGrid({
       entityId={assetId}
       cards={cards}
       defaultLayout={defaultLayout}
-      serverLayout={serverLayout}
+      {...(serverLayout ? { serverLayout } : {})}
     />
   );
 }

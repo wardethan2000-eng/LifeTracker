@@ -17,11 +17,11 @@ export function AttachmentLightbox({ images, initialIndex, onClose, onCaptionUpd
   const [isEditingCaption, setIsEditingCaption] = useState(false);
   const [captionDraft, setCaptionDraft] = useState("");
 
-  const current = images[index];
+  const current = images[index] ?? images[0]!;
   const hasMultiple = images.length > 1;
-  const currentCaption = captionOverrides.has(current?.id)
+  const currentCaption = captionOverrides.has(current.id)
     ? captionOverrides.get(current.id)
-    : current?.caption;
+    : current.caption;
 
   // Reset editor when navigating
   useEffect(() => {

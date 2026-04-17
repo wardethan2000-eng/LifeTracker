@@ -675,7 +675,7 @@ const buildProjectWorkspaceHref = (
   projectId: string,
   focusPhaseId?: string
 ): string => focusPhaseId
-  ? `/projects/${projectId}?householdId=${householdId}&focusPhaseId=${focusPhaseId}#phase-${focusPhaseId}`
+  ? `/projects/${projectId}/phases?householdId=${householdId}&focusPhaseId=${focusPhaseId}#phase-${focusPhaseId}`
   : `/projects/${projectId}?householdId=${householdId}`;
 
 const resolveProjectWorkspaceHref = async (
@@ -1808,6 +1808,7 @@ export async function createLogAction(formData: FormData): Promise<void> {
   const assetId = getRequiredString(formData, "assetId");
   const input: CreateMaintenanceLogInput = {
     applyLinkedParts: getOptionalString(formData, "applyLinkedParts") !== "false",
+    isRepeatFailure: false,
     metadata: {}
   };
 
@@ -4136,10 +4137,10 @@ export async function createPlaybookAction(formData: FormData): Promise<void> {
 
   const input: CreatePlaybookInput = {
     title,
+    leadDays: leadDays ?? 7,
     ...(description ? { description } : {}),
     ...(triggerMonth !== undefined ? { triggerMonth } : {}),
     ...(triggerDay !== undefined ? { triggerDay } : {}),
-    ...(leadDays !== undefined ? { leadDays } : {}),
   };
 
   await createPlaybook(householdId, input);

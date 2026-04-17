@@ -64,6 +64,47 @@ const sortSupplies = (supplies: WorkspaceSupply[], sortField: SortField, sortDir
   });
 };
 
+type ProcurementSection = {
+  key: string;
+  title: string;
+  description: string;
+  supplies: WorkspaceSupply[];
+};
+
+const buildProcurementSections = (supplies: WorkspaceSupply[]): ProcurementSection[] => {
+  const needsPurchase = supplies.filter((supply) => !supply.isProcured && supply.quantityOnHand <= 0);
+  const partialCoverage = supplies.filter((supply) => !supply.isProcured && supply.quantityOnHand > 0 && supply.quantityOnHand < supply.quantityNeeded);
+  const stocked = supplies.filter((supply) => !supply.isProcured && supply.quantityOnHand >= supply.quantityNeeded);
+  const purchased = supplies.filter((supply) => supply.isProcured);
+
+  return [
+    {
+      key: "needs-purchase",
+      title: "Needs purchase",
+      description: "Nothing is on hand yet, so these items still need sourcing or a buy decision.",
+      supplies: needsPurchase,
+    },
+    {
+      key: "partial-coverage",
+      title: "Partially covered",
+      description: "Some quantity is already available, but more still needs to be bought or transferred.",
+      supplies: partialCoverage,
+    },
+    {
+      key: "stocked",
+      title: "Ready from stock",
+      description: "These items are already covered by current inventory or on-hand quantity.",
+      supplies: stocked,
+    },
+    {
+      key: "purchased",
+      title: "Purchased",
+      description: "Ordered or purchased items that can stay out of the active buy list.",
+      supplies: purchased,
+    },
+  ].filter((section) => section.supplies.length > 0);
+};
+
 export function ProjectSuppliesWorkspace({ householdId, projectId, phases, supplies, inventoryItems }: ProjectSuppliesWorkspaceProps): JSX.Element {
   const [customCategories, setCustomCategories] = useState<string[]>(() => Array.from(new Set(supplies.map((supply) => normalizeCategory(supply.category)).filter((category): category is string => category !== null))));
   const [showCategoryInput, setShowCategoryInput] = useState(false);
@@ -78,7 +119,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
   const [showFilters, setShowFilters] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, string | null>>({});
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
   const [showLinkPreview, setShowLinkPreview] = useState(false);
   const [createPrefill, setCreatePrefill] = useState<{ name?: string; description?: string; estimatedUnitCost?: string; supplier?: string; supplierUrl?: string; imageUrl?: string }>({});
   const [createPrefillKey, setCreatePrefillKey] = useState(0);
@@ -138,25 +179,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
     return sortSupplies(filtered, sortField, sortDir);
   }, [visibleSupplies, searchQuery, statusFilter, categoryFilter, phaseFilter, supplierFilter, sortField, sortDir]);
 
-  const suppliesByCategory = useMemo(() => {
-    const map = new Map<string | null, WorkspaceSupply[]>();
-    for (const supply of filteredSupplies) {
-      const cat = normalizeCategory(supply.category);
-      const bucket = map.get(cat) ?? [];
-      bucket.push(supply);
-      map.set(cat, bucket);
-    }
-    return map;
-  }, [filteredSupplies]);
-
-  const sectionOrder = useMemo((): (string | null)[] => {
-    const result: (string | null)[] = [];
-    if (suppliesByCategory.has(null)) result.push(null);
-    for (const cat of categories) {
-      if (suppliesByCategory.has(cat)) result.push(cat);
-    }
-    return result;
-  }, [categories, suppliesByCategory]);
+  const procurementSections = useMemo(() => buildProcurementSections(filteredSupplies), [filteredSupplies]);
 
   const handleCreateCategory = () => {
     const normalized = normalizeCategory(newCategoryName);
@@ -181,7 +204,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
 
   const expandAll = () => setCollapsedSections(new Set());
   const collapseAll = () => {
-    const allKeys = sectionOrder.map((cat) => cat ?? "__uncategorized");
+    const allKeys = procurementSections.map((section) => section.key);
     setCollapsedSections(new Set(allKeys));
   };
 
@@ -219,94 +242,74 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
 
   return (
     <div className="project-supplies-workspace">
-      {/* ── Header card with stats + add form ── */}
       <Card
-        title="Supplies"
+        title="Materials"
         actions={
           <div className="supply-toolbar">
-            {showCategoryInput ? (
-              <div className="supply-toolbar__inline-input">
-                <input
-                  autoFocus
-                  value={newCategoryName}
-                  onChange={(event) => setNewCategoryName(event.currentTarget.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleCreateCategory(); } if (event.key === "Escape") { setShowCategoryInput(false); setNewCategoryName(""); } }}
-                  placeholder="Category name"
-                />
-                <button type="button" className="button button--ghost button--xs" onClick={handleCreateCategory}>Add</button>
-                <button type="button" className="button button--ghost button--xs" onClick={() => { setShowCategoryInput(false); setNewCategoryName(""); }}>Cancel</button>
-              </div>
-            ) : (
-              <>
-                <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Category</button>
-                <button type="button" className="button button--sm" onClick={() => setShowCreateForm((v) => !v)}>
-                  {showCreateForm ? "Cancel" : "+ Add Supply"}
-                </button>
-              </>
-            )}
+            <button type="button" className="button button--ghost button--sm" onClick={() => setShowAdvancedCreate((value) => !value)}>
+              {showAdvancedCreate ? "Hide details" : "More details"}
+            </button>
           </div>
         }
       >
-        <div className="supply-stat-bar">
-          <div className="supply-stat">
-            <span>{visibleSupplies.length}</span>
-            <label>Total</label>
+        {showLinkPreview && (
+          <LinkPreviewDialog
+            householdId={householdId}
+            onConfirm={(data) => {
+              const priceRaw = data.fields.price?.replace(/[^\d.]/g, "") ?? "";
+              setCreatePrefill({
+                name: data.fields.name ?? "",
+                description: data.fields.description ?? "",
+                estimatedUnitCost: priceRaw,
+                supplier: data.retailer ?? "",
+                supplierUrl: data.sourceUrl ?? "",
+                imageUrl: data.imageUrl ?? "",
+              });
+              setCreatePrefillKey((k) => k + 1);
+              setShowAdvancedCreate(true);
+              setShowLinkPreview(false);
+            }}
+            onCancel={() => setShowLinkPreview(false)}
+          />
+        )}
+        <form action={createProjectPhaseSupplyAction} className="supply-create-form" key={createPrefillKey}>
+          <input type="hidden" name="householdId" value={householdId} />
+          <input type="hidden" name="projectId" value={projectId} />
+          <div className="supply-quick-add">
+            <div className="supply-create-form__grid supply-create-form__grid--quick">
+              <label className="field">
+                <span>Phase</span>
+                <select name="phaseId" required defaultValue={phases[0]?.id ?? ""}>
+                  {phases.map((phase) => (
+                    <option key={phase.id} value={phase.id}>{phase.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field field--span-2">
+                <span>Material</span>
+                <input name="name" placeholder="Drywall, deck screws, primer" required defaultValue={createPrefill.name ?? ""} />
+              </label>
+              <label className="field">
+                <span>Qty</span>
+                <input name="quantityNeeded" type="number" min="0" step="1" defaultValue="1" required />
+              </label>
+              <label className="field">
+                <span>Unit</span>
+                <input name="unit" defaultValue="each" />
+              </label>
+            </div>
+            <div className="supply-quick-add__actions">
+              <button type="submit" className="button button--primary">Add material</button>
+              <button type="button" className="button button--ghost button--sm" onClick={() => setShowAdvancedCreate((value) => !value)}>
+                {showAdvancedCreate ? "Hide details" : "Add details"}
+              </button>
+              <button type="button" className="button button--ghost button--sm" onClick={() => setShowLinkPreview(true)}>Add from link</button>
+            </div>
           </div>
-          <div className="supply-stat supply-stat--warning">
-            <span>{outstandingCount}</span>
-            <label>Outstanding</label>
-          </div>
-          <div className="supply-stat supply-stat--success">
-            <span>{purchasedCount}</span>
-            <label>Purchased</label>
-          </div>
-          <div className="supply-stat">
-            <span>{formatCurrency(totalEstimatedRemaining, "$0.00")}</span>
-            <label>Est. remaining</label>
-          </div>
-        </div>
 
-        {showCreateForm ? (
-          <div>
-            {showLinkPreview && (
-              <LinkPreviewDialog
-                householdId={householdId}
-                onConfirm={(data) => {
-                  const priceRaw = data.fields.price?.replace(/[^\d.]/g, "") ?? "";
-                  setCreatePrefill({
-                    name: data.fields.name ?? "",
-                    description: data.fields.description ?? "",
-                    estimatedUnitCost: priceRaw,
-                    supplier: data.retailer ?? "",
-                    supplierUrl: data.sourceUrl ?? "",
-                    imageUrl: data.imageUrl ?? "",
-                  });
-                  setCreatePrefillKey((k) => k + 1);
-                  setShowLinkPreview(false);
-                }}
-                onCancel={() => setShowLinkPreview(false)}
-              />
-            )}
-            <form action={createProjectPhaseSupplyAction} className="supply-create-form" key={createPrefillKey}>
-              <input type="hidden" name="householdId" value={householdId} />
-              <input type="hidden" name="projectId" value={projectId} />
+          {showAdvancedCreate ? (
+            <div className="supply-create-form__details">
               <div className="supply-create-form__grid">
-                <label className="field">
-                  <span>Phase</span>
-                  <select name="phaseId" required defaultValue={phases[0]?.id ?? ""}>
-                    {phases.map((phase) => (
-                      <option key={phase.id} value={phase.id}>{phase.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field field--span-2">
-                  <span>Supply Name</span>
-                  <input name="name" placeholder="Joint compound, screws, vapor barrier" required defaultValue={createPrefill.name ?? ""} />
-                </label>
-                <label className="field">
-                  <span>Description</span>
-                  <textarea name="description" rows={2} placeholder="Brand preference, sizing, or substitution notes" defaultValue={createPrefill.description ?? ""} />
-                </label>
                 <label className="field">
                   <span>Category</span>
                   <>
@@ -319,16 +322,12 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
                   </>
                 </label>
                 <label className="field">
-                  <span>Qty Needed</span>
-                  <input name="quantityNeeded" type="number" min="0" step="1" defaultValue="1" required />
-                </label>
-                <label className="field">
-                  <span>Unit</span>
-                  <input name="unit" defaultValue="each" />
-                </label>
-                <label className="field">
                   <span>Est. Unit Cost</span>
                   <input name="estimatedUnitCost" type="number" min="0" step="0.01" defaultValue={createPrefill.estimatedUnitCost ?? ""} />
+                </label>
+                <label className="field field--span-2">
+                  <span>Description</span>
+                  <textarea name="description" rows={2} placeholder="Brand preference, sizing, or substitution notes" defaultValue={createPrefill.description ?? ""} />
                 </label>
                 <label className="field">
                   <span>Supplier</span>
@@ -356,14 +355,44 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
                   <textarea name="notes" rows={2} placeholder="Substitutions, source notes, brand preferences" />
                 </label>
               </div>
-              <div className="inline-actions" style={{ marginTop: 12 }}>
-                <button type="button" className="button button--ghost button--sm" onClick={() => setShowLinkPreview(true)}>Add from Link</button>
-                <button type="submit" className="button button--sm">Add Supply</button>
-                <button type="button" className="button button--ghost button--sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
-              </div>
-            </form>
+
+              {showCategoryInput ? (
+                <div className="supply-toolbar__inline-input">
+                  <input
+                    autoFocus
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.currentTarget.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleCreateCategory(); } if (event.key === "Escape") { setShowCategoryInput(false); setNewCategoryName(""); } }}
+                    placeholder="Category name"
+                  />
+                  <button type="button" className="button button--ghost button--xs" onClick={handleCreateCategory}>Add</button>
+                  <button type="button" className="button button--ghost button--xs" onClick={() => { setShowCategoryInput(false); setNewCategoryName(""); }}>Cancel</button>
+                </div>
+              ) : (
+                <button type="button" className="button button--ghost button--sm" onClick={() => setShowCategoryInput(true)}>+ Category</button>
+              )}
+            </div>
+          ) : null}
+        </form>
+
+        <div className="supply-stat-bar">
+          <div className="supply-stat">
+            <span>{visibleSupplies.length}</span>
+            <label>Total</label>
           </div>
-        ) : null}
+          <div className="supply-stat supply-stat--warning">
+            <span>{outstandingCount}</span>
+            <label>Outstanding</label>
+          </div>
+          <div className="supply-stat supply-stat--success">
+            <span>{purchasedCount}</span>
+            <label>Purchased</label>
+          </div>
+          <div className="supply-stat">
+            <span>{formatCurrency(totalEstimatedRemaining, "$0.00")}</span>
+            <label>Est. remaining</label>
+          </div>
+        </div>
       </Card>
 
       {/* ── Search & Filters — always visible, outside the card ── */}
@@ -452,12 +481,12 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
 
       {visibleSupplies.length === 0 ? (
         <p className="supply-sections__empty">
-          No supplies yet. Add your first supply above.
+          No materials yet. Add the first one above.
         </p>
       ) : null}
 
       {/* ── Expand/Collapse controls ── */}
-      {sectionOrder.length > 0 ? (
+      {procurementSections.length > 0 ? (
         <div className="supply-section-controls">
           <button type="button" className="button button--ghost button--xs" onClick={expandAll}>Expand all</button>
           <button type="button" className="button button--ghost button--xs" onClick={collapseAll}>Collapse all</button>
@@ -465,11 +494,10 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
         </div>
       ) : null}
 
-      {/* ── Category accordion sections ── */}
-      {sectionOrder.map((category) => {
-        const key = category ?? "__uncategorized";
-        const sectionSupplies = suppliesByCategory.get(category) ?? [];
-        if (sectionSupplies.length === 0) return null;
+      {/* ── Procurement-state sections ── */}
+      {procurementSections.map((section) => {
+        const key = section.key;
+        const sectionSupplies = section.supplies;
         const isCollapsed = collapsedSections.has(key);
         const purchasedInSection = sectionSupplies.filter((s) => s.isProcured).length;
         const outstandingInSection = sectionSupplies.length - purchasedInSection;
@@ -485,7 +513,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
               aria-expanded={sectionExpanded}
             >
               <span className="supply-section__chevron">{sectionExpanded ? "\u25BE" : "\u25B8"}</span>
-              <h3 className="supply-section__title">{category ?? "Uncategorized"}</h3>
+              <h3 className="supply-section__title">{section.title}</h3>
               <span className="pill pill--sm pill--muted">{sectionSupplies.length}</span>
               <span className="supply-section__meta">
                 {purchasedInSection > 0 ? <span className="supply-section__tag supply-section__tag--success">{purchasedInSection} purchased</span> : null}
@@ -494,6 +522,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
             </button>
             {sectionExpanded ? (
               <div className="supply-section__body">
+                <p className="data-table__secondary" style={{ margin: "0 0 12px" }}>{section.description}</p>
                 {sectionSupplies.map((supply) => (
                   <ProjectSupplyCard
                     key={supply.id}
@@ -503,6 +532,7 @@ export function ProjectSuppliesWorkspace({ householdId, projectId, phases, suppl
                     phaseName={supply.phaseName}
                     supply={supply}
                     inventoryItems={inventoryItems}
+                    openPhaseHref={supply.openPhaseHref}
                     {...(supply.linkedInventoryItem ? { linkedInventoryItem: supply.linkedInventoryItem } : {})}
                     categories={categorySuggestions}
                     onCategoryChange={handleCategoryChange}

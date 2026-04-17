@@ -95,7 +95,7 @@ export function PhaseSplitPanel({
   const selectedPhaseSummary = phases.find((p) => p.id === selectedPhaseId);
 
   return (
-    <div>
+    <div id={selectedPhase ? `phase-${selectedPhase.id}` : undefined}>
       <div className={`phase-split${sidebarCollapsed ? " phase-split--collapsed" : ""}`}>
         {/* ── Left: Phase list (or collapsed rail) ── */}
         <div className="phase-split__list">
@@ -337,7 +337,7 @@ function PhaseDetailPanel({
     { id: "supplies", label: "Supplies", count: phase.supplies.length },
     { id: "expenses", label: "Expenses", count: phase.expenses.length },
     { id: "photos", label: "Photos" },
-    { id: "notes", label: "Notes", count: phaseHasNotes ? 1 : undefined },
+    { id: "notes", label: "Notes", ...(phaseHasNotes ? { count: 1 } : {}) },
   ];
 
   return (

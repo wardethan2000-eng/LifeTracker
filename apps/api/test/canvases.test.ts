@@ -308,6 +308,8 @@ describe("POST /v1/households/:householdId/canvases", () => {
       entityType: "asset",
       entityId: "asset1",
       canvasMode: "floorplan",
+      physicalUnit: "ft",
+      snapToGrid: true,
     });
   });
 

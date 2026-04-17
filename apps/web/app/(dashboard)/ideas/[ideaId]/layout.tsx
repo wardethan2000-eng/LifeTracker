@@ -46,7 +46,6 @@ export default async function IdeaLayout({ params, children }: IdeaLayoutProps):
     { id: "overview", label: "Overview", href: base },
     { id: "notes", label: "Notes", href: `${base}/notes` },
     { id: "canvas", label: "Canvas", href: `${base}/canvas` },
-    { id: "comments", label: "Comments", href: `${base}/comments` },
     { id: "activity", label: "Activity", href: `${base}/activity` },
     { id: "settings", label: "Settings", href: `${base}/settings` },
   ];

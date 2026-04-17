@@ -26,11 +26,11 @@ export function ProjectPortfolioAside({ householdId, projects, selectedSort }: P
     <>
       <section className="panel">
         <div className="panel__header">
-          <h2>Risk Watch</h2>
+          <h2>Needs Attention</h2>
         </div>
         <div className="panel__body project-insight-list">
           {atRiskProjects.length === 0 ? (
-            <p className="panel__empty">No visible projects are currently flagged as late, underfunded, or materially blocked.</p>
+            <p className="panel__empty">Nothing in the current view is late, materially blocked, or showing strong budget pressure.</p>
           ) : (
             atRiskProjects.slice(0, 5).map((project) => (
               <div key={project.id} className="project-insight-item">
@@ -47,7 +47,7 @@ export function ProjectPortfolioAside({ householdId, projects, selectedSort }: P
 
       <section className="panel">
         <div className="panel__header">
-          <h2>Material Gaps</h2>
+          <h2>Material Blockers</h2>
         </div>
         <div className="panel__body project-insight-list">
           {materialGapProjects.length === 0 ? (
@@ -68,7 +68,7 @@ export function ProjectPortfolioAside({ householdId, projects, selectedSort }: P
 
       <section className="panel">
         <div className="panel__header">
-          <h2>Funding Snapshot</h2>
+          <h2>Budget Snapshot</h2>
         </div>
         <div className="panel__body--padded project-funding-stack">
           <div className="project-funding-row">

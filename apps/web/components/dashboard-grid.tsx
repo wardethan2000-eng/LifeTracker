@@ -152,7 +152,7 @@ export function DashboardGrid({
   // ── Drag handlers ─────────────────────────────────────────────────────────
 
   const handleDragStart = useCallback(
-    (layout: Layout, _oldItem: LayoutItem) => {
+    (layout: Layout, _oldItem: LayoutItem | null) => {
       isDragging.current = true;
       lastSwapTarget.current = null;
       setSwapTargetId(null);
@@ -169,7 +169,8 @@ export function DashboardGrid({
    *  dragged card's original slot.  No compactVertical here so the grid
    *  stays predictable until the drop finalizes. */
   const handleDrag = useCallback(
-    (_layout: Layout, _oldItem: LayoutItem, newItem: LayoutItem) => {
+    (_layout: Layout, _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
+      if (!newItem) return;
       const pre = preDragLayout.current;
       const origDragged = pre.find((c) => c.i === newItem.i);
       if (!origDragged) return;
@@ -201,11 +202,12 @@ export function DashboardGrid({
   /** Finalize the swap: exchange the two cards' positions, compact, and
    *  persist. */
   const handleDragStop = useCallback(
-    (_layout: Layout, _oldItem: LayoutItem, newItem: LayoutItem) => {
+    (_layout: Layout, _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
       isDragging.current = false;
       dragEndedAt.current = Date.now();
       lastSwapTarget.current = null;
       setSwapTargetId(null);
+      if (!newItem) return;
       if (!loaded) return;
 
       const pre = preDragLayout.current;
@@ -268,9 +270,7 @@ export function DashboardGrid({
         breakpoints={BREAKPOINTS}
         cols={COLS}
         rowHeight={ROW_HEIGHT}
-        compactType={null}
         dragConfig={{ handle: ".dashboard-card__header" }}
-        resizeHandles={["s", "w", "e", "n", "sw", "nw", "se", "ne"]}
         onDragStart={handleDragStart}
         onDrag={handleDrag}
         onDragStop={handleDragStop}

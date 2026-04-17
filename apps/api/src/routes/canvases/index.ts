@@ -353,6 +353,7 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
     const userId = request.auth.userId;
     await assertMembership(app.prisma, householdId, userId);
     const input = createIdeaCanvasSchema.parse(request.body);
+    const canvasMode = (input.canvasMode ?? "diagram") as "diagram" | "floorplan" | "freehand";
 
     const canvas = await app.prisma.ideaCanvas.create({
       data: {
@@ -361,7 +362,13 @@ export const ideaCanvasRoutes: FastifyPluginAsync = async (app) => {
         name: input.name,
         entityType: input.entityType ?? null,
         entityId: input.entityId ?? null,
-        canvasMode: (input.canvasMode ?? "diagram") as "diagram" | "floorplan" | "freehand",
+        canvasMode,
+        ...(canvasMode === "floorplan"
+          ? {
+              physicalUnit: "ft",
+              snapToGrid: true,
+            }
+          : {}),
         layers: {
           create: [{ name: "Default", sortOrder: 0 }],
         },

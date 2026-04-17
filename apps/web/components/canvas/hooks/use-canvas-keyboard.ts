@@ -7,6 +7,7 @@ type UseCanvasKeyboardInput = {
   editingEdgeId: string | null;
   editingName: boolean;
   showSettings: boolean;
+  showLayerPanel: boolean;
   activeTool: ActiveTool;
   physicalUnit: string | null | undefined;
   nodes: IdeaCanvasNode[];
@@ -30,6 +31,7 @@ export function useCanvasKeyboard({
   editingEdgeId,
   editingName,
   showSettings,
+  showLayerPanel,
   activeTool,
   physicalUnit,
   nodes,
@@ -49,7 +51,7 @@ export function useCanvasKeyboard({
 }: UseCanvasKeyboardInput) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (editingNodeId || editingEdgeId || editingName || showSettings) return;
+      if (editingNodeId || editingEdgeId || editingName || showSettings || showLayerPanel) return;
       const active = document.activeElement;
       if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
 
@@ -91,7 +93,7 @@ export function useCanvasKeyboard({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [
-    editingNodeId, editingEdgeId, editingName, showSettings,
+    editingNodeId, editingEdgeId, editingName, showSettings, showLayerPanel,
     onDelete, onUndo, onRedo, onCopy, onPaste, onEscape,
     onFinishWallChain, onSelectAll, onRotate90, onGroup, onUngroup,
     setActiveTool,

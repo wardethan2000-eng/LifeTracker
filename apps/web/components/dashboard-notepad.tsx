@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { EntryEntityType } from "@aegis/types";
 import { createEntry, getEntries, updateEntry } from "../lib/api";
 
 const RichEditor = dynamic(
@@ -11,7 +12,7 @@ const RichEditor = dynamic(
 
 type DashboardNotepadProps = {
   householdId: string;
-  entityType: string;
+  entityType: EntryEntityType;
   entityId: string;
 };
 
@@ -64,7 +65,7 @@ export function DashboardNotepad({ householdId, entityType, entityId }: Dashboar
             entityId,
             title: "Dashboard Notepad",
             body: text,
-            bodyFormat: "html",
+            bodyFormat: "rich_text",
             entryType: "note",
             entryDate: new Date().toISOString(),
             tags: [NOTEPAD_TAG],

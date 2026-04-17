@@ -55,6 +55,7 @@ export function ProjectSupplyCard({
   inventoryItems = [],
   linkedInventoryItem,
   phaseName,
+  openPhaseHref,
   categories = [],
   onCategoryChange,
   dragHandleProps,
@@ -174,6 +175,11 @@ export function ProjectSupplyCard({
           >
             Edit
           </button>
+          {openPhaseHref ? (
+            <a href={openPhaseHref} className="button button--ghost button--xs">
+              Open phase
+            </a>
+          ) : null}
           {isDeleting ? (
             <span className="supply-row__delete-confirm">
               <button type="button" className="button button--danger button--xs" onClick={handleDelete} disabled={isPending}>

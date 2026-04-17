@@ -65,8 +65,9 @@ export const readSnapshot = async <T = unknown>(
     "SELECT payload FROM snapshot WHERE household_id = $1 AND entity_type = $2",
     [householdId, entityType]
   );
-  if (result.rows.length === 0) return null;
-  return JSON.parse(result.rows[0].payload) as T[];
+  const row = result.rows[0];
+  if (!row) return null;
+  return JSON.parse(row.payload) as T[];
 };
 
 /** How old (in ms) is the locally cached snapshot for a given entity type? */
@@ -79,8 +80,9 @@ export const snapshotAge = async (
     "SELECT loaded_at FROM snapshot WHERE household_id = $1 AND entity_type = $2",
     [householdId, entityType]
   );
-  if (result.rows.length === 0) return null;
-  return Date.now() - new Date(result.rows[0].loaded_at).getTime();
+  const row = result.rows[0];
+  if (!row) return null;
+  return Date.now() - new Date(row.loaded_at).getTime();
 };
 
 /** Remove all cached data for a household (e.g. on sign-out). */

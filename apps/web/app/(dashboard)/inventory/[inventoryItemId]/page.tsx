@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { AttachmentSection } from "../../../../components/attachment-section";
-import { InventoryCommentsPanel } from "../../../../components/inventory-comments-panel";
+import { EntityNotesWorkspace } from "../../../../components/entity-notes-workspace";
 import { InventoryDangerActions } from "../../../../components/inventory-danger-actions";
 import { InventoryItemDetailEditor } from "../../../../components/inventory-item-detail-editor";
 import { InventoryItemLocationsPanel } from "../../../../components/inventory-item-locations-panel";
@@ -11,7 +11,6 @@ import { InventoryTransactionHistory } from "../../../../components/inventory-tr
 import {
   ApiError,
   getHouseholdSpacesTree,
-  getInventoryItemComments,
   getInventoryItemConsumption,
   getInventoryItemDetail,
   getMe
@@ -91,10 +90,9 @@ export default async function InventoryItemDetailPage({ params, searchParams }: 
 
 async function ItemDetailContent({ householdId, inventoryItemId }: { householdId: string; inventoryItemId: string }): Promise<JSX.Element> {
   try {
-    const [item, analytics, comments, spaces] = await Promise.all([
+    const [item, analytics, spaces] = await Promise.all([
       getInventoryItemDetail(householdId, inventoryItemId, { transactionLimit: 20 }),
       getInventoryItemConsumption(householdId, inventoryItemId),
-      getInventoryItemComments(householdId, inventoryItemId),
       getHouseholdSpacesTree(householdId)
     ]);
     const backHref = `/inventory?householdId=${householdId}`;
@@ -326,10 +324,14 @@ async function ItemDetailContent({ householdId, inventoryItemId }: { householdId
             entityId={item.id}
           />
 
-          <InventoryCommentsPanel
+          <EntityNotesWorkspace
             householdId={householdId}
-            inventoryItemId={item.id}
-            comments={comments}
+            entityType="inventory_item"
+            entityId={item.id}
+            title="Notes"
+            subtitle="Capture sourcing notes, restock reminders, warnings, and reference notes directly on this inventory item."
+            backToHref={`/inventory/${item.id}?householdId=${householdId}`}
+            compact
           />
 
           <section className="panel">

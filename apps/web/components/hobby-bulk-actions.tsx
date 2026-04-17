@@ -329,7 +329,7 @@ export function HobbyBulkActions({
                 {logResult.failed.length > 0 && (
                   <ul>
                     {logResult.failed.map((f, i) => (
-                      <li key={f.sessionId ?? i}>{f.name ?? "(unknown)"}: {f.message}</li>
+                      <li key={f.id ?? i}>{f.label ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -382,7 +382,7 @@ export function HobbyBulkActions({
                 {archiveResult.failed.length > 0 && (
                   <ul>
                     {archiveResult.failed.map((f, i) => (
-                      <li key={f.sessionId ?? i}>{f.name ?? "(unknown)"}: {f.message}</li>
+                      <li key={f.id ?? i}>{f.label ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}

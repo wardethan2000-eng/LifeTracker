@@ -161,7 +161,7 @@ export function AssetMaintenanceSections({
         <ScheduleForm
           assetId={detail.asset.id}
           metrics={detail.metrics.map((metric) => ({ id: metric.id, name: metric.name, unit: metric.unit }))}
-          procedures={procedures}
+          {...(procedures ? { procedures } : {})}
           action={createScheduleAction}
         />
       </Card>

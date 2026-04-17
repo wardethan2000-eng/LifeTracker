@@ -30,7 +30,7 @@ export async function AssetMaintenanceTab({ detail, householdMembers, procedures
       <div className="resource-layout__primary">
         <AssetMaintenanceSections
           detail={detail}
-          procedures={procedures}
+          {...(procedures ? { procedures } : {})}
           createScheduleAction={createScheduleAction}
           completeScheduleAction={completeScheduleAction}
           toggleScheduleActiveAction={toggleScheduleActiveAction}

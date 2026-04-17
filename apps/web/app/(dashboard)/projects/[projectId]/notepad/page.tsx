@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { ApiError, getMe } from "../../../../../lib/api";
-import { ProjectNotesEditor } from "../../../../../components/project-notes-editor";
+import { EntityNotesWorkspace } from "../../../../../components/entity-notes-workspace";
 
 type ProjectNotepadPageProps = {
   params: Promise<{ projectId: string }>;
@@ -22,7 +22,14 @@ export default async function ProjectNotepadPage({ params, searchParams }: Proje
 
     return (
       <section id="project-notepad" style={{ padding: "16px 0" }}>
-        <ProjectNotesEditor householdId={household.id} projectId={projectId} />
+        <EntityNotesWorkspace
+          householdId={household.id}
+          entityType="project"
+          entityId={projectId}
+          title="Project notes"
+          subtitle="Save planning notes, reminders, checklists, and reference material for this project."
+          backToHref={`/projects/${projectId}/notepad?householdId=${household.id}`}
+        />
       </section>
     );
   } catch (error) {

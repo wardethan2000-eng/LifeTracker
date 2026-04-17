@@ -125,7 +125,7 @@ export function AssetCreationWizard({
           visibility: "shared",
           manufacturer: quickFields.manufacturer?.trim() || undefined,
           model: quickFields.model?.trim() || undefined,
-          assetTypeSource: selectedPresetKey === "__blank__" ? "manual" : "preset",
+          assetTypeSource: selectedPresetKey === "__blank__" ? "manual" : selectedPresetSource,
           assetTypeVersion: 1,
           fieldDefinitions: [],
           customFields: {},

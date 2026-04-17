@@ -92,7 +92,7 @@ async function RecipeContent({ householdId, hobbyId, recipeId, timezone }: { hou
               Edit
             </Link>
             <HobbyRecipeDeleteButton
-              householdId={household.id}
+              householdId={householdId}
               hobbyId={hobbyId}
               recipeId={recipeId}
               deleteAction={deleteHobbyRecipeAction}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
-import type { ActivityLog } from "@aegis/types";
+import type { ActivityLog, DateFormat } from "@aegis/types";
 import { HouseholdCsvExportButton } from "../../../components/asset-export-actions";
 import { ApiError, getDisplayPreferences, getHouseholdActivity, getMe } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/formatters";
@@ -215,11 +215,11 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps):
             householdId={household.id}
             entityType={entityType}
             windowDays={windowDays}
-            cursor={cursor}
             history={history}
             limit={limit}
             dateFormat={prefs.dateFormat}
             formatMetadataValueWithPrefs={formatMetadataValueWithPrefs}
+            {...(cursor ? { cursor } : {})}
           />
         </Suspense>
       </div>
@@ -232,10 +232,10 @@ type ActivityListContentProps = {
   householdId: string;
   entityType: string;
   windowDays: string;
-  cursor: string | undefined;
+  cursor?: string;
   history: string[];
   limit: number;
-  dateFormat: string;
+  dateFormat: DateFormat;
   formatMetadataValueWithPrefs: (value: unknown) => string;
 };
 

@@ -620,7 +620,7 @@ export type ImportInventoryResult = {
 
 type RequestOptions<T> = {
   path: string;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   schema?: Schema<T>;
   cacheOptions?: RequestInit["cache"] | { revalidate: number };

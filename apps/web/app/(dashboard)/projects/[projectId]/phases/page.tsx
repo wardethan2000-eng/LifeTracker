@@ -1,8 +1,11 @@
+import Link from "next/link";
 import type { JSX } from "react";
 import { Suspense } from "react";
 import { PhaseSplitPanel } from "../../../../../components/phase-split-panel";
+import { ProjectGanttTimeline } from "../../../../../components/project-gantt-timeline";
 import {
   ApiError,
+  fetchProjectTimelineData,
   getHouseholdInventory,
   getHouseholdMembers,
   getHouseholdServiceProviders,
@@ -40,11 +43,22 @@ const PhaseDetailsSkeleton = (): JSX.Element => (
   </div>
 );
 
+const ScheduleSkeleton = (): JSX.Element => (
+  <section className="panel" aria-hidden="true">
+    <div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />
+      ))}
+    </div>
+  </section>
+);
+
 export default async function ProjectPhasesPage({ params, searchParams }: ProjectPhasesPageProps): Promise<JSX.Element> {
   const { projectId } = await params;
   const query = searchParams ? await searchParams : {};
   const householdId = typeof query.householdId === "string" ? query.householdId : undefined;
   const focusedPhaseId = typeof query.focusPhaseId === "string" ? query.focusPhaseId : undefined;
+  const view = query.view === "schedule" ? "schedule" : "board";
 
   try {
     const me = await getMe();
@@ -55,16 +69,51 @@ export default async function ProjectPhasesPage({ params, searchParams }: Projec
     }
 
     const project = await getProjectDetail(household.id, projectId);
+    const buildPlanHref = (targetView: "board" | "schedule"): string => {
+      const params = new URLSearchParams({ householdId: household.id });
+      if (focusedPhaseId) {
+        params.set("focusPhaseId", focusedPhaseId);
+      }
+      if (targetView === "schedule") {
+        params.set("view", "schedule");
+      }
+      return `/projects/${project.id}/phases?${params.toString()}`;
+    };
 
     return (
       <section id="project-phases">
-        <Suspense fallback={<PhaseDetailsSkeleton />}>
-          <PhaseSplitPanelAsync
-            householdId={household.id}
-            projectId={project.id}
-            project={project}
-            {...(focusedPhaseId ? { initialPhaseId: focusedPhaseId } : {})}
-          />
+        <div className="panel" style={{ marginBottom: 20 }}>
+          <div className="panel__body--padded" style={{ display: "grid", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+              <div style={{ display: "grid", gap: 6, maxWidth: 720 }}>
+                <h2 style={{ margin: 0 }}>Plan workspace</h2>
+                <p className="data-table__secondary" style={{ margin: 0 }}>
+                  Manage phases, tasks, milestones, materials, and schedule from one planning surface instead of splitting planning across separate tabs.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Link href={buildPlanHref("board")} className={`button button--sm${view === "board" ? "" : " button--ghost"}`}>
+                  Plan board
+                </Link>
+                <Link href={buildPlanHref("schedule")} className={`button button--sm${view === "schedule" ? "" : " button--ghost"}`}>
+                  Schedule
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Suspense fallback={view === "schedule" ? <ScheduleSkeleton /> : <PhaseDetailsSkeleton />}>
+          {view === "schedule" ? (
+            <ProjectScheduleAsync householdId={household.id} projectId={project.id} />
+          ) : (
+            <PhaseSplitPanelAsync
+              householdId={household.id}
+              projectId={project.id}
+              project={project}
+              {...(focusedPhaseId ? { initialPhaseId: focusedPhaseId } : {})}
+            />
+          )}
         </Suspense>
       </section>
     );
@@ -73,7 +122,7 @@ export default async function ProjectPhasesPage({ params, searchParams }: Projec
       return (
         <div className="panel">
           <div className="panel__body--padded">
-            <p>Failed to load phases: {error.message}</p>
+            <p>Failed to load plan workspace: {error.message}</p>
           </div>
         </div>
       );
@@ -100,7 +149,7 @@ async function PhaseSplitPanelAsync({
     getHouseholdInventory(householdId, { limit: 100 }),
   ]);
 
-  const unphasedTasks = project.tasks.filter((t) => !t.phaseId);
+  const unphasedTasks = project.tasks.filter((task) => !task.phaseId);
 
   return (
     <PhaseSplitPanel
@@ -116,5 +165,19 @@ async function PhaseSplitPanelAsync({
       unphasedTasks={unphasedTasks}
       {...(initialPhaseId ? { initialPhaseId } : {})}
     />
+  );
+}
+
+async function ProjectScheduleAsync({ householdId, projectId }: { householdId: string; projectId: string }): Promise<JSX.Element> {
+  const timelineData = await fetchProjectTimelineData(householdId, projectId);
+
+  return (
+    <section id="project-schedule">
+      <ProjectGanttTimeline
+        data={timelineData}
+        householdId={householdId}
+        projectId={projectId}
+      />
+    </section>
   );
 }

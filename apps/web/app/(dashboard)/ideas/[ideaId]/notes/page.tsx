@@ -1,13 +1,15 @@
 import type { JSX } from "react";
 import { ApiError, getMe } from "../../../../../lib/api";
-import { EntryTimeline } from "../../../../../components/entry-system";
+import { EntityNotesWorkspace } from "../../../../../components/entity-notes-workspace";
 
 type IdeaNotesPageProps = {
   params: Promise<{ ideaId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function IdeaNotesPage({ params }: IdeaNotesPageProps): Promise<JSX.Element> {
+export default async function IdeaNotesPage({ params, searchParams }: IdeaNotesPageProps): Promise<JSX.Element> {
   const { ideaId } = await params;
+  void searchParams;
 
   try {
     const me = await getMe();
@@ -15,13 +17,13 @@ export default async function IdeaNotesPage({ params }: IdeaNotesPageProps): Pro
     if (!household) return <p>No household found.</p>;
 
     return (
-      <EntryTimeline
+      <EntityNotesWorkspace
         householdId={household.id}
         entityType="idea"
         entityId={ideaId}
-        title="Idea Notes"
-        quickAddLabel="Note"
-        entryHrefTemplate={`/ideas/${ideaId}/notes#entry-{entryId}`}
+        title="Idea notes"
+        subtitle="Capture research, references, next steps, reminders, and planning notes as the idea evolves."
+        backToHref={`/ideas/${ideaId}/notes`}
       />
     );
   } catch (error) {

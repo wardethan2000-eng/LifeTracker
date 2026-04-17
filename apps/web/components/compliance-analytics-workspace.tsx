@@ -96,16 +96,6 @@ const getTone = (rate: number): "success" | "warning" | "danger" => {
   return "danger";
 };
 
-const formatMonth = (value: string): string => {
-  const [year, month] = value.split("-").map((entry) => Number.parseInt(entry, 10));
-
-  if (!year || !month) {
-    return value;
-  }
-
-  return monthFormatter.format(new Date(Date.UTC(year, month - 1, 1)));
-};
-
 const emptyMessage = "No maintenance logs in this period";
 
 const AnalyticsLoadingState = ({ blocks = 3 }: { blocks?: number }): JSX.Element => (

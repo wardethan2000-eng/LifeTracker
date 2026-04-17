@@ -167,6 +167,11 @@ export function AttachmentGallery({
     }
     const newItems = [...items];
     const [moved] = newItems.splice(dragSrc, 1);
+    if (!moved) {
+      setDragSrc(null);
+      setDragOver(null);
+      return;
+    }
     newItems.splice(targetIndex, 0, moved);
     const withOrder = newItems.map((a, i) => ({ ...a, sortOrder: i }));
     setItems(withOrder);
@@ -250,7 +255,7 @@ export function AttachmentGallery({
           images={lightbox.images}
           initialIndex={lightbox.index}
           onClose={() => setLightbox(null)}
-          onCaptionUpdate={readonly ? undefined : handleCaptionUpdate}
+          {...(!readonly ? { onCaptionUpdate: handleCaptionUpdate } : {})}
         />
       )}
     </>

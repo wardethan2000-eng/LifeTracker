@@ -30,7 +30,7 @@ export function getEdgeAnchors(source: IdeaCanvasNode, target: IdeaCanvasNode) {
         { x: c.cx, y: node.y + node.height }, // bottom
         { x: node.x, y: c.cy },        // left
       ];
-      let best = vertices[0];
+      let best = { x: c.cx, y: c.cy };
       let bestDot = -Infinity;
       for (const v of vertices) {
         const dot = (v.x - c.cx) * cos + (v.y - c.cy) * sin;
@@ -133,7 +133,8 @@ export function computeAlignmentGuides(
           if (Math.abs(diff) < Math.abs(bestDx)) {
             bestDx = diff;
             for (let i = guides.length - 1; i >= 0; i--) {
-              if (guides[i].axis === "vertical") guides.splice(i, 1);
+              const guide = guides[i];
+              if (guide?.axis === "vertical") guides.splice(i, 1);
             }
           }
           guides.push({ axis: "vertical", position: oxx });
@@ -148,7 +149,8 @@ export function computeAlignmentGuides(
           if (Math.abs(diff) < Math.abs(bestDy)) {
             bestDy = diff;
             for (let i = guides.length - 1; i >= 0; i--) {
-              if (guides[i].axis === "horizontal") guides.splice(i, 1);
+              const guide = guides[i];
+              if (guide?.axis === "horizontal") guides.splice(i, 1);
             }
           }
           guides.push({ axis: "horizontal", position: oyy });

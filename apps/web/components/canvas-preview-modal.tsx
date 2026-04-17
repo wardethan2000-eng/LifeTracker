@@ -105,8 +105,8 @@ type CanvasDashboardCardProps = {
     id: string;
     name: string;
     canvasMode: string;
-    nodeCount: number;
-    edgeCount: number;
+    nodeCount?: number;
+    edgeCount?: number;
     nodes: IdeaCanvasThumbnailNode[];
     edges: IdeaCanvasThumbnailEdge[];
     updatedAt: string;
@@ -115,6 +115,8 @@ type CanvasDashboardCardProps = {
 
 export function CanvasDashboardCard({ householdId, canvas }: CanvasDashboardCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const nodeCount = canvas.nodeCount ?? canvas.nodes.length;
+  const edgeCount = canvas.edgeCount ?? canvas.edges.length;
 
   return (
     <>
@@ -140,7 +142,7 @@ export function CanvasDashboardCard({ householdId, canvas }: CanvasDashboardCard
             <span className="canvas-dash-card__mode">{canvas.canvasMode}</span>
           )}
           <span className="canvas-dash-card__counts">
-            {canvas.nodeCount} nodes · {canvas.edgeCount} edges
+            {nodeCount} nodes · {edgeCount} edges
           </span>
         </div>
       </button>

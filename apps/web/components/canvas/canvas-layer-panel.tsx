@@ -19,6 +19,7 @@ export interface CanvasLayerPanelProps {
   onDelete: (layerId: string) => void;
   onClose: () => void;
   isFloorplan?: boolean;
+  embedded?: boolean;
 }
 
 export function CanvasLayerPanel({
@@ -36,6 +37,7 @@ export function CanvasLayerPanel({
   onDelete,
   onClose,
   isFloorplan = false,
+  embedded = false,
 }: CanvasLayerPanelProps): JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -59,17 +61,22 @@ export function CanvasLayerPanel({
   }
 
   return (
-    <div className="idea-canvas__layer-panel">
+    <div className={`idea-canvas__layer-panel${embedded ? " idea-canvas__layer-panel--embedded" : ""}`}>
       <div className="idea-canvas__layer-panel-header">
-        <span className="idea-canvas__layer-panel-title">Layers</span>
-        <button
-          type="button"
-          className="button button--ghost button--small"
-          onClick={onClose}
-          title="Close layers panel"
-        >
-          ✕
-        </button>
+        <div className="idea-canvas__layer-panel-heading">
+          <span className="idea-canvas__layer-panel-title">{isFloorplan ? "Layers & floors" : "Layers"}</span>
+          <span className="idea-canvas__layer-panel-subtitle">The active layer receives new items.</span>
+        </div>
+        {!embedded ? (
+          <button
+            type="button"
+            className="button button--ghost button--small"
+            onClick={onClose}
+            title="Close layers panel"
+          >
+            ✕
+          </button>
+        ) : null}
       </div>
 
       <div className="idea-canvas__layer-list">
@@ -77,8 +84,6 @@ export function CanvasLayerPanel({
           const isActive = layer.id === activeLayerId;
           const isTop = idx === 0;
           const isBottom = idx === sorted.length - 1;
-          // In descending order, "move up" = increase sortOrder = visually higher
-          const realIdx = layers.findIndex((l) => l.id === layer.id);
 
           return (
             <div
@@ -205,7 +210,7 @@ export function CanvasLayerPanel({
         >
           + Add Layer
         </button>
-        <span className="idea-canvas__layer-count">{layers.length}/20</span>
+        <span className="idea-canvas__layer-count">{layers.length === 1 ? "1 layer" : `${layers.length} layers`}</span>
       </div>
     </div>
   );

@@ -6,11 +6,9 @@ import dynamic from "next/dynamic";
 import type { DashboardCardDef } from "./dashboard-grid";
 const DashboardGrid = dynamic(() => import("./dashboard-grid").then((m) => ({ default: m.DashboardGrid })), { ssr: false });
 import { PinButton } from "./pin-button";
-import { DashboardNotepad } from "./dashboard-notepad";
 import { ProjectProgressBar } from "./project-progress-bar";
 import { AttachmentSection } from "./attachment-section";
 import { NotesAndCanvasCard, type NccNoteSummary, type NccCanvasSummary } from "./notes-canvas-card";
-import { CanvasThumbnail } from "./canvas-thumbnail";
 import type { ProjectPhaseProgress, IdeaCanvasThumbnail } from "@aegis/types";
 import { useFormattedDate } from "../lib/formatted-date";
 
@@ -88,28 +86,41 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     phaseProgress,
     recentNote,
     canvases,
-    canvasThumbnails,
   } = props;
 
   const base = `/projects/${projectId}`;
+  const nextTask = upcomingTasks[0] ?? null;
 
   const cards: DashboardCardDef[] = [
     {
-      key: "tasks",
-      title: "Tasks",
+      key: "focus",
+      title: "Next Focus",
       content: (
-        <dl className="dashboard-card__kv">
-          <div><dt>Remaining</dt><dd>{remainingTaskCount}</dd></div>
-          <div><dt>Completed</dt><dd>{completedTaskCount} / {totalTaskCount}</dd></div>
-          <div><dt>Blocked</dt><dd>{blockedTasks}</dd></div>
-          <div><dt>Critical Path</dt><dd>{criticalPathTasks}</dd></div>
-        </dl>
+        nextTask ? (
+          <div className="dashboard-card__focus">
+            <strong>{nextTask.title}</strong>
+            <p>
+              {nextTask.dueDate
+                ? `Due ${formatShortDate(nextTask.dueDate)}`
+                : "No due date set yet"}
+            </p>
+            <dl className="dashboard-card__kv">
+              <div><dt>Remaining tasks</dt><dd>{remainingTaskCount}</dd></div>
+              <div><dt>Blocked</dt><dd>{blockedTasks}</dd></div>
+            </dl>
+          </div>
+        ) : (
+          <div className="dashboard-card__focus">
+            <strong>{activePhaseLabel ?? "No active phase yet"}</strong>
+            <p>Start by defining the next concrete task or phase milestone.</p>
+          </div>
+        )
       ),
-      footerLink: { label: "View all tasks →", href: `${base}/phases${qs}` },
+      footerLink: { label: "Open plan →", href: `${base}/phases${qs}` },
     },
     {
       key: "phases",
-      title: "Phase Progress",
+      title: "Plan Progress",
       content: (
         <div>
           <div style={{ marginBottom: 12 }}>
@@ -135,7 +146,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     },
     {
       key: "budget",
-      title: "Budget & Spending",
+      title: "Budget Snapshot",
       content: (
         <dl className="dashboard-card__kv">
           <div><dt>Budget</dt><dd>{formatCurrency(budgetAmount)}</dd></div>
@@ -154,7 +165,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     },
     {
       key: "inventory",
-      title: "Materials",
+      title: "Material Readiness",
       content: (
         <dl className="dashboard-card__kv">
           <div><dt>Total Items</dt><dd>{supplyTotalItems}</dd></div>
@@ -182,7 +193,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     },
     {
       key: "journal",
-      title: "Recent Log",
+      title: "Recent Activity",
       content: recentEntries.length > 0 ? (
         <div className="dashboard-card__list">
           {recentEntries.map((entry) => (
@@ -195,19 +206,7 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
       ) : (
         <p className="dashboard-card__empty">No log entries yet</p>
       ),
-      footerLink: { label: "View log →", href: `${base}/notes${qs}` },
-    },
-    {
-      key: "notepad",
-      title: "Quick Notepad",
-      content: (
-        <DashboardNotepad
-          householdId={householdId}
-          entityType="project"
-          entityId={projectId}
-        />
-      ),
-      footerLink: { label: "Open log →", href: `${base}/notes${qs}` },
+      footerLink: { label: "Open activity →", href: `${base}/notes${qs}` },
     },
     {
       key: "attachments",
@@ -253,43 +252,19 @@ export function ProjectDashboard(props: ProjectDashboardProps) {
     });
   }
 
-  if (canvasThumbnails) {
-    for (const canvas of canvasThumbnails) {
-      cards.push({
-        key: `canvas-${canvas.id}`,
-        title: canvas.name,
-        content: (
-          <div className="dashboard-card__canvas-preview">
-            <CanvasThumbnail nodes={canvas.nodes} edges={canvas.edges} className="dashboard-card__canvas-svg" />
-          </div>
-        ),
-        footerLink: { label: "Open canvas →", href: `/canvases/${canvas.id}${qs}` },
-      });
-    }
-  }
-
   const defaultLayout: LayoutItem[] = [
-    { i: "tasks", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
+    { i: "focus", x: 0, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "phases", x: 1, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "budget", x: 2, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "inventory", x: 3, y: 0, w: 1, h: 3, minW: 1, minH: 2 },
     { i: "upcoming", x: 0, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
     { i: "journal", x: 2, y: 3, w: 2, h: 3, minW: 1, minH: 2 },
-    { i: "notepad", x: 0, y: 6, w: 2, h: 4, minW: 1, minH: 3 },
-    { i: "assets", x: 2, y: 6, w: 2, h: 3, minW: 1, minH: 2 },
-    { i: "attachments", x: 2, y: 9, w: 2, h: 4, minW: 1, minH: 3 },
+    { i: "assets", x: 0, y: 6, w: 2, h: 3, minW: 1, minH: 2 },
+    { i: "attachments", x: 2, y: 6, w: 2, h: 4, minW: 1, minH: 3 },
   ];
 
   if (subProjectCount > 0) {
     defaultLayout.push({ i: "subprojects", x: 0, y: 9, w: 2, h: 2, minW: 1, minH: 2 });
-  }
-
-  if (canvasThumbnails) {
-    let yOffset = 12;
-    for (const canvas of canvasThumbnails) {
-      defaultLayout.push({ i: `canvas-${canvas.id}`, x: 0, y: yOffset, w: 2, h: 4, minW: 1, minH: 3 });
-      yOffset += 4;
-    }
   }
 
   return (

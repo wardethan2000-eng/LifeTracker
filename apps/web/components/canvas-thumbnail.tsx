@@ -25,7 +25,7 @@ export function CanvasThumbnail({ nodes, edges, className }: CanvasThumbnailProp
   const imageUrlMap = useMemo(() => buildImageUrlMap(nodes), [nodes]);
 
   const svgString = useMemo(
-    () => renderCanvasToSVG(nodes, edges, { backgroundColor: "transparent", imageUrlMap }),
+    () => renderCanvasToSVG(nodes, edges, { backgroundColor: "transparent", ...(imageUrlMap ? { imageUrlMap } : {}) }),
     [nodes, edges, imageUrlMap],
   );
 

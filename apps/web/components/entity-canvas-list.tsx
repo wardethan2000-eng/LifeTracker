@@ -155,10 +155,10 @@ export function EntityCanvasList({
                 href={`/canvases/${canvas.id}?householdId=${householdId}`}
                 className="canvas-list__card-link"
               >
-                <CanvasThumbnail canvas={canvas} className="canvas-list__thumbnail" />
+                <CanvasThumbnail nodes={canvas.nodes} edges={canvas.edges} className="canvas-list__thumbnail" />
                 <div className="canvas-list__card-info">
                   <span className="canvas-list__card-name">{canvas.name}</span>
-                  <span className="canvas-list__card-date">{formatDate(canvas.createdAt)}</span>
+                  <span className="canvas-list__card-date">{formatDate(canvas.updatedAt)}</span>
                 </div>
               </Link>
               <button

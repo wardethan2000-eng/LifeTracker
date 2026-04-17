@@ -542,7 +542,7 @@ export function HomeDashboard(props: HomeDashboardProps) {
       entityType="home"
       cards={[...cards, ...pinCards]}
       defaultLayout={defaultLayout}
-      serverLayout={serverLayout}
+      {...(serverLayout ? { serverLayout } : {})}
     />
   );
 }

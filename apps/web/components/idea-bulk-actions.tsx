@@ -406,7 +406,7 @@ export function IdeaBulkActions({
                 {stageResult.failed.length > 0 && (
                   <ul>
                     {stageResult.failed.map((f) => (
-                      <li key={f.ideaId}>{f.title ?? f.ideaId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-stage"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -459,7 +459,7 @@ export function IdeaBulkActions({
                 {archiveResult.failed.length > 0 && (
                   <ul>
                     {archiveResult.failed.map((f) => (
-                      <li key={f.ideaId}>{f.title ?? f.ideaId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-priority"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -512,7 +512,7 @@ export function IdeaBulkActions({
                 {deleteResult.failed.length > 0 && (
                   <ul>
                     {deleteResult.failed.map((f) => (
-                      <li key={f.ideaId}>{f.title ?? f.ideaId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-status"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}
@@ -578,7 +578,7 @@ export function IdeaBulkActions({
                 {priorityResult.failed.length > 0 && (
                   <ul>
                     {priorityResult.failed.map((f) => (
-                      <li key={f.ideaId}>{f.title ?? f.ideaId}: {f.message}</li>
+                      <li key={f.id ?? f.label ?? "failed-promote"}>{f.label ?? f.id ?? "(unknown)"}: {f.error}</li>
                     ))}
                   </ul>
                 )}

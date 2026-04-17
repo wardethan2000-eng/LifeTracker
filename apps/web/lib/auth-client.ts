@@ -8,6 +8,6 @@ const apiBaseUrl =
     ? window.location.origin
     : (process.env.NEXT_PUBLIC_LIFEKEEPER_API_BASE_URL ?? "http://localhost:4000");
 
-export const authClient = createAuthClient({
+export const authClient: ReturnType<typeof createAuthClient> = createAuthClient({
   baseURL: apiBaseUrl,
 });

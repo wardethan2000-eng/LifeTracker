@@ -347,10 +347,12 @@ export const libraryPresetSchema = presetDefinitionSchema.extend({
   source: z.literal("library")
 });
 
+const userReferenceIdSchema = z.string().min(1);
+
 export const customPresetProfileSchema = presetDefinitionSchema.extend({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
-  createdById: z.string().cuid(),
+  createdById: userReferenceIdSchema,
   source: z.literal("custom"),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
@@ -801,8 +803,8 @@ export const assetLabelDataSchema = z.object({
 export const assetSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
-  createdById: z.string().cuid(),
-  ownerId: z.string().cuid().nullable().default(null),
+  createdById: userReferenceIdSchema,
+  ownerId: userReferenceIdSchema.nullable().default(null),
   parentAssetId: z.string().cuid().nullable().default(null),
   spaceId: z.string().cuid().nullable().default(null),
   spaceLocation: z.object({
@@ -898,7 +900,7 @@ export const householdSummarySchema = z.object({
 });
 
 export const addHouseholdMemberSchema = z.object({
-  userId: z.string().cuid().optional(),
+  userId: userReferenceIdSchema.optional(),
   clerkUserId: z.string().min(1).max(255).optional(),
   email: z.string().email().optional(),
   role: householdRoleSchema.default("member")
@@ -919,7 +921,7 @@ export const updateHouseholdMemberSchema = z.object({
 export const householdMemberSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
-  userId: z.string().cuid(),
+  userId: userReferenceIdSchema,
   role: householdRoleSchema,
   joinedAt: z.string().datetime(),
   createdAt: z.string().datetime(),
@@ -940,7 +942,7 @@ export const notificationPayloadSchema = z.record(z.string(), z.unknown());
 
 export const notificationSchema = z.object({
   id: z.string().cuid(),
-  userId: z.string().cuid(),
+  userId: userReferenceIdSchema,
   householdId: z.string().cuid().nullable(),
   assetId: z.string().cuid().nullable(),
   scheduleId: z.string().cuid().nullable(),
@@ -1041,7 +1043,7 @@ export const updateMaintenanceScheduleSchema = z.object({
 });
 
 export const shallowUserSchema = z.object({
-  id: z.string().cuid(),
+  id: userReferenceIdSchema,
   displayName: z.string().nullable()
 });
 
@@ -1174,7 +1176,7 @@ export const maintenanceLogSchema = z.object({
   id: z.string().cuid(),
   assetId: z.string().cuid(),
   scheduleId: z.string().cuid().nullable(),
-  completedById: z.string().cuid(),
+  completedById: userReferenceIdSchema,
   serviceProviderId: z.string().cuid().nullable().default(null),
   title: z.string(),
   notes: z.string().nullable(),
@@ -3052,7 +3054,7 @@ export const updateProjectNoteSchema = createProjectNoteSchema.partial().extend(
 export const activityLogSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
-  userId: z.string().cuid(),
+  userId: userReferenceIdSchema,
   action: z.string(),
   entityType: z.string(),
   entityId: z.string(),
@@ -3063,7 +3065,7 @@ export const activityLogSchema = z.object({
 export const activityLogQuerySchema = z.object({
   entityType: z.string().optional(),
   entityId: z.string().optional(),
-  userId: z.string().cuid().optional(),
+  userId: userReferenceIdSchema.optional(),
   since: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().cuid().optional()
@@ -3082,7 +3084,7 @@ export const invitationStatusSchema = z.enum(invitationStatusValues);
 export const householdInvitationSchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
-  invitedByUserId: z.string().cuid(),
+  invitedByUserId: userReferenceIdSchema,
   email: z.string(),
   status: invitationStatusSchema,
   token: z.string(),
@@ -3113,7 +3115,7 @@ export const commentSchema = z.object({
   projectId: z.string().cuid().nullable().default(null),
   hobbyId: z.string().cuid().nullable().default(null),
   inventoryItemId: z.string().cuid().nullable().default(null),
-  authorId: z.string().cuid(),
+  authorId: userReferenceIdSchema,
   author: shallowUserSchema,
   body: z.string(),
   parentCommentId: z.string().cuid().nullable(),
@@ -3162,7 +3164,7 @@ export const entryResolvedEntitySchema = z.object({
 export const entrySchema = z.object({
   id: z.string().cuid(),
   householdId: z.string().cuid(),
-  createdById: z.string().cuid(),
+  createdById: userReferenceIdSchema,
   title: z.string().nullable().default(null),
   body: z.string(),
   bodyFormat: bodyFormatSchema.default("plain_text"),

@@ -29,7 +29,6 @@ const assetTabs = (assetId: string) => [
   { id: "inventory", label: "Inventory", href: `/assets/${assetId}/inventory` },
   { id: "notes", label: "Notes", href: `/assets/${assetId}/notes` },
   { id: "canvas", label: "Canvas", href: `/assets/${assetId}/canvas` },
-  { id: "comments", label: "Comments", href: `/assets/${assetId}/comments` },
   { id: "history", label: "History", href: `/assets/${assetId}/history` },
   { id: "settings", label: "Advanced", href: `/assets/${assetId}/settings` },
 ];

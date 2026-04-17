@@ -155,7 +155,7 @@ export async function HomeDashboardSection({ householdId }: { householdId: strin
       }))}
       pinnedNotes={pinnedNotes.items}
       canvases={canvases}
-      serverLayout={homeLayout?.layoutJson}
+      {...(homeLayout?.layoutJson ? { serverLayout: homeLayout.layoutJson } : {})}
     />
   );
 }

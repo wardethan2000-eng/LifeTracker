@@ -35,7 +35,13 @@ async function AssetListContent({ householdId, limit, offset, includeArchived, s
 
   try {
     const [assetPage, dueWork] = await Promise.all([
-      getHouseholdAssetsPaginated(householdId, { limit, offset, includeArchived, search: search || undefined, category: category || undefined }),
+      getHouseholdAssetsPaginated(householdId, {
+        limit,
+        offset,
+        includeArchived,
+        ...(search ? { search } : {}),
+        ...(category ? { category } : {}),
+      }),
       getHouseholdDueWork(householdId, { limit: 500 }),
     ]);
 

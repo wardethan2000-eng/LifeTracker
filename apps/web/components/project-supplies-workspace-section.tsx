@@ -18,7 +18,7 @@ export async function ProjectSuppliesWorkspaceSection({ householdId, projectId }
   const supplies = phaseDetails.flatMap((phase) => phase.supplies.map((supply) => ({
     ...supply,
     phaseName: phase.name,
-    openPhaseHref: `/projects/${projectId}/phases?householdId=${householdId}&phaseId=${phase.id}`,
+    openPhaseHref: `/projects/${projectId}/phases?householdId=${householdId}&focusPhaseId=${phase.id}#phase-${phase.id}`,
     ...(supply.inventoryItemId && inventoryLookup.has(supply.inventoryItemId)
       ? { linkedInventoryItem: inventoryLookup.get(supply.inventoryItemId)! }
       : {})

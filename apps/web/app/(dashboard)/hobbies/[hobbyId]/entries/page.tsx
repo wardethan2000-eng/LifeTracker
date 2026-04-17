@@ -1,13 +1,15 @@
 import type { JSX } from "react";
-import { EntryTimeline } from "../../../../../components/entry-system";
 import { ApiError, getMe } from "../../../../../lib/api";
+import { EntityNotesWorkspace } from "../../../../../components/entity-notes-workspace";
 
 type HobbySectionPageProps = {
   params: Promise<{ hobbyId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function HobbyEntriesPage({ params }: HobbySectionPageProps): Promise<JSX.Element> {
+export default async function HobbyEntriesPage({ params, searchParams }: HobbySectionPageProps): Promise<JSX.Element> {
   const { hobbyId } = await params;
+  void searchParams;
 
   try {
     const me = await getMe();
@@ -15,13 +17,13 @@ export default async function HobbyEntriesPage({ params }: HobbySectionPageProps
     if (!household) return <p>No household found.</p>;
 
     return (
-      <EntryTimeline
+      <EntityNotesWorkspace
         householdId={household.id}
         entityType="hobby"
         entityId={hobbyId}
-        title="Hobby Entries"
-        quickAddLabel="Entry"
-        entryHrefTemplate={`/hobbies/${hobbyId}/entries#entry-{entryId}`}
+        title="Hobby notes"
+        subtitle="Store journal entries, practice observations, reminders, and reference notes for this hobby."
+        backToHref={`/hobbies/${hobbyId}/entries`}
       />
     );
   } catch (error) {

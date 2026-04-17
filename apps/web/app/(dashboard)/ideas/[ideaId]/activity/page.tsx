@@ -64,12 +64,12 @@ export default async function IdeaActivityPage({ params, searchParams }: IdeaAct
 
   return (
     <Suspense fallback={<section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1, 2, 3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section>}>
-      <ActivityContent householdId={household.id} ideaId={ideaId} cursor={cursor} history={history} />
+      <ActivityContent householdId={household.id} ideaId={ideaId} history={history} {...(cursor ? { cursor } : {})} />
     </Suspense>
   );
 }
 
-async function ActivityContent({ householdId, ideaId, cursor, history }: { householdId: string; ideaId: string; cursor: string | undefined; history: string[] }): Promise<JSX.Element> {
+async function ActivityContent({ householdId, ideaId, cursor, history }: { householdId: string; ideaId: string; cursor?: string; history: string[] }): Promise<JSX.Element> {
   const prefs = await getDisplayPreferences().catch(() => ({
     pageSize: 25,
     dateFormat: "US" as const,

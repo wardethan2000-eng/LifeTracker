@@ -63,8 +63,8 @@ async function SettingsContent({ householdId, hobbyId, timezone }: { householdId
               {hobby.hobbyType ? <div><dt>Hobby Type</dt><dd>{hobby.hobbyType}</dd></div> : null}
               <div><dt>Workflow</dt><dd>{isPipeline ? "Pipeline workflow" : "Simple status"}</dd></div>
               <div><dt>Notes</dt><dd>{hobby.notes ?? "Not set"}</dd></div>
-              <div><dt>Created</dt><dd>{formatDate(hobby.createdAt, "-", household.timezone, prefs.dateFormat)}</dd></div>
-              <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt, "-", household.timezone, prefs.dateFormat)}</dd></div>
+              <div><dt>Created</dt><dd>{formatDate(hobby.createdAt, "-", timezone, prefs.dateFormat)}</dd></div>
+              <div><dt>Updated</dt><dd>{formatDate(hobby.updatedAt, "-", timezone, prefs.dateFormat)}</dd></div>
             </dl>
             <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: "16px" }}>
               {isPipeline

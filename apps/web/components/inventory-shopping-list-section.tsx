@@ -176,7 +176,18 @@ function PurchaseEditForm({ purchase, onSave, onCancel }: PurchaseEditFormProps)
       </div>
       <div className="inline-actions inline-actions--end">
         <button type="button" className="button button--ghost button--sm" onClick={onCancel}>Cancel</button>
-        <button type="button" className="button button--primary button--sm" onClick={() => onSave({ supplierName: supplierName || undefined, notes: notes || undefined })}>Save</button>
+        <button
+          type="button"
+          className="button button--primary button--sm"
+          onClick={() =>
+            onSave({
+              ...(supplierName ? { supplierName } : {}),
+              ...(notes ? { notes } : {}),
+            })
+          }
+        >
+          Save
+        </button>
       </div>
     </div>
   );

@@ -20,23 +20,29 @@ export function ProjectPortfolioStats({ householdId, projects, selectedStatusLab
   const totalInventoryAllocated = portfolioProjects.reduce((sum, project) => sum + project.totalInventoryAllocated, 0);
   const portfolioCoverage = totalInventoryNeeded > 0 ? totalInventoryAllocated / totalInventoryNeeded : null;
   const atRiskProjects = portfolioProjects.filter((project) => project.isAtRisk);
-  const lateProjects = atRiskProjects.filter((project) => project.isLate);
-  const budgetPressureProjects = portfolioProjects.filter((project) => project.budgetRatio !== null && project.budgetRatio >= 0.9);
+  const activeProjects = portfolioProjects.filter((project) => project.status === "active");
+  const planningProjects = portfolioProjects.filter((project) => project.status === "planning");
+  const nearTargetProjects = portfolioProjects.filter((project) => project.daysToTarget !== null && project.daysToTarget >= 0 && project.daysToTarget <= 14);
 
   return (
     <section className="stats-row">
       <div className="stat-card stat-card--accent">
-        <span className="stat-card__label">Visible Projects</span>
+        <span className="stat-card__label">Projects in view</span>
         <strong className="stat-card__value">{portfolioProjects.length}</strong>
         <span className="stat-card__sub">{selectedStatusLabel}</span>
       </div>
+      <div className="stat-card">
+        <span className="stat-card__label">Work underway</span>
+        <strong className="stat-card__value">{activeProjects.length}</strong>
+        <span className="stat-card__sub">{planningProjects.length} still in planning</span>
+      </div>
       <div className="stat-card stat-card--danger">
-        <span className="stat-card__label">Delivery Risk</span>
+        <span className="stat-card__label">Needs attention</span>
         <strong className="stat-card__value">{atRiskProjects.length}</strong>
-        <span className="stat-card__sub">{lateProjects.length} late, {budgetPressureProjects.length} under funding pressure</span>
+        <span className="stat-card__sub">{nearTargetProjects.length} due within two weeks</span>
       </div>
       <div className="stat-card stat-card--warning">
-        <span className="stat-card__label">Budget Exposure</span>
+        <span className="stat-card__label">Committed spend</span>
         <strong className="stat-card__value">{formatCurrency(visibleCommitted, "$0.00")}</strong>
         <span className="stat-card__sub">
           {visibleBudget > 0
@@ -54,9 +60,9 @@ export function ProjectPortfolioStats({ householdId, projects, selectedStatusLab
         </span>
       </div>
       <div className="stat-card">
-        <span className="stat-card__label">Actual Spend</span>
+        <span className="stat-card__label">Actual spend</span>
         <strong className="stat-card__value">{formatCurrency(visibleSpent, "$0.00")}</strong>
-        <span className="stat-card__sub">Committed total includes planned materials.</span>
+        <span className="stat-card__sub">Committed spend includes planned materials still to be purchased.</span>
       </div>
     </section>
   );

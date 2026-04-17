@@ -3,8 +3,7 @@ import type { JSX } from "react";
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { createProjectAction, createProjectFromTemplateAction } from "../../../actions";
-import { ProjectCoreFormFields } from "../../../../components/project-core-form-fields";
-import { TabNav } from "../../../../components/tab-nav";
+import { ProjectCreationWizard } from "../../../../components/project-creation-wizard";
 import { ApiError, getMe, getProjectDetail, getProjectTemplates } from "../../../../lib/api";
 
 type NewProjectPageProps = {
@@ -17,7 +16,6 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
   const params = searchParams ? await searchParams : {};
   const householdId = typeof params.householdId === "string" ? params.householdId : undefined;
   const parentProjectId = typeof params.parentProjectId === "string" ? params.parentProjectId : undefined;
-  const mode = params.mode === "template" ? "template" : "manual";
 
   try {
     const me = await getMe();
@@ -34,49 +32,21 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
       );
     }
 
-    const buildPlanningHref = (planningMode: "manual" | "template"): string => {
-      const query = new URLSearchParams({ householdId: household.id });
-      if (parentProjectId) {
-        query.set("parentProjectId", parentProjectId);
-      }
-      const basePath = planningMode === "template" ? "/projects/new/template" : "/projects/new";
-      return `${basePath}?${query.toString()}`;
-    };
-
     return (
       <>
         <header className="page-header">
           <div>
             <h1>{t("newPageTitle")}</h1>
-            <p style={{ marginTop: 6 }}>{t("newPageSubtitle")}</p>
+            <p style={{ marginTop: 6 }}>Set up the project in a guided flow instead of sorting through every field at once.</p>
           </div>
           <div className="page-header__actions">
             <Link href={`/projects?householdId=${household.id}`} className="button button--ghost">{tCommon("actions.backToProjects")}</Link>
           </div>
         </header>
 
-        <TabNav
-          ariaLabel="Planning sections"
-          variant="pill"
-          items={[
-            {
-              id: "manual",
-              label: "Manual Plan",
-              href: buildPlanningHref("manual"),
-              active: mode === "manual",
-            },
-            {
-              id: "template",
-              label: "Saved Template",
-              href: buildPlanningHref("template"),
-              active: mode === "template",
-            },
-          ]}
-        />
-
         <div className="page-body">
           <Suspense fallback={<section className="panel" aria-hidden="true"><div className="panel__body--padded" style={{ display: "grid", gap: 12 }}>{[1, 2, 3].map((i) => (<div key={i} className="skeleton-bar" style={{ width: "100%", height: 52, borderRadius: 8 }} />))}</div></section>}>
-            <NewProjectContent householdId={household.id} parentProjectId={parentProjectId} mode={mode} />
+            <NewProjectContent householdId={household.id} parentProjectId={parentProjectId} />
           </Suspense>
         </div>
       </>
@@ -101,68 +71,21 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
   }
 }
 
-async function NewProjectContent({ householdId, parentProjectId, mode }: { householdId: string; parentProjectId: string | undefined; mode: string }): Promise<JSX.Element> {
+async function NewProjectContent({ householdId, parentProjectId }: { householdId: string; parentProjectId: string | undefined }): Promise<JSX.Element> {
   const parentProject = parentProjectId
     ? await getProjectDetail(householdId, parentProjectId).catch(() => null)
     : null;
   const projectTemplates = await getProjectTemplates(householdId).catch(() => []);
 
   return (
-    <>
-      {parentProjectId && parentProject && (
-        <div className="note" style={{ marginBottom: 16 }}>
-          Creating a sub-project under <Link href={`/projects/${parentProjectId}?householdId=${householdId}`} className="text-link"><strong>{parentProject.name}</strong></Link>
-        </div>
-      )}
-      {mode === "template" ? (
-        <section className="panel" style={{ marginBottom: 24 }}>
-          <div className="panel__header">
-            <h2>Start From Saved Template</h2>
-          </div>
-          <div className="panel__body--padded" style={{ display: "grid", gap: 16 }}>
-            {projectTemplates.length > 0 ? (
-              <form action={createProjectFromTemplateAction} className="workbench-grid">
-                <input type="hidden" name="householdId" value={householdId} />
-                {parentProjectId ? <input type="hidden" name="parentProjectId" value={parentProjectId} /> : null}
-                <label className="field">
-                  <span>Template</span>
-                  <select name="templateId" defaultValue="" required>
-                    <option value="" disabled>Select a saved template</option>
-                    {projectTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>{template.name} · {template.phaseCount} phases · {template.taskCount} tasks</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Project Name</span>
-                  <input name="name" placeholder="Winterize 2026" required />
-                </label>
-                <label className="field">
-                  <span>Start Date</span>
-                  <input name="startDate" type="date" />
-                </label>
-                <label className="field">
-                  <span>Target End Date</span>
-                  <input name="targetEndDate" type="date" />
-                </label>
-                <div className="inline-actions" style={{ marginTop: 8 }}>
-                  <button type="submit" className="button button--ghost">Create From Template</button>
-                </div>
-              </form>
-            ) : (
-              <p className="panel__empty">No saved templates are available yet. Use the manual page to build a project, then save it as a template from project settings.</p>
-            )}
-          </div>
-        </section>
-      ) : (
-        <ProjectCoreFormFields
-          action={createProjectAction}
-          householdId={householdId}
-          submitLabel="Create Project"
-          cancelHref={`/projects?householdId=${householdId}`}
-          {...(parentProjectId ? { parentProjectId } : {})}
-        />
-      )}
-    </>
+    <ProjectCreationWizard
+      createAction={createProjectAction}
+      createFromTemplateAction={createProjectFromTemplateAction}
+      householdId={householdId}
+      projectTemplates={projectTemplates}
+      cancelHref={`/projects?householdId=${householdId}`}
+      parentProjectName={parentProject?.name ?? null}
+      {...(parentProjectId ? { parentProjectId } : {})}
+    />
   );
 }

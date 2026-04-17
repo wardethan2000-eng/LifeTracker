@@ -16,6 +16,7 @@ import {
 import { IdeaProvenanceBar } from "../../../../components/idea-provenance-bar";
 import { PinnedOverviewSection } from "../../../../components/pinned-overview-section";
 import { ProjectDashboard } from "../../../../components/project-dashboard";
+import { formatCurrency, formatDate } from "../../../../lib/formatters";
 
 type ProjectDetailPageProps = {
   params: Promise<{ projectId: string }>;
@@ -91,9 +92,12 @@ async function ProjectOverviewContent({ householdId, projectId, qs }: { househol
       });
     }
 
-    // Supply counts from inventory
-    const supplyTotalItems = project.supplies?.length ?? 0;
-    const supplyNeededItems = project.supplies?.filter((s) => s.status === "needed").length ?? 0;
+    // Supply counts roll up from project phases in the current detail payload.
+    const supplyTotalItems = project.phases.reduce((sum, phase) => sum + phase.supplyCount, 0);
+    const supplyNeededItems = project.phases.reduce(
+      (sum, phase) => sum + Math.max(phase.supplyCount - phase.procuredSupplyCount, 0),
+      0,
+    );
 
     // Upcoming tasks (not completed, sorted by due date)
     const upcomingTasks = fullTasks
@@ -111,6 +115,7 @@ async function ProjectOverviewContent({ householdId, projectId, qs }: { househol
         dueDate: task.dueDate ?? null,
         status: task.status,
       }));
+    const nextTask = upcomingTasks[0] ?? null;
 
     // Top linked assets
     const topAssets = project.assets.slice(0, 5).map((a) => ({
@@ -145,36 +150,89 @@ async function ProjectOverviewContent({ householdId, projectId, qs }: { househol
           entries={pinnedResult.items}
           overviewPins={overviewPins}
         />
+        <section className="panel">
+          <div className="panel__body--padded project-overview-hero">
+            <div className="project-overview-hero__summary">
+              <div className="project-overview-hero__eyebrow">Project overview</div>
+              <h2>{project.name}</h2>
+              <p>
+                {project.description?.trim().length
+                  ? project.description
+                  : "This workspace brings the next plan step, schedule pressure, budget, materials, and recent activity into one place."}
+              </p>
+            </div>
+            <dl className="project-overview-hero__details">
+              <div>
+                <dt>Next focus</dt>
+                <dd>{nextTask?.title ?? activePhase?.name ?? "Define the next task or phase"}</dd>
+              </div>
+              <div>
+                <dt>Timing</dt>
+                <dd>{formatDate(project.targetEndDate, "No target end date")}</dd>
+              </div>
+              <div>
+                <dt>Budget</dt>
+                <dd>{formatCurrency(project.budgetAmount, "No budget set")}</dd>
+              </div>
+              <div>
+                <dt>Materials</dt>
+                <dd>{supplyNeededItems > 0 ? `${supplyNeededItems} items still needed` : "No material blockers"}</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+        <section className="stats-row">
+          <div className="stat-card stat-card--accent">
+            <span className="stat-card__label">Progress</span>
+            <strong className="stat-card__value">{percentComplete}%</strong>
+            <span className="stat-card__sub">{completedTaskCount} of {totalTaskCount} tasks completed</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__label">Current plan</span>
+            <strong className="stat-card__value">{activePhase?.name ?? "No active phase"}</strong>
+            <span className="stat-card__sub">{completedPhaseCount} of {phaseCount} phases complete</span>
+          </div>
+          <div className="stat-card stat-card--warning">
+            <span className="stat-card__label">Upcoming work</span>
+            <strong className="stat-card__value">{upcomingTasks.length}</strong>
+            <span className="stat-card__sub">{blockedTasks.length} blocked · {criticalPathTasks.length} critical path</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__label">Connected work</span>
+            <strong className="stat-card__value">{project.assets.length + (project.childProjects?.length ?? 0)}</strong>
+            <span className="stat-card__sub">{project.assets.length} assets · {project.childProjects?.length ?? 0} sub-projects</span>
+          </div>
+        </section>
         <ProjectDashboard
-        householdId={householdId}
-        projectId={project.id}
-        qs={qs}
-        status={project.status}
-        statusLabel={projectStatusLabels[project.status] ?? project.status}
-        percentComplete={percentComplete}
-        remainingTaskCount={remainingTaskCount}
-        totalTaskCount={totalTaskCount}
-        completedTaskCount={completedTaskCount}
-        blockedTasks={blockedTasks.length}
-        criticalPathTasks={criticalPathTasks.length}
-        completedPhaseCount={completedPhaseCount}
-        phaseCount={phaseCount}
-        activePhaseLabel={activePhase?.name ?? null}
-        budgetAmount={project.budgetAmount ?? null}
-        totalSpent={totalSpent}
-        remainingEstimatedHours={remainingEstimatedHours}
-        supplyTotalItems={supplyTotalItems}
-        supplyNeededItems={supplyNeededItems}
-        linkedAssetCount={project.assets.length}
-        topAssets={topAssets}
-        subProjectCount={project.childProjects?.length ?? 0}
-        recentEntries={recentEntries}
-        upcomingTasks={upcomingTasks}
-        phaseProgress={phaseProgress}
-        recentNote={recentNote}
-        canvases={canvasSummaries}
-        canvasThumbnails={canvases}
-      />
+          householdId={householdId}
+          projectId={project.id}
+          qs={qs}
+          status={project.status}
+          statusLabel={projectStatusLabels[project.status] ?? project.status}
+          percentComplete={percentComplete}
+          remainingTaskCount={remainingTaskCount}
+          totalTaskCount={totalTaskCount}
+          completedTaskCount={completedTaskCount}
+          blockedTasks={blockedTasks.length}
+          criticalPathTasks={criticalPathTasks.length}
+          completedPhaseCount={completedPhaseCount}
+          phaseCount={phaseCount}
+          activePhaseLabel={activePhase?.name ?? null}
+          budgetAmount={project.budgetAmount ?? null}
+          totalSpent={totalSpent}
+          remainingEstimatedHours={remainingEstimatedHours}
+          supplyTotalItems={supplyTotalItems}
+          supplyNeededItems={supplyNeededItems}
+          linkedAssetCount={project.assets.length}
+          topAssets={topAssets}
+          subProjectCount={project.childProjects?.length ?? 0}
+          recentEntries={recentEntries}
+          upcomingTasks={upcomingTasks}
+          phaseProgress={phaseProgress}
+          recentNote={recentNote}
+          canvases={canvasSummaries}
+          canvasThumbnails={canvases}
+        />
       </>
     );
   } catch (error) {
@@ -194,7 +252,10 @@ async function ProjectOverviewContent({ householdId, projectId, qs }: { househol
 
 // ── Page ──────────────────────────────────────────────────
 export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps): Promise<JSX.Element> {
-  const [routeParams, query] = await Promise.all([params, searchParams ?? Promise.resolve({})]);
+  const [routeParams, query] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
+  ]);
   const householdIdParam = typeof query.householdId === "string" ? query.householdId : undefined;
 
   const me = await getMe();

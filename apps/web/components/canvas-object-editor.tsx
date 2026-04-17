@@ -10,7 +10,7 @@ import {
   requestAttachmentUpload,
   updateCanvasObject,
 } from "../lib/api";
-import { CANVAS_OBJECT_PRESETS } from "../lib/canvas-object-presets";
+import { CANVAS_OBJECT_PRESETS, getCanvasObjectPresetSvgPath } from "../lib/canvas-object-presets";
 
 const CATEGORY_LABELS: Record<CanvasObjectCategory, string> = {
   vehicle: "Vehicles",
@@ -21,6 +21,7 @@ const CATEGORY_LABELS: Record<CanvasObjectCategory, string> = {
   tool: "Tools",
   person: "People",
   electronics: "Electronics",
+  landscape: "Landscape",
   custom: "Custom",
 };
 
@@ -84,7 +85,7 @@ export default function CanvasObjectEditor({
   // Load existing image URL if editing
   useEffect(() => {
     if (object?.imageSource === "preset" && object.presetKey) {
-      setPreviewUrl(object.presetKey);
+      setPreviewUrl(getCanvasObjectPresetSvgPath(object.presetKey));
     } else if (object?.imageSource === "uploaded" && object.attachmentId) {
       getAttachmentDownloadUrl(householdId, object.attachmentId)
         .then(({ url }) => {
@@ -92,6 +93,9 @@ export default function CanvasObjectEditor({
           setExistingImageUrl(url);
         })
         .catch(() => {});
+    } else {
+      setPreviewUrl(null);
+      setExistingImageUrl(null);
     }
     if (object?.maskData) {
       try {

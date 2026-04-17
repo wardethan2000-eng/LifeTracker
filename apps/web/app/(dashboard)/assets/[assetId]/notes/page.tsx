@@ -1,13 +1,15 @@
 import type { JSX } from "react";
 import { ApiError, getMe } from "../../../../../lib/api";
-import { EntryTimeline } from "../../../../../components/entry-system";
+import { EntityNotesWorkspace } from "../../../../../components/entity-notes-workspace";
 
 type AssetNotesPageProps = {
   params: Promise<{ assetId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function AssetNotesPage({ params }: AssetNotesPageProps): Promise<JSX.Element> {
+export default async function AssetNotesPage({ params, searchParams }: AssetNotesPageProps): Promise<JSX.Element> {
   const { assetId } = await params;
+  void searchParams;
 
   try {
     const me = await getMe();
@@ -15,13 +17,13 @@ export default async function AssetNotesPage({ params }: AssetNotesPageProps): P
     if (!household) return <p>No household found.</p>;
 
     return (
-      <EntryTimeline
+      <EntityNotesWorkspace
         householdId={household.id}
         entityType="asset"
         entityId={assetId}
-        title="Asset Notes"
-        quickAddLabel="Note"
-        entryHrefTemplate={`/assets/${assetId}/notes#entry-{entryId}`}
+        title="Asset notes"
+        subtitle="Keep maintenance context, decisions, warnings, reminders, and reference notes tied directly to this asset."
+        backToHref={`/assets/${assetId}/notes`}
       />
     );
   } catch (error) {

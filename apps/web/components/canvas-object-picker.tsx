@@ -11,6 +11,8 @@ import {
 import {
   CANVAS_OBJECT_PRESETS,
   CANVAS_OBJECT_PRESETS_BY_CATEGORY,
+  getCanvasObjectPresetByKey,
+  getCanvasObjectPresetSvgPath,
   type CanvasObjectPreset,
 } from "../lib/canvas-object-presets";
 import CanvasObjectEditor from "./canvas-object-editor";
@@ -93,7 +95,7 @@ export default function CanvasObjectPicker({
   const handlePlaceLibraryObject = useCallback(
     async (obj: CanvasObject) => {
       if (obj.imageSource === "preset" && obj.presetKey) {
-        const preset = CANVAS_OBJECT_PRESETS.find((p) => p.key === obj.presetKey);
+        const preset = getCanvasObjectPresetByKey(obj.presetKey);
         if (preset) {
           onPlace({ source: "preset", preset });
           return;
@@ -193,7 +195,7 @@ export default function CanvasObjectPicker({
                 <div className="canvas-obj-picker__grid">
                   {libraryForCategory.map((obj) => {
                     const imgSrc = obj.imageSource === "preset" && obj.presetKey
-                      ? obj.presetKey
+                      ? getCanvasObjectPresetSvgPath(obj.presetKey)
                       : resolvedUrls.get(obj.id);
                     return (
                       <div key={obj.id} className="canvas-obj-picker__item">
